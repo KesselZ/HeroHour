@@ -18,10 +18,12 @@ class SpriteFactory {
         this.unitConfig = {
             'melee': { row: 1, col: 1, defaultFacing: 'right' },
             'ranged': { row: 4, col: 1, defaultFacing: 'right' },
-            'boss': { row: 1, col: 2, defaultFacing: 'right' },
-            'archer': { row: 2, col: 4, defaultFacing: 'left' }, // 射手在图中是面朝左的
+            'tiance': { row: 1, col: 2, defaultFacing: 'right' }, // 天策骑兵
+            'chunyang': { row: 1, col: 3, defaultFacing: 'left' }, // 纯阳：修正面向为 left
+            'archer': { row: 2, col: 4, defaultFacing: 'left' }, // 射手
             'healer': { row: 2, col: 2, defaultFacing: 'right' },
-            'cangjian': { row: 2, col: 3, defaultFacing: 'right' }
+            'cangjian': { row: 2, col: 3, defaultFacing: 'right' },
+            'cangyun': { row: 3, col: 3, defaultFacing: 'right' } // 苍云
         };
     }
 

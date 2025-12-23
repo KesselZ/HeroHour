@@ -58,6 +58,35 @@ class Projectile extends THREE.Group {
             const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const mesh = new THREE.Mesh(geo, mat);
             this.add(mesh);
+        } else if (type === 'air_sword') {
+            // 纯阳：气剑 - 细长、青蓝色、半透明发光
+            const group = new THREE.Group();
+            
+            // 剑身
+            const bladeGeo = new THREE.BoxGeometry(0.8, 0.05, 0.05);
+            const bladeMat = new THREE.MeshBasicMaterial({ 
+                color: 0x88ffff, 
+                transparent: true, 
+                opacity: 0.8 
+            });
+            const blade = new THREE.Mesh(bladeGeo, bladeMat);
+            group.add(blade);
+
+            // 护手/剑格 (简单的十字)
+            const hiltGeo = new THREE.BoxGeometry(0.05, 0.3, 0.05);
+            const hilt = new THREE.Mesh(hiltGeo, bladeMat);
+            hilt.position.x = -0.2;
+            group.add(hilt);
+
+            // 整体偏移，让剑尖作为旋转/移动中心
+            group.rotation.y = Math.PI / 2; // 指向 Z 轴
+            this.add(group);
+
+            // 增加一点外发光点
+            const glowGeo = new THREE.SphereGeometry(0.1, 8, 8);
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.4 });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            this.add(glow);
         }
     }
 

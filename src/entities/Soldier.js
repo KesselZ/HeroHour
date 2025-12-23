@@ -17,13 +17,15 @@ export class BaseUnit extends THREE.Group {
             attackRange = 0.5,
             attackDamage = 15,
             attackSpeed = 1000,
-            projectileManager = null // 注入弹道管理器
+            projectileManager = null, // 注入弹道管理器
+            cost = 2 // 引入强度属性 (消耗分)
         } = config;
 
         this.side = side;
         this.index = index;
         this.type = type;
         this.projectileManager = projectileManager;
+        this.cost = cost;
         
         this.maxHealth = hp;
         this.health = hp;
@@ -38,6 +40,10 @@ export class BaseUnit extends THREE.Group {
         this.lastAttackTime = 0;
         
         this.unitSprite = null;
+        
+        // 物理动力学属性：用于平滑击退
+        this.knockbackVelocity = new THREE.Vector3();
+        this.knockbackFriction = 0.85; // 摩擦力，值越小停得越快
         
         this.initVisual();
     }
@@ -82,8 +88,94 @@ export class BaseUnit extends THREE.Group {
     }
 
 
+    /**
+     * 击退效果：注入瞬时速度，由 update 逐帧平滑消化
+     * @param {THREE.Vector3} fromPosition 攻击发起点
+     * @param {number} force 击退强度（冲量）
+     */
+    applyKnockback(fromPosition, force = 0.5) {
+        if (this.isDead) return;
+        
+        // 计算从发起点到受击点的方向
+        const dir = new THREE.Vector3()
+            .subVectors(this.position, fromPosition)
+            .normalize();
+        
+        dir.y = 0;
+        
+        // 注入初速度
+        this.knockbackVelocity.addScaledVector(dir, force);
+        
+        // 受击视觉反馈：变红
+        this.unitSprite.material.color.setHex(0xff8888);
+        setTimeout(() => {
+            if (!this.isDead && this.unitSprite) {
+                this.unitSprite.material.color.setHex(0xffffff);
+            }
+        }, 150);
+    }
+
+    /**
+     * 范围攻击通用 API
+     * @param {Array} targets 潜在目标列表
+     * @param {Object} options 攻击参数 { radius, angle, damage, knockbackForce, customDir }
+     */
+    executeAOE(targets, options) {
+        const { radius = 2.0, angle = Math.PI * 2, damage = 10, knockbackForce = 0.5, customDir = null } = options;
+        
+        // 获取当前朝向：优先使用传入的 customDir（用于同步 VFX），否则朝向目标
+        const forward = new THREE.Vector3(1, 0, 0);
+        if (customDir) {
+            forward.copy(customDir);
+        } else if (this.target) {
+            forward.subVectors(this.target.position, this.position).normalize();
+        }
+
+        targets.forEach(target => {
+            if (target === this || target.isDead) return;
+
+            const toTarget = new THREE.Vector3().subVectors(target.position, this.position);
+            const dist = toTarget.length();
+
+            if (dist <= radius) {
+                // 如果是全圆攻击，直接判定命中
+                if (angle >= Math.PI * 2) {
+                    this.applyDamageAndKnockback(target, damage, knockbackForce);
+                } else {
+                    // 扇形判定：利用点积判断夹角
+                    const dot = forward.dot(toTarget.normalize());
+                    const targetAngle = Math.acos(Math.min(1, Math.max(-1, dot)));
+                    if (targetAngle <= angle / 2) {
+                        this.applyDamageAndKnockback(target, damage, knockbackForce);
+                    }
+                }
+            }
+        });
+    }
+
+    applyDamageAndKnockback(target, damage, knockbackForce) {
+        target.takeDamage(damage + (rng.next() - 0.5) * 5);
+        if (knockbackForce > 0) {
+            target.applyKnockback(this.position, knockbackForce);
+        }
+    }
+
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
+
+        // 1. 处理物理冲力 (击退位移)
+        if (this.knockbackVelocity.lengthSq() > 0.0001) {
+            // 应用当前冲力位移
+            this.position.add(this.knockbackVelocity);
+            // 模拟摩擦力：每帧衰减
+            this.knockbackVelocity.multiplyScalar(this.knockbackFriction);
+            
+            // 如果冲力还很大，暂时打断 AI 寻路 (硬直感)
+            if (this.knockbackVelocity.length() > 0.05) {
+                this.applySeparation(allies, enemies); // 击退过程中也要处理碰撞
+                return; 
+            }
+        }
 
         // 处理特殊状态（如旋风斩）
         if (this.type === 'cangjian' && this.isSpinning) {
@@ -105,7 +197,7 @@ export class BaseUnit extends THREE.Group {
             if (distance > this.attackRange) {
                 this.moveTowardsTarget();
             } else {
-                this.performAttack();
+                this.performAttack(enemies, allies);
             }
             
             // 2. 碰撞挤压逻辑：防止单位完全重叠
@@ -252,12 +344,12 @@ export class BaseUnit extends THREE.Group {
         // 像素风不需要旋转 Group，Sprite 始终面向相机
     }
 
-    performAttack() {
+    performAttack(enemies, allies) {
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
             this.onAttackAnimation();
-            // 使用 seeded rng 处理伤害波动
+            // 默认单体攻击
             this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5);
         }
     }
@@ -332,7 +424,8 @@ export class MeleeSoldier extends BaseUnit {
             attackRange: 0.8,
             attackDamage: 15,
             attackSpeed: 1000,
-            projectileManager
+            projectileManager,
+            cost: 2
         });
     }
 }
@@ -348,11 +441,12 @@ export class RangedSoldier extends BaseUnit {
             attackRange: 6.0,
             attackDamage: 12,
             attackSpeed: 1800,
-            projectileManager
+            projectileManager,
+            cost: 2
         });
     }
 
-    performAttack() {
+    performAttack(enemies, allies) {
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
@@ -385,11 +479,12 @@ export class Archer extends BaseUnit {
             attackRange: 10.0, // 极远射程
             attackDamage: 18,
             attackSpeed: 2000,
-            projectileManager
+            projectileManager,
+            cost: 3
         });
     }
 
-    performAttack() {
+    performAttack(enemies, allies) {
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
@@ -421,7 +516,8 @@ export class Healer extends BaseUnit {
             attackRange: 5.0, // 治疗范围
             attackDamage: -20, // 负伤害即治疗
             attackSpeed: 2500,
-            projectileManager
+            projectileManager,
+            cost: 4
         });
     }
 
@@ -434,7 +530,7 @@ export class Healer extends BaseUnit {
         }
     }
 
-    performAttack() {
+    performAttack(enemies, allies) {
         if (!this.target || this.target.side !== this.side) return;
 
         const now = Date.now();
@@ -469,7 +565,8 @@ export class Cangjian extends BaseUnit {
             attackRange: 1.5,
             attackDamage: 8, // 单次伤害降低，因为是高频多段伤害
             attackSpeed: 4000,
-            projectileManager
+            projectileManager,
+            cost: 6
         });
         this.isSpinning = false;
         this.spinTimer = 0;
@@ -477,7 +574,7 @@ export class Cangjian extends BaseUnit {
         this.swordVFX = null;
     }
 
-    performAttack() {
+    performAttack(enemies, allies) {
         if (this.isSpinning) return;
 
         const now = Date.now();
@@ -537,15 +634,209 @@ export class Cangjian extends BaseUnit {
 
         // 3. 真实 AOE 伤害：每 10 帧检测一次周围敌人
         if (this.spinTimer % 10 === 0) {
-            const aoeRadius = 2.5;
-            enemies.forEach(enemy => {
-                if (!enemy.isDead) {
-                    const dist = this.position.distanceTo(enemy.position);
-                    if (dist < aoeRadius) {
-                        enemy.takeDamage(this.attackDamage);
-                    }
-                }
+            this.executeAOE(enemies, {
+                radius: 2.5,
+                angle: Math.PI * 2, // 全圆攻击
+                damage: this.attackDamage,
+                knockbackForce: 0.07 // 设为 0.07
             });
+        }
+    }
+}
+
+/**
+ * 苍云：肉盾，攻击方式类似近战，走得慢 (第三行第三个)
+ */
+export class Cangyun extends BaseUnit {
+    constructor(side, index, projectileManager) {
+        super({
+            side,
+            index,
+            type: 'cangyun',
+            hp: 250, // 极高生命值
+            speed: 0.02, // 移动缓慢
+            attackRange: 0.8,
+            attackDamage: 12, // 伤害一般
+            attackSpeed: 1200,
+            projectileManager,
+            cost: 5
+        });
+    }
+}
+
+/**
+ * 天策骑兵：移动快，180度扇形攻击 + 强力击退 (第一行第二个)
+ */
+export class Tiance extends BaseUnit {
+    constructor(side, index, projectileManager) {
+        super({
+            side,
+            index,
+            type: 'tiance',
+            hp: 180, 
+            speed: 0.05,
+            attackRange: 1.8, 
+            attackDamage: 14, // 伤害减半 (28 -> 14)
+            attackSpeed: 800, // 攻速双倍 (1600 -> 800)
+            projectileManager,
+            cost: 8
+        });
+        this.sweepRadius = 2.0; // 范围缩小 (3.5 -> 2.0)
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+
+            // 1. 锁定攻击方向：基于当前主目标，确保 VFX 和逻辑完美同步
+            const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
+            attackDir.y = 0;
+
+            // 2. 显示 VFX
+            this.showSweepVFX(attackDir); 
+
+            // 3. 执行判定
+            this.executeAOE(enemies, {
+                radius: this.sweepRadius,
+                angle: Math.PI, 
+                damage: this.attackDamage,
+                knockbackForce: 0.15,
+                customDir: attackDir 
+            });
+        }
+    }
+
+    showSweepVFX(attackDir) {
+        const group = new THREE.Group();
+        
+        // 使用 RingGeometry 制作平贴地面的扇形波，比 Torus 更像“横扫剑气”
+        const innerRadius = this.sweepRadius * 0.5;
+        const outerRadius = this.sweepRadius;
+        
+        // 创建一个 180 度的扇形，起点设在 -PI/2，这样其中轴线正好对着正方向
+        const geo = new THREE.RingGeometry(innerRadius, outerRadius, 32, 1, -Math.PI/2, Math.PI);
+        const mat = new THREE.MeshBasicMaterial({ 
+            color: 0xff4400, 
+            transparent: true, 
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        
+        // 关键：让扇形平躺在地面
+        mesh.rotation.x = -Math.PI / 2;
+        group.add(mesh);
+
+        // 设置位置并利用 lookAt 指向目标方向点 (复用远程攻击逻辑)
+        group.position.copy(this.position);
+        group.position.y = 0.15;
+        
+        const lookTarget = this.position.clone().add(attackDir);
+        group.lookAt(lookTarget);
+        
+        this.parent.add(group);
+
+        // 特效动画
+        const startTime = Date.now();
+        const duration = 250;
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / duration;
+            if (progress < 1) {
+                // 模拟剑气扩散
+                group.scale.set(1 + progress * 0.5, 1 + progress * 0.5, 1);
+                mesh.material.opacity = 0.6 * (1 - progress);
+                requestAnimationFrame(animate);
+            } else {
+                if (group.parent) group.parent.remove(group);
+                geo.dispose();
+                mat.dispose();
+            }
+        };
+        animate();
+    }
+}
+
+/**
+ * 纯阳：远近结合，优先远程，近身切剑 (第一行第三个)
+ */
+export class Chunyang extends BaseUnit {
+    constructor(side, index, projectileManager) {
+        super({
+            side,
+            index,
+            type: 'chunyang',
+            hp: 110,
+            speed: 0.035,
+            attackRange: 10.0, 
+            attackDamage: 18,
+            attackSpeed: 1200,
+            projectileManager,
+            cost: 6
+        });
+        this.meleeSwitchThreshold = 4.5; // 决定切换到近战模式的阈值
+        this.meleeAttackRange = 1.2;     // 近战实际出招距离
+        this.remoteAttackRange = 10.0;   // 远程攻击距离
+        this.isMeleeMode = false;
+    }
+
+    updateAI(enemies, allies) {
+        super.updateAI(enemies, allies);
+        
+        if (this.target) {
+            const dist = this.position.distanceTo(this.target.position);
+            // 如果目标进入 4.5 范围，则切换为近战模式并缩短攻击范围，促使其跑位贴脸
+            if (dist < this.meleeSwitchThreshold) {
+                this.isMeleeMode = true;
+                this.attackRange = this.meleeAttackRange;
+            } else {
+                this.isMeleeMode = false;
+                this.attackRange = this.remoteAttackRange;
+            }
+        }
+    }
+
+    performAttack(enemies, allies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+
+            if (this.isMeleeMode) {
+                // 近战：剑击（再次弱化 2 倍：0.06 -> 0.03）
+                this.target.takeDamage(this.attackDamage * 1.5);
+                this.target.applyKnockback(this.position, 0.03); 
+            } else {
+                // 远程：依次射出 3 把气剑
+                const swordCount = 3;
+                const delayBetweenSwords = 200; 
+
+                for (let i = 0; i < swordCount; i++) {
+                    setTimeout(() => {
+                        if (this.isDead || !this.target || this.target.isDead) return;
+
+                        const offset = new THREE.Vector3(
+                            (i - 1) * 0.4, 
+                            1.2 + Math.sin(i) * 0.2, 
+                            (rng.next() - 0.5) * 0.5
+                        );
+                        const spawnPos = this.position.clone().add(offset);
+
+                        if (this.projectileManager) {
+                            this.projectileManager.spawn({
+                                startPos: spawnPos,
+                                target: this.target,
+                                speed: 0.25,
+                                damage: this.attackDamage / swordCount, 
+                                type: 'air_sword'
+                            });
+                        }
+                    }, i * delayBetweenSwords);
+                }
+            }
         }
     }
 }

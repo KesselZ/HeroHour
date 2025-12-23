@@ -48,9 +48,11 @@ scene.add(dirLight);
 // 5. UI 逻辑
 const startBtn = document.querySelector('#start-btn');
 const mainMenu = document.querySelector('#main-menu');
+const menuBg = document.querySelector('#menu-background');
 
 startBtn.addEventListener('click', async () => {
     mainMenu.classList.add('hidden');
+    if (menuBg) menuBg.classList.add('hidden');
     enterGameState(GameState.LOADING);
     
     // 加载资源

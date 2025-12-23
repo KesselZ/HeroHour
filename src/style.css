@@ -38,17 +38,39 @@ body, html {
     align-items: center;
 }
 
+.menu-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('/assets/主界面背景图.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: auto; /* 关键：不要任何缩放 */
+    background-color: #0b141a; /* 匹配背景图深色的底色 */
+    z-index: -1;
+    pointer-events: none;
+}
+
 /* 武侠风主菜单容器 */
 .menu-container {
     pointer-events: auto;
     position: relative;
-    padding: 40px 60px;
-    background: rgba(10, 10, 10, 0.85);
-    border: 2px solid #8b7355;
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 50px rgba(139, 115, 85, 0.2);
+    padding: 60px 80px;
+    background: rgba(0, 0, 0, 0.4); /* 降低透明度，展现背景 */
+    border: 1px solid rgba(139, 115, 85, 0.5);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
     text-align: center;
-    min-width: 320px;
-    backdrop-filter: blur(5px);
+    min-width: 360px;
+    backdrop-filter: blur(8px);
+    border-radius: 4px;
+    animation: fadeInMenu 1.2s ease-out;
+}
+
+@keyframes fadeInMenu {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* 装饰线条 */
@@ -56,13 +78,13 @@ body, html {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    width: 80%;
-    height: 20px;
-    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20" viewBox="0 0 100 20"><path d="M0 10 Q 25 0, 50 10 T 100 10" fill="none" stroke="%238b7355" stroke-width="1"/></svg>') repeat-x;
+    width: 90%;
+    height: 30px;
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="30" viewBox="0 0 100 30"><path d="M0 15 Q 25 5, 50 15 T 100 15" fill="none" stroke="%23d4af37" stroke-width="0.5" opacity="0.6"/></svg>') repeat-x;
 }
 
-.menu-decoration-top { top: 10px; }
-.menu-decoration-bottom { bottom: 10px; transform: translateX(-50%) rotate(180deg); }
+.menu-decoration-top { top: 15px; }
+.menu-decoration-bottom { bottom: 15px; transform: translateX(-50%) rotate(180deg); }
 
 /* 游戏标题样式 */
 .game-title {
@@ -187,6 +209,9 @@ body, html {
 .archer-icon { background-image: url('/assets/character.png'); background-position: 100% 33.33%; }
 .healer-icon { background-image: url('/assets/character.png'); background-position: 33.33% 33.33%; }
 .cangjian-icon { background-image: url('/assets/character.png'); background-position: 66.66% 33.33%; }
+.tiance-icon { background-image: url('/assets/character.png'); background-position: 33.33% 0%; }
+.chunyang-icon { background-image: url('/assets/character.png'); background-position: 66.66% 0%; }
+.cangyun-icon { background-image: url('/assets/character.png'); background-position: 66.66% 66.66%; }
 
 .slot-count {
     font-size: 0.9rem;
