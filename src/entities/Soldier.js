@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { spriteFactory } from '../core/SpriteFactory.js';
 import { rng } from '../core/Random.js';
+import { modifierManager } from '../core/ModifierManager.js';
 
 /**
  * 基础战斗单位类
@@ -27,12 +28,17 @@ export class BaseUnit extends THREE.Group {
         this.projectileManager = projectileManager;
         this.cost = cost;
         
-        this.maxHealth = hp;
-        this.health = hp;
-        // 使用 seeded rng 替代 Math.random()
-        this.moveSpeed = speed + (rng.next() - 0.5) * 0.01;
-        this.attackRange = attackRange;
-        this.attackDamage = attackDamage;
+        // 核心改动：应用属性修正管理器
+        this.maxHealth = modifierManager.getModifiedValue(this, 'hp', hp);
+        this.health = this.maxHealth;
+        
+        // 基础移速叠加随机微差后，再应用全局修正
+        const rawSpeed = speed + (rng.next() - 0.5) * 0.01;
+        this.moveSpeed = modifierManager.getModifiedValue(this, 'speed', rawSpeed);
+        
+        this.attackRange = modifierManager.getModifiedValue(this, 'range', attackRange);
+        this.attackDamage = modifierManager.getModifiedValue(this, 'damage', attackDamage);
+        
         this.attackCooldownTime = attackSpeed;
         
         this.isDead = false;

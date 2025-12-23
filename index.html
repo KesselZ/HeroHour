@@ -24,6 +24,110 @@
                 <div class="menu-decoration-bottom"></div>
             </div>
 
+            <!-- 大世界 HUD (简化后的资源显示) -->
+            <div id="world-ui" class="hidden">
+                <div class="resource-bar" style="top: 15px; left: 10px;">
+                    <div class="res-item"><span class="res-emoji">💰</span><span id="world-gold">1000</span></div>
+                    <div class="res-item"><span class="res-emoji">🪵</span><span id="world-wood">200</span></div>
+                </div>
+
+                <!-- 城镇概览 (左下角) -->
+                <div class="hero-mini-card" id="city-mini-card">
+                    <div class="mini-portrait" id="world-city-portrait"></div>
+                    <div class="mini-stats">
+                        <span id="world-city-display-name">稻香村</span>
+                        <span class="hero-level">当前主城</span>
+                    </div>
+                </div>
+
+                <div id="town-management-panel" class="menu-container hidden town-panel-v3">
+                    <div class="menu-decoration-top"></div>
+                    <h2 id="town-name" class="town-title-v3">稻香村<span>管理中心</span></h2>
+                    
+                    <div class="town-main-content">
+                        <!-- 左侧：建筑规划 -->
+                        <div class="town-construction-section">
+                            <div class="section-header">建筑规划</div>
+                            <div class="construction-container">
+                                <div class="construction-category economy">
+                                    <div class="cat-label">商业</div>
+                                    <div id="build-cat-economy" class="building-grid"></div>
+                                </div>
+                                <div class="construction-category military">
+                                    <div class="cat-label">军事</div>
+                                    <div id="build-cat-military" class="building-grid"></div>
+                                </div>
+                                <div class="construction-category magic">
+                                    <div class="cat-label">特殊</div>
+                                    <div id="build-cat-magic" class="building-grid"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右侧：招募面板 -->
+                        <div class="town-recruit-section">
+                            <div class="section-header">招募新兵</div>
+                            <div id="town-recruit-list" class="recruit-list-v3"></div>
+                        </div>
+                    </div>
+
+                    <!-- 底部：调兵遣将区域 -->
+                    <div class="town-army-section">
+                        <div class="army-container garrison">
+                            <div class="army-label">驻守兵力</div>
+                            <div id="town-units-list" class="army-slots-v3"></div>
+                        </div>
+                        <div class="army-transfer-divider">⇅</div>
+                        <div class="army-container hero-army">
+                            <div class="army-label">我的队伍</div>
+                            <div id="hero-army-list" class="army-slots-v3"></div>
+                        </div>
+                    </div>
+
+                    <div class="town-footer-v3">
+                        <button id="close-town-btn" class="wuxia-btn">完成并退出</button>
+                    </div>
+                    <div class="menu-decoration-bottom"></div>
+                </div>
+
+                <div class="world-date-display">天宝 三年 · 春</div>
+            </div>
+
+            <!-- 角色选择界面 -->
+            <div id="character-select" class="menu-container hidden">
+                <div class="menu-decoration-top"></div>
+                <h2 class="game-title select-title">选择<span>你的侠客</span></h2>
+                <div class="character-cards">
+                    <div class="char-card" data-hero="qijin">
+                        <div class="char-portrait qijin-portrait"></div>
+                        <h3 class="char-name">祁进</h3>
+                        <p class="char-title">紫虚子</p>
+                        <div class="char-traits">
+                            <div class="trait">
+                                <span class="trait-tag">门派领袖</span>
+                                <span class="trait-desc">纯阳弟子血量和伤害提高 20%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="char-card" data-hero="lichengen">
+                        <div class="char-portrait lichengen-portrait"></div>
+                        <h3 class="char-name">李承恩</h3>
+                        <p class="char-title">天策府统领</p>
+                        <div class="char-traits">
+                            <div class="trait">
+                                <span class="trait-tag">骁勇善战</span>
+                                <span class="trait-desc">大世界移动速度提高 20%，天策兵种血量提高 10%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menu-options">
+                    <button id="confirm-char-btn" class="wuxia-btn disabled" disabled>开启江湖</button>
+                    <button id="back-to-menu-btn" class="wuxia-btn small-btn">返回主页</button>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
             <!-- 部署界面 -->
             <div id="deployment-ui" class="deployment-container hidden">
                 <div class="deploy-info">请派遣你的侠客 (点击图标后点击地面)</div>

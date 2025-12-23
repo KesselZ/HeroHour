@@ -1,12 +1,24 @@
-/* 基础重置 */
+/* 基础重置与剑三【隐元秘鉴】画卷风格 */
+:root {
+    --jx3-celadon: #5b8a8a;       /* 标志性的山色青 */
+    --jx3-celadon-light: #b2d3d3; /* 淡青色，用于卡片背景 */
+    --jx3-celadon-dark: #2c4a4a;  /* 深青色，用于文字和边框 */
+    --jx3-paper: #e9e4d1;         /* 画卷背景色 (米色/纸张色) */
+    --jx3-paper-dark: #d6cfb5;    /* 阴影纸张色 */
+    --jx3-ink: #2b2b2b;           /* 水墨黑，用于标题 */
+    --jx3-gold: #a68b44;          /* 哑光金 */
+    --jx3-border: #8b7355;        /* 棕褐色边框 */
+    --transition-snappy: 0.15s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
 body, html {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #050505;
-    color: #e0ceb2;
+    background-color: #0b1c24;
+    color: var(--jx3-ink);
     font-family: "Microsoft YaHei", "SimSun", serif;
 }
 
@@ -14,7 +26,7 @@ body, html {
     width: 100vw;
     height: 100vh;
     position: relative;
-    background: radial-gradient(circle, #2c1a1a 0%, #050505 100%);
+    background: radial-gradient(circle at center, #1b3d4d 0%, #081419 100%);
 }
 
 #game-canvas {
@@ -47,62 +59,75 @@ body, html {
     background-image: url('/assets/主界面背景图.png');
     background-repeat: no-repeat;
     background-position: center;
-    background-size: auto; /* 关键：不要任何缩放 */
-    background-color: #0b141a; /* 匹配背景图深色的底色 */
+    background-size: cover;
+    opacity: 0.5;
+    filter: brightness(0.7) saturate(0.6);
     z-index: -1;
-    pointer-events: none;
 }
 
-/* 武侠风主菜单容器 */
+/* 剑三画卷风格面板 */
 .menu-container {
     pointer-events: auto;
     position: relative;
     padding: 60px 80px;
-    background: rgba(0, 0, 0, 0.4); /* 降低透明度，展现背景 */
-    border: 1px solid rgba(139, 115, 85, 0.5);
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+    background: var(--jx3-paper);
+    border: 8px solid var(--jx3-celadon);
+    outline: 2px solid var(--jx3-gold);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
     text-align: center;
-    min-width: 360px;
-    backdrop-filter: blur(8px);
+    min-width: 500px;
+    /* 修正：动画只运行一次，防止状态改变时抖动 */
+    animation: openScroll 0.3s ease-out forwards;
     border-radius: 4px;
-    animation: fadeInMenu 1.2s ease-out;
 }
 
-@keyframes fadeInMenu {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+@keyframes openScroll {
+    from { opacity: 0; transform: scaleY(0.9); }
+    to { opacity: 1; transform: scaleY(1); }
 }
 
 /* 装饰线条 */
 .menu-decoration-top, .menu-decoration-bottom {
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    height: 30px;
-    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="30" viewBox="0 0 100 30"><path d="M0 15 Q 25 5, 50 15 T 100 15" fill="none" stroke="%23d4af37" stroke-width="0.5" opacity="0.6"/></svg>') repeat-x;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    background: var(--jx3-celadon);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--jx3-paper);
+    font-weight: bold;
+    letter-spacing: 4px;
 }
 
-.menu-decoration-top { top: 15px; }
-.menu-decoration-bottom { bottom: 15px; transform: translateX(-50%) rotate(180deg); }
+.menu-decoration-top { 
+    top: 0; 
+    border-bottom: 2px solid var(--jx3-gold);
+}
+.menu-decoration-bottom { 
+    bottom: 0; 
+    border-top: 2px solid var(--jx3-gold);
+}
 
-/* 游戏标题样式 */
+/* 游戏标题 */
 .game-title {
-    font-size: 3.5rem;
-    margin-bottom: 40px;
-    color: #d4af37; /* 金色 */
-    text-shadow: 0 0 15px rgba(212, 175, 55, 0.6), 3px 3px 5px #000;
-    font-weight: 900;
-    letter-spacing: 8px;
-    position: relative;
+    font-size: 2.5rem;
+    margin: 20px 0 40px 0;
+    color: var(--jx3-ink);
+    font-weight: 700;
+    letter-spacing: 10px;
+    border-bottom: 2px solid var(--jx3-celadon);
+    display: inline-block;
+    padding-bottom: 10px;
 }
 
 .game-title span {
-    color: #b22222; /* 火红色 */
-    margin-left: 10px;
+    color: var(--jx3-celadon);
+    margin-left: 5px;
 }
 
-/* 武侠风格按钮 */
+/* 剑三风格按钮 */
 .menu-options {
     display: flex;
     flex-direction: column;
@@ -110,68 +135,540 @@ body, html {
 }
 
 .wuxia-btn {
-    background: linear-gradient(to bottom, #2a2a2a, #1a1a1a);
-    color: #c9b38e;
-    border: 1px solid #5d4a37;
-    padding: 12px 30px;
-    font-size: 1.2rem;
+    background: var(--jx3-celadon);
+    color: var(--jx3-paper);
+    border: 1px solid var(--jx3-gold);
+    padding: 12px 40px;
+    font-size: 1.1rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.15s ease;
+    letter-spacing: 5px;
+    font-weight: bold;
     position: relative;
-    overflow: hidden;
-    letter-spacing: 4px;
-    text-transform: uppercase;
 }
 
 .wuxia-btn:hover {
-    background: #3d3126;
-    color: #fff;
-    border-color: #d4af37;
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+    background: var(--jx3-celadon-dark);
     transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
-.wuxia-btn::before {
-    content: '';
+.wuxia-btn.disabled {
+    background: #ccc;
+    border-color: #999;
+    color: #666;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* 角色卡片：修正为标准的矩形立牌风格 */
+.character-cards {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    margin-bottom: 40px;
+}
+
+.char-card {
+    width: 200px;
+    background: var(--jx3-celadon-light);
+    border: 2px solid var(--jx3-celadon);
+    padding: 20px 10px;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    /* 修正：移除 clip-path，改用标准的阴影和边框来体现精致感 */
+    border-radius: 2px;
+}
+
+.char-card:hover {
+    background: #c5e4e4;
+    transform: translateY(-8px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.char-card.selected {
+    background: #fff;
+    /* 修正：不增加 border-width 以防止布局抖动，改用 outline 或内阴影 */
+    border-color: var(--jx3-gold);
+    box-shadow: 0 0 0 2px var(--jx3-gold), 0 10px 25px rgba(91, 138, 138, 0.4);
+    z-index: 2;
+}
+
+.char-card.selected::before {
+    content: '已选中';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
-    transition: 0.5s;
+    top: -12px;
+    background: var(--jx3-gold);
+    color: white;
+    padding: 2px 15px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    border-radius: 2px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-.wuxia-btn:hover::before {
-    left: 100%;
+.char-portrait {
+    width: 100px;
+    height: 100px;
+    border: 1px solid var(--jx3-celadon);
+    background-color: white;
+    margin-bottom: 15px;
 }
 
-/* 部署界面样式 */
-.deployment-container {
+.char-name {
+    font-size: 1.5rem;
+    color: var(--jx3-celadon-dark);
+    margin: 5px 0;
+    font-weight: bold;
+}
+
+.char-title {
+    font-size: 0.85rem;
+    color: var(--jx3-ink);
+    margin-bottom: 15px;
+    opacity: 0.7;
+    font-style: normal;
+}
+
+.char-traits {
+    width: 90%;
+    border-top: 1px dashed rgba(0,0,0,0.2);
+    padding-top: 10px;
+}
+
+.trait-tag {
+    color: var(--jx3-celadon-dark);
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.trait-desc {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #444;
+    text-align: center;
+}
+
+/* 简化资源条 */
+.resource-bar {
+    pointer-events: auto;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 15px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px 15px;
+    border-radius: 4px;
+    border: 1px solid var(--jx3-gold);
+    color: white;
+}
+
+.res-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.res-emoji {
+    font-size: 1.2rem;
+}
+
+.mini-portrait {
+    width: 50px;
+    height: 50px;
+    background-color: white;
+    border: 2px solid var(--jx3-celadon);
+    background-size: 400% 400%;
+    image-rendering: pixelated;
+}
+
+/* 城市头像样式已移除，改由脚本控制 */
+
+/* 左下角英雄简卡 */
+.hero-mini-card {
     pointer-events: auto;
     position: absolute;
     bottom: 20px;
+    left: 20px;
+    background: var(--jx3-paper);
+    border: 2px solid var(--jx3-celadon);
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 4px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.hero-mini-card:hover {
+    transform: scale(1.05);
+    background: #f0f0e0;
+}
+
+.mini-stats {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 城市管理面板 V3 精美重构 */
+.town-panel-v3 {
+    width: 1150px;
+    max-width: 96vw;
+    padding: 20px 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background: #f4f0e0;
+    max-height: 94vh;
+    border: 6px solid var(--jx3-celadon);
+    outline: 2px solid var(--jx3-gold);
+    box-sizing: border-box;
+}
+
+.town-title-v3 {
+    font-size: 2.5rem;
+    color: var(--jx3-celadon-dark);
+    margin: 0;
+    text-align: center;
+    border-bottom: 3px double var(--jx3-celadon);
+    padding-bottom: 10px;
+    letter-spacing: 4px;
+}
+
+.town-main-content {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    min-height: 0;
+    flex-grow: 1;
+}
+
+/* 建筑规划区块 */
+.town-construction-section {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 2px solid var(--jx3-celadon);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.construction-container {
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.construction-category {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cat-label {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--jx3-celadon);
+    border-left: 5px solid var(--jx3-gold);
+    padding: 2px 12px;
+    background: #f9f9f9;
+}
+
+.building-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    padding: 5px;
+}
+
+.building-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    padding: 12px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.building-card:hover:not(.locked) {
+    border-color: var(--jx3-gold);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.building-name {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+}
+
+.building-cost {
+    font-size: 0.8rem;
+    color: #a68b44;
+    background: #fdfaf2;
+    padding: 4px;
+    border-radius: 4px;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+    border: 1px solid #f0e6cc;
+}
+
+/* 招募区块 */
+.town-recruit-section {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border: 2px solid var(--jx3-celadon);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.recruit-list-v3 {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
+.recruit-item {
+    display: grid;
+    grid-template-columns: 48px 1fr 70px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.recruit-item:hover {
+    border-color: var(--jx3-gold);
+}
+
+.recruit-item .wuxia-btn {
+    padding: 8px 0;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+}
+
+/* 调兵区域 */
+.town-army-section {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 10px;
+    align-items: center;
+    background: #fff;
+    padding: 12px;
+    border: 2px solid var(--jx3-celadon);
+    border-radius: 4px;
+}
+
+.army-container {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.army-slots-v3 {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 60px;
+    justify-content: center;
+    padding: 8px;
+}
+
+.army-label {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--jx3-celadon);
+    text-align: center;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.army-transfer-divider {
+    font-size: 2rem;
+    color: var(--jx3-celadon);
+    text-align: center;
+    opacity: 0.5;
+}
+
+.town-footer-v3 {
+    display: flex;
+    justify-content: center;
+}
+
+.town-footer-v3 .wuxia-btn {
+    padding: 12px 60px;
+    font-size: 1.1rem;
+}
+
+.town-footer {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.world-date-display {
+    position: absolute;
+    top: 15px;
+    right: 30px;
+    color: var(--jx3-paper);
+    font-weight: bold;
+    font-family: "SimSun", serif;
+    text-shadow: 1px 1px 2px black;
+}
+
+.small-btn {
+    padding: 6px 20px;
+    font-size: 0.9rem;
+}
+
+
+/* 招募画卷特定样式 */
+.recruit-scroll {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) !important;
+    width: 600px;
+    z-index: 100;
+}
+
+.recruit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.recruit-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.3);
+    padding: 10px 20px;
+    border: 1px solid var(--jx3-celadon-light);
+    border-radius: 4px;
+}
+
+.unit-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.unit-name {
+    font-weight: bold;
+    color: var(--jx3-celadon-dark);
+}
+
+.unit-cost {
+    font-size: 0.9rem;
+    color: var(--jx3-gold);
+}
+
+.recruit-tip {
+    font-size: 0.8rem;
+    color: #b22222;
+    margin-top: 10px;
+    font-style: italic;
+}
+
+/* 领兵提示样式 */
+.transfer-prompt {
+    position: absolute;
+    bottom: 120px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(10, 10, 10, 0.9);
-    border: 2px solid #8b7355;
+    pointer-events: auto;
+    z-index: 30;
+}
+
+.prompt-content {
+    background: var(--jx3-paper);
+    border: 2px solid var(--jx3-celadon);
+    padding: 15px 30px;
+    border-radius: 4px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+#transfer-msg {
+    color: var(--jx3-celadon-dark);
+    font-weight: bold;
+}
+
+.prompt-btns {
+    display: flex;
+    gap: 15px;
+}
+
+.secondary {
+    background: #999 !important;
+    border-color: #777 !important;
+}
+
+
+/* 通用隐藏与 Canvas */
+.hidden { display: none !important; }
+canvas { image-rendering: pixelated; }
+
+/* 部署界面 (画卷风格) */
+.deployment-container {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 40px;
+    background: var(--jx3-paper);
+    border: 4px solid var(--jx3-celadon);
     padding: 15px 30px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 15px;
-    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
 
 .deploy-info {
-    color: #d4af37;
-    font-size: 1.1rem;
-    letter-spacing: 2px;
+    color: var(--jx3-celadon-dark);
+    font-weight: bold;
 }
 
 .unit-slots {
     display: flex;
-    gap: 20px;
+    gap: 15px;
 }
 
 .unit-slot {
@@ -179,57 +676,29 @@ body, html {
     flex-direction: column;
     align-items: center;
     cursor: pointer;
-    transition: transform 0.2s;
-    border: 1px solid transparent;
+    border: 1px solid var(--jx3-celadon-light);
     padding: 5px;
+    background: white;
+    transition: transform 0.15s;
 }
 
 .unit-slot:hover {
-    transform: translateY(-5px);
-    border-color: #d4af37;
+    border-color: var(--jx3-celadon);
+    transform: scale(1.1);
 }
 
 .unit-slot.selected {
-    border-color: #ff4444;
-    background: rgba(212, 175, 55, 0.1);
+    border-color: var(--jx3-gold);
+    background: var(--jx3-celadon-light);
 }
 
 .slot-icon {
-    width: 50px;
-    height: 50px;
-    background-size: 400% 400%; /* 对应 4x4 精灵图 */
-    image-rendering: pixelated;
-    border: 1px solid #555;
-    margin-bottom: 5px;
+    width: 40px;
+    height: 40px;
 }
-
-/* 对应 SpriteFactory 中的行列 */
-.melee-icon { background-image: url('/assets/character.png'); background-position: 0% 0%; }
-.ranged-icon { background-image: url('/assets/character.png'); background-position: 0% 100%; }
-.archer-icon { background-image: url('/assets/character.png'); background-position: 100% 33.33%; }
-.healer-icon { background-image: url('/assets/character.png'); background-position: 33.33% 33.33%; }
-.cangjian-icon { background-image: url('/assets/character.png'); background-position: 66.66% 33.33%; }
-.tiance-icon { background-image: url('/assets/character.png'); background-position: 33.33% 0%; }
-.chunyang-icon { background-image: url('/assets/character.png'); background-position: 66.66% 0%; }
-.cangyun-icon { background-image: url('/assets/character.png'); background-position: 66.66% 66.66%; }
 
 .slot-count {
-    font-size: 0.9rem;
-    color: #e0ceb2;
-}
-
-.small-btn {
-    padding: 8px 20px !important;
-    font-size: 1rem !important;
-    width: auto !important;
-}
-
-.hidden {
-    display: none !important;
-}
-
-/* 像素感修正 (针对后续 Canvas 渲染) */
-canvas {
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: var(--jx3-celadon-dark);
 }
