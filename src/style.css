@@ -1,0 +1,210 @@
+/* 基础重置 */
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #050505;
+    color: #e0ceb2;
+    font-family: "Microsoft YaHei", "SimSun", serif;
+}
+
+#app {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    background: radial-gradient(circle, #2c1a1a 0%, #050505 100%);
+}
+
+#game-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+/* UI 层容器 */
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 武侠风主菜单容器 */
+.menu-container {
+    pointer-events: auto;
+    position: relative;
+    padding: 40px 60px;
+    background: rgba(10, 10, 10, 0.85);
+    border: 2px solid #8b7355;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 50px rgba(139, 115, 85, 0.2);
+    text-align: center;
+    min-width: 320px;
+    backdrop-filter: blur(5px);
+}
+
+/* 装饰线条 */
+.menu-decoration-top, .menu-decoration-bottom {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 20px;
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20" viewBox="0 0 100 20"><path d="M0 10 Q 25 0, 50 10 T 100 10" fill="none" stroke="%238b7355" stroke-width="1"/></svg>') repeat-x;
+}
+
+.menu-decoration-top { top: 10px; }
+.menu-decoration-bottom { bottom: 10px; transform: translateX(-50%) rotate(180deg); }
+
+/* 游戏标题样式 */
+.game-title {
+    font-size: 3.5rem;
+    margin-bottom: 40px;
+    color: #d4af37; /* 金色 */
+    text-shadow: 0 0 15px rgba(212, 175, 55, 0.6), 3px 3px 5px #000;
+    font-weight: 900;
+    letter-spacing: 8px;
+    position: relative;
+}
+
+.game-title span {
+    color: #b22222; /* 火红色 */
+    margin-left: 10px;
+}
+
+/* 武侠风格按钮 */
+.menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.wuxia-btn {
+    background: linear-gradient(to bottom, #2a2a2a, #1a1a1a);
+    color: #c9b38e;
+    border: 1px solid #5d4a37;
+    padding: 12px 30px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+}
+
+.wuxia-btn:hover {
+    background: #3d3126;
+    color: #fff;
+    border-color: #d4af37;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+    transform: translateY(-2px);
+}
+
+.wuxia-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
+    transition: 0.5s;
+}
+
+.wuxia-btn:hover::before {
+    left: 100%;
+}
+
+/* 部署界面样式 */
+.deployment-container {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10, 10, 10, 0.9);
+    border: 2px solid #8b7355;
+    padding: 15px 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+}
+
+.deploy-info {
+    color: #d4af37;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+}
+
+.unit-slots {
+    display: flex;
+    gap: 20px;
+}
+
+.unit-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 1px solid transparent;
+    padding: 5px;
+}
+
+.unit-slot:hover {
+    transform: translateY(-5px);
+    border-color: #d4af37;
+}
+
+.unit-slot.selected {
+    border-color: #ff4444;
+    background: rgba(212, 175, 55, 0.1);
+}
+
+.slot-icon {
+    width: 50px;
+    height: 50px;
+    background-size: 400% 400%; /* 对应 4x4 精灵图 */
+    image-rendering: pixelated;
+    border: 1px solid #555;
+    margin-bottom: 5px;
+}
+
+/* 对应 SpriteFactory 中的行列 */
+.melee-icon { background-image: url('/assets/character.png'); background-position: 0% 0%; }
+.ranged-icon { background-image: url('/assets/character.png'); background-position: 0% 100%; }
+.archer-icon { background-image: url('/assets/character.png'); background-position: 100% 33.33%; }
+.healer-icon { background-image: url('/assets/character.png'); background-position: 33.33% 33.33%; }
+.cangjian-icon { background-image: url('/assets/character.png'); background-position: 66.66% 33.33%; }
+
+.slot-count {
+    font-size: 0.9rem;
+    color: #e0ceb2;
+}
+
+.small-btn {
+    padding: 8px 20px !important;
+    font-size: 1rem !important;
+    width: auto !important;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* 像素感修正 (针对后续 Canvas 渲染) */
+canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}

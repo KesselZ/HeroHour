@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剑网三大乱斗 - 武侠像素大战略</title>
+    <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- UI 层：主菜单、UI面板等 -->
+        <div id="ui-layer">
+            <!-- 主菜单 -->
+            <div id="main-menu" class="menu-container">
+                <div class="menu-decoration-top"></div>
+                <h1 class="game-title">剑网三<span>大乱斗</span></h1>
+                <div class="menu-options">
+                    <button id="start-btn" class="wuxia-btn">闯荡江湖</button>
+                    <button id="collection-btn" class="wuxia-btn">侠客名录</button>
+                    <button id="options-btn" class="wuxia-btn">江湖设置</button>
+                    <button id="exit-btn" class="wuxia-btn">退出游戏</button>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 部署界面 -->
+            <div id="deployment-ui" class="deployment-container hidden">
+                <div class="deploy-info">请派遣你的侠客 (点击图标后点击地面)</div>
+                <div class="unit-slots">
+                    <div class="unit-slot" data-type="melee">
+                        <div class="slot-icon melee-icon"></div>
+                        <span class="slot-count">x10</span>
+                    </div>
+                    <div class="unit-slot" data-type="ranged">
+                        <div class="slot-icon ranged-icon"></div>
+                        <span class="slot-count">x4</span>
+                    </div>
+                    <div class="unit-slot" data-type="archer">
+                        <div class="slot-icon archer-icon"></div>
+                        <span class="slot-count">x2</span>
+                    </div>
+                    <div class="unit-slot" data-type="healer">
+                        <div class="slot-icon healer-icon"></div>
+                        <span class="slot-count">x2</span>
+                    </div>
+                    <div class="unit-slot" data-type="cangjian">
+                        <div class="slot-icon cangjian-icon"></div>
+                        <span class="slot-count">x2</span>
+                    </div>
+                </div>
+                <button id="fight-btn" class="wuxia-btn small-btn">开战！</button>
+            </div>
+        </div>
+        
+        <!-- Canvas 层：Three.js 渲染 -->
+        <canvas id="game-canvas"></canvas>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
+
