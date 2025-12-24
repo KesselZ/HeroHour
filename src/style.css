@@ -277,6 +277,17 @@ body, html {
     gap: 5px;
     font-size: 0.9rem;
     font-weight: bold;
+    transition: transform 0.2s;
+}
+
+.res-update-anim {
+    animation: resPulse 0.5s ease-out;
+}
+
+@keyframes resPulse {
+    0% { transform: scale(1); color: white; }
+    30% { transform: scale(1.3); color: var(--jx3-gold); text-shadow: 0 0 10px var(--jx3-gold); }
+    100% { transform: scale(1); color: white; }
 }
 
 .res-emoji {
@@ -294,22 +305,233 @@ body, html {
 
 /* 城市头像样式已移除，改由脚本控制 */
 
-/* 左下角英雄简卡 */
-.hero-mini-card {
-    pointer-events: auto;
+/* --- 优雅的左下角 HUD 系统 --- */
+.hud-bottom-left {
     position: absolute;
-    bottom: 20px;
-    left: 20px;
+    bottom: 25px;
+    left: 25px;
+    display: flex;
+    align-items: flex-end; /* 底部对齐，体现高低差 */
+    gap: 12px;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.hud-card {
+    pointer-events: auto;
     background: var(--jx3-paper);
     border: 2px solid var(--jx3-celadon);
-    padding: 10px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column; /* 内容纵向排列 */
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    position: relative;
+}
+
+.hud-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    background: #fdfaf2;
+    border-color: var(--jx3-gold);
+}
+
+.hud-portrait {
+    background-color: white;
+    border: 1px solid var(--jx3-celadon);
+    image-rendering: pixelated;
+    background-size: 400% 400%; /* 适配 4x4 精灵图 */
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* 城池卡片专用：图案大 */
+.hud-card-city .hud-portrait {
+    width: 80px;
+    height: 80px;
+}
+.hud-card-city {
+    min-width: 100px;
+}
+
+/* 英雄卡片专用：图案相对小 */
+.hud-card-hero .hud-portrait {
+    width: 52px;
+    height: 52px;
+}
+.hud-card-hero {
+    min-width: 70px;
+}
+
+.hud-info {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.hud-name {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--jx3-celadon-dark);
+    font-family: "SimSun", serif;
+}
+
+.hud-sub {
+    font-size: 0.65rem;
+    color: #888;
+    transform: scale(0.9);
+}
+
+/* 状态条样式 */
+.hud-mini-bars {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 2px;
+}
+
+.mini-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.mini-bar-fill {
+    height: 100%;
+    width: 100%;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mini-bar-fill.hp { background: linear-gradient(to right, #d32f2f, #ff5252); }
+.mini-bar-fill.mp { background: linear-gradient(to right, #1976d2, #448aff); }
+
+/* 侠客信息面板 V3 */
+.hero-panel-v3 {
+    width: 650px;
+    padding: 60px 40px;
+}
+
+.hero-panel-content {
+    display: flex;
+    gap: 40px;
+    text-align: left;
+}
+
+.hero-panel-left {
+    flex: 0 0 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hero-big-portrait {
+    width: 150px;
+    height: 150px;
+    border: 4px solid var(--jx3-celadon);
+    background: white;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    image-rendering: pixelated;
+    background-size: 400% 400%;
+}
+
+.hero-panel-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.stat-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.stat-group label {
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: var(--jx3-celadon-dark);
+}
+
+.stat-bar-bg {
+    width: 100%;
+    height: 12px;
+    background: #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #ccc;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    width: 100%;
+    transition: width 0.3s ease-out;
+}
+
+.stat-bar-fill.xp { background: linear-gradient(to right, #a68b44, #d4af37); }
+.stat-bar-fill.hp { background: linear-gradient(to right, #cc0000, #ff4444); }
+.stat-bar-fill.mp { background: linear-gradient(to right, #0044cc, #00aaff); }
+
+.attributes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 15px;
+    border-top: 1px dashed #ccc;
+}
+
+.attr-item {
+    font-size: 0.95rem;
+    color: var(--jx3-ink);
+    font-weight: bold;
+}
+
+/* 侠客面板技能区 */
+.hero-skills-section {
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 2px double var(--jx3-celadon);
+    text-align: left;
+}
+
+.hero-skills-list {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.hero-skill-slot {
+    width: 48px;
+    height: 48px;
+    background: white;
+    border: 2px solid var(--jx3-celadon);
+    border-radius: 4px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    border-radius: 4px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    cursor: pointer;
-    transition: transform 0.2s;
+    justify-content: center;
+    cursor: help;
+    transition: all 0.2s;
+}
+
+.hero-skill-slot:hover {
+    border-color: var(--jx3-gold);
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(166, 139, 68, 0.3);
+}
+
+.hero-skill-slot .skill-icon-small {
+    width: 32px;
+    height: 32px;
+    image-rendering: pixelated;
 }
 
 .hero-mini-card:hover {
@@ -326,7 +548,7 @@ body, html {
 .town-panel-v3 {
     width: 1150px;
     max-width: 96vw;
-    padding: 20px 30px;
+    padding: 50px 30px; /* 增加上下边距从 20px 到 50px，避开 40px 高的装饰条 */
     display: flex;
     flex-direction: column;
     gap: 15px;
@@ -338,13 +560,42 @@ body, html {
 }
 
 .town-title-v3 {
-    font-size: 2.5rem;
-    color: var(--jx3-celadon-dark);
-    margin: 0;
+    font-size: 2.2rem;
+    color: var(--jx3-ink);
+    margin: 10px 0 0 0;
     text-align: center;
     border-bottom: 3px double var(--jx3-celadon);
-    padding-bottom: 10px;
-    letter-spacing: 4px;
+    padding-bottom: 8px;
+    letter-spacing: 12px;
+    font-weight: 900;
+    font-family: "SimSun", serif;
+}
+
+.close-btn-v3 {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    width: 30px;
+    height: 30px;
+    background: var(--jx3-paper);
+    border: 2px solid var(--jx3-celadon);
+    color: var(--jx3-celadon-dark);
+    font-size: 24px;
+    line-height: 24px;
+    cursor: pointer;
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s;
+    border-radius: 4px;
+    padding: 0;
+}
+
+.close-btn-v3:hover {
+    background: #ff4444;
+    color: white;
+    border-color: #cc0000;
 }
 
 .town-main-content {
@@ -389,44 +640,92 @@ body, html {
 }
 
 .building-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    overflow-x: auto;
     gap: 15px;
-    padding: 5px;
+    padding: 10px 5px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--jx3-celadon) transparent;
+}
+
+.building-grid::-webkit-scrollbar {
+    height: 6px;
+}
+
+.building-grid::-webkit-scrollbar-thumb {
+    background: var(--jx3-celadon);
+    border-radius: 3px;
 }
 
 .building-card {
+    flex: 0 0 125px; /* 宽度从 160px 缩减到 125px */
     background: white;
     border: 1px solid #e0e0e0;
-    padding: 12px;
+    padding: 10px 8px;
     border-radius: 4px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
 }
 
-.building-card:hover:not(.locked) {
+.building-card:hover {
     border-color: var(--jx3-gold);
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+
+/* 等级色彩表达逻辑 */
+.building-card.lv-0 {
+    background: #f0f0f0;
+    filter: grayscale(0.8);
+    opacity: 0.7;
+}
+
+.building-card.lv-0:hover {
+    filter: grayscale(0.3);
+    opacity: 1;
+    background: #fff;
+}
+
+.building-card.lv-1 { border-left: 4px solid var(--jx3-celadon-light); }
+.building-card.lv-2 { border-left: 4px solid var(--jx3-celadon); }
+.building-card.lv-3 { border-left: 4px solid var(--jx3-gold); }
+.building-card.is-max { 
+    background: #fdfaf2;
+    border-color: var(--jx3-gold);
+    box-shadow: inset 0 0 10px rgba(166, 139, 68, 0.1);
+}
+
+.building-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 2px;
 }
 
 .building-name {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: bold;
     color: #333;
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
 }
 
 .building-cost {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #a68b44;
     background: #fdfaf2;
-    padding: 4px;
-    border-radius: 4px;
+    padding: 2px 4px;
+    border-radius: 3px;
     width: 100%;
     text-align: center;
     font-weight: bold;
@@ -534,19 +833,138 @@ body, html {
     gap: 20px;
 }
 
-.world-date-display {
+.world-date-display-container {
     position: absolute;
     top: 15px;
-    right: 30px;
+    right: 25px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.world-date-display {
     color: var(--jx3-paper);
     font-weight: bold;
     font-family: "SimSun", serif;
-    text-shadow: 1px 1px 2px black;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    font-size: 1.1rem;
+    letter-spacing: 2px;
 }
 
-.small-btn {
-    padding: 6px 20px;
-    font-size: 0.9rem;
+.time-progress-outer {
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid var(--jx3-celadon);
+    border-radius: 50%;
+    position: relative;
+}
+
+.time-progress-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    /* 动态控制 conic-gradient */
+    background: conic-gradient(var(--jx3-gold) 0%, transparent 0);
+}
+
+.tooltip-container {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.7); /* 降低透明度，从 0.85 降至 0.7 */
+    color: white;
+    padding: 12px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--jx3-gold);
+    pointer-events: none;
+    z-index: 2000;
+    width: 220px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tooltip-level {
+    font-size: 0.8rem;
+    color: var(--jx3-paper);
+    opacity: 0.8;
+    margin-top: -4px;
+}
+
+.tooltip-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--jx3-gold);
+    border-bottom: 1px solid rgba(166, 139, 68, 0.3);
+    padding-bottom: 4px;
+}
+
+.tooltip-effect {
+    font-size: 0.85rem;
+    color: #00ffcc;
+    font-weight: bold;
+}
+
+.tooltip-desc {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #ccc;
+}
+
+/* 结算界面特有样式 */
+.settlement-content {
+    margin: 20px 0;
+    width: 100%;
+    min-height: 150px;
+    display: flex;
+    justify-content: center;
+}
+
+.loss-section {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.section-label {
+    font-weight: bold;
+    color: var(--jx3-celadon-dark);
+    margin-bottom: 15px;
+    border-bottom: 1px dashed var(--jx3-celadon);
+    padding-bottom: 5px;
+}
+
+.loss-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+}
+
+.loss-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: white;
+    padding: 8px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 80px;
+}
+
+.loss-count {
+    color: #cc0000;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.loss-name {
+    font-size: 0.8rem;
+    color: #666;
 }
 
 
@@ -645,6 +1063,86 @@ body, html {
 /* 通用隐藏与 Canvas */
 .hidden { display: none !important; }
 canvas { image-rendering: pixelated; }
+
+/* 战斗技能栏 */
+.skill-bar-container {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 40px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 2px solid var(--jx3-gold);
+    box-shadow: 0 0 20px rgba(166, 139, 68, 0.4);
+    z-index: 1000;
+}
+
+.skill-slots {
+    display: flex;
+    gap: 15px;
+}
+
+.skill-btn {
+    width: 60px;
+    height: 60px;
+    background: var(--jx3-paper);
+    border: 2px solid var(--jx3-celadon);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    overflow: hidden;
+}
+
+.skill-btn:hover:not(.disabled) {
+    border-color: var(--jx3-gold);
+    transform: translateY(-4px);
+}
+
+.skill-icon {
+    width: 32px;
+    height: 32px;
+    pointer-events: none;
+}
+
+.skill-cost {
+    font-size: 0.7rem;
+    color: #00aaff;
+    font-weight: bold;
+    pointer-events: none;
+}
+
+.cooldown-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background: rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+}
+
+.skill-name-tag {
+    position: absolute;
+    top: -25px;
+    background: var(--jx3-gold);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 2px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+.skill-btn:hover .skill-name-tag {
+    opacity: 1;
+}
 
 /* 部署界面 (画卷风格) */
 .deployment-container {

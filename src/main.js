@@ -4,6 +4,7 @@ import { WorldScene } from './scenes/WorldScene.js'; // 引入大世界场景
 import { spriteFactory } from './core/SpriteFactory.js';
 import { setSeed } from './core/Random.js';
 import { modifierManager } from './core/ModifierManager.js';
+import { worldManager } from './core/WorldManager.js';
 
 // 游戏状态管理
 const GameState = {
@@ -33,6 +34,8 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
+// 关键修复：确保渲染器的色彩空间与材质贴图一致，防止泛白
+renderer.outputColorSpace = THREE.SRGBColorSpace; 
 
 // 2. 窗口缩放适配
 window.addEventListener('resize', () => {
@@ -40,15 +43,6 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-// 3. 基础灯光
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // 从 0.8 降低到 0.4，让颜色更浓郁
-scene.add(ambientLight);
-
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); // 稍微加强直射光，增强立体感
-dirLight.position.set(5, 10, 5);
-dirLight.castShadow = true;
-scene.add(dirLight);
 
 // 5. UI 逻辑
 const startBtn = document.querySelector('#start-btn');
@@ -136,6 +130,17 @@ confirmCharBtn.addEventListener('click', async () => {
     enterGameState(GameState.WORLD);
 });
 
+// 监听大世界发出的开战请求
+window.addEventListener('start-battle', (e) => {
+    const enemyConfig = e.detail;
+    enterGameState(GameState.BATTLE, enemyConfig);
+});
+
+// 监听战斗结束返回大世界的请求
+window.addEventListener('battle-finished', () => {
+    enterGameState(GameState.WORLD);
+});
+
 /**
  * 根据选择的角色应用全局属性加成
  */
@@ -143,7 +148,14 @@ function applyHeroTraits(heroId) {
     // 首先清空旧的修正器
     modifierManager.clear();
 
+    // 初始化世界管理器的英雄数据
+    worldManager.heroData.id = heroId;
     if (heroId === 'qijin') {
+        worldManager.heroData.hpMax = 500;
+        worldManager.heroData.stats.atk = 45;
+        worldManager.heroData.stats.speed = 0.08;
+        worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'battle_shout']; // 增加神剑归宗
+        
         // 祁进天赋：纯阳弟子血量和伤害提高 20%
         modifierManager.addGlobalModifier({
             id: 'qijin_chunyang_hp',
@@ -160,6 +172,11 @@ function applyHeroTraits(heroId) {
             multiplier: 1.2
         });
     } else if (heroId === 'lichengen') {
+        worldManager.heroData.hpMax = 650;
+        worldManager.heroData.stats.atk = 35;
+        worldManager.heroData.stats.speed = 0.06;
+        worldManager.heroData.skills = ['battle_shout', 'summon_militia']; // 李承恩技能组
+
         // 李承恩天赋：大世界移动速度提高 20%
         modifierManager.addGlobalModifier({
             id: 'lichengen_world_speed',
@@ -176,23 +193,47 @@ function applyHeroTraits(heroId) {
             multiplier: 1.1
         });
     }
+    // 初始生命值为满血
+    worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
 }
 
-function enterGameState(state) {
+function enterGameState(state, config = null) {
     currentState = state;
     
-    // 清理当前所有场景内容 (除了基础光源)
-    // 注意：实际项目中建议更精细地管理 Object3D 的销毁
+    // 1. 彻底清理当前所有场景内容 (包括灯光、物体、背景和雾)
+    const objectsToRemove = [];
+    scene.children.forEach(child => {
+        objectsToRemove.push(child);
+    });
     
+    objectsToRemove.forEach(obj => {
+        if (obj.parent) obj.parent.remove(obj);
+        // 释放资源
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+            if (Array.isArray(obj.material)) {
+                obj.material.forEach(m => m.dispose());
+            } else {
+                obj.material.dispose();
+            }
+        }
+    });
+
+    // 关键修复：重置场景全局属性，防止战斗环境污染大世界
+    scene.background = new THREE.Color(0x000000); // 重置背景为黑色
+    scene.fog = null; // 清除雾效
+    
+    // 确保渲染器状态回到默认 (针对可能的过曝问题)
+    renderer.toneMappingExposure = 1.0; 
+    
+    // 2. 进入新状态
     if (state === GameState.WORLD) {
-        // 进入大世界
         worldInstance = new WorldScene(scene, camera, renderer);
         worldInstance.init(selectedHero);
         worldInstance.start();
     } else if (state === GameState.BATTLE) {
-        // 进入战斗
         if (worldInstance) worldInstance.stop();
-        battleInstance = new BattleScene(scene, camera);
+        battleInstance = new BattleScene(scene, camera, config);
         battleInstance.start();
     }
 }

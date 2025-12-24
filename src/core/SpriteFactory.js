@@ -9,18 +9,50 @@ export const ASSET_REGISTRY = {
         CHARS1: '/assets/character.png',
         CHARS2: '/assets/character2.png',
         CHARS3: '/assets/character3.png',
-        ITEMS: '/assets/items.png'
+        ITEMS: '/assets/items.png',
+        ENEMY: '/assets/enemy.png' // 新增野怪图集
     },
     UNITS: {
         // 主角
         'qijin': { sheet: 'CHARS3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'left' },
         'lichengen': { sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },
         
-        // 环境物体
+        // 环境与建筑
         'main_city': { sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 2, scale: 4.0 }, 
         'gold_pile': { sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 4, scale: 1.2 },
+        'items': { sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 1, scale: 1.2 },
 
-        // 兵种 (统一使用 4x4 网格配置)
+        // --- 野怪系列 (基于 enemy.png 4x4 网格) ---
+        // 第一行：野生动物
+        'wild_boar': { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 1, scale: 1.3 },
+        'wolf':      { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 2, scale: 1.3 },
+        'tiger':     { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 3, scale: 1.6 },
+        'bear':      { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 4, scale: 1.8 },
+
+        // 第二行：山贼与叛军
+        'bandit':        { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4 },
+        'bandit_archer': { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4 },
+        'rebel_soldier': { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4 },
+        'rebel_axeman':  { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4 },
+
+        // 第三行：杂物与毒虫
+        'snake':    { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 1, scale: 1.0 },
+        'bats':     { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 2, scale: 1.2 },
+        'deer':     { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 3, scale: 1.3 },
+        'pheasant': { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 4, scale: 1.0 },
+
+        // 第四行：精英与特殊
+        'assassin_monk': { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4 },
+        'zombie':        { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4 },
+        'heavy_knight':  { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 3, scale: 1.6 },
+        'shadow_ninja':  { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 4, scale: 1.4 },
+
+        // 旧映射兼容重定向 (用于平滑过渡)
+        'wild_beast':   { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 3, scale: 1.6 }, // 指向老虎
+        'rebel_flag':   { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4 }, // 指向叛军甲兵
+        'sword_master': { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4 }, // 指向刺客武僧
+
+        // 兵种 (局内战斗单位)
         'melee': { sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 1, scale: 1.4, defaultFacing: 'right' },
         'ranged': { sheet: 'CHARS1', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4, defaultFacing: 'right' },
         'tiance': { sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },

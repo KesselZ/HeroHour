@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { spriteFactory } from '../core/SpriteFactory.js';
 import { rng } from '../core/Random.js';
 import { modifierManager } from '../core/ModifierManager.js';
+import { worldManager } from '../core/WorldManager.js';
 
 /**
  * 基础战斗单位类
@@ -419,7 +420,160 @@ export class BaseUnit extends THREE.Group {
     }
 }
 
+/**
+ * 英雄单位：主角亲自参战，拥有高属性和独特逻辑
+ */
+export class HeroUnit extends BaseUnit {
+    static displayName = '主角';
+    constructor(side, index, projectileManager) {
+        const heroData = worldManager.heroData;
+        
+        // 英雄属性计算：基础属性 + 等级加成
+        const hp = heroData.hpMax + (heroData.level - 1) * 50;
+        const atk = heroData.stats.atk + (heroData.level - 1) * 5;
+        
+        super({
+            side,
+            index,
+            type: heroData.id, 
+            hp: hp,
+            speed: heroData.stats.speed,
+            attackDamage: atk,
+            attackRange: (heroData.id === 'qijin' ? 6.0 : 1.2),
+            attackSpeed: 800, // 英雄攻击频率通常较快
+            projectileManager,
+            cost: 0
+        });
+
+        this.isHero = true;
+        this.level = heroData.level;
+        this.health = (heroData.hpCurrent !== undefined && heroData.hpCurrent > 0) ? heroData.hpCurrent : hp;
+        
+        // 英雄更加醒目：体型变大 50%
+        this.scale.set(1.5, 1.5, 1.5);
+
+        // 创建英雄专属血条
+        this.createHeroHealthBar();
+    }
+
+    /**
+     * 创建头顶 3D 血条
+     */
+    createHeroHealthBar() {
+        // 血条底色 (黑)
+        const bgGeo = new THREE.PlaneGeometry(0.8, 0.1);
+        const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+        const bg = new THREE.Mesh(bgGeo, bgMat);
+        bg.position.y = 1.2; // 位于头顶
+        this.add(bg);
+
+        // 血条填充 (红)
+        const fillGeo = new THREE.PlaneGeometry(0.78, 0.08);
+        const fillMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        this.hpFill = new THREE.Mesh(fillGeo, fillMat);
+        this.hpFill.position.set(0, 0, 0.01); // 稍微靠前
+        bg.add(this.hpFill);
+
+        // 记录初始宽度用于缩放
+        this.hpBarFullWidth = 0.78;
+    }
+
+    updateHealthBar() {
+        if (!this.hpFill) return;
+        const pct = Math.max(0, this.health / this.maxHealth);
+        this.hpFill.scale.x = pct;
+        // 调整位置让它从左侧对齐缩放
+        this.hpFill.position.x = -(1 - pct) * (this.hpBarFullWidth / 2);
+    }
+
+    takeDamage(amount) {
+        super.takeDamage(amount);
+        // 实时更新 3D 血条
+        this.updateHealthBar();
+        // 实时同步英雄血量到全局数据
+        if (this.side === 'player') {
+            worldManager.heroData.hpCurrent = this.health;
+        }
+    }
+
+    // 英雄死亡逻辑重写
+    die() {
+        if (this.isDead) return;
+        super.die();
+        console.log(`%c[战损] %c英雄 ${this.type} 撤离了战场！`, 'color: #ff0000; font-weight: bold', 'color: #fff');
+        
+        // 触发英雄败北事件（可以导致战斗直接结束或士气崩溃）
+        if (this.side === 'player') {
+            window.dispatchEvent(new CustomEvent('hero-defeated', { detail: { heroId: this.type } }));
+        }
+    }
+
+    performAttack(enemies, allies) {
+        // 根据英雄 ID 选择不同的攻击模组
+        const heroData = worldManager.heroData;
+        if (heroData.id === 'qijin') {
+            this.performChunyangAttack(enemies, allies);
+        } else if (heroData.id === 'lichengen') {
+            this.performTianceAttack(enemies, allies);
+        }
+    }
+
+    // 复用或增强纯阳攻击逻辑
+    performChunyangAttack(enemies, allies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            
+            // 英雄版：一次射出 5 把气剑，且带有更强的视觉效果
+            const swordCount = 5;
+            for (let i = 0; i < swordCount; i++) {
+                setTimeout(() => {
+                    if (this.isDead || !this.target || this.target.isDead) return;
+                    const spawnPos = this.position.clone().add(new THREE.Vector3((i - 2) * 0.3, 1.5, 0));
+                    if (this.projectileManager) {
+                        this.projectileManager.spawn({
+                            startPos: spawnPos,
+                            target: this.target,
+                            speed: 0.3,
+                            damage: this.attackDamage / 3, 
+                            type: 'air_sword'
+                        });
+                    }
+                }, i * 100);
+            }
+        }
+    }
+
+    // 复用或增强天策横扫逻辑
+    performTianceAttack(enemies, allies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+
+            // 英雄版：270度超大范围横扫，附带强力击退
+            const radius = 2.5;
+            enemies.forEach(enemy => {
+                if (enemy.isDead) return;
+                const dist = this.position.distanceTo(enemy.position);
+                if (dist < radius) {
+                    const dirToEnemy = enemy.position.clone().sub(this.position).normalize();
+                    const forward = new THREE.Vector3(1, 0, 0); 
+                    const dot = forward.dot(dirToEnemy);
+                    
+                    if (dot > -0.5) { // 270度范围
+                        enemy.takeDamage(this.attackDamage);
+                        enemy.applyKnockback(this.position, 0.15); // 强力击退
+                    }
+                }
+            });
+        }
+    }
+}
+
 export class MeleeSoldier extends BaseUnit {
+    static displayName = '天策弟子';
     constructor(side, index, projectileManager) {
         super({
             side,
@@ -437,6 +591,7 @@ export class MeleeSoldier extends BaseUnit {
 }
 
 export class RangedSoldier extends BaseUnit {
+    static displayName = '长歌弟子';
     constructor(side, index, projectileManager) {
         super({
             side,
@@ -475,6 +630,7 @@ export class RangedSoldier extends BaseUnit {
  * 射手：射程更远，使用箭矢 (第二行第四个)
  */
 export class Archer extends BaseUnit {
+    static displayName = '唐门射手';
     constructor(side, index, projectileManager) {
         super({
             side,
@@ -512,6 +668,7 @@ export class Archer extends BaseUnit {
  * 奶妈：治疗队友 (第二行第二个)
  */
 export class Healer extends BaseUnit {
+    static displayName = '万花补给';
     constructor(side, index, projectileManager) {
         super({
             side,
@@ -537,8 +694,6 @@ export class Healer extends BaseUnit {
     }
 
     performAttack(enemies, allies) {
-        if (!this.target || this.target.side !== this.side) return;
-
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
@@ -557,10 +712,145 @@ export class Healer extends BaseUnit {
     }
 }
 
+// ==========================================
+// 野外势力与动物 (基于 enemy.png)
+// ==========================================
+
+// --- 第一行：野生动物 (纯近战，移速较快) ---
+export class WildBoar extends BaseUnit {
+    static displayName = '野猪';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'wild_boar', hp: 150, speed: 0.04, attackRange: 0.8, attackDamage: 12, cost: 2, projectileManager });
+    }
+}
+
+export class Wolf extends BaseUnit {
+    static displayName = '野狼';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'wolf', hp: 100, speed: 0.05, attackRange: 0.8, attackDamage: 15, cost: 2, projectileManager });
+    }
+}
+
+export class Tiger extends BaseUnit {
+    static displayName = '猛虎';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'tiger', hp: 250, speed: 0.045, attackRange: 1.2, attackDamage: 25, cost: 5, projectileManager });
+    }
+}
+
+export class Bear extends BaseUnit {
+    static displayName = '黑熊';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'bear', hp: 400, speed: 0.025, attackRange: 1.0, attackDamage: 30, cost: 6, projectileManager });
+    }
+}
+
+// --- 第二行：山贼与叛军 ---
+export class Bandit extends BaseUnit {
+    static displayName = '山贼刀匪';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'bandit', hp: 120, speed: 0.035, attackRange: 0.8, attackDamage: 18, cost: 2, projectileManager });
+    }
+}
+
+export class BanditArcher extends BaseUnit {
+    static displayName = '山贼弩匪';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'bandit_archer', hp: 80, speed: 0.03, attackRange: 8.0, attackDamage: 15, attackSpeed: 2000, cost: 3, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 
+                target: this.target, 
+                speed: 0.25, 
+                damage: this.attackDamage, 
+                type: 'arrow' 
+            });
+        }
+    }
+}
+
+export class RebelSoldier extends BaseUnit {
+    static displayName = '叛军甲兵';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'rebel_soldier', hp: 180, speed: 0.025, attackRange: 0.8, attackDamage: 20, cost: 3, projectileManager });
+    }
+}
+
+export class RebelAxeman extends BaseUnit {
+    static displayName = '叛军斧兵';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'rebel_axeman', hp: 160, speed: 0.03, attackRange: 0.8, attackDamage: 22, cost: 3, projectileManager });
+    }
+}
+
+// --- 第三行：毒虫与飞禽 ---
+export class Snake extends BaseUnit {
+    static displayName = '毒蛇';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'snake', hp: 50, speed: 0.04, attackRange: 0.6, attackDamage: 10, cost: 1, projectileManager });
+    }
+}
+
+export class Bats extends BaseUnit {
+    static displayName = '蝙蝠群';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'bats', hp: 40, speed: 0.06, attackRange: 0.5, attackDamage: 8, cost: 1, projectileManager });
+    }
+}
+
+export class Deer extends BaseUnit {
+    static displayName = '林间小鹿';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'deer', hp: 80, speed: 0.05, attackRange: 0.5, attackDamage: 2, cost: 1, projectileManager });
+    }
+}
+
+export class Pheasant extends BaseUnit {
+    static displayName = '山鸡';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'pheasant', hp: 30, speed: 0.04, attackRange: 0.4, attackDamage: 1, cost: 1, projectileManager });
+    }
+}
+
+// --- 第四行：精英与特殊 ---
+export class AssassinMonk extends BaseUnit {
+    static displayName = '苦修刺客';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'assassin_monk', hp: 150, speed: 0.045, attackRange: 0.8, attackDamage: 25, attackSpeed: 800, cost: 5, projectileManager });
+    }
+}
+
+export class Zombie extends BaseUnit {
+    static displayName = '毒尸傀儡';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'zombie', hp: 300, speed: 0.015, attackRange: 0.7, attackDamage: 15, cost: 4, projectileManager });
+    }
+}
+
+export class HeavyKnight extends BaseUnit {
+    static displayName = '铁浮屠重骑';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'heavy_knight', hp: 500, speed: 0.02, attackRange: 1.5, attackDamage: 35, cost: 8, projectileManager });
+    }
+}
+
+export class ShadowNinja extends BaseUnit {
+    static displayName = '隐之影';
+    constructor(side, index, projectileManager) {
+        super({ side, index, type: 'shadow_ninja', hp: 120, speed: 0.06, attackRange: 0.8, attackDamage: 28, attackSpeed: 600, cost: 7, projectileManager });
+    }
+}
+
 /**
  * 藏剑：旋风斩 (第二行第三个)
  */
 export class Cangjian extends BaseUnit {
+    static displayName = '藏剑弟子';
     constructor(side, index, projectileManager) {
         super({
             side,
@@ -654,6 +944,7 @@ export class Cangjian extends BaseUnit {
  * 苍云：肉盾，攻击方式类似近战，走得慢 (第三行第三个)
  */
 export class Cangyun extends BaseUnit {
+    static displayName = '苍云将士';
     constructor(side, index, projectileManager) {
         super({
             side,
@@ -674,6 +965,7 @@ export class Cangyun extends BaseUnit {
  * 天策骑兵：移动快，180度扇形攻击 + 强力击退 (第一行第二个)
  */
 export class Tiance extends BaseUnit {
+    static displayName = '天策骑兵';
     constructor(side, index, projectileManager) {
         super({
             side,
@@ -770,6 +1062,7 @@ export class Tiance extends BaseUnit {
  * 纯阳：远近结合，优先远程，近身切剑 (第一行第三个)
  */
 export class Chunyang extends BaseUnit {
+    static displayName = '纯阳弟子';
     constructor(side, index, projectileManager) {
         super({
             side,

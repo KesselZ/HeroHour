@@ -59,8 +59,13 @@ export class GrasslandEnvironment extends BaseEnvironment {
     }
 
     setupLighting() {
-        // 温暖的主光源
-        const sunLight = new THREE.DirectionalLight(0xfff5e1, 1.2);
+        // 1. 战斗环境光：0.4
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        this.scene.add(ambientLight);
+        this.objects.push(ambientLight);
+
+        // 2. 战斗直射主光源：3.0 (高强度直射光，模拟战场肃杀感)
+        const sunLight = new THREE.DirectionalLight(0xfff5e1, 3.0);
         sunLight.position.set(20, 30, 10);
         sunLight.castShadow = true;
         // 提升阴影质量
@@ -68,11 +73,6 @@ export class GrasslandEnvironment extends BaseEnvironment {
         sunLight.shadow.mapSize.height = 2048;
         this.scene.add(sunLight);
         this.objects.push(sunLight);
-
-        // 补光，让阴影不至于全黑
-        const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x4a7a3a, 0.6);
-        this.scene.add(hemisphereLight);
-        this.objects.push(hemisphereLight);
     }
 
     createProceduralGrass() {

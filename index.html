@@ -31,23 +31,85 @@
                     <div class="res-item"><span class="res-emoji">🪵</span><span id="world-wood">200</span></div>
                 </div>
 
-                <!-- 城镇概览 (左下角) -->
-                <div class="hero-mini-card" id="city-mini-card">
-                    <div class="mini-portrait" id="world-city-portrait"></div>
-                    <div class="mini-stats">
-                        <span id="world-city-display-name">稻香村</span>
-                        <span class="hero-level">当前主城</span>
+                <!-- 大世界 HUD：左下角状态区 -->
+                <div class="hud-bottom-left" id="world-hud-bottom-left">
+                    <!-- 城池卡片：大尺寸 -->
+                    <div class="hud-card hud-card-city" id="city-mini-card">
+                        <div class="hud-portrait" id="world-city-portrait"></div>
+                        <div class="hud-info">
+                            <span class="hud-name" id="world-city-display-name">稻香村</span>
+                            <span class="hud-sub">当前主城</span>
+                        </div>
                     </div>
+
+                    <!-- 英雄卡片：小尺寸，靠右排列 -->
+                    <div class="hud-card hud-card-hero" id="hero-mini-card">
+                        <div class="hud-portrait" id="world-hero-portrait"></div>
+                        <div class="hud-info">
+                            <div class="hud-mini-bars">
+                                <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp"></div></div>
+                                <div class="mini-bar-bg"><div id="hud-hero-mp-bar" class="mini-bar-fill mp"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 侠客属性面板 -->
+                <div id="hero-stats-panel" class="menu-container hidden hero-panel-v3">
+                    <div class="menu-decoration-top">侠客名鉴</div>
+                    <button id="close-hero-panel" class="close-btn-v3">×</button>
+                    
+                    <div class="hero-panel-content">
+                        <div class="hero-panel-left">
+                            <div class="hero-big-portrait" id="hero-panel-portrait"></div>
+                            <h2 id="hero-panel-name">祁进</h2>
+                            <p id="hero-panel-title" class="char-title">紫虚子</p>
+                        </div>
+                        
+                        <div class="hero-panel-right">
+                            <div class="stat-group">
+                                <label>经验 (XP)</label>
+                                <div class="stat-bar-bg"><div id="hero-xp-bar" class="stat-bar-fill xp"></div></div>
+                                <span id="hero-xp-text">0 / 100</span>
+                            </div>
+                            <div class="stat-group">
+                                <label>气血 (HP)</label>
+                                <div class="stat-bar-bg"><div id="hero-hp-bar" class="stat-bar-fill hp"></div></div>
+                                <span id="hero-hp-text">500 / 500</span>
+                            </div>
+                            <div class="stat-group">
+                                <label>内力 (MP)</label>
+                                <div class="stat-bar-bg"><div id="hero-mp-bar" class="stat-bar-fill mp"></div></div>
+                                <span id="hero-mp-text">100 / 100</span>
+                            </div>
+                            
+                            <div class="attributes-grid">
+                                <div class="attr-item">攻击: <span id="attr-atk">45</span></div>
+                                <div class="attr-item">防御: <span id="attr-def">30</span></div>
+                                <div class="attr-item">移速: <span id="attr-speed">0.08</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 下方：技能展示区 -->
+                    <div class="hero-skills-section">
+                        <h3 class="section-label">习得招式</h3>
+                        <div id="hero-panel-skills" class="hero-skills-list">
+                            <!-- 动态填充技能图标 -->
+                        </div>
+                    </div>
+
+                    <div class="menu-decoration-bottom"></div>
                 </div>
 
                 <div id="town-management-panel" class="menu-container hidden town-panel-v3">
                     <div class="menu-decoration-top"></div>
-                    <h2 id="town-name" class="town-title-v3">稻香村<span>管理中心</span></h2>
+                    <button id="close-town-panel" class="close-btn-v3" title="关闭">×</button>
+                    <h2 id="town-name" class="town-title-v3">稻香村</h2>
                     
                     <div class="town-main-content">
                         <!-- 左侧：建筑规划 -->
                         <div class="town-construction-section">
-                            <div class="section-header">建筑规划</div>
                             <div class="construction-container">
                                 <div class="construction-category economy">
                                     <div class="cat-label">商业</div>
@@ -66,7 +128,6 @@
 
                         <!-- 右侧：招募面板 -->
                         <div class="town-recruit-section">
-                            <div class="section-header">招募新兵</div>
                             <div id="town-recruit-list" class="recruit-list-v3"></div>
                         </div>
                     </div>
@@ -84,13 +145,15 @@
                         </div>
                     </div>
 
-                    <div class="town-footer-v3">
-                        <button id="close-town-btn" class="wuxia-btn">完成并退出</button>
-                    </div>
                     <div class="menu-decoration-bottom"></div>
                 </div>
 
-                <div class="world-date-display">天宝 三年 · 春</div>
+                <div class="world-date-display-container">
+                    <div class="time-progress-outer">
+                        <div class="time-progress-circle"></div>
+                    </div>
+                    <div class="world-date-display">天宝 三年 · 春</div>
+                </div>
             </div>
 
             <!-- 角色选择界面 -->
@@ -166,6 +229,39 @@
                     </div>
                 </div>
                 <button id="fight-btn" class="wuxia-btn small-btn">开战！</button>
+            </div>
+
+            <!-- 战斗技能栏 (战斗开始后显示) -->
+            <div id="battle-skill-bar" class="skill-bar-container hidden">
+                <div class="skill-slots" id="skill-slots">
+                    <!-- 动态生成技能按钮 -->
+                </div>
+            </div>
+
+            <!-- 战斗结算界面 -->
+            <div id="battle-settlement" class="menu-container hidden">
+                <div class="menu-decoration-top">战斗统计</div>
+                <h2 id="settlement-title" class="game-title">战斗胜利</h2>
+                <div class="settlement-content">
+                    <div class="loss-section">
+                        <div class="section-label">我方损失兵力</div>
+                        <div id="settlement-losses-list" class="loss-list">
+                            <!-- 动态填充 -->
+                        </div>
+                    </div>
+                </div>
+                <div class="menu-options">
+                    <button id="return-to-world-btn" class="wuxia-btn">返回大世界</button>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 全局提示框 (Tooltip) -->
+            <div id="game-tooltip" class="tooltip-container hidden">
+                <div class="tooltip-title"></div>
+                <div class="tooltip-level"></div>
+                <div class="tooltip-effect"></div>
+                <div class="tooltip-desc"></div>
             </div>
         </div>
         

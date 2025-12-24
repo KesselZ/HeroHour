@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { spriteFactory } from '../core/SpriteFactory.js';
 import { modifierManager } from '../core/ModifierManager.js';
 import { worldManager } from '../core/WorldManager.js'; // 引入数据管家
+import { SkillRegistry } from '../core/SkillSystem.js';
+import { timeManager } from '../core/TimeManager.js';
 
 /**
  * 大世界场景类
@@ -33,53 +35,49 @@ export class WorldScene {
      * @param {string} heroId 选中的英雄 ID
      */
     init(heroId) {
+        // ... 原有初始化 ...
         this.heroId = heroId;
-        
-        // 1. 创建地面 (瓦片地图感)
         this.createGround();
-        
-        // 2. 创建主角小人
         this.createPlayer();
-        
-        // 3. 设置灯光
         this.setupLights();
-
-        // 4. 初始化 UI
         this.initUI();
-        
-        // 5. 设置摄像机初始位置
         this.camera.position.set(0, 10, 10);
         this.camera.lookAt(0, 0, 0);
 
-        // 6. 应用英雄速度加成
         const bonus = modifierManager.getModifiedValue({ side: 'player', type: 'hero' }, 'world_speed', 1.0);
         this.moveSpeed *= bonus;
 
-        // 7. 放置主城
+        // 7. 放置交互物体
         this.spawnMainCity();
+
+        // 在主城附近放置一个测试用的山贼组 (坐标: -5, 5)
+        this.spawnEnemyGroup('bandits', -5, 5); 
+
+        // 其他远处的敌人组
+        this.spawnEnemyGroup('wild_animals', 15, 10);  // 远处的野兽
+        this.spawnEnemyGroup('shadow_sect', -15, 20); // 远处的影之教派
     }
 
     initUI() {
-        // 1. 设置左下角城市显示 (使用当前管理的城市数据)
+        // ... 原有初始化代码 ...
         const cityData = worldManager.cities['main_city_1'];
         
-        // 设置左下角城市名字 (显示稻香村)
         const cityDisplayName = document.getElementById('world-city-display-name');
         if (cityDisplayName) cityDisplayName.innerText = cityData.name;
 
-        // 设置左下角城市图标 (对应 items.png 第一行第二个图标)
         const cityPortrait = document.getElementById('world-city-portrait');
         if (cityPortrait) {
             const iconStyle = spriteFactory.getIconStyle(cityData.getIconKey());
             Object.assign(cityPortrait.style, iconStyle);
         }
 
-        // 2. 绑定主城界面关闭按钮
-        document.getElementById('close-town-btn').onclick = () => {
-            document.getElementById('town-management-panel').classList.add('hidden');
-        };
+        const closeBtn = document.getElementById('close-town-panel');
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                document.getElementById('town-management-panel').classList.add('hidden');
+            };
+        }
 
-        // 3. 绑定左下角卡片点击事件 (打开默认主城)
         const miniCard = document.getElementById('city-mini-card');
         if (miniCard) {
             miniCard.onclick = () => {
@@ -87,8 +85,164 @@ export class WorldScene {
             };
         }
 
-        // 4. 初始化资源显示
+        const heroMiniCard = document.getElementById('hero-mini-card');
+        if (heroMiniCard) {
+            heroMiniCard.onclick = () => {
+                this.openHeroStats();
+            };
+        }
+
+        const closeHeroBtn = document.getElementById('close-hero-panel');
+        if (closeHeroBtn) {
+            closeHeroBtn.onclick = () => {
+                document.getElementById('hero-stats-panel').classList.add('hidden');
+            };
+        }
+
+        // 监听英雄状态变化事件 (例如在战斗中释放技能扣蓝)
+        window.addEventListener('hero-stats-changed', () => {
+            this.updateHeroHUD();
+        });
+
         worldManager.updateHUD();
+        this.updateHeroHUD(); // 初始化英雄头像
+
+        // 初始化提示框逻辑
+        this.setupTooltip();
+    }
+
+    /**
+     * 更新左下角英雄 HUD (头像与简易血条/蓝条)
+     */
+    updateHeroHUD() {
+        const heroPortrait = document.getElementById('world-hero-portrait');
+        const hpBar = document.getElementById('hud-hero-hp-bar');
+        const mpBar = document.getElementById('hud-hero-mp-bar');
+        
+        const heroData = worldManager.heroData;
+        
+        if (heroPortrait) {
+            // 使用统一的背景样式
+            const iconStyle = spriteFactory.getIconStyle(heroData.id);
+            Object.assign(heroPortrait.style, iconStyle);
+        }
+
+        if (hpBar) {
+            const hpPct = (heroData.hpCurrent / heroData.hpMax) * 100;
+            hpBar.style.width = `${hpPct}%`;
+        }
+
+        if (mpBar) {
+            const mpPct = (heroData.mpCurrent / heroData.mpMax) * 100;
+            mpBar.style.width = `${mpPct}%`;
+        }
+    }
+
+    /**
+     * 打开英雄属性面板
+     */
+    openHeroStats() {
+        const panel = document.getElementById('hero-stats-panel');
+        const data = worldManager.heroData;
+        
+        // 填充数据
+        document.getElementById('hero-panel-name').innerText = (data.id === 'qijin' ? '祁进' : '李承恩');
+        document.getElementById('hero-panel-title').innerText = (data.id === 'qijin' ? '紫虚子' : '天策府统领');
+        
+        // 肖像
+        const portrait = document.getElementById('hero-panel-portrait');
+        const iconStyle = spriteFactory.getIconStyle(data.id);
+        Object.assign(portrait.style, iconStyle);
+        
+        // 进度条
+        const xpPct = (data.xp / data.xpMax) * 100;
+        const hpPct = (data.hpCurrent / data.hpMax) * 100;
+        const mpPct = (data.mpCurrent / data.mpMax) * 100;
+        
+        document.getElementById('hero-xp-bar').style.width = `${xpPct}%`;
+        document.getElementById('hero-hp-bar').style.width = `${hpPct}%`;
+        document.getElementById('hero-mp-bar').style.width = `${mpPct}%`;
+        
+        document.getElementById('hero-xp-text').innerText = `${data.xp} / ${data.xpMax}`;
+        document.getElementById('hero-hp-text').innerText = `${Math.floor(data.hpCurrent)} / ${data.hpMax}`;
+        document.getElementById('hero-mp-text').innerText = `${data.mpCurrent} / ${data.mpMax}`;
+        
+        // 基础属性
+        document.getElementById('attr-atk').innerText = data.stats.atk + (data.level - 1) * 5;
+        document.getElementById('attr-def').innerText = data.stats.def;
+        document.getElementById('attr-speed').innerText = data.stats.speed.toFixed(2);
+        
+        // 渲染技能列表
+        const skillsContainer = document.getElementById('hero-panel-skills');
+        skillsContainer.innerHTML = '';
+        data.skills.forEach(skillId => {
+            const skill = SkillRegistry[skillId];
+            if (!skill) return;
+
+            const slot = document.createElement('div');
+            slot.className = 'hero-skill-slot';
+            
+            const iconStyle = spriteFactory.getIconStyle(skill.icon);
+            slot.innerHTML = `
+                <div class="skill-icon-small" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+            `;
+
+            // 绑定 Tooltip
+            slot.onmouseenter = () => this.showTooltip({
+                name: skill.name,
+                level: `消耗: ${skill.cost} 内力`,
+                effect: `冷却: ${skill.cooldown / 1000} 秒`,
+                description: skill.description
+            });
+            slot.onmouseleave = () => this.hideTooltip();
+
+            skillsContainer.appendChild(slot);
+        });
+
+        panel.classList.remove('hidden');
+    }
+
+    setupTooltip() {
+        this.tooltip = document.getElementById('game-tooltip');
+        if (!this.tooltip) {
+            console.warn("Tooltip element #game-tooltip not found in DOM.");
+            return;
+        }
+        
+        this.tooltipTitle = this.tooltip.querySelector('.tooltip-title');
+        this.tooltipLevel = this.tooltip.querySelector('.tooltip-level');
+        this.tooltipEffect = this.tooltip.querySelector('.tooltip-effect');
+        this.tooltipDesc = this.tooltip.querySelector('.tooltip-desc');
+
+        window.addEventListener('mousemove', (e) => {
+            if (!this.tooltip.classList.contains('hidden')) {
+                const x = e.clientX + 15;
+                const y = e.clientY + 15;
+                
+                // 边界检测：防止超出屏幕右侧或底部
+                const tooltipWidth = this.tooltip.offsetWidth;
+                const tooltipHeight = this.tooltip.offsetHeight;
+                
+                const finalX = (x + tooltipWidth > window.innerWidth) ? (e.clientX - tooltipWidth - 15) : x;
+                const finalY = (y + tooltipHeight > window.innerHeight) ? (e.clientY - tooltipHeight - 15) : y;
+                
+                this.tooltip.style.left = `${finalX}px`;
+                this.tooltip.style.top = `${finalY}px`;
+            }
+        });
+    }
+
+    showTooltip(data) {
+        if (!this.tooltip) return;
+        this.tooltipTitle.innerText = data.name;
+        this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
+        this.tooltipEffect.innerText = `● ${data.effect}`;
+        this.tooltipDesc.innerText = data.description;
+        this.tooltip.classList.remove('hidden');
+    }
+
+    hideTooltip() {
+        if (this.tooltip) this.tooltip.classList.add('hidden');
     }
 
     /**
@@ -98,7 +252,7 @@ export class WorldScene {
         const panel = document.getElementById('town-management-panel');
         const cityData = worldManager.cities[cityId];
         
-        document.getElementById('town-name').innerHTML = `${cityData.name}<span>城市管理</span>`;
+        document.getElementById('town-name').innerText = cityData.name;
         panel.classList.remove('hidden');
 
         this.refreshTownUI(cityId);
@@ -118,23 +272,30 @@ export class WorldScene {
             
             cityData.buildings[cat].forEach(build => {
                 const card = document.createElement('div');
-                card.className = `building-card ${build.level === 0 ? 'locked' : ''}`;
                 const isMax = build.level >= build.maxLevel;
+                card.className = `building-card lv-${build.level} ${isMax ? 'is-max' : ''}`;
                 
                 card.innerHTML = `
                     <div class="building-icon" style="${this.getIconStyleString(build.icon)}"></div>
-                    <span class="building-name">${build.name} (Lv.${build.level})</span>
+                    <span class="building-name">${build.name}</span>
                     <span class="building-cost">${isMax ? '已满级' : `💰${build.cost.gold} 🪵${build.cost.wood}`}</span>
                 `;
                 
+                // 绑定提示框显示
+                card.onmouseenter = () => this.showTooltip(build);
+                card.onmouseleave = () => this.hideTooltip();
+
                 card.onclick = () => {
                     if (isMax) return;
+                    
+                    const goldCost = build.cost.gold;
+                    const woodCost = build.cost.wood;
+
                     // 检查资源并升级
-                    if (worldManager.resources.gold >= build.cost.gold && worldManager.resources.wood >= build.cost.wood) {
-                        worldManager.resources.gold -= build.cost.gold;
-                        worldManager.resources.wood -= build.cost.wood;
+                    if (worldManager.resources.gold >= goldCost && worldManager.resources.wood >= woodCost) {
+                        worldManager.spendGold(goldCost);
+                        worldManager.spendWood(woodCost);
                         cityData.upgradeBuilding(cat, build.id);
-                        worldManager.updateHUD();
                         this.refreshTownUI(cityId);
                     } else {
                         alert('资源不足，无法建设！');
@@ -160,7 +321,12 @@ export class WorldScene {
 
         const recruitList = document.getElementById('town-recruit-list');
         recruitList.innerHTML = '';
-        ['melee', 'ranged', 'tiance', 'chunyang'].forEach(type => {
+        
+        // 使用动态解锁逻辑获取可招募列表
+        const availableRecruits = worldManager.getAvailableRecruits(cityId);
+        
+        availableRecruits.forEach(unitInfo => {
+            const type = unitInfo.type;
             const item = document.createElement('div');
             item.className = 'recruit-item';
             const cost = worldManager.unitCosts[type].gold;
@@ -216,14 +382,14 @@ export class WorldScene {
 
     getUnitName(type) {
         const names = {
-            'melee': '近战步兵',
-            'ranged': '远程射手',
+            'melee': '天策弟子',
+            'ranged': '长歌弟子',
             'tiance': '天策骑兵',
             'chunyang': '纯阳弟子',
             'cangjian': '藏剑弟子',
             'cangyun': '苍云将士',
-            'archer': '弓箭手',
-            'healer': '补给兵'
+            'archer': '唐门射手',
+            'healer': '万花补给'
         };
         return names[type] || type;
     }
@@ -236,6 +402,35 @@ export class WorldScene {
         
         this.scene.add(city);
         this.interactables.push({ mesh: city, type: 'city', id: 'main_city_1' });
+    }
+
+    /**
+     * 在大世界生成一队敌人 (老虎/叛军等)
+     * @param {string} templateId 模板ID (来自 WorldManager.enemyTemplates)
+     */
+    spawnEnemyGroup(templateId, x, z) {
+        const template = worldManager.enemyTemplates[templateId];
+        if (!template) return;
+
+        // 创建大世界图标 (例如老虎)
+        const groupSprite = spriteFactory.createUnitSprite(template.overworldIcon);
+        groupSprite.position.set(x, 0.8, z);
+        this.scene.add(groupSprite);
+
+        // 计算这队的随机强度
+        const points = Math.floor(
+            Math.random() * (template.pointRange[1] - template.pointRange[0] + 1)
+        ) + template.pointRange[0];
+
+        this.interactables.push({
+            mesh: groupSprite,
+            type: 'enemy_group',
+            config: {
+                name: template.name,
+                unitPool: template.unitPool,
+                totalPoints: points
+            }
+        });
     }
 
     createGround() {
@@ -264,10 +459,10 @@ export class WorldScene {
     }
 
     setupLights() {
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // 大世界环境光：1.0
         this.scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.6); // 大世界直射光：1.6
         dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
         this.scene.add(dirLight);
@@ -278,9 +473,12 @@ export class WorldScene {
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         
-        // 显示 World HUD (后续实现)
+        // 显示 World HUD
         const hud = document.getElementById('world-ui');
         if (hud) hud.classList.remove('hidden');
+
+        // 初始化时间显示
+        timeManager.updateUI();
     }
 
     stop() {
@@ -297,6 +495,13 @@ export class WorldScene {
 
     update(deltaTime) {
         if (!this.isActive || !this.playerHero) return;
+
+        // 更新时间系统
+        const seasonChanged = timeManager.update();
+        if (seasonChanged) {
+            // 季度更替时结算一次产出
+            worldManager.processResourceProduction();
+        }
 
         // 1. 处理移动输入
         const moveDir = new THREE.Vector3(0, 0, 0);
@@ -344,19 +549,23 @@ export class WorldScene {
      */
     checkCityInteraction() {
         this.interactables.forEach(item => {
+            const dist = this.playerHero.position.distanceTo(item.mesh.position);
+            
             if (item.type === 'city') {
-                const dist = this.playerHero.position.distanceTo(item.mesh.position);
                 const townPanel = document.getElementById('town-management-panel');
-                
-                // 当主角靠近主城 (距离 < 3.0) 且面板未打开时
                 if (dist < 3.0) {
                     if (townPanel.classList.contains('hidden')) {
-                        // 自动打开或通过交互提示打开，这里我们直接打开（符合用户“点击/进入”描述）
                         this.openTownManagement(item.id || 'main_city_1');
                     }
-                } else {
-                    // 离开范围自动关闭（可选，或者让用户手动点完成）
-                    // townPanel.classList.add('hidden');
+                }
+            } else if (item.type === 'enemy_group') {
+                // 如果靠近敌人组，触发战斗
+                if (dist < 1.5) {
+                    console.log(`%c[开战] %c遭遇 ${item.config.name}！`, 'color: #ff4444; font-weight: bold', 'color: #fff');
+                    // 派发全局事件切换到战斗场景，并传入该组的配置
+                    window.dispatchEvent(new CustomEvent('start-battle', { 
+                        detail: item.config 
+                    }));
                 }
             }
         });
