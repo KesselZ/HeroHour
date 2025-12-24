@@ -10,6 +10,7 @@ export const ASSET_REGISTRY = {
         CHARS2: '/assets/character2.png',
         CHARS3: '/assets/character3.png',
         ITEMS: '/assets/items.png',
+        ITEMS2: '/assets/items2.png',
         ENEMY: '/assets/enemy.png',
         SKILL1: '/assets/skill.png',
         SKILL2: '/assets/skill2.png'
@@ -34,6 +35,19 @@ export const ASSET_REGISTRY = {
         'main_city': { name: '主城', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 2, scale: 4.0 }, 
         'gold_pile': { name: '金币堆', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 4, scale: 1.2 },
         'items': { name: '物品堆', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 1, scale: 1.2 },
+        'tree': { name: '阔叶树', sheet: 'ITEMS', rows: 4, cols: 4, r: 3, c: 1, scale: 2.5 },
+        'chest': { name: '宝箱', sheet: 'ITEMS', rows: 4, cols: 4, r: 3, c: 3, scale: 1.2 },
+        'boxes': { name: '木箱堆', sheet: 'ITEMS', rows: 4, cols: 4, r: 2, c: 4, scale: 1.5 },
+        'mine': { name: '矿洞', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 3, scale: 3.0 },
+
+        // --- items2.png 系列 ---
+        'wood_small': { name: '小堆木材', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 3, scale: 1.2 },
+        'wood_large': { name: '大堆木材', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 4, scale: 1.5 },
+        'house_1': { name: '民居一', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 1, scale: 3.0 },
+        'house_2': { name: '民居二', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 2, scale: 3.0 },
+        'house_3': { name: '民居三', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 3, scale: 3.0 },
+        'gold_mine_world': { name: '金矿', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
+        'sawmill_world': { name: '伐木场', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 2, scale: 3.5 },
 
         // --- 野怪系列 (基于 enemy.png 4x4 网格) ---
         // 第一行：野生动物

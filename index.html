@@ -8,6 +8,9 @@
 </head>
 <body>
     <div id="app">
+        <!-- 全局通知容器 -->
+        <div id="notification-container"></div>
+
         <!-- UI 层：主菜单、UI面板等 -->
         <div id="ui-layer">
             <div id="menu-background" class="menu-bg"></div>
@@ -148,15 +151,18 @@
                     <div class="menu-decoration-bottom"></div>
                 </div>
 
-                <!-- 招式学习面板 (嵌套在属性面板之上或独立) -->
-                <div id="skill-learn-panel" class="menu-container hidden skill-learn-v3">
+                <!-- 招式学习面板 (独立于属性面板，确保居中) -->
+                <div id="skill-learn-panel" class="hidden skill-learn-v3">
                     <div class="menu-decoration-top">秘籍研习</div>
                     <button id="close-skill-learn" class="close-btn-v3">×</button>
                     <div class="skill-learn-content">
-                        <div class="skill-learn-tabs">
-                            <button class="tab-btn active" data-sect="chunyang">纯阳招式</button>
-                            <button class="tab-btn" data-sect="tiance">天策招式</button>
-                            <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
+                        <div class="skill-learn-header-row">
+                            <div class="skill-learn-tabs">
+                                <button class="tab-btn active" data-sect="chunyang">纯阳招式</button>
+                                <button class="tab-btn" data-sect="tiance">天策招式</button>
+                                <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
+                            </div>
+                            <div class="learn-sp-tag">可用技能点: <span id="learn-panel-sp">0</span></div>
                         </div>
                         <div id="skill-list-to-learn" class="skill-grid-v3">
                             <!-- 动态生成待学习技能 -->

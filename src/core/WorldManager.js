@@ -194,7 +194,10 @@ class WorldManager {
             'main_city_1': new City('main_city_1', '稻香村')
         };
 
-        // 4. 兵种价格定义
+        // 4. 占领建筑状态
+        this.capturedBuildings = []; // { id, type, owner, pos }
+
+        // 5. 兵种价格定义
         this.unitCosts = {
             'melee': { gold: 50 },
             'ranged': { gold: 80 },
@@ -284,11 +287,20 @@ class WorldManager {
         let totalGoldGain = 0;
         let totalWoodGain = 0;
         
+        // 1. 城镇产出
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
             totalGoldGain += city.production.gold;
             totalWoodGain += city.production.wood;
         }
+
+        // 2. 占领建筑产出
+        this.capturedBuildings.forEach(b => {
+            if (b.owner === 'player') {
+                if (b.type === 'gold_mine') totalGoldGain += 200; // 金矿产出更高
+                if (b.type === 'sawmill') totalWoodGain += 100;
+            }
+        });
 
         if (totalGoldGain > 0) this.addGold(totalGoldGain);
         if (totalWoodGain > 0) this.addWood(totalWoodGain);
@@ -327,6 +339,109 @@ class WorldManager {
         this.updateHUD();
     }
 
+    /**
+     * 显示全局通知气泡
+     * @param {string} message 消息内容
+     */
+    showNotification(message) {
+        const container = document.getElementById('notification-container');
+        if (!container) return;
+
+        const notification = document.createElement('div');
+        notification.className = 'game-notification';
+        notification.innerText = message;
+
+        // 限制最大显示数量，防止刷屏
+        if (container.children.length >= 3) {
+            container.removeChild(container.firstChild);
+        }
+
+        container.appendChild(notification);
+
+        // 4秒后自动移除（与 CSS 动画时长匹配）
+        setTimeout(() => {
+            if (notification.parentNode) {
+                container.removeChild(notification);
+            }
+        }, 4000);
+    }
+
+    /**
+     * 处理捡起大世界物品的通用接口
+     * @param {string} itemType 物品类型 ('gold_pile', 'chest' 等)
+     * @returns {Object} 获得的奖励描述
+     */
+    handlePickup(itemType) {
+        let reward = { gold: 0, wood: 0, xp: 0 };
+        let msg = "";
+
+        switch (itemType) {
+            case 'gold_pile':
+                reward.gold = Math.floor(Math.random() * 100) + 50; // 50-150 金币
+                msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
+                break;
+            case 'chest':
+                // 宝箱随机给金币或木材
+                if (Math.random() > 0.5) {
+                    reward.gold = Math.floor(Math.random() * 300) + 100;
+                    msg = `开启了宝箱，获得 ${reward.gold} 💰`;
+                } else {
+                    reward.wood = Math.floor(Math.random() * 100) + 50;
+                    msg = `开启了宝箱，获得 ${reward.wood} 🪵`;
+                }
+                reward.xp = 20; // 开启宝箱给点经验
+                break;
+            case 'wood_small':
+                reward.wood = Math.floor(Math.random() * 50) + 30;
+                msg = `捡到了木材，获得 ${reward.wood} 🪵`;
+                break;
+            case 'wood_large':
+                reward.wood = Math.floor(Math.random() * 150) + 100;
+                msg = `捡到了一大堆木材，获得 ${reward.wood} 🪵`;
+                break;
+        }
+
+        if (reward.gold > 0) this.addGold(reward.gold);
+        if (reward.wood > 0) this.addWood(reward.wood);
+        if (reward.xp > 0) this.gainXP(reward.xp);
+
+        if (msg) {
+            console.log(`%c[交互] %c${msg}`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
+        }
+
+        return reward;
+    }
+
+    /**
+     * 处理占领大世界建筑的接口
+     * @param {Object} buildingItem 交互项
+     */
+    handleCapture(buildingItem) {
+        const { id, config } = buildingItem;
+        
+        // 如果已经是自己的，直接返回
+        if (config.owner === 'player') return;
+
+        // 占领逻辑 (目前简化，直接占领)
+        config.owner = 'player';
+        
+        // 如果不在已记录列表中，则添加
+        if (!this.capturedBuildings.find(b => b.id === id)) {
+            this.capturedBuildings.push({
+                id: id,
+                type: config.type, // 'gold_mine' 或 'sawmill'
+                owner: 'player'
+            });
+        }
+
+        const name = config.type === 'gold_mine' ? '金矿' : '伐木场';
+        this.showNotification(`成功占领了${name}！每季度将产出额外资源。`);
+        console.log(`%c[占领] %c${name} (${id}) 现在归属于 玩家`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        
+        // 触发 UI 刷新或特效 (可选)
+        window.dispatchEvent(new CustomEvent('building-captured', { detail: { id, type: config.type } }));
+    }
+
     updateHUD() {
         const resources = ['gold', 'wood'];
         resources.forEach(res => {
@@ -352,20 +467,29 @@ class WorldManager {
      * 增加金钱接口
      */
     addGold(amount) {
-        if (amount === 0) return;
+        if (amount <= 0) return;
         this.resources.gold += amount;
         this.updateHUD();
         this.triggerResourceAnimation('gold');
+        
+        // 派发事件供大世界显示飘字
+        window.dispatchEvent(new CustomEvent('resource-gained', { 
+            detail: { type: 'gold', amount: amount } 
+        }));
     }
 
     /**
      * 增加木材接口
      */
     addWood(amount) {
-        if (amount === 0) return;
+        if (amount <= 0) return;
         this.resources.wood += amount;
         this.updateHUD();
         this.triggerResourceAnimation('wood');
+
+        window.dispatchEvent(new CustomEvent('resource-gained', { 
+            detail: { type: 'wood', amount: amount } 
+        }));
     }
 
     /**
@@ -396,8 +520,14 @@ class WorldManager {
      * 英雄获得经验并处理升级
      */
     gainXP(amount) {
+        if (amount <= 0) return;
         const data = this.heroData;
         data.xp += amount;
+        
+        // 派发事件供大世界显示飘字
+        window.dispatchEvent(new CustomEvent('resource-gained', { 
+            detail: { type: 'xp', amount: amount } 
+        }));
         
         while (data.xp >= data.xpMax) {
             data.xp -= data.xpMax;

@@ -1,3 +1,5 @@
+import { worldManager } from './WorldManager.js';
+
 /**
  * 时间管理器：管理游戏内的日期、季节和季度更替
  */
@@ -42,7 +44,12 @@ class TimeManager {
     }
 
     onSeasonChange() {
-        console.log(`%c[时节更替] %c天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+        const dateStr = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
+        console.log(`%c[时节更替] %c${dateStr}`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+        
+        // 使用全局通知系统
+        worldManager.showNotification(`时节更替：${dateStr}`);
+        
         // 这里可以触发大世界的资源产出结算
         // worldManager.processResourceProduction();
     }

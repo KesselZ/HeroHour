@@ -4,6 +4,7 @@ import { modifierManager } from '../core/ModifierManager.js';
 import { worldManager } from '../core/WorldManager.js'; // 引入数据管家
 import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
 import { timeManager } from '../core/TimeManager.js';
+import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
 
 /**
  * 大世界场景类
@@ -25,6 +26,9 @@ export class WorldScene {
         
         // 大世界物体
         this.interactables = [];
+        this.activeCityId = null;       // 当前正打开 UI 的城市
+        this.manuallyClosedCityId = null; // 玩家刚刚手动关闭的城市（离开范围前不再弹窗）
+        this.floatingStack = 0;         // 当前正在飘字的层数，用于防重叠
         
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
@@ -35,9 +39,11 @@ export class WorldScene {
      * @param {string} heroId 选中的英雄 ID
      */
     init(heroId) {
-        // ... 原有初始化 ...
+        // 1. 生成随机地图蓝图
+        const mapData = mapGenerator.generate(100);
+
         this.heroId = heroId;
-        this.createGround();
+        this.createGround(mapData);
         this.createPlayer();
         this.setupLights();
         this.initUI();
@@ -50,12 +56,50 @@ export class WorldScene {
         // 7. 放置交互物体
         this.spawnMainCity();
 
+        // 根据地图蓝图随机分布一些物体 (每 10 格尝试生成一次)
+        this.randomizeWorldObjects();
+
         // 在主城附近放置一个测试用的山贼组 (坐标: -5, 5)
         this.spawnEnemyGroup('bandits', -5, 5); 
+    }
 
-        // 其他远处的敌人组
-        this.spawnEnemyGroup('wild_animals', 15, 10);  // 远处的野兽
-        this.spawnEnemyGroup('shadow_sect', -15, 20); // 远处的影之教派
+    /**
+     * 根据生成的地图蓝图随机分布资源
+     */
+    randomizeWorldObjects() {
+        const size = mapGenerator.size;
+        const halfSize = size / 2;
+
+        for (let z = 0; z < size; z++) {
+            for (let x = 0; x < size; x++) {
+                const type = mapGenerator.grid[z][x];
+                if (type !== TILE_TYPES.GRASS) continue;
+
+                // 计算世界坐标
+                const worldX = x - halfSize;
+                const worldZ = z - halfSize;
+
+                // 避开出生点区域 (稻香村在 -10, -10 附近)
+                const distToStart = Math.sqrt(Math.pow(worldX + 10, 2) + Math.pow(worldZ + 10, 2));
+                if (distToStart < 8) continue;
+
+                const roll = Math.random();
+                if (roll < 0.01) {
+                    this.spawnPickup('gold_pile', worldX, worldZ);
+                } else if (roll < 0.015) {
+                    this.spawnPickup('chest', worldX, worldZ);
+                } else if (roll < 0.02) {
+                    this.spawnPickup('wood_small', worldX, worldZ);
+                } else if (roll < 0.025) {
+                    this.spawnCapturedBuilding(Math.random() > 0.5 ? 'gold_mine_world' : 'sawmill_world', 
+                                             Math.random() > 0.5 ? 'gold_mine' : 'sawmill', worldX, worldZ);
+                } else if (roll < 0.05) {
+                    this.spawnDecoration('tree', worldX, worldZ);
+                } else if (roll < 0.055) {
+                    this.spawnDecoration('house_1', worldX, worldZ);
+                }
+            }
+        }
     }
 
     initUI() {
@@ -75,6 +119,9 @@ export class WorldScene {
         if (closeBtn) {
             closeBtn.onclick = () => {
                 document.getElementById('town-management-panel').classList.add('hidden');
+                // 记录手动关闭状态
+                this.manuallyClosedCityId = this.activeCityId;
+                this.activeCityId = null;
             };
         }
 
@@ -130,6 +177,13 @@ export class WorldScene {
         // 监听英雄状态变化事件 (例如在战斗中释放技能扣蓝)
         window.addEventListener('hero-stats-changed', () => {
             this.updateHeroHUD();
+        });
+
+        // 监听资源获得事件，触发大世界飘字
+        window.addEventListener('resource-gained', (e) => {
+            if (!this.isActive || !this.playerHero) return;
+            const { type, amount } = e.detail;
+            this.spawnFloatingText(type, amount);
         });
 
         worldManager.updateHUD();
@@ -261,6 +315,10 @@ export class WorldScene {
         const skillIds = SectSkills[sect] || [];
         const heroData = worldManager.heroData;
 
+        // 更新面板上的技能点显示
+        const panelSpDisplay = document.getElementById('learn-panel-sp');
+        if (panelSpDisplay) panelSpDisplay.innerText = heroData.skillPoints;
+
         skillIds.forEach(id => {
             const skill = SkillRegistry[id];
             if (!skill) return;
@@ -273,7 +331,6 @@ export class WorldScene {
             item.innerHTML = `
                 <div class="skill-learn-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
                 <div class="skill-learn-name">${skill.name}</div>
-                <div class="skill-learn-cost">${isOwned ? '已习得' : '消耗: 1 技能点'}</div>
                 ${!isOwned ? `<button class="wuxia-btn-small buy-skill-btn" data-id="${id}">研习</button>` : ''}
             `;
 
@@ -289,7 +346,7 @@ export class WorldScene {
                         this.openHeroStats(); // 刷新属性面板
                         console.log(`%c[习得] %c成功研习招式：${skill.name}`, 'color: #d4af37; font-weight: bold', 'color: #fff');
                     } else {
-                        alert("技能点不足，请通过战斗升级获取技能点！");
+                        worldManager.showNotification("技能点不足，请通过战斗升级获取技能点！");
                     }
                 };
             }
@@ -394,7 +451,7 @@ export class WorldScene {
                         cityData.upgradeBuilding(cat, build.id);
                         this.refreshTownUI(cityId);
                     } else {
-                        alert('资源不足，无法建设！');
+                        worldManager.showNotification('资源不足，无法建设！');
                     }
                 };
                 container.appendChild(card);
@@ -439,7 +496,7 @@ export class WorldScene {
                 if (worldManager.recruitUnit(type, cityId)) {
                     this.refreshTownUI(cityId);
                 } else {
-                    alert('金钱不足！');
+                    worldManager.showNotification('金钱不足！');
                 }
             };
             recruitList.appendChild(item);
@@ -490,6 +547,24 @@ export class WorldScene {
         return names[type] || type;
     }
 
+    /**
+     * 生成可占领建筑
+     */
+    spawnCapturedBuilding(spriteKey, buildingType, x, z) {
+        const sprite = spriteFactory.createUnitSprite(spriteKey);
+        sprite.position.set(x, 1.2, z); // 建筑通常大一点，位置稍微调高
+        this.scene.add(sprite);
+        this.interactables.push({
+            id: `${buildingType}_${Math.floor(x)}_${Math.floor(z)}`,
+            mesh: sprite,
+            type: 'captured_building',
+            config: {
+                type: buildingType, // 'gold_mine' | 'sawmill'
+                owner: 'none'
+            }
+        });
+    }
+
     spawnMainCity() {
         // ... 保持原样 ...
         const city = spriteFactory.createUnitSprite('main_city');
@@ -529,20 +604,47 @@ export class WorldScene {
         });
     }
 
-    createGround() {
-        // 创建一个巨大的水墨感草地
-        const geometry = new THREE.PlaneGeometry(200, 200);
+    createGround(mapData) {
+        const size = mapGenerator.size;
+        const geometry = new THREE.PlaneGeometry(size, size, size, size);
+        
+        // 为顶点着色以显示地形
+        const colors = [];
+        const color = new THREE.Color();
+
+        for (let z = 0; z <= size; z++) {
+            for (let x = 0; x <= size; x++) {
+                // 读取对应格子的地形类型
+                const gridX = Math.min(x, size - 1);
+                const gridZ = Math.min(z, size - 1);
+                const type = mapData[gridZ][gridX];
+
+                if (type === TILE_TYPES.WATER) {
+                    color.setHex(0x3366aa); // 蓝紫色河流
+                } else if (type === TILE_TYPES.MOUNTAIN) {
+                    color.setHex(0x444444); // 深灰色山脉
+                } else {
+                    color.setHex(0x557755); // 墨绿色草地
+                }
+                colors.push(color.r, color.g, color.b);
+            }
+        }
+
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
         const material = new THREE.MeshStandardMaterial({ 
-            color: 0x557755,
-            roughness: 0.8
+            vertexColors: true,
+            roughness: 0.9,
+            metalness: 0.1
         });
+
         const ground = new THREE.Mesh(geometry, material);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         this.scene.add(ground);
 
         // 添加简单的网格辅助
-        const grid = new THREE.GridHelper(200, 50, 0x445544, 0x334433);
+        const grid = new THREE.GridHelper(size, size / 2, 0x445544, 0x334433);
         grid.position.y = 0.05;
         this.scene.add(grid);
     }
@@ -608,7 +710,24 @@ export class WorldScene {
 
         if (moveDir.lengthSq() > 0) {
             moveDir.normalize();
-            this.playerHero.position.addScaledVector(moveDir, this.moveSpeed);
+            
+            // 预测移动后的位置
+            const nextPos = this.playerHero.position.clone().addScaledVector(moveDir, this.moveSpeed);
+            
+            // 地形通行性检测
+            if (mapGenerator.isPassable(nextPos.x, nextPos.z)) {
+                this.playerHero.position.copy(nextPos);
+            } else {
+                // 如果正前方不通，尝试分量移动 (滑墙效果)
+                const nextPosX = this.playerHero.position.clone().add(new THREE.Vector3(moveDir.x * this.moveSpeed, 0, 0));
+                if (mapGenerator.isPassable(nextPosX.x, nextPosX.z)) {
+                    this.playerHero.position.copy(nextPosX);
+                }
+                const nextPosZ = this.playerHero.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * this.moveSpeed));
+                if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z)) {
+                    this.playerHero.position.copy(nextPosZ);
+                }
+            }
             
             // 2. 处理面向翻转
             if (moveDir.x !== 0) {
@@ -629,9 +748,9 @@ export class WorldScene {
                     texture.needsUpdate = true;
                 }
             }
-
-            // 3. 移动后检测与主城的交互
-            this.checkCityInteraction();
+            
+            // 3. 移动后检测交互
+            this.checkInteractions();
         }
 
         // 3. 相机平滑跟随
@@ -641,29 +760,144 @@ export class WorldScene {
     }
 
     /**
-     * 检测与主城的距离，触发交互
+     * 在英雄头上生成飘字
      */
-    checkCityInteraction() {
-        this.interactables.forEach(item => {
+    spawnFloatingText(type, amount) {
+        const textEl = document.createElement('div');
+        textEl.className = 'floating-text';
+        
+        // 增加堆叠逻辑：如果同时有多个飘字，高度递增
+        this.floatingStack++;
+        const currentStack = this.floatingStack;
+        
+        let color = '#ffffff';
+        let prefix = '';
+        
+        switch (type) {
+            case 'gold':
+                color = '#ffcc00'; // 金色
+                prefix = '💰 +';
+                break;
+            case 'wood':
+                color = '#deb887'; // 木色 (BurlyWood)
+                prefix = '🪵 +';
+                break;
+            case 'xp':
+                color = '#00ffcc'; // 经验青色
+                prefix = '✨ XP +';
+                break;
+        }
+        
+        textEl.style.color = color;
+        textEl.innerText = `${prefix}${amount}`;
+        
+        // 获取英雄在屏幕上的位置
+        const vector = new THREE.Vector3();
+        this.playerHero.getWorldPosition(vector);
+        vector.y += 2.2; // 基础高度在英雄头顶上方
+        
+        vector.project(this.camera);
+        
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
+        
+        // 应用堆叠偏移和微小的随机水平抖动
+        const stackYOffset = (currentStack - 1) * 35; // 每个飘字间隔 35 像素
+        const randomXOffset = (Math.random() - 0.5) * 40; // 随机左右抖动 20 像素
+        
+        textEl.style.left = `${x + randomXOffset}px`;
+        textEl.style.top = `${y - stackYOffset}px`;
+        
+        document.getElementById('ui-layer').appendChild(textEl);
+        
+        // 0.8秒后减少堆叠计数（此时第一段动画已快结束，空出位置）
+        setTimeout(() => {
+            this.floatingStack = Math.max(0, this.floatingStack - 1);
+        }, 800);
+        
+        // 1.5秒后完全移除元素
+        setTimeout(() => {
+            if (textEl.parentNode) {
+                textEl.parentNode.removeChild(textEl);
+            }
+        }, 1500);
+    }
+
+    /**
+     * 检测周围可交互物体
+     */
+    checkInteractions() {
+        const toRemove = [];
+
+        this.interactables.forEach((item, index) => {
             const dist = this.playerHero.position.distanceTo(item.mesh.position);
             
             if (item.type === 'city') {
-                const townPanel = document.getElementById('town-management-panel');
+                const cityId = item.id || 'main_city_1';
                 if (dist < 3.0) {
-                    if (townPanel.classList.contains('hidden')) {
-                        this.openTownManagement(item.id || 'main_city_1');
+                    // 如果还没有记录当前城市，且不是刚刚手动关闭的，则打开
+                    if (this.activeCityId !== cityId && this.manuallyClosedCityId !== cityId) {
+                        this.openTownManagement(cityId);
+                        this.activeCityId = cityId;
+                    }
+                } else {
+                    // 离开范围
+                    if (this.activeCityId === cityId) {
+                        document.getElementById('town-management-panel').classList.add('hidden');
+                        this.activeCityId = null;
+                    }
+                    // 离开范围后，重置手动关闭状态，允许下次进入时再次触发
+                    if (this.manuallyClosedCityId === cityId) {
+                        this.manuallyClosedCityId = null;
                     }
                 }
             } else if (item.type === 'enemy_group') {
-                // 如果靠近敌人组，触发战斗
                 if (dist < 1.5) {
                     console.log(`%c[开战] %c遭遇 ${item.config.name}！`, 'color: #ff4444; font-weight: bold', 'color: #fff');
-                    // 派发全局事件切换到战斗场景，并传入该组的配置
                     window.dispatchEvent(new CustomEvent('start-battle', { 
                         detail: item.config 
                     }));
                 }
+            } else if (item.type === 'pickup') {
+                if (dist < 1.2) {
+                    worldManager.handlePickup(item.pickupType);
+                    this.scene.remove(item.mesh);
+                    toRemove.push(index);
+                }
+            } else if (item.type === 'captured_building') {
+                // 占领逻辑
+                if (dist < 2.0) {
+                    worldManager.handleCapture(item);
+                }
             }
+        });
+
+        for (let i = toRemove.length - 1; i >= 0; i--) {
+            this.interactables.splice(toRemove[i], 1);
+        }
+    }
+
+    /**
+     * 生成装饰性物体（不可交互）
+     */
+    spawnDecoration(key, x, z) {
+        // 改为使用精灵图，保持风格统一
+        const sprite = spriteFactory.createUnitSprite(key);
+        sprite.position.set(x, 0.8, z);
+        this.scene.add(sprite);
+    }
+
+    /**
+     * 生成可拾取资源
+     */
+    spawnPickup(key, x, z) {
+        const sprite = spriteFactory.createUnitSprite(key);
+        sprite.position.set(x, 0.8, z);
+        this.scene.add(sprite);
+        this.interactables.push({
+            mesh: sprite,
+            type: 'pickup',
+            pickupType: key
         });
     }
 }
