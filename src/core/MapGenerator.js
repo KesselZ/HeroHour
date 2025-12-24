@@ -109,10 +109,27 @@ export class MapGenerator {
 
     /**
      * 检查坐标是否可通行
+     * 引入碰撞半径 (radius)，确保角色身体不会渗入山体或湖泊
      */
-    isPassable(worldX, worldZ) {
-        const type = this.getTileType(worldX, worldZ);
-        return type === TILE_TYPES.GRASS;
+    isPassable(worldX, worldZ, radius = 0.6) {
+        // 检查以中心点为圆心的四个边缘点（前、后、左、右）
+        // 以及中心点本身，确保整个身体都在草地上
+        const points = [
+            { x: worldX, z: worldZ },
+            { x: worldX + radius, z: worldZ },
+            { x: worldX - radius, z: worldZ },
+            { x: worldX, z: worldZ + radius },
+            { x: worldX, z: worldZ - radius }
+        ];
+
+        for (const p of points) {
+            const type = this.getTileType(p.x, p.z);
+            if (type !== TILE_TYPES.GRASS) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     /**

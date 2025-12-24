@@ -52,6 +52,7 @@ export class WorldScene {
 
         // 3. 渲染视觉表现
         this.createGround(mapData);
+        this.createWater(mapGenerator.size);
         this.createPlayer();
         
         // 恢复玩家位置
@@ -589,7 +590,6 @@ export class WorldScene {
     createGround(mapData) {
         const size = mapGenerator.size;
         const heightMap = worldManager.mapState.heightMap;
-        // 增加分段数，让高度变化更平滑
         const geometry = new THREE.PlaneGeometry(size, size, size, size);
         
         const colors = [];
@@ -606,16 +606,20 @@ export class WorldScene {
                 let h = 0;
                 if (type === TILE_TYPES.WATER) {
                     color.setHex(0x1a3a6d);
-                    // 同步阈值 0.15，且深度降低 30%
                     const diff = Math.abs(rawNoise + 0.15);
                     h = -1.5 - (diff * 8.4 + Math.pow(diff, 2) * 14.0); 
                 } else if (type === TILE_TYPES.MOUNTAIN) {
-                    color.setHex(0x5a5a5a);
-                    // 同步阈值 0.20，且高度降低 30% (从 20/50 降至 14/35)
+                    // 山脉颜色：色阶化处理，增加像素感
+                    const step = Math.floor(rawNoise * 5) / 5; // 将连续值量化为 5 个阶梯
+                    const greyVal = 0.3 + (step * 0.3);
+                    color.setRGB(greyVal, greyVal, greyVal * 1.1);
                     const diff = rawNoise - 0.20;
                     h = 2.0 + (diff * 14.0 + Math.pow(diff, 2) * 35.0); 
                 } else {
-                    color.setHex(0x4a7c44);
+                    // 草地颜色：色阶化处理，增强“块状”色彩感
+                    const step = Math.floor(rawNoise * 4) / 4;
+                    const greenVal = 0.4 + (step * 0.2);
+                    color.setRGB(greenVal * 0.4, greenVal, greenVal * 0.2);
                     h = 0;
                 }
                 
@@ -630,11 +634,34 @@ export class WorldScene {
         geometry.computeVertexNormals();
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
+        // 创建高度像素化的“MC 风格”贴图
+        const canvas = document.createElement('canvas');
+        canvas.width = 16; // 极低分辨率
+        canvas.height = 16;
+        const ctx = canvas.getContext('2d');
+        for (let i = 0; i < 16; i++) {
+            for (let j = 0; j < 16; j++) {
+                // 随机生成大色块噪声
+                const noise = Math.random() * 40;
+                const brightness = 210 + noise;
+                ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+                ctx.fillRect(i, j, 1, 1);
+            }
+        }
+        
+        const terrainTex = new THREE.CanvasTexture(canvas);
+        terrainTex.magFilter = THREE.NearestFilter; // 关键：禁用平滑缩放，强制像素方块
+        terrainTex.minFilter = THREE.NearestFilter;
+        terrainTex.wrapS = terrainTex.wrapT = THREE.RepeatWrapping;
+        // 再次降低平铺密度一倍 (从 size/2 降至 size/4)，让像素块视觉上再变大一倍
+        terrainTex.repeat.set(size / 4, size / 4); 
+
         const material = new THREE.MeshStandardMaterial({ 
+            map: terrainTex,
             vertexColors: true,
-            roughness: 0.8,
-            metalness: 0.1,
-            flatShading: false
+            roughness: 1.0, // 增加粗糙度，减少反光带来的平滑感
+            metalness: 0.0,
+            flatShading: true // 开启面平滑，产生结实的方块边缘感
         });
 
         const ground = new THREE.Mesh(geometry, material);
@@ -642,12 +669,64 @@ export class WorldScene {
         ground.receiveShadow = true;
         this.scene.add(ground);
 
-        // 辅助网格：规模扩大后，网格间距也适当调大，保持画面清爽
+        // 辅助网格
         const grid = new THREE.GridHelper(size, size / 10, 0x445544, 0x223322);
         grid.position.y = 0.1;
-        grid.material.opacity = 0.1;
+        grid.material.opacity = 0.05;
         grid.material.transparent = true;
         this.scene.add(grid);
+    }
+
+    /**
+     * 创建独立的水位平面
+     */
+    createWater(size) {
+        const geometry = new THREE.PlaneGeometry(size, size);
+        
+        // 创建流动的水面贴图
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 256, 256);
+        gradient.addColorStop(0, '#1e5ab6');
+        gradient.addColorStop(0.5, '#2a6ed0');
+        gradient.addColorStop(1, '#1e5ab6');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 256, 256);
+        
+        // 添加白色的水波纹点点
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        for (let i = 0; i < 100; i++) {
+            ctx.beginPath();
+            ctx.arc(Math.random() * 256, Math.random() * 256, Math.random() * 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const waterTex = new THREE.CanvasTexture(canvas);
+        waterTex.magFilter = THREE.NearestFilter; // 水面也强制像素化
+        waterTex.minFilter = THREE.NearestFilter;
+        waterTex.wrapS = waterTex.wrapT = THREE.RepeatWrapping;
+        // 水面平铺密度再次降低一倍 (从 size/4 降至 size/8)
+        waterTex.repeat.set(size / 8, size / 8); 
+        this.waterTex = waterTex; // 保存引用以便动画
+
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x4488ff, // 给水面一个基础蓝色底色，增强厚重感
+            map: waterTex,
+            transparent: true,
+            opacity: 0.7,
+            roughness: 0.2,
+            metalness: 0.3,
+            side: THREE.DoubleSide,
+            flatShading: true // 水面也开启面平滑
+        });
+
+        const water = new THREE.Mesh(geometry, material);
+        water.rotation.x = -Math.PI / 2;
+        // 水位高度设定在 -0.8，正好能淹没深谷形成河流，同时不影响平原
+        water.position.y = -0.8; 
+        this.scene.add(water);
     }
 
     createPlayer() {
@@ -699,6 +778,12 @@ export class WorldScene {
 
     update(deltaTime) {
         if (!this.isActive || !this.playerHero) return;
+
+        // 水面流动动画
+        if (this.waterTex) {
+            this.waterTex.offset.x += 0.005 * deltaTime;
+            this.waterTex.offset.y += 0.002 * deltaTime;
+        }
 
         const seasonChanged = timeManager.update();
         if (seasonChanged) {
