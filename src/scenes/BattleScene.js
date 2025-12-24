@@ -44,7 +44,7 @@ const UnitTypeMap = {
 
 import { GrasslandEnvironment } from '../environment/Environments.js';
 import { ProjectileManager } from '../core/ProjectileManager.js';
-import { rng } from '../core/Random.js';
+import { rng, setSeed } from '../core/Random.js';
 
 export class BattleScene {
     constructor(scene, camera, enemyConfig = null) {
@@ -452,6 +452,11 @@ export class BattleScene {
     }
 
     startFighting() {
+        // 关键点：开战瞬间锁定种子！
+        // 这样无论是什么战斗，随机数序列（暴击、伤害浮动）都从 888 开始
+        // 结果将只取决于你的兵种位置和属性
+        setSeed(888);
+
         this.isDeployment = false;
         this.isActive = true;
         this.enemyUnits.forEach(u => u.visible = true); 

@@ -5,6 +5,34 @@
 class Random {
     constructor(seed = 12345) {
         this.seed = seed;
+        this.p = new Uint8Array(512);
+        this.rebuildPermutationTable();
+    }
+
+    /**
+     * 根据当前种子重建置换表
+     * 这是消除“网格感”的关键，确保哈希分布均匀
+     */
+    rebuildPermutationTable() {
+        const p = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) p[i] = i;
+
+        // 使用当前种子进行洗牌 (Fisher-Yates Shuffle)
+        let tempSeed = this.seed;
+        const nextInternal = () => {
+            tempSeed = (tempSeed * 1664525 + 1013904223) % 4294967296;
+            return tempSeed / 4294967296;
+        };
+
+        for (let i = 255; i > 0; i--) {
+            const j = Math.floor(nextInternal() * (i + 1));
+            [p[i], p[j]] = [p[j], p[i]];
+        }
+
+        // 扩展到 512 以避免边界检查
+        for (let i = 0; i < 512; i++) {
+            this.p[i] = p[i & 255];
+        }
     }
 
     // 返回 0 到 1 之间的浮点数
@@ -24,28 +52,32 @@ class Random {
     }
 
     /**
-     * 简单的 2D 柏林噪声实现 (简化版)
+     * 标准改进版柏林噪声 (Improved Perlin Noise)
+     * 解决了简版算法导致的“网格感”和“均匀感”
      */
     noise2D(x, y) {
-        const X = Math.floor(x) & 255;
-        const Y = Math.floor(y) & 255;
+        // 1. 找到输入点所在的单位正方形坐标 (X, Y)
+        let X = Math.floor(x) & 255;
+        let Y = Math.floor(y) & 255;
+
+        // 2. 找到点在正方形内的相对坐标 (0.0 ~ 1.0)
         x -= Math.floor(x);
         y -= Math.floor(y);
-        const u = x * x * x * (x * (x * 6 - 15) + 10);
-        const v = y * y * y * (y * (y * 6 - 15) + 10);
-        
-        // 伪随机梯度查找 (基于 LCG 的简化哈希)
-        const hash = (i) => {
-            const val = (i * 1664525 + 1013904223) % 4294967296;
-            return val / 4294967296;
-        };
 
-        const p = new Array(512);
-        for (let i = 0; i < 256; i++) p[i] = p[i + 256] = Math.floor(hash(i + this.seed) * 256);
+        // 3. 计算淡入淡出曲线 (Fade Curve)，确保过渡平滑
+        const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+        const u = fade(x);
+        const v = fade(y);
 
-        const A = p[X] + Y, AA = p[A], AB = p[A + 1],
-              B = p[X + 1] + Y, BA = p[B], BB = p[B + 1];
+        // 4. 哈希坐标并计算 4 个顶点的梯度值
+        const p = this.p;
+        const AA = p[p[X] + Y];
+        const AB = p[p[X] + Y + 1];
+        const BA = p[p[X + 1] + Y];
+        const BB = p[p[X + 1] + Y + 1];
 
+        // 5. 混合 (Lerp) 结果
+        const lerp = (t, a, b) => a + t * (b - a);
         const grad = (hash, x, y) => {
             const h = hash & 15;
             const u = h < 8 ? x : y;
@@ -53,14 +85,14 @@ class Random {
             return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
         };
 
-        const lerp = (t, a, b) => a + t * (b - a);
-
-        return lerp(v, lerp(u, grad(p[AA], x, y), grad(p[BA], x - 1, y)),
-                       lerp(u, grad(p[AB], x, y - 1), grad(p[BB], x - 1, y - 1)));
+        return lerp(v, 
+            lerp(u, grad(AA, x, y), grad(BA, x - 1, y)),
+            lerp(u, grad(AB, x, y - 1), grad(BB, x - 1, y - 1))
+        );
     }
 }
 
-// 导出一个全局单例，方便全项目共用
+// 导出一个全局单例
 export const rng = new Random(Math.floor(Math.random() * 1000000));
 
 /**
@@ -68,6 +100,7 @@ export const rng = new Random(Math.floor(Math.random() * 1000000));
  */
 export function setSeed(seed) {
     rng.seed = seed;
-    console.log(`%c[系统] 战斗种子已设定为: ${seed}`, 'color: #00ff00; font-weight: bold');
+    rng.rebuildPermutationTable(); // 关键：设置种子后必须重建表
+    console.log(`%c[系统] 随机种子已更新: ${seed}`, 'color: #00ff00; font-weight: bold');
 }
 

@@ -194,10 +194,19 @@ class WorldManager {
             'main_city_1': new City('main_city_1', '稻香村')
         };
 
-        // 4. 占领建筑状态
-        this.capturedBuildings = []; // { id, type, owner, pos }
+        // 4. 地图持久化状态
+        this.mapState = {
+            isGenerated: false,
+            grid: [],           // 地形网格
+            heightMap: [],      // 原始高度图 (噪声原值)
+            entities: [],       // 大世界物体 { id, type, x, z, config, isRemoved }
+            playerPos: { x: 0, z: 0 } // 记录玩家位置，方便战斗回来后恢复
+        };
 
-        // 5. 兵种价格定义
+        // 5. 占领建筑状态 (已整合进 entities，保留此数组用于快速结算收益)
+        this.capturedBuildings = []; 
+
+        // 6. 兵种价格定义
         this.unitCosts = {
             'melee': { gold: 50 },
             'ranged': { gold: 80 },
@@ -337,6 +346,88 @@ class WorldManager {
             console.log(`%c[调兵] %c英雄从 ${city.name} 领取了 ${count} 名士兵`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
         }
         this.updateHUD();
+    }
+
+    /**
+     * 初始化或获取地图数据
+     * @param {Object} generator 地图生成器实例 (由 Scene 传入)
+     */
+    getOrGenerateWorld(generator) {
+        if (this.mapState.isGenerated) {
+            return this.mapState;
+        }
+
+        console.log("%c[系统] 正在生成全新的江湖地图...", "color: #5b8a8a; font-weight: bold");
+        
+        const size = 300; // 地图边长增加三倍
+        const grid = generator.generate(size);
+        const entities = [];
+
+        // 逻辑填充逻辑移动到这里 (数据生成)
+        const halfSize = size / 2;
+        for (let z = 0; z < size; z++) {
+            for (let x = 0; x < size; x++) {
+                const type = grid[z][x];
+                if (type !== 'grass') continue;
+
+                const worldX = x - halfSize;
+                const worldZ = z - halfSize;
+
+                // 避开出生点
+                const distToStart = Math.sqrt(Math.pow(worldX + 10, 2) + Math.pow(worldZ + 10, 2));
+                if (distToStart < 12) continue;
+
+                const roll = Math.random();
+                if (roll < 0.002) {
+                    entities.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
+                } else if (roll < 0.003) {
+                    entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
+                } else if (roll < 0.004) {
+                    entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_small', x: worldX, z: worldZ });
+                } else if (roll < 0.005) {
+                    const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
+                    const sKey = bType === 'gold_mine' ? 'gold_mine_world' : 'sawmill_world';
+                    entities.push({ 
+                        id: `${bType}_${x}_${z}`, 
+                        type: 'captured_building', 
+                        spriteKey: sKey,
+                        buildingType: bType, 
+                        x: worldX, z: worldZ,
+                        config: { owner: 'none', type: bType }
+                    });
+                } else if (roll < 0.015) {
+                    entities.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
+                } else if (roll < 0.017) {
+                    entities.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
+                }
+            }
+        }
+
+        // 记录状态
+        this.mapState.isGenerated = true;
+        this.mapState.grid = grid;
+        this.mapState.heightMap = generator.heightMap;
+        this.mapState.entities = entities;
+        this.mapState.size = size;
+
+        return this.mapState;
+    }
+
+    /**
+     * 更新实体状态（例如被捡走）
+     */
+    removeEntity(id) {
+        const entity = this.mapState.entities.find(e => e.id === id);
+        if (entity) {
+            entity.isRemoved = true;
+        }
+    }
+
+    /**
+     * 更新玩家位置存档
+     */
+    savePlayerPos(x, z) {
+        this.mapState.playerPos = { x, z };
     }
 
     /**
@@ -542,6 +633,7 @@ class WorldManager {
             data.stats.fali += 10;
             data.mpMax = data.stats.fali;
             data.mpCurrent = data.mpMax;
+            data.stats.haste = Math.min(0.4, (data.level - 1) * 0.02); // 示例：每级增加 2% 冷却缩减
 
             console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！获得 1 点技能点`, 'color: #00ff00; font-weight: bold', 'color: #fff');
         }
@@ -592,4 +684,3 @@ class WorldManager {
 }
 
 export const worldManager = new WorldManager();
-

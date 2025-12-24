@@ -123,8 +123,8 @@ confirmCharBtn.addEventListener('click', async () => {
     // 应用英雄天赋属性
     applyHeroTraits(selectedHero);
     
-    // 设定随机种子
-    setSeed(888); 
+    // 设定随机种子 - 移除全局锁定，由场景自行控制
+    // setSeed(888); 
     
     // 核心改动：选择完角色后先进入大世界
     enterGameState(GameState.WORLD);
