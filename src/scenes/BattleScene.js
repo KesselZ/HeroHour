@@ -83,7 +83,7 @@ export class BattleScene {
         // 英雄引用
         this.heroUnit = null;
         this.activeSkill = null; // 当前正在准备释放的技能 (针对 location 类型)
-        this.skillCooldowns = {}; // 技能冷却记录
+        this.worldManager = worldManager; // 挂载管理器方便组件访问
 
         // 全局挂载，方便兵种 AI 逻辑访问场景状态
         window.battle = this;
@@ -387,15 +387,9 @@ export class BattleScene {
     deployUnit(type, position) {
         let unit;
         const idx = this.playerUnits.length;
-        switch(type) {
-            case 'melee': unit = new MeleeSoldier('player', idx, this.projectileManager); break;
-            case 'ranged': unit = new RangedSoldier('player', idx, this.projectileManager); break;
-            case 'archer': unit = new Archer('player', idx, this.projectileManager); break;
-            case 'healer': unit = new Healer('player', idx, this.projectileManager); break;
-            case 'cangjian': unit = new Cangjian('player', idx, this.projectileManager); break;
-            case 'tiance': unit = new Tiance('player', idx, this.projectileManager); break;
-            case 'chunyang': unit = new Chunyang('player', idx, this.projectileManager); break;
-            case 'cangyun': unit = new Cangyun('player', idx, this.projectileManager); break;
+        const Cls = UnitTypeMap[type];
+        if (Cls) {
+            unit = new Cls('player', idx, this.projectileManager);
         }
 
         if (unit) {
@@ -412,6 +406,30 @@ export class BattleScene {
                 this.updatePreviewSprite(null);
                 document.querySelectorAll('.unit-slot').forEach(s => s.classList.remove('selected'));
             }
+        }
+    }
+
+    /**
+     * 战斗中召唤辅助单位
+     */
+    spawnSupportUnits(type, count, position) {
+        const Cls = UnitTypeMap[type];
+        if (!Cls) return;
+
+        for (let i = 0; i < count; i++) {
+            const idx = this.playerUnits.length;
+            const unit = new Cls('player', idx, this.projectileManager);
+            // 在指定位置附近随机偏移一点，避免重叠
+            const offset = new THREE.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2);
+            unit.position.copy(position).add(offset);
+            unit.position.y = 0.6;
+            
+            this.playerUnits.push(unit);
+            this.scene.add(unit);
+            
+            // 召唤单位通常不计入初始兵力损耗，或者视需求而定
+            // 这里我们简单地直接加入战场
+            console.log(`%c[召唤] %c${unit.type} 加入了战斗`, 'color: #00ffff', 'color: #fff');
         }
     }
 
@@ -489,7 +507,7 @@ export class BattleScene {
             
             btn.innerHTML = `
                 <div class="skill-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
-                <div class="skill-cost">蓝:${skill.cost}</div>
+                <div class="skill-cost">内:${skill.cost}</div>
                 <div class="cooldown-overlay" id="cd-${skillId}"></div>
                 <div class="skill-name-tag">${skill.name}</div>
             `;
@@ -506,14 +524,17 @@ export class BattleScene {
         if (!this.isActive) return;
         
         const skill = SkillRegistry[skillId];
-        const now = Date.now();
-        
-        if (this.skillCooldowns[skillId] && now < this.skillCooldowns[skillId]) return;
-        if (worldManager.heroData.mpCurrent < skill.cost) return;
+        if (!skill) return;
+
+        // 使用 Skill 类自带的检查方法 (包含 CD 和蓝量)
+        if (!skill.isReady(this.worldManager.heroData)) {
+            console.warn(`技能 ${skill.name} 尚未就绪或蓝量不足`);
+            return;
+        }
 
         if (skill.targeting.type === 'location') {
             this.activeSkill = skillId;
-            // 核心改动：显示对应的指示器
+            // 显示对应的指示器
             this.showSkillIndicator(skill.targeting);
             console.log(`请点击战场选择 [${skill.name}] 的释放位置`);
         } else {
@@ -537,20 +558,41 @@ export class BattleScene {
 
     executeSkill(skillId, targetPos = null) {
         const skill = SkillRegistry[skillId];
-        worldManager.heroData.mpCurrent -= skill.cost;
+        if (!skill) return;
+
+        // 调用 Skill 实例的执行方法
+        const success = skill.execute(this, this.heroUnit, targetPos);
+
+        if (success) {
+            // 只有执行成功才触发 UI 更新
+            window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+            
+            // 计算应用加速后的实际 CD
+            const heroData = this.worldManager.heroData;
+            const actualCD = skill.cooldown * (1 - (heroData.stats.haste || 0));
+            this.startSkillCDAnimation(skillId, actualCD);
+        }
         
-        // 通知大世界 UI 刷新
-        window.dispatchEvent(new CustomEvent('hero-stats-changed'));
-
-        this.skillCooldowns[skillId] = Date.now() + skill.cooldown;
-        this.startSkillCDAnimation(skillId, skill.cooldown);
-
-        skill.execute(this, this.heroUnit, targetPos);
         this.activeSkill = null;
     }
 
     startSkillCDAnimation(skillId, cooldown) {
-        // ... (保持原样)
+        const overlay = document.getElementById(`cd-${skillId}`);
+        if (!overlay) return;
+
+        overlay.style.height = '100%';
+        const startTime = Date.now();
+        
+        const update = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.max(0, 1 - elapsed / cooldown);
+            overlay.style.height = `${progress * 100}%`;
+            
+            if (progress > 0) {
+                requestAnimationFrame(update);
+            }
+        };
+        update();
     }
 
     // ========================================================
@@ -697,6 +739,64 @@ export class BattleScene {
                     }
                 }, 80); 
                 break;
+
+            case 'dome': // 镇山河：半透明气场罩
+                const domeGeo = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+                const domeMat = new THREE.MeshBasicMaterial({ 
+                    color, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false 
+                });
+                const dome = new THREE.Mesh(domeGeo, domeMat);
+                dome.position.copy(pos);
+                this.scene.add(dome);
+                
+                // 简单的呼吸动画
+                const startDome = Date.now();
+                const domeAnim = () => {
+                    const elapsed = Date.now() - startDome;
+                    if (elapsed < duration) {
+                        const s = 1 + Math.sin(elapsed * 0.005) * 0.05;
+                        dome.scale.set(s, s, s);
+                        requestAnimationFrame(domeAnim);
+                    } else {
+                        this.scene.remove(dome);
+                        domeGeo.dispose(); domeMat.dispose();
+                    }
+                };
+                domeAnim();
+                break;
+
+            case 'tornado': // 风来吴山：旋转飓风
+                const tGroup = new THREE.Group();
+                this.scene.add(tGroup);
+                
+                // 由多个环组成的螺旋感
+                for (let i = 0; i < 5; i++) {
+                    const tGeo = new THREE.TorusGeometry(radius * (0.2 + i * 0.2), 0.05, 16, 32);
+                    const tMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 });
+                    const ring = new THREE.Mesh(tGeo, tMat);
+                    ring.rotation.x = Math.PI / 2;
+                    ring.position.y = i * 0.5;
+                    tGroup.add(ring);
+                }
+                tGroup.position.copy(pos);
+
+                const startTornado = Date.now();
+                const tornadoAnim = () => {
+                    const elapsed = Date.now() - startTornado;
+                    if (elapsed < duration) {
+                        tGroup.rotation.y += 0.2;
+                        tGroup.position.y = Math.sin(elapsed * 0.01) * 0.2;
+                        requestAnimationFrame(tornadoAnim);
+                    } else {
+                        this.scene.remove(tGroup);
+                        tGroup.traverse(c => {
+                            if (c.geometry) c.geometry.dispose();
+                            if (c.material) c.material.dispose();
+                        });
+                    }
+                };
+                tornadoAnim();
+                break;
         }
     }
 
@@ -772,15 +872,17 @@ export class BattleScene {
     applyBuffToUnits(units, options) {
         const { stat, multiplier, duration, color } = options;
         units.forEach(unit => {
-            const originalVal = unit[stat];
             if (stat === 'attackDamage') unit.attackDamage *= multiplier;
             if (stat === 'moveSpeed') unit.moveSpeed *= multiplier;
+            if (stat === 'invincible') unit.isInvincible = true;
+            
             if (color) unit.unitSprite.material.color.setHex(color);
 
             setTimeout(() => {
                 if (!unit.isDead) {
                     if (stat === 'attackDamage') unit.attackDamage /= multiplier;
                     if (stat === 'moveSpeed') unit.moveSpeed /= multiplier;
+                    if (stat === 'invincible') unit.isInvincible = false;
                     if (color) unit.unitSprite.material.color.setHex(0xffffff);
                 }
             }, duration);
@@ -869,6 +971,12 @@ export class BattleScene {
 
         // 3. 更新大世界英雄数据
         worldManager.updateHeroArmy(armyChanges);
+        
+        // 核心改动：战斗胜利获得经验
+        if (isVictory) {
+            const xpGain = this.enemyUnits.length * 10; // 简单根据敌军数量给经验
+            worldManager.gainXP(xpGain);
+        }
 
         // 4. 显示结算界面
         this.showSettlementUI(isVictory, losses);

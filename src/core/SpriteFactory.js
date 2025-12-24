@@ -10,57 +10,65 @@ export const ASSET_REGISTRY = {
         CHARS2: '/assets/character2.png',
         CHARS3: '/assets/character3.png',
         ITEMS: '/assets/items.png',
-        ENEMY: '/assets/enemy.png' // 新增野怪图集
+        ENEMY: '/assets/enemy.png',
+        SKILL1: '/assets/skill.png',
+        SKILL2: '/assets/skill2.png'
     },
     UNITS: {
-        // 主角
-        'qijin': { sheet: 'CHARS3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'left' },
-        'lichengen': { sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },
+        // --- 技能图标 (Skill Icons) ---
+        // skill.png 第一行
+        'skill_zhenshanhe':   { name: '镇山河图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 1 },
+        'skill_fenglaiwushan': { name: '风来吴山图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 2 },
+        'skill_hanrulei':      { name: '撼如雷图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 4 },
         
-        // 环境与建筑
-        'main_city': { sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 2, scale: 4.0 }, 
-        'gold_pile': { sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 4, scale: 1.2 },
-        'items': { sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 1, scale: 1.2 },
+        // skill2.png 第一行
+        'skill_wanjiangui_zong': { name: '万剑归宗图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 1 },
+        'skill_shenjian_zong':   { name: '神剑归宗图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 2 }, // 选了第二个红色的剑气
+        'skill_jijieling':       { name: '集结令图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 2, c: 2 }, // 选了那个小金人，很有号召感
+
+        // --- 主角 ---
+        'qijin': { name: '祁进', sheet: 'CHARS3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'left' },
+        'lichengen': { name: '李承恩', sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },
+        
+        // --- 环境与建筑 ---
+        'main_city': { name: '主城', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 2, scale: 4.0 }, 
+        'gold_pile': { name: '金币堆', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 4, scale: 1.2 },
+        'items': { name: '物品堆', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 1, scale: 1.2 },
 
         // --- 野怪系列 (基于 enemy.png 4x4 网格) ---
         // 第一行：野生动物
-        'wild_boar': { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 1, scale: 1.3 },
-        'wolf':      { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 2, scale: 1.3 },
-        'tiger':     { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 3, scale: 1.6 },
-        'bear':      { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 4, scale: 1.8 },
+        'wild_boar': { name: '野猪', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 1, scale: 1.3 },
+        'wolf':      { name: '野狼', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 2, scale: 1.3 },
+        'tiger':     { name: '猛虎', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 3, scale: 1.6 },
+        'bear':      { name: '黑熊', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 4, scale: 1.8 },
 
         // 第二行：山贼与叛军
-        'bandit':        { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4 },
-        'bandit_archer': { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4 },
-        'rebel_soldier': { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4 },
-        'rebel_axeman':  { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4 },
+        'bandit':        { name: '山贼刀匪', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4 },
+        'bandit_archer': { name: '山贼弩匪', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4 },
+        'rebel_soldier': { name: '叛军甲兵', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4 },
+        'rebel_axeman':  { name: '叛军斧兵', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4 },
 
         // 第三行：杂物与毒虫
-        'snake':    { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 1, scale: 1.0 },
-        'bats':     { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 2, scale: 1.2 },
-        'deer':     { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 3, scale: 1.3 },
-        'pheasant': { sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 4, scale: 1.0 },
+        'snake':    { name: '毒蛇', sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 1, scale: 1.0 },
+        'bats':     { name: '蝙蝠群', sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 2, scale: 1.2 },
+        'deer':     { name: '林间小鹿', sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 3, scale: 1.3 },
+        'pheasant': { name: '山鸡', sheet: 'ENEMY', rows: 4, cols: 4, r: 3, c: 4, scale: 1.0 },
 
-        // 第四行：精英与特殊
-        'assassin_monk': { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4 },
-        'zombie':        { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4 },
-        'heavy_knight':  { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 3, scale: 1.6 },
-        'shadow_ninja':  { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 4, scale: 1.4 },
+        // 第行：精英与特殊
+        'assassin_monk': { name: '苦修刺客', sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4 },
+        'zombie':        { name: '毒尸傀儡', sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4 },
+        'heavy_knight':  { name: '铁浮屠重骑', sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 3, scale: 1.6 },
+        'shadow_ninja':  { name: '隐之影', sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 4, scale: 1.4 },
 
-        // 旧映射兼容重定向 (用于平滑过渡)
-        'wild_beast':   { sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 3, scale: 1.6 }, // 指向老虎
-        'rebel_flag':   { sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4 }, // 指向叛军甲兵
-        'sword_master': { sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4 }, // 指向刺客武僧
-
-        // 兵种 (局内战斗单位)
-        'melee': { sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 1, scale: 1.4, defaultFacing: 'right' },
-        'ranged': { sheet: 'CHARS1', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4, defaultFacing: 'right' },
-        'tiance': { sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },
-        'chunyang': { sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 3, scale: 1.4, defaultFacing: 'right' },
-        'archer': { sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'left' },
-        'healer': { sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4, defaultFacing: 'right' },
-        'cangjian': { sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
-        'cangyun': { sheet: 'CHARS1', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'right' }
+        // --- 局内战斗单位 (兵种) ---
+        'melee':    { name: '天策弟子', sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'ranged':   { name: '长歌弟子', sheet: 'CHARS1', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'tiance':   { name: '天策骑兵', sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },
+        'chunyang': { name: '纯阳弟子', sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 3, scale: 1.4, defaultFacing: 'right' },
+        'archer':   { name: '唐门射手', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'left' },
+        'healer':   { name: '万花补给', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4, defaultFacing: 'right' },
+        'cangjian': { name: '藏剑弟子', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
+        'cangyun':  { name: '苍云将士', sheet: 'CHARS1', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'right' }
     }
 };
 

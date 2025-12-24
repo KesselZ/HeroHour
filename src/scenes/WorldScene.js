@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { spriteFactory } from '../core/SpriteFactory.js';
 import { modifierManager } from '../core/ModifierManager.js';
 import { worldManager } from '../core/WorldManager.js'; // 引入数据管家
-import { SkillRegistry } from '../core/SkillSystem.js';
+import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
 import { timeManager } from '../core/TimeManager.js';
 
 /**
@@ -99,6 +99,34 @@ export class WorldScene {
             };
         }
 
+        // --- 招式学习逻辑 ---
+        const skillLearnBtn = document.getElementById('open-skill-learn-btn');
+        const skillLearnPanel = document.getElementById('skill-learn-panel');
+        const closeSkillLearnBtn = document.getElementById('close-skill-learn');
+
+        if (skillLearnBtn) {
+            skillLearnBtn.onclick = () => {
+                skillLearnPanel.classList.remove('hidden');
+                this.renderLearnableSkills('chunyang'); // 默认显示纯阳
+            };
+        }
+
+        if (closeSkillLearnBtn) {
+            closeSkillLearnBtn.onclick = () => {
+                skillLearnPanel.classList.add('hidden');
+            };
+        }
+
+        // 标签切换
+        const tabs = document.querySelectorAll('.skill-learn-tabs .tab-btn');
+        tabs.forEach(tab => {
+            tab.onclick = () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                this.renderLearnableSkills(tab.dataset.sect);
+            };
+        });
+
         // 监听英雄状态变化事件 (例如在战斗中释放技能扣蓝)
         window.addEventListener('hero-stats-changed', () => {
             this.updateHeroHUD();
@@ -163,14 +191,28 @@ export class WorldScene {
         document.getElementById('hero-hp-bar').style.width = `${hpPct}%`;
         document.getElementById('hero-mp-bar').style.width = `${mpPct}%`;
         
-        document.getElementById('hero-xp-text').innerText = `${data.xp} / ${data.xpMax}`;
-        document.getElementById('hero-hp-text').innerText = `${Math.floor(data.hpCurrent)} / ${data.hpMax}`;
-        document.getElementById('hero-mp-text').innerText = `${data.mpCurrent} / ${data.mpMax}`;
+        document.getElementById('hero-xp-text').innerText = `${data.xp}/${data.xpMax}`;
+        document.getElementById('hero-hp-text').innerText = `${Math.floor(data.hpCurrent)}/${data.hpMax}`;
+        document.getElementById('hero-mp-text').innerText = `${data.mpCurrent}/${data.mpMax}`;
         
+        // 扩展 V4 信息
+        const levelDisplay = document.getElementById('hero-level-val');
+        if (levelDisplay) levelDisplay.innerText = data.level;
+
+        // 技能点显示
+        const spDisplay = document.getElementById('hero-skill-points');
+        if (spDisplay) spDisplay.innerText = data.skillPoints;
+
         // 基础属性
         document.getElementById('attr-atk').innerText = data.stats.atk + (data.level - 1) * 5;
         document.getElementById('attr-def').innerText = data.stats.def;
         document.getElementById('attr-speed').innerText = data.stats.speed.toFixed(2);
+        
+        // 扩展属性
+        document.getElementById('attr-primary-name').innerText = data.stats.primaryStatName;
+        document.getElementById('attr-primary-val').innerText = data.stats.primaryStatValue;
+        document.getElementById('attr-fali').innerText = data.stats.fali;
+        document.getElementById('attr-haste').innerText = Math.floor(data.stats.haste * 100);
         
         // 渲染技能列表
         const skillsContainer = document.getElementById('hero-panel-skills');
@@ -188,18 +230,72 @@ export class WorldScene {
             `;
 
             // 绑定 Tooltip
-            slot.onmouseenter = () => this.showTooltip({
-                name: skill.name,
-                level: `消耗: ${skill.cost} 内力`,
-                effect: `冷却: ${skill.cooldown / 1000} 秒`,
-                description: skill.description
-            });
+            slot.onmouseenter = () => {
+                const actualCD = (skill.cooldown * (1 - (data.stats.haste || 0)) / 1000).toFixed(1);
+                this.showTooltip({
+                    name: skill.name,
+                    level: `消耗: ${skill.cost} 内力`,
+                    effect: `冷却: ${actualCD} 秒 (原始: ${skill.cooldown / 1000}s)`,
+                    description: skill.description
+                });
+            };
             slot.onmouseleave = () => this.hideTooltip();
 
             skillsContainer.appendChild(slot);
         });
 
+        // 切换类名
+        panel.classList.remove('hero-panel-v3');
+        panel.classList.add('hero-panel-v4');
         panel.classList.remove('hidden');
+    }
+
+    /**
+     * 渲染可学习招式列表
+     */
+    renderLearnableSkills(sect) {
+        const container = document.getElementById('skill-list-to-learn');
+        if (!container) return;
+
+        container.innerHTML = '';
+        const skillIds = SectSkills[sect] || [];
+        const heroData = worldManager.heroData;
+
+        skillIds.forEach(id => {
+            const skill = SkillRegistry[id];
+            if (!skill) return;
+
+            const isOwned = heroData.skills.includes(id);
+            const item = document.createElement('div');
+            item.className = `learn-item ${isOwned ? 'owned' : ''}`;
+
+            const iconStyle = spriteFactory.getIconStyle(skill.icon);
+            item.innerHTML = `
+                <div class="skill-learn-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                <div class="skill-learn-name">${skill.name}</div>
+                <div class="skill-learn-cost">${isOwned ? '已习得' : '消耗: 1 技能点'}</div>
+                ${!isOwned ? `<button class="wuxia-btn-small buy-skill-btn" data-id="${id}">研习</button>` : ''}
+            `;
+
+            // 购买逻辑
+            const buyBtn = item.querySelector('.buy-skill-btn');
+            if (buyBtn) {
+                buyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (heroData.skillPoints > 0) {
+                        heroData.skillPoints--;
+                        heroData.skills.push(id);
+                        this.renderLearnableSkills(sect); // 刷新当前列表
+                        this.openHeroStats(); // 刷新属性面板
+                        console.log(`%c[习得] %c成功研习招式：${skill.name}`, 'color: #d4af37; font-weight: bold', 'color: #fff');
+                    } else {
+                        alert("技能点不足，请通过战斗升级获取技能点！");
+                    }
+                };
+            }
+
+            container.appendChild(item);
+        });
     }
 
     setupTooltip() {

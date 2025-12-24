@@ -75,13 +75,13 @@ class City {
         };
 
         this.availableUnits = {
-            'melee': 10,
-            'ranged': 5
+            'melee': 100,
+            'ranged': 50
         };
         
         this.production = {
-            gold: 100,
-            wood: 20
+            gold: 1000,
+            wood: 200
         };
     }
 
@@ -150,8 +150,8 @@ class WorldManager {
     constructor() {
         // 1. 基础资源 (仅保留金钱和木材)
         this.resources = {
-            gold: 1000,
-            wood: 200
+            gold: 10000,
+            wood: 2000
         };
 
         // 2. 英雄数据 (持久化状态)
@@ -160,6 +160,7 @@ class WorldManager {
             level: 1,
             xp: 0,
             xpMax: 100, // 下一级所需经验
+            skillPoints: 1, // 初始给 1 点技能点
             hpMax: 500,
             hpCurrent: 500,
             mpMax: 100,
@@ -168,13 +169,18 @@ class WorldManager {
             stats: {
                 atk: 45,
                 def: 30,
-                speed: 0.08
+                speed: 0.08,
+                // --- 基础 RPG 属性 ---
+                fali: 100,            // 法力：决定内力上限
+                haste: 0,             // 加速：冷却缩减 (0-1)
+                primaryStatName: '力道', // 主属性名称 (力道/根骨等)
+                primaryStatValue: 50   // 主属性数值
             }
         };
 
         this.heroArmy = {
-            'melee': 5,
-            'ranged': 2,
+            'melee': 50,
+            'ranged': 20,
             'tiance': 0,
             'chunyang': 0,
             'cangjian': 0,
@@ -384,6 +390,33 @@ class WorldManager {
             return true;
         }
         return false;
+    }
+
+    /**
+     * 英雄获得经验并处理升级
+     */
+    gainXP(amount) {
+        const data = this.heroData;
+        data.xp += amount;
+        
+        while (data.xp >= data.xpMax) {
+            data.xp -= data.xpMax;
+            data.level++;
+            data.xpMax = Math.floor(data.xpMax * 1.5);
+            data.skillPoints++; // 每升一级给 1 点技能点
+            
+            // 升级属性提升 (简单实现)
+            data.hpMax += 50;
+            data.hpCurrent = data.hpMax;
+            data.stats.atk += 5;
+            data.stats.fali += 10;
+            data.mpMax = data.stats.fali;
+            data.mpCurrent = data.mpMax;
+
+            console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！获得 1 点技能点`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        }
+        
+        window.dispatchEvent(new CustomEvent('hero-stats-changed'));
     }
 
     /**

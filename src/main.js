@@ -154,47 +154,35 @@ function applyHeroTraits(heroId) {
         worldManager.heroData.hpMax = 500;
         worldManager.heroData.stats.atk = 45;
         worldManager.heroData.stats.speed = 0.08;
-        worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'battle_shout']; // 增加神剑归宗
+        // 祁进属性：高力道，法力一般，少量加速
+        worldManager.heroData.stats.primaryStatName = '力道';
+        worldManager.heroData.stats.primaryStatValue = 65;
+        worldManager.heroData.stats.fali = 100; // 法力决定内力上限
+        worldManager.heroData.stats.haste = 0.1; // 10% 冷却缩减
         
-        // 祁进天赋：纯阳弟子血量和伤害提高 20%
-        modifierManager.addGlobalModifier({
-            id: 'qijin_chunyang_hp',
-            side: 'player',
-            unitType: 'chunyang',
-            stat: 'hp',
-            multiplier: 1.2
-        });
-        modifierManager.addGlobalModifier({
-            id: 'qijin_chunyang_dmg',
-            side: 'player',
-            unitType: 'chunyang',
-            stat: 'damage',
-            multiplier: 1.2
-        });
+        // 祁进技能：剑雨、神剑、镇山河
+        worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe']; 
+        
+        // ... (modifierManager 逻辑保持不变)
     } else if (heroId === 'lichengen') {
         worldManager.heroData.hpMax = 650;
         worldManager.heroData.stats.atk = 35;
         worldManager.heroData.stats.speed = 0.06;
-        worldManager.heroData.skills = ['battle_shout', 'summon_militia']; // 李承恩技能组
-
-        // 李承恩天赋：大世界移动速度提高 20%
-        modifierManager.addGlobalModifier({
-            id: 'lichengen_world_speed',
-            side: 'player',
-            stat: 'world_speed',
-            multiplier: 1.2
-        });
-        // 额外给天策兵种一点防御/血量加成，作为统领的隐形成长
-        modifierManager.addGlobalModifier({
-            id: 'lichengen_tiance_hp',
-            side: 'player',
-            unitType: 'tiance',
-            stat: 'hp',
-            multiplier: 1.1
-        });
+        // 李承恩属性：极高加速，法力充沛（指挥全军）
+        worldManager.heroData.stats.primaryStatName = '力道';
+        worldManager.heroData.stats.primaryStatValue = 55;
+        worldManager.heroData.stats.fali = 150; 
+        worldManager.heroData.stats.haste = 0.2; // 20% 冷却缩减
+        
+        // 李承恩技能：撼如雷、集结令、风来吴山（暂代大风车逻辑）
+        worldManager.heroData.skills = ['battle_shout', 'summon_militia', 'fenglaiwushan']; 
     }
-    // 初始生命值为满血
+    
+    // 同步更新内力上限
+    worldManager.heroData.mpMax = worldManager.heroData.stats.fali;
+    // 初始生命和内力为满
     worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
+    worldManager.heroData.mpCurrent = worldManager.heroData.mpMax;
 }
 
 function enterGameState(state, config = null) {

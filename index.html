@@ -54,51 +54,114 @@
                     </div>
                 </div>
 
-                <!-- 侠客属性面板 -->
-                <div id="hero-stats-panel" class="menu-container hidden hero-panel-v3">
-                    <div class="menu-decoration-top">侠客名鉴</div>
-                    <button id="close-hero-panel" class="close-btn-v3">×</button>
+                <!-- 侠客属性面板 V4 紧凑版 -->
+                <div id="hero-stats-panel" class="menu-container hidden hero-panel-v4">
+                    <div class="hero-panel-header">
+                        <div class="header-ornament-left"></div>
+                        <div class="panel-title">侠客名鉴</div>
+                        <div class="header-ornament-right"></div>
+                        <button id="close-hero-panel" class="close-btn-v3">×</button>
+                    </div>
                     
-                    <div class="hero-panel-content">
-                        <div class="hero-panel-left">
-                            <div class="hero-big-portrait" id="hero-panel-portrait"></div>
-                            <h2 id="hero-panel-name">祁进</h2>
-                            <p id="hero-panel-title" class="char-title">紫虚子</p>
-                        </div>
-                        
-                        <div class="hero-panel-right">
-                            <div class="stat-group">
-                                <label>经验 (XP)</label>
-                                <div class="stat-bar-bg"><div id="hero-xp-bar" class="stat-bar-fill xp"></div></div>
-                                <span id="hero-xp-text">0 / 100</span>
-                            </div>
-                            <div class="stat-group">
-                                <label>气血 (HP)</label>
-                                <div class="stat-bar-bg"><div id="hero-hp-bar" class="stat-bar-fill hp"></div></div>
-                                <span id="hero-hp-text">500 / 500</span>
-                            </div>
-                            <div class="stat-group">
-                                <label>内力 (MP)</label>
-                                <div class="stat-bar-bg"><div id="hero-mp-bar" class="stat-bar-fill mp"></div></div>
-                                <span id="hero-mp-text">100 / 100</span>
+                    <div class="hero-panel-main">
+                        <!-- 上部分：核心信息与进度条 -->
+                        <div class="hero-core-info">
+                            <div class="hero-avatar-area">
+                                <div class="hero-big-portrait" id="hero-panel-portrait"></div>
+                                <div class="hero-identity">
+                                    <h2 id="hero-panel-name">祁进</h2>
+                                    <p id="hero-panel-title" class="char-title">紫虚子</p>
+                                    <div class="hero-level-tag">等级 <span id="hero-level-val">1</span></div>
+                                </div>
                             </div>
                             
-                            <div class="attributes-grid">
-                                <div class="attr-item">攻击: <span id="attr-atk">45</span></div>
-                                <div class="attr-item">防御: <span id="attr-def">30</span></div>
-                                <div class="attr-item">移速: <span id="attr-speed">0.08</span></div>
+                            <div class="hero-bars-area">
+                                <div class="stat-group-v3">
+                                    <div class="bar-label">气血 (HP)</div>
+                                    <div class="stat-bar-container">
+                                        <div class="stat-bar-bg"><div id="hero-hp-bar" class="stat-bar-fill hp"></div></div>
+                                        <span id="hero-hp-text" class="stat-value">500/500</span>
+                                    </div>
+                                </div>
+                                <div class="stat-group-v3">
+                                    <div class="bar-label">内力 (MP)</div>
+                                    <div class="stat-bar-container">
+                                        <div class="stat-bar-bg"><div id="hero-mp-bar" class="stat-bar-fill mp"></div></div>
+                                        <span id="hero-mp-text" class="stat-value">100/100</span>
+                                    </div>
+                                </div>
+                                <div class="stat-group-v3">
+                                    <div class="bar-label">阅历 (XP)</div>
+                                    <div class="stat-bar-container">
+                                        <div class="stat-bar-bg"><div id="hero-xp-bar" class="stat-bar-fill xp"></div></div>
+                                        <span id="hero-xp-text" class="stat-value">0/100</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 中部分：详细属性矩阵 -->
+                        <div class="hero-attributes-section">
+                            <div class="attributes-header">
+                                <span>—— 基础潜能 ——</span>
+                                <div class="skill-points-tag">可用技能点: <span id="hero-skill-points">1</span></div>
+                            </div>
+                            <div class="attributes-grid-v4">
+                                <div class="attr-box">
+                                    <div class="attr-label">外功攻击</div>
+                                    <div class="attr-val" id="attr-atk">45</div>
+                                </div>
+                                <div class="attr-box">
+                                    <div class="attr-label">外功防御</div>
+                                    <div class="attr-val" id="attr-def">30</div>
+                                </div>
+                                <div class="attr-box">
+                                    <div class="attr-label">轻功移速</div>
+                                    <div class="attr-val" id="attr-speed">0.08</div>
+                                </div>
+                                <div class="attr-box highlighted">
+                                    <div class="attr-label" id="attr-primary-name">力道</div>
+                                    <div class="attr-val" id="attr-primary-val">65</div>
+                                </div>
+                                <div class="attr-box">
+                                    <div class="attr-label">内功法力</div>
+                                    <div class="attr-val" id="attr-fali">100</div>
+                                </div>
+                                <div class="attr-box">
+                                    <div class="attr-label">战斗加速</div>
+                                    <div class="attr-val"><span id="attr-haste">10</span>%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 下部分：技能展示 -->
+                        <div class="hero-skills-section-v4">
+                            <div class="section-header-v4">
+                                <div class="label-with-icon">習得招式</div>
+                                <button id="open-skill-learn-btn" class="learn-skill-btn-v4">秘籍研习</button>
+                            </div>
+                            <div id="hero-panel-skills" class="hero-skills-list-v4">
+                                <!-- 动态填充技能图标 -->
                             </div>
                         </div>
                     </div>
+                    <div class="menu-decoration-bottom"></div>
+                </div>
 
-                    <!-- 下方：技能展示区 -->
-                    <div class="hero-skills-section">
-                        <h3 class="section-label">习得招式</h3>
-                        <div id="hero-panel-skills" class="hero-skills-list">
-                            <!-- 动态填充技能图标 -->
+                <!-- 招式学习面板 (嵌套在属性面板之上或独立) -->
+                <div id="skill-learn-panel" class="menu-container hidden skill-learn-v3">
+                    <div class="menu-decoration-top">秘籍研习</div>
+                    <button id="close-skill-learn" class="close-btn-v3">×</button>
+                    <div class="skill-learn-content">
+                        <div class="skill-learn-tabs">
+                            <button class="tab-btn active" data-sect="chunyang">纯阳招式</button>
+                            <button class="tab-btn" data-sect="tiance">天策招式</button>
+                            <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
+                        </div>
+                        <div id="skill-list-to-learn" class="skill-grid-v3">
+                            <!-- 动态生成待学习技能 -->
                         </div>
                     </div>
-
                     <div class="menu-decoration-bottom"></div>
                 </div>
 

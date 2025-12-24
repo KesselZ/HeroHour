@@ -20,7 +20,8 @@ export class BaseUnit extends THREE.Group {
             attackDamage = 15,
             attackSpeed = 1000,
             projectileManager = null, // 注入弹道管理器
-            cost = 2 // 引入强度属性 (消耗分)
+            cost = 2, // 引入强度属性 (消耗分)
+            mass = 1.0 // 新增：质量/重量，影响被推挤的程度
         } = config;
 
         this.side = side;
@@ -28,13 +29,12 @@ export class BaseUnit extends THREE.Group {
         this.type = type;
         this.projectileManager = projectileManager;
         this.cost = cost;
-        
-        // 核心改动：应用属性修正管理器
+        this.mass = mass; // 质量越大，越难被推开
         this.maxHealth = modifierManager.getModifiedValue(this, 'hp', hp);
         this.health = this.maxHealth;
         
         // 基础移速叠加随机微差后，再应用全局修正
-        const rawSpeed = speed + (rng.next() - 0.5) * 0.01;
+        const rawSpeed = (speed + (rng.next() - 0.5) * 0.01) * 0.7; // 全局移速降低 30%
         this.moveSpeed = modifierManager.getModifiedValue(this, 'speed', rawSpeed);
         
         this.attackRange = modifierManager.getModifiedValue(this, 'range', attackRange);
@@ -263,25 +263,37 @@ export class BaseUnit extends THREE.Group {
 
 
     /**
-     * 简单的碰撞挤压：当两个单位太近时产生排斥力
+     * 优化后的碰撞挤压：考虑质量 (Mass) 和 敌我关系
      */
     applySeparation(allies, enemies) {
-        const separationRadius = 0.6; // 碰撞半径
-        const force = 0.02; // 挤开的力量
+        const separationRadius = 0.6; // 基础排斥半径
+        const force = 0.02; // 基础挤开力量
         const allUnits = [...allies, ...enemies];
 
         for (const other of allUnits) {
             if (other === this || other.isDead) continue;
 
             const dist = this.position.distanceTo(other.position);
-            if (dist < separationRadius) {
+            
+            // 敌对单位之间的排斥半径更小，允许贴得更近（增加“包围”感而非“弹开”感）
+            const effectiveRadius = (other.side === this.side) ? separationRadius : 0.45;
+
+            if (dist < effectiveRadius) {
                 // 计算排斥方向
                 const pushDir = new THREE.Vector3()
                     .subVectors(this.position, other.position)
                     .normalize();
                 
-                // 距离越近，推力越大
-                const strength = (1 - dist / separationRadius) * force;
+                // 核心逻辑：推挤强度受自身质量影响
+                // 如果我是英雄 (mass=5)，对方是小兵 (mass=1)，我被推开的力量只有 1/5
+                let strength = (1 - dist / effectiveRadius) * force;
+                strength /= this.mass; 
+
+                // 如果是敌对单位，进一步削弱“日常推挤”，只保留最基本的空间隔离
+                if (other.side !== this.side) {
+                    strength *= 0.5;
+                }
+
                 this.position.addScaledVector(pushDir, strength);
             }
         }
@@ -376,7 +388,7 @@ export class BaseUnit extends THREE.Group {
 
 
     takeDamage(amount) {
-        if (this.isDead) return;
+        if (this.isDead || this.isInvincible) return;
         this.health -= amount;
         
         // 通用受击反馈：强烈的红色闪烁
@@ -442,7 +454,8 @@ export class HeroUnit extends BaseUnit {
             attackRange: (heroData.id === 'qijin' ? 6.0 : 1.2),
             attackSpeed: 800, // 英雄攻击频率通常较快
             projectileManager,
-            cost: 0
+            cost: 0,
+            mass: 5.0 // 英雄质量极大，普通士兵推不动
         });
 
         this.isHero = true;
@@ -720,28 +733,28 @@ export class Healer extends BaseUnit {
 export class WildBoar extends BaseUnit {
     static displayName = '野猪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'wild_boar', hp: 150, speed: 0.04, attackRange: 0.8, attackDamage: 12, cost: 2, projectileManager });
+        super({ side, index, type: 'wild_boar', hp: 100, speed: 0.03, attackRange: 0.8, attackDamage: 8, cost: 2, projectileManager });
     }
 }
 
 export class Wolf extends BaseUnit {
     static displayName = '野狼';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'wolf', hp: 100, speed: 0.05, attackRange: 0.8, attackDamage: 15, cost: 2, projectileManager });
+        super({ side, index, type: 'wolf', hp: 60, speed: 0.04, attackRange: 0.8, attackDamage: 10, cost: 2, projectileManager });
     }
 }
 
 export class Tiger extends BaseUnit {
     static displayName = '猛虎';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'tiger', hp: 250, speed: 0.045, attackRange: 1.2, attackDamage: 25, cost: 5, projectileManager });
+        super({ side, index, type: 'tiger', hp: 250, speed: 0.045, attackRange: 1.2, attackDamage: 25, cost: 5, mass: 2.0, projectileManager });
     }
 }
 
 export class Bear extends BaseUnit {
     static displayName = '黑熊';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bear', hp: 400, speed: 0.025, attackRange: 1.0, attackDamage: 30, cost: 6, projectileManager });
+        super({ side, index, type: 'bear', hp: 400, speed: 0.025, attackRange: 1.0, attackDamage: 30, cost: 6, mass: 3.0, projectileManager });
     }
 }
 
@@ -749,7 +762,7 @@ export class Bear extends BaseUnit {
 export class Bandit extends BaseUnit {
     static displayName = '山贼刀匪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bandit', hp: 120, speed: 0.035, attackRange: 0.8, attackDamage: 18, cost: 2, projectileManager });
+        super({ side, index, type: 'bandit', hp: 80, speed: 0.03, attackRange: 0.8, attackDamage: 12, cost: 2, projectileManager });
     }
 }
 
@@ -777,7 +790,7 @@ export class BanditArcher extends BaseUnit {
 export class RebelSoldier extends BaseUnit {
     static displayName = '叛军甲兵';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'rebel_soldier', hp: 180, speed: 0.025, attackRange: 0.8, attackDamage: 20, cost: 3, projectileManager });
+        super({ side, index, type: 'rebel_soldier', hp: 180, speed: 0.025, attackRange: 0.8, attackDamage: 20, cost: 3, mass: 1.5, projectileManager });
     }
 }
 
@@ -792,14 +805,14 @@ export class RebelAxeman extends BaseUnit {
 export class Snake extends BaseUnit {
     static displayName = '毒蛇';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'snake', hp: 50, speed: 0.04, attackRange: 0.6, attackDamage: 10, cost: 1, projectileManager });
+        super({ side, index, type: 'snake', hp: 30, speed: 0.035, attackRange: 0.6, attackDamage: 6, cost: 1, projectileManager });
     }
 }
 
 export class Bats extends BaseUnit {
     static displayName = '蝙蝠群';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bats', hp: 40, speed: 0.06, attackRange: 0.5, attackDamage: 8, cost: 1, projectileManager });
+        super({ side, index, type: 'bats', hp: 20, speed: 0.05, attackRange: 0.5, attackDamage: 4, cost: 1, projectileManager });
     }
 }
 
@@ -835,7 +848,7 @@ export class Zombie extends BaseUnit {
 export class HeavyKnight extends BaseUnit {
     static displayName = '铁浮屠重骑';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'heavy_knight', hp: 500, speed: 0.02, attackRange: 1.5, attackDamage: 35, cost: 8, projectileManager });
+        super({ side, index, type: 'heavy_knight', hp: 500, speed: 0.02, attackRange: 1.5, attackDamage: 35, cost: 8, mass: 4.0, projectileManager });
     }
 }
 
@@ -956,7 +969,8 @@ export class Cangyun extends BaseUnit {
             attackDamage: 12, // 伤害一般
             attackSpeed: 1200,
             projectileManager,
-            cost: 5
+            cost: 5,
+            mass: 2.5 // 苍云盾墙，质量较高
         });
     }
 }
