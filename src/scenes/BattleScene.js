@@ -901,7 +901,7 @@ export class BattleScene {
         });
     }
 
-    update() {
+    update(deltaTime) {
         // 1. 相机固定
         this.camera.position.set(0, 15, 18); 
         this.camera.up.set(0, 1, 0);
@@ -924,10 +924,10 @@ export class BattleScene {
         if (this.isDeployment) return;
         if (!this.isActive) return;
 
-        this.playerUnits.forEach(u => u.update(this.enemyUnits, this.playerUnits));
-        this.enemyUnits.forEach(u => u.update(this.playerUnits, this.enemyUnits));
+        this.playerUnits.forEach(u => u.update(this.enemyUnits, this.playerUnits, deltaTime));
+        this.enemyUnits.forEach(u => u.update(this.playerUnits, this.enemyUnits, deltaTime));
 
-        this.projectileManager.update();
+        this.projectileManager.update(deltaTime);
         this.checkWinCondition();
     }
 
@@ -942,7 +942,7 @@ export class BattleScene {
         }
     }
 
-    endBattle(message, isVictory) {
+    async endBattle(message, isVictory) {
         this.isActive = false;
         
         // 清理技能指示器
@@ -977,9 +977,22 @@ export class BattleScene {
         // 3. 更新大世界英雄数据
         worldManager.updateHeroArmy(armyChanges);
         
-        // 核心改动：战斗胜利获得经验
+        // 核心改动：根据敌军战力和时间进度计算经验
         if (isVictory) {
-            const xpGain = this.enemyUnits.length * 10; // 简单根据敌军数量给经验
+            // 基础经验 = 战力点数 * 4
+            const totalPoints = this.enemyConfig ? this.enemyConfig.totalPoints : 0;
+            const baseXP = totalPoints * 4;
+            
+            // 时间乘数：每个季节增加 5%
+            const { timeManager } = await import('../core/TimeManager.js');
+            const progress = timeManager.getGlobalProgress();
+            const timeMultiplier = 1.0 + (progress * 0.05);
+            
+            const xpGain = Math.floor(baseXP * timeMultiplier);
+            
+            console.log(`%c[战斗胜利] %c战力基数: ${totalPoints}, 时间加成: x${timeMultiplier.toFixed(2)}, 获得阅历: ${xpGain}`, 
+                'color: #00ff00; font-weight: bold', 'color: #fff');
+                
             worldManager.gainXP(xpGain);
         }
 

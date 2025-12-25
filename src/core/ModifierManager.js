@@ -44,8 +44,9 @@ class ModifierManager {
             // 1. 检查阵营是否匹配 (side: 'player' | 'enemy')
             if (mod.side && unit.side !== mod.side) continue;
             
-            // 2. 检查兵种是否匹配 (unitType: 'chunyang' | 'tiance' 等)
-            if (mod.unitType && unit.type !== mod.unitType) continue;
+            // 2. 检查兵种是否匹配 (支持通用 'hero' 标签)
+            const isTypeMatch = mod.unitType && (unit.type === mod.unitType || (mod.unitType === 'hero' && unit.isHero));
+            if (mod.unitType && !isTypeMatch) continue;
             
             // 3. 检查属性名是否匹配
             if (mod.stat !== statName) continue;

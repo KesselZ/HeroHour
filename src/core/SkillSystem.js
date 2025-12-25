@@ -55,8 +55,8 @@ export class Skill {
         heroData.mpCurrent -= this.cost;
 
         // 2. 计算当前技能强度系数
-        // 公式：技能强度 = 1.0 + (主属性 / 100)
-        const skillPower = 1.0 + (heroData.stats.primaryStatValue / 100);
+        // 公式：技能强度 = 1.0 + (法术值 / 100)
+        const skillPower = 1.0 + (heroData.stats.spells / 100);
 
         // 3. 执行动作清单
         this.actions.forEach(action => {

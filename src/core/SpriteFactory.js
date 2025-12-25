@@ -13,7 +13,8 @@ export const ASSET_REGISTRY = {
         ITEMS2: '/assets/items2.png',
         ENEMY: '/assets/enemy.png',
         SKILL1: '/assets/skill.png',
-        SKILL2: '/assets/skill2.png'
+        SKILL2: '/assets/skill2.png',
+        BUILDING2: '/assets/building2.png'
     },
     UNITS: {
         // --- 技能图标 (Skill Icons) ---
@@ -49,6 +50,23 @@ export const ASSET_REGISTRY = {
         'house_3': { name: '民居三', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 3, scale: 3.0 },
         'gold_mine_world': { name: '金矿', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
         'sawmill_world': { name: '伐木场', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 2, scale: 3.5 },
+        'dummy_training': { name: '演武木人', sheet: 'ITEMS2', rows: 4, cols: 4, r: 2, c: 3, scale: 1.2 },
+
+        // --- building2.png 系列 (扩展建筑库) ---
+        'sawmill_v2': { name: '伐木工坊', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 1, scale: 3.0 },
+        'gold_mine_v2': { name: '露天金矿', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 2, scale: 3.0 },
+        'spell_altar_v2': { name: '法术祭坛V2', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 4, scale: 3.0 },
+        
+        'pagoda_library': { name: '万文阁', sheet: 'BUILDING2', rows: 4, cols: 4, r: 2, c: 1, scale: 3.5 },
+        'training_camp': { name: '演武校场', sheet: 'BUILDING2', rows: 4, cols: 4, r: 2, c: 4, scale: 3.5 },
+        
+        'weapon_forge_v2': { name: '神兵铸坊', sheet: 'BUILDING2', rows: 4, cols: 4, r: 3, c: 1, scale: 3.0 },
+        'imperial_treasury': { name: '大唐内库', sheet: 'BUILDING2', rows: 4, cols: 4, r: 3, c: 4, scale: 3.5 },
+        
+        'merchant_guild': { name: '九州商行', sheet: 'BUILDING2', rows: 4, cols: 4, r: 4, c: 1, scale: 3.0 },
+        'treasure_pavilion_v2': { name: '藏宝阁', sheet: 'BUILDING2', rows: 4, cols: 4, r: 4, c: 2, scale: 3.0 },
+        'distillery_v2': { name: '杜康酒坊', sheet: 'BUILDING2', rows: 4, cols: 4, r: 4, c: 3, scale: 3.0 },
+        'herbalist_garden': { name: '百草园', sheet: 'BUILDING2', rows: 4, cols: 4, r: 4, c: 4, scale: 3.0 },
 
         // --- 野怪系列 (基于 enemy.png 4x4 网格) ---
         // 第一行：野生动物

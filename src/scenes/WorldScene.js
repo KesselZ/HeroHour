@@ -59,9 +59,14 @@ export class WorldScene {
         const mapData = mapState.grid;
 
         // 3. 渲染视觉表现
+        this.setupLights();
         this.createGround(mapData);
         this.createWater(mapGenerator.size);
         this.createPlayer();
+        
+        // 设置背景色，增加武侠大世界的沉浸感
+        this.scene.background = new THREE.Color(0x87ceeb); // 天蓝色背景
+        this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.005); // 淡淡的远景雾效
         
         // 初始位置设定
         this.camera.position.set(this.playerHero.position.x, 15, this.playerHero.position.z + 12);
@@ -90,7 +95,10 @@ export class WorldScene {
         window.addEventListener('sect-monsters-cleared', this._onSectMonstersCleared);
 
         // --- 英雄大世界属性应用 ---
-        // 应用来自 modifierManager 的大世界移动速度修正 (如李承恩天赋)
+        // 行军速度直接由“轻功”属性决定 (0.6 是世界地图缩放系数)
+        this.moveSpeed = worldManager.heroData.stats.speed * 0.6;
+
+        // 依然保留额外修正器接口 (如以后获得马匹道具)
         const bonus = modifierManager.getModifiedValue({ side: 'player', type: 'hero' }, 'world_speed', 1.0);
         this.moveSpeed *= bonus;
 
@@ -215,10 +223,11 @@ export class WorldScene {
     openHeroStats() {
         const panel = document.getElementById('hero-stats-panel');
         const data = worldManager.heroData;
+        const heroInfo = worldManager.availableHeroes[data.id];
         
         // 填充数据
-        document.getElementById('hero-panel-name').innerText = (data.id === 'qijin' ? '祁进' : '李承恩');
-        document.getElementById('hero-panel-title').innerText = (data.id === 'qijin' ? '紫虚子' : '天策府统领');
+        document.getElementById('hero-panel-name').innerText = (data.id === 'qijin' ? '祁进' : (data.id === 'lichengen' ? '李承恩' : '叶英'));
+        document.getElementById('hero-panel-title').innerText = heroInfo ? heroInfo.title : '';
         
         const portrait = document.getElementById('hero-panel-portrait');
         const iconStyle = spriteFactory.getIconStyle(data.id);
@@ -239,17 +248,27 @@ export class WorldScene {
         const levelDisplay = document.getElementById('hero-level-val');
         if (levelDisplay) levelDisplay.innerText = data.level;
 
-        const spDisplay = document.getElementById('hero-skill-points');
-        if (spDisplay) spDisplay.innerText = data.skillPoints;
-
-        document.getElementById('attr-atk').innerText = data.stats.atk + (data.level - 1) * 5;
-        document.getElementById('attr-def').innerText = data.stats.def;
-        document.getElementById('attr-speed').innerText = data.stats.speed.toFixed(2);
+        // 核心属性显示
+        document.getElementById('attr-atk').innerText = data.stats.soldierAtk;
+        document.getElementById('attr-def').innerText = data.stats.soldierDef;
+        document.getElementById('attr-speed').innerText = data.stats.speed.toFixed(3);
         
-        document.getElementById('attr-primary-name').innerText = data.stats.primaryStatName;
-        document.getElementById('attr-primary-val').innerText = data.stats.primaryStatValue;
-        document.getElementById('attr-fali').innerText = data.stats.fali;
+        // 动态修改力道/身法标签
+        const powerLabel = document.getElementById('attr-power-label');
+        const powerName = heroInfo ? heroInfo.primaryStat : '力道';
+        if (powerLabel) powerLabel.innerText = powerName;
+        
+        document.getElementById('attr-primary-val').innerText = data.stats.power;
+        document.getElementById('attr-fali').innerText = data.stats.spells;
         document.getElementById('attr-haste').innerText = Math.floor(data.stats.haste * 100);
+
+        // 绑定属性 Tooltip (简化介绍，隐藏具体数值)
+        this.bindAttrTooltip('attr-box-atk', '攻击', `统率三军，提升帐下所有士兵的进攻能力`);
+        this.bindAttrTooltip('attr-box-def', '坚韧', `严明军纪，磨炼士卒意志，提升士兵的生存能力`);
+        this.bindAttrTooltip('attr-box-power', powerName, `修习内功外招，增强侠客自身的体质与劈砍威力`);
+        this.bindAttrTooltip('attr-box-spells', '法术', `通过玄妙法门增强招式威力，使技能爆发出更强的效果`);
+        this.bindAttrTooltip('attr-box-speed', '轻功', `身轻如燕，提升侠客行走江湖与临阵对敌时的移动速度`);
+        this.bindAttrTooltip('attr-box-haste', '加速', `提升招式运转速度，使其冷却时间缩短`);
         
         const skillsContainer = document.getElementById('hero-panel-skills');
         skillsContainer.innerHTML = '';
@@ -284,6 +303,14 @@ export class WorldScene {
         panel.classList.remove('hidden');
     }
 
+    bindAttrTooltip(id, name, desc) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.onmouseenter = () => this.showTooltip({ name, description: desc });
+            el.onmouseleave = () => this.hideTooltip();
+        }
+    }
+
     renderLearnableSkills(sect) {
         const container = document.getElementById('skill-list-to-learn');
         if (!container) return;
@@ -291,9 +318,6 @@ export class WorldScene {
         container.innerHTML = '';
         const skillIds = SectSkills[sect] || [];
         const heroData = worldManager.heroData;
-
-        const panelSpDisplay = document.getElementById('learn-panel-sp');
-        if (panelSpDisplay) panelSpDisplay.innerText = heroData.skillPoints;
 
         skillIds.forEach(id => {
             const skill = SkillRegistry[id];
@@ -307,24 +331,17 @@ export class WorldScene {
             item.innerHTML = `
                 <div class="skill-learn-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
                 <div class="skill-learn-name">${skill.name}</div>
-                ${!isOwned ? `<button class="wuxia-btn-small buy-skill-btn" data-id="${id}">研习</button>` : ''}
+                <div class="skill-learn-status">${isOwned ? '已习得' : '未参透'}</div>
             `;
 
-            const buyBtn = item.querySelector('.buy-skill-btn');
-            if (buyBtn) {
-                buyBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (heroData.skillPoints > 0) {
-                        heroData.skillPoints--;
-                        heroData.skills.push(id);
-                        this.renderLearnableSkills(sect); 
-                        this.openHeroStats(); 
-                        console.log(`%c[习得] %c成功研习招式：${skill.name}`, 'color: #d4af37; font-weight: bold', 'color: #fff');
-                    } else {
-                        worldManager.showNotification("技能点不足，请通过战斗升级获取技能点！");
-                    }
-                };
-            }
+            item.onmouseenter = () => {
+                this.showTooltip({
+                    name: skill.name,
+                    level: isOwned ? '【已习得】' : '【未参透】',
+                    description: skill.description
+                });
+            };
+            item.onmouseleave = () => this.hideTooltip();
 
             container.appendChild(item);
         });
@@ -402,18 +419,24 @@ export class WorldScene {
         if (!this.tooltip) return;
         this.tooltipTitle.innerText = data.name;
         
-        if (data.level !== undefined && data.maxLevel !== undefined) {
-            this.tooltipLevel.innerText = (typeof data.level === 'number') 
-                ? `当前等级: ${data.level} / ${data.maxLevel}`
-                : `${data.level} : ${data.maxLevel}`;
+        // 修正：智能处理不同类型的提示框数据
+        if (data.level !== undefined) {
+            if (typeof data.level === 'number' && data.maxLevel !== undefined) {
+                // 建筑等级模式：当前等级 / 最高等级
+                this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
+            } else if (typeof data.level === 'string' && data.maxLevel !== undefined) {
+                // 键值对模式：例如 "预计难度: 简单"
+                this.tooltipLevel.innerText = `${data.level}: ${data.maxLevel}`;
+            } else {
+                // 兵种属性模式：直接显示传入的字符串
+                this.tooltipLevel.innerText = data.level;
+            }
             
-            // 如果提供了颜色，则应用，否则恢复默认白色
             if (data.color) {
                 this.tooltipLevel.style.color = data.color;
             } else {
                 this.tooltipLevel.style.color = '#ffffff';
             }
-            
             this.tooltipLevel.classList.remove('hidden');
         } else {
             this.tooltipLevel.classList.add('hidden');
@@ -455,13 +478,21 @@ export class WorldScene {
 
     refreshTownUI(cityId) {
         const cityData = worldManager.cities[cityId];
+        const allBuildings = cityData.getAvailableBuildings();
         
+        // 更新季度收入显示
+        const goldIncome = document.getElementById('town-income-gold');
+        const woodIncome = document.getElementById('town-income-wood');
+        if (goldIncome) goldIncome.innerText = cityData.production.gold;
+        if (woodIncome) woodIncome.innerText = cityData.production.wood;
+
+        // 1. 刷新建筑面板
         ['economy', 'military', 'magic'].forEach(cat => {
             const container = document.getElementById(`build-cat-${cat}`);
             if (!container) return;
             container.innerHTML = '';
             
-            cityData.buildings[cat].forEach(build => {
+            allBuildings[cat].forEach(build => {
                 const card = document.createElement('div');
                 const isMax = build.level >= build.maxLevel;
                 card.className = `building-card lv-${build.level} ${isMax ? 'is-max' : ''}`;
@@ -477,13 +508,8 @@ export class WorldScene {
 
                 card.onclick = () => {
                     if (isMax) return;
-                    const goldCost = build.cost.gold;
-                    const woodCost = build.cost.wood;
-
-                    if (worldManager.resources.gold >= goldCost && worldManager.resources.wood >= woodCost) {
-                        worldManager.spendGold(goldCost);
-                        worldManager.spendWood(woodCost);
-                        cityData.upgradeBuilding(cat, build.id);
+                    if (worldManager.spendGold(build.cost.gold) && worldManager.spendWood(build.cost.wood)) {
+                        cityData.upgradeBuilding(build.id);
                         this.refreshTownUI(cityId);
                     } else {
                         worldManager.showNotification('资源不足，无法建设！');
@@ -493,6 +519,7 @@ export class WorldScene {
             });
         });
 
+        // 2. 刷新城镇驻军
         const townUnitsList = document.getElementById('town-units-list');
         townUnitsList.innerHTML = '';
         for (const type in cityData.availableUnits) {
@@ -502,27 +529,34 @@ export class WorldScene {
                     worldManager.transferToHero(type, 1, cityId);
                     this.refreshTownUI(cityId);
                 });
+                this.bindUnitTooltip(slot, type);
                 townUnitsList.appendChild(slot);
             }
         }
 
+        // 3. 刷新可招募列表
         const recruitList = document.getElementById('town-recruit-list');
         recruitList.innerHTML = '';
-        const availableRecruits = worldManager.getAvailableRecruits(cityId);
-        
-        availableRecruits.forEach(unitInfo => {
+        worldManager.getAvailableRecruits(cityId).forEach(unitInfo => {
             const type = unitInfo.type;
+            const details = worldManager.getUnitDetails(type);
             const item = document.createElement('div');
             item.className = 'recruit-item';
-            const cost = worldManager.unitCosts[type].gold;
+            
+            // 计算最终招募价格
+            const baseCost = worldManager.unitCosts[type].gold;
+            const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
+
             item.innerHTML = `
                 <div class="slot-icon" style="${this.getIconStyleString(type)}"></div>
                 <div class="unit-info">
-                    <span class="unit-name">${this.getUnitName(type)}</span>
-                    <span class="unit-cost">💰${cost}</span>
+                    <span class="unit-name">${details.name}</span>
+                    <span class="unit-cost">💰${finalCost}</span>
                 </div>
                 <button class="wuxia-btn tiny-btn">招募</button>
             `;
+
+            this.bindUnitTooltip(item, type);
             item.querySelector('button').onclick = (e) => {
                 e.stopPropagation();
                 if (worldManager.recruitUnit(type, cityId)) {
@@ -534,6 +568,7 @@ export class WorldScene {
             recruitList.appendChild(item);
         });
 
+        // 4. 刷新侠客队伍
         const heroArmyList = document.getElementById('hero-army-list');
         heroArmyList.innerHTML = '';
         for (const type in worldManager.heroArmy) {
@@ -543,9 +578,27 @@ export class WorldScene {
                     worldManager.transferToCity(type, 1, cityId);
                     this.refreshTownUI(cityId);
                 });
+                this.bindUnitTooltip(slot, type);
                 heroArmyList.appendChild(slot);
             }
         }
+    }
+
+    /**
+     * 统一绑定兵种属性悬浮窗，消除重复代码
+     */
+    bindUnitTooltip(element, type) {
+        const stats = worldManager.getUnitDetails(type);
+        // 遵照要求：UI 上依然统一显示为“伤害”，不再显示“秒伤”等现代术语
+        const label = '伤害'; 
+        
+        element.onmouseenter = () => this.showTooltip({
+            name: stats.name,
+            level: `气血:${stats.hp} | ${label}:${stats.dps} (${stats.rangeType})`,
+            description: stats.description,
+            color: '#d4af37' // 武侠金色
+        });
+        element.onmouseleave = () => this.hideTooltip();
     }
 
     createArmySlot(type, count, onClick) {
@@ -565,17 +618,7 @@ export class WorldScene {
     }
 
     getUnitName(type) {
-        const names = {
-            'melee': '天策弟子',
-            'ranged': '长歌弟子',
-            'tiance': '天策骑兵',
-            'chunyang': '纯阳弟子',
-            'cangjian': '藏剑弟子',
-            'cangyun': '苍云将士',
-            'archer': '唐门射手',
-            'healer': '万花补给'
-        };
-        return names[type] || type;
+        return worldManager.getUnitDetails(type).name;
     }
 
     createGround(mapData) {

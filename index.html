@@ -107,31 +107,30 @@
                         <div class="hero-attributes-section">
                             <div class="attributes-header">
                                 <span>—— 基础潜能 ——</span>
-                                <div class="skill-points-tag">可用技能点: <span id="hero-skill-points">1</span></div>
                             </div>
                             <div class="attributes-grid-v4">
-                                <div class="attr-box">
-                                    <div class="attr-label">外功攻击</div>
+                                <div class="attr-box" id="attr-box-atk">
+                                    <div class="attr-label">攻击</div>
                                     <div class="attr-val" id="attr-atk">45</div>
                                 </div>
-                                <div class="attr-box">
-                                    <div class="attr-label">外功防御</div>
+                                <div class="attr-box" id="attr-box-def">
+                                    <div class="attr-label">坚韧</div>
                                     <div class="attr-val" id="attr-def">30</div>
                                 </div>
-                                <div class="attr-box">
-                                    <div class="attr-label">轻功移速</div>
-                                    <div class="attr-val" id="attr-speed">0.08</div>
+                                <div class="attr-box" id="attr-box-power">
+                                    <div class="attr-label" id="attr-power-label">力道</div>
+                                    <div class="attr-val" id="attr-primary-val">50</div>
                                 </div>
-                                <div class="attr-box highlighted">
-                                    <div class="attr-label" id="attr-primary-name">力道</div>
-                                    <div class="attr-val" id="attr-primary-val">65</div>
-                                </div>
-                                <div class="attr-box">
-                                    <div class="attr-label">内功法力</div>
+                                <div class="attr-box highlighted" id="attr-box-spells">
+                                    <div class="attr-label">法术</div>
                                     <div class="attr-val" id="attr-fali">100</div>
                                 </div>
-                                <div class="attr-box">
-                                    <div class="attr-label">战斗加速</div>
+                                <div class="attr-box" id="attr-box-speed">
+                                    <div class="attr-label">轻功</div>
+                                    <div class="attr-val" id="attr-speed">0.08</div>
+                                </div>
+                                <div class="attr-box" id="attr-box-haste">
+                                    <div class="attr-label">加速</div>
                                     <div class="attr-val"><span id="attr-haste">10</span>%</div>
                                 </div>
                             </div>
@@ -141,7 +140,7 @@
                         <div class="hero-skills-section-v4">
                             <div class="section-header-v4">
                                 <div class="label-with-icon">習得招式</div>
-                                <button id="open-skill-learn-btn" class="learn-skill-btn-v4">秘籍研习</button>
+                                <button id="open-skill-learn-btn" class="learn-skill-btn-v4">招式图谱</button>
                             </div>
                             <div id="hero-panel-skills" class="hero-skills-list-v4">
                                 <!-- 动态填充技能图标 -->
@@ -153,7 +152,7 @@
 
                 <!-- 招式学习面板 (独立于属性面板，确保居中) -->
                 <div id="skill-learn-panel" class="hidden skill-learn-v3">
-                    <div class="menu-decoration-top">秘籍研习</div>
+                    <div class="menu-decoration-top">招式图谱</div>
                     <button id="close-skill-learn" class="close-btn-v3">×</button>
                     <div class="skill-learn-content">
                         <div class="skill-learn-header-row">
@@ -162,7 +161,6 @@
                                 <button class="tab-btn" data-sect="tiance">天策招式</button>
                                 <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
                             </div>
-                            <div class="learn-sp-tag">可用技能点: <span id="learn-panel-sp">0</span></div>
                         </div>
                         <div id="skill-list-to-learn" class="skill-grid-v3">
                             <!-- 动态生成待学习技能 -->
@@ -174,7 +172,11 @@
                 <div id="town-management-panel" class="menu-container hidden town-panel-v3">
                     <div class="menu-decoration-top"></div>
                     <button id="close-town-panel" class="close-btn-v3" title="关闭">×</button>
-                    <h2 id="town-name" class="town-title-v3">稻香村</h2>
+                    <div class="town-header-top-v3">
+                        <div class="town-income-v3">季度产出: 💰<span id="town-income-gold">1000</span> 🪵<span id="town-income-wood">200</span></div>
+                        <h2 id="town-name" class="town-title-v3">稻香村</h2>
+                        <div style="flex: 1;"></div> <!-- 占位符确保名称居中 -->
+                    </div>
                     
                     <div class="town-main-content">
                         <!-- 左侧：建筑规划 -->
@@ -351,4 +353,5 @@
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>
+
 

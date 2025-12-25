@@ -441,9 +441,9 @@ export class HeroUnit extends BaseUnit {
     constructor(side, index, projectileManager) {
         const heroData = worldManager.heroData;
         
-        // 英雄属性计算：基础属性 + 等级加成
-        const hp = heroData.hpMax + (heroData.level - 1) * 50;
-        const atk = heroData.stats.atk + (heroData.level - 1) * 5;
+        // 英雄属性计算：直接从同步后的数据获取
+        const hp = heroData.hpMax;
+        const atk = 30; // 英雄基础攻击，会被 Modifier 放大
         
         super({
             side,
@@ -589,15 +589,16 @@ export class HeroUnit extends BaseUnit {
 export class MeleeSoldier extends BaseUnit {
     static displayName = '天策弟子';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('melee');
         super({
             side,
             index,
             type: 'melee',
-            hp: 120,
-            speed: 0.03,
-            attackRange: 0.8,
-            attackDamage: 15,
-            attackSpeed: 1000,
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 2
         });
@@ -607,15 +608,16 @@ export class MeleeSoldier extends BaseUnit {
 export class RangedSoldier extends BaseUnit {
     static displayName = '长歌弟子';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('ranged');
         super({
             side,
             index,
             type: 'ranged',
-            hp: 80,
-            speed: 0.025,
-            attackRange: 6.0,
-            attackDamage: 12,
-            attackSpeed: 1800,
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 2
         });
@@ -646,15 +648,16 @@ export class RangedSoldier extends BaseUnit {
 export class Archer extends BaseUnit {
     static displayName = '唐门射手';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('archer');
         super({
             side,
             index,
             type: 'archer',
-            hp: 70,
-            speed: 0.03,
-            attackRange: 10.0, // 极远射程
-            attackDamage: 18,
-            attackSpeed: 2000,
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range, // 极远射程
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 3
         });
@@ -684,15 +687,16 @@ export class Archer extends BaseUnit {
 export class Healer extends BaseUnit {
     static displayName = '万花补给';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('healer');
         super({
             side,
             index,
             type: 'healer',
-            hp: 90,
-            speed: 0.02, // 移动慢
-            attackRange: 5.0, // 治疗范围
-            attackDamage: -20, // 负伤害即治疗
-            attackSpeed: 2500,
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range, // 治疗范围
+            attackDamage: -stats.atk, // 负伤害即治疗
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 4
         });
@@ -866,15 +870,16 @@ export class ShadowNinja extends BaseUnit {
 export class Cangjian extends BaseUnit {
     static displayName = '藏剑弟子';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('cangjian');
         super({
             side,
             index,
             type: 'cangjian',
-            hp: 180,
-            speed: 0.035,
-            attackRange: 1.5,
-            attackDamage: 8, // 单次伤害降低，因为是高频多段伤害
-            attackSpeed: 4000,
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk, // 单次伤害降低，因为是高频多段伤害
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 6
         });
@@ -960,15 +965,16 @@ export class Cangjian extends BaseUnit {
 export class Cangyun extends BaseUnit {
     static displayName = '苍云将士';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('cangyun');
         super({
             side,
             index,
             type: 'cangyun',
-            hp: 250, // 极高生命值
-            speed: 0.02, // 移动缓慢
-            attackRange: 0.8,
-            attackDamage: 12, // 伤害一般
-            attackSpeed: 1200,
+            hp: stats.hp, // 极高生命值
+            speed: stats.speed, // 移动缓慢
+            attackRange: stats.range,
+            attackDamage: stats.atk, // 伤害一般
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 5,
             mass: 2.5 // 苍云盾墙，质量较高
@@ -982,15 +988,16 @@ export class Cangyun extends BaseUnit {
 export class Tiance extends BaseUnit {
     static displayName = '天策骑兵';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('tiance');
         super({
             side,
             index,
             type: 'tiance',
-            hp: 180, 
-            speed: 0.05,
-            attackRange: 1.8, 
-            attackDamage: 14, // 伤害减半 (28 -> 14)
-            attackSpeed: 800, // 攻速双倍 (1600 -> 800)
+            hp: stats.hp, 
+            speed: stats.speed,
+            attackRange: stats.range, 
+            attackDamage: stats.atk, 
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 8
         });
@@ -1079,15 +1086,16 @@ export class Tiance extends BaseUnit {
 export class Chunyang extends BaseUnit {
     static displayName = '纯阳弟子';
     constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitDetails('chunyang');
         super({
             side,
             index,
             type: 'chunyang',
-            hp: 110,
-            speed: 0.035,
-            attackRange: 10.0, 
-            attackDamage: 18,
-            attackSpeed: 1200,
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range, 
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 6
         });

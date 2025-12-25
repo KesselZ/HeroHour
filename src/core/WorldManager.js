@@ -1,147 +1,198 @@
 import { modifierManager } from './ModifierManager.js';
 
 /**
- * 城镇类：管理单个城镇的属性和逻辑
+ * 1. 建筑全量注册表：定义所有建筑的元数据
+ * 这种方式将数据与逻辑彻底分离，以后增加建筑只需在此处添加
+ */
+const BUILDING_REGISTRY = {
+    'town_hall': { name: '议政厅', category: 'economy', maxLevel: 3, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。' },
+    'market': { name: '市场', category: 'economy', maxLevel: 3, icon: 'merchant_guild', cost: { gold: 300, wood: 50 }, description: '互通有无：提高城镇的金钱与木材产出效率。' },
+    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '江湖传闻：每级增加全军 15% 的阅历（经验）获取速度。' },
+    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 3, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '财源广进：每级提升该城镇 20% 的金钱产出。' },
+    'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '辎重运输：每级增加城镇木材产出，并降低全军招募成本 5%。' },
+    
+    // 军事建筑：现在每级都有数值成长
+    'barracks': { name: '兵营', category: 'military', maxLevel: 5, icon: 'melee', cost: { gold: 400, wood: 150 }, description: '训练基础步兵。每级增加全军近战兵种 15% 生命。' },
+    'archery_range': { name: '靶场', category: 'military', maxLevel: 5, icon: 'archer', cost: { gold: 400, wood: 200 }, description: '招募唐门射手。每级增加全军远程兵种 15% 伤害。' },
+    'stable': { name: '天策马厩', category: 'military', maxLevel: 5, icon: 'tiance', cost: { gold: 800, wood: 300 }, description: '招募天策骑兵。每级增加天策骑兵 15% 伤害与生命。' },
+    'sword_forge': { name: '藏剑剑庐', category: 'military', maxLevel: 5, icon: 'cangjian', cost: { gold: 900, wood: 400 }, description: '招募藏剑弟子。每级增加藏剑弟子 15% 伤害与生命。' },
+    'martial_shrine': { name: '苍云讲武堂', category: 'military', maxLevel: 5, icon: 'cangyun', cost: { gold: 850, wood: 450 }, description: '招募苍云将士。每级增加苍云将士 15% 生命与防御。' },
+    'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 1000, wood: 500 }, description: '招募纯阳弟子。每级增加纯阳弟子 15% 属性。' },
+    'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '招募万花弟子。每级增加万花弟子 15% 气血与疗效。' },
+    
+    'spell_altar': { name: '法术祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1200, wood: 600 }, description: '博采众长：每级随机感悟全江湖招式。' },
+    'treasure_pavilion': { name: '藏宝阁', category: 'economy', maxLevel: 1, icon: 'treasure_pavilion_v2', cost: { gold: 2000, wood: 800 }, description: '琳琅满目：极其罕见的珍宝汇聚之地。' },
+    'sect_chunyang': { name: '两仪阁', category: 'magic', maxLevel: 3, icon: 'chunyang', cost: { gold: 800, wood: 400 }, description: '纯阳秘所：感悟纯阳专属招式。' },
+    'sect_tiance': { name: '演武场', category: 'magic', maxLevel: 3, icon: 'dummy_training', cost: { gold: 800, wood: 400 }, description: '天策重地：感悟天策专属招式。' },
+    'sect_cangjian': { name: '问水阁', category: 'magic', maxLevel: 3, icon: 'cangjian', cost: { gold: 800, wood: 400 }, description: '藏剑雅处：感悟藏剑专属招式。' }
+};
+
+/**
+ * 2. 门派蓝图：定义每个门派出身的城市所拥有的建筑列表
+ */
+const BLUEPRINTS = {
+    'chunyang': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'medical_pavilion', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_chunyang'],
+    'tiance': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_tiance', 'medical_pavilion'],
+    'cangjian': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_cangjian', 'medical_pavilion']
+};
+
+/**
+ * 3. 兵种属性与说明注册表：全游戏唯一的兵种属性配置中心
+ */
+const UNIT_STATS_DATA = {
+    'melee': { name: '天策弟子', hp: 120, atk: 15, range: 0.8, rangeType: '近战', speed: 0.03, attackSpeed: 1000, description: '天策府的基础步兵，攻守兼备，是战场的中流砥柱。' },
+    'ranged': { name: '长歌弟子', hp: 80, atk: 12, range: 6.0, rangeType: '远程', speed: 0.025, attackSpeed: 1800, description: '以音律伤敌，能够在大后方提供稳定的持续火力。' },
+    'archer': { name: '唐门射手', hp: 70, atk: 18, range: 10.0, rangeType: '极远', speed: 0.03, attackSpeed: 2000, description: '穿心弩箭，百步穿杨，拥有全江湖最远的杀伤距离。' },
+    'tiance': { name: '天策骑兵', hp: 180, atk: 14, range: 1.8, rangeType: '冲锋', speed: 0.05, attackSpeed: 800, description: '铁骑突出刀枪鸣，横扫攻击附带强力击退，极具穿透力。' },
+    'chunyang': { name: '纯阳弟子', hp: 110, atk: 18, range: 10.0, rangeType: '远近结合', speed: 0.035, attackSpeed: 1200, description: '远则御剑气，近则斩青锋，能根据敌人距离切换战斗模式。' },
+    'cangjian': { name: '藏剑弟子', hp: 180, atk: 8, range: 1.5, rangeType: 'AOE', speed: 0.035, attackSpeed: 4000, description: '身负重剑，旋风斩能对周围所有敌人造成多段打击。' },
+    'cangyun': { name: '苍云将士', hp: 250, atk: 12, range: 0.8, rangeType: '盾墙', speed: 0.02, attackSpeed: 1200, description: '陌刀盾甲，不动如山，是江湖中最坚韧的防御力量。' },
+    'healer': { name: '万花补给', hp: 90, atk: 20, range: 5.0, rangeType: '治疗', speed: 0.02, attackSpeed: 2500, description: '妙手仁心，能够为战场上受伤的友军提供持续的气血恢复。' }
+};
+
+/**
+ * 城镇类：现在它通过 blueprintId 彻底解决了“出身”问题
  */
 class City {
-    constructor(id, name, owner = 'player', type = 'main_city') {
+    constructor(id, name, owner = 'player', type = 'main_city', blueprintId = 'chunyang') {
         this.id = id;
         this.name = name;
-        this.owner = owner; // 'player' or 'ai_faction_id'
-        this.type = type; // 决定图标
-        this.level = 1;
-        this.x = 0; // 初始化位置
+        this.owner = owner; 
+        this.type = type;
+        this.blueprintId = blueprintId; // 核心：这座城市的“出身蓝图”
+        this.x = 0;
         this.z = 0;
         
-        // 建筑分类与效果定义预留
-        this.buildings = {
-            'economy': [
-                { 
-                    id: 'town_hall', name: '议政厅', level: 1, maxLevel: 3, 
-                    cost: { gold: 500, wood: 100 }, icon: 'main_city', 
-                    effect: '增加基础金钱产出',
-                    description: '城镇的核心权力机构。升级可大幅提升每季度的税收收入。'
-                },
-                { 
-                    id: 'market', name: '市场', level: 1, maxLevel: 2, 
-                    cost: { gold: 300, wood: 50 }, icon: 'gold_pile', 
-                    effect: '提高资源产出效率',
-                    description: '进行商贸往来的场所。提高金钱和木材的额外产出百分比。'
-                },
-                { 
-                    id: 'tavern', name: '酒馆', level: 0, maxLevel: 1, 
-                    cost: { gold: 200, wood: 80 }, icon: 'healer', 
-                    effect: '解锁万花补给招募',
-                    description: '江湖侠客落脚之地。建造后可招募擅长治疗的万花弟子。'
-                },
-                { 
-                    id: 'inn', name: '旅馆', level: 0, maxLevel: 1, 
-                    cost: { gold: 350, wood: 120 }, icon: 'items', 
-                    effect: '提高英雄体力恢复速率',
-                    description: '提供舒适休息的环境。让驻守英雄和路过侠客更快恢复元气。'
-                }
-            ],
-            'military': [
-                { 
-                    id: 'barracks', name: '兵营', level: 1, maxLevel: 5, 
-                    cost: { gold: 400, wood: 150 }, icon: 'melee', 
-                    effect: '解锁基础步兵，提升生命值',
-                    description: '训练天策弟子和长歌弟子的地方。升级可强化其体质。'
-                },
-                { 
-                    id: 'archery_range', name: '靶场', level: 0, maxLevel: 3, 
-                    cost: { gold: 400, wood: 200 }, icon: 'archer', 
-                    effect: '解锁唐门射手，提升伤害',
-                    description: '供远程兵种修习箭术。建造后可招募唐门射手。'
-                },
-                { 
-                    id: 'stable', name: '马厩', level: 0, maxLevel: 3, 
-                    cost: { gold: 800, wood: 300 }, icon: 'tiance', 
-                    effect: '解锁天策骑兵招募',
-                    description: '饲养名马的场所。建造后可招募强大的天策府骑兵。'
-                }
-            ],
-            'magic': [
-                { 
-                    id: 'mage_guild', name: '法师公会', level: 0, maxLevel: 5, 
-                    cost: { gold: 1000, wood: 500 }, icon: 'chunyang', 
-                    effect: '解锁纯阳弟子招募',
-                    description: '道家修行之地。建造后可招募控制与输出兼备的纯阳弟子。'
-                },
-                { 
-                    id: 'shrine', name: '祭坛', level: 0, maxLevel: 1, 
-                    cost: { gold: 1500, wood: 800 }, icon: 'cangyun', 
-                    effect: '解锁苍云将士招募',
-                    description: '供奉战神之灵。建造后可招募坚不可摧的苍云肉盾。'
-                }
-            ]
+        // 只存储建筑的等级数据
+        this.buildingLevels = {
+            'town_hall': 1,
+            'market': 1,
+            'barracks': 1
         };
 
-        this.availableUnits = {
-            'melee': 100,
-            'ranged': 50
-        };
+        this.availableUnits = { 'melee': 100, 'ranged': 50 };
+        this.production = { gold: 1000, wood: 200 };
+    }
+
+    /**
+     * 动态获取当前城市所有的建筑列表
+     * 基于城市自身的 blueprintId，与当前 owner 无关，实现了“夺城而不改制”的战略感
+     */
+    getAvailableBuildings() {
+        const list = { economy: [], military: [], magic: [] };
+        const blueprint = BLUEPRINTS[this.blueprintId] || BLUEPRINTS['chunyang'];
         
-        this.production = {
-            gold: 1000,
-            wood: 200
-        };
-    }
+        blueprint.forEach(id => {
+            const meta = BUILDING_REGISTRY[id];
+            if (meta) {
+                list[meta.category].push({ 
+                    id, 
+                    ...meta, 
+                    level: this.buildingLevels[id] || 0 
+                });
+            }
+        });
 
-    getIconKey() {
-        return this.type;
-    }
-
-    /**
-     * 检查某个建筑是否已建造（等级 > 0）
-     */
-    isBuildingBuilt(buildingId) {
-        for (const cat in this.buildings) {
-            const build = this.buildings[cat].find(b => b.id === buildingId);
-            if (build) return build.level > 0;
-        }
-        return false;
+        return list;
     }
 
     /**
-     * 升级建筑并触发效果应用
+     * 升级建筑逻辑
      */
-    upgradeBuilding(category, buildingId) {
-        const building = this.buildings[category].find(b => b.id === buildingId);
-        if (building && building.level < building.maxLevel) {
-            building.level++;
-            
-            // 触发效果应用接口
-            this.applyBuildingEffect(buildingId, building.level);
+    upgradeBuilding(buildingId) {
+        const meta = BUILDING_REGISTRY[buildingId];
+        const currentLevel = this.buildingLevels[buildingId] || 0;
+        
+        if (meta && currentLevel < meta.maxLevel) {
+            this.buildingLevels[buildingId] = currentLevel + 1;
+            this._applyEffect(buildingId, this.buildingLevels[buildingId]);
             return true;
         }
         return false;
     }
 
     /**
-     * 核心逻辑接口：在这里根据建筑 ID 和等级触发实际的数值变动
+     * 效果分发器
      */
-    applyBuildingEffect(buildingId, level) {
-        console.log(`%c[建筑效果] %c${buildingId} 升级至 Lv.${level}，正在触发效果...`, 'color: #a68b44; font-weight: bold', 'color: #fff');
+    _applyEffect(id, level) {
+        console.log(`%c[建设] %c${id} 升级至 Lv.${level}`, 'color: #a68b44; font-weight: bold', 'color: #fff');
         
-        switch (buildingId) {
-            case 'town_hall':
-                this.production.gold += 50; // 每升一级增加金钱产出
-                break;
-            case 'barracks':
-                // 增加近战兵血量加成 (示例：Lv.2 时增加 10%)
-                if (level >= 2) {
-                    modifierManager.addGlobalModifier({
-                        id: `city_${this.id}_barracks_hp`,
-                        side: 'player',
-                        unitType: 'melee',
-                        stat: 'hp',
-                        multiplier: 1 + (level - 1) * 0.1
-                    });
-                }
-                break;
-            // 其他效果可以在此预留或直接实现
+        // --- 商业建筑效果 ---
+        if (id === 'town_hall') {
+            // 每级增加 200 金钱产出
+            this.production.gold += 200;
+        } else if (id === 'market') {
+            // 每级增加 100 金钱和 50 木材
+            this.production.gold += 100;
+            this.production.wood += 50;
+        } else if (id === 'bank') {
+            // 每级增加该城市当前金钱产出的 20% (基于初始 1000 的基数，约 200)
+            this.production.gold += 200;
+        } else if (id === 'trade_post') {
+            // 每级增加 80 木材，并降低全局招募成本 5%
+            this.production.wood += 80;
+            modifierManager.addGlobalModifier({ 
+                id: `city_${this.id}_recruit_discount`, 
+                side: 'player', 
+                stat: 'recruit_cost', 
+                multiplier: 1.0 - (level * 0.05) 
+            });
+        } else if (id === 'inn') {
+            // 每级增加全军阅历获取 15%
+            modifierManager.addGlobalModifier({ 
+                id: `city_${this.id}_xp_bonus`, 
+                side: 'player', 
+                stat: 'xp_gain', 
+                multiplier: 1.0 + (level * 0.15) 
+            });
         }
+        // --- 特殊建筑效果 ---
+        else if (id === 'spell_altar') {
+            worldManager.grantRandomSkill({ ignoreSect: true });
+        } else if (id.startsWith('sect_')) {
+            const sectId = id.replace('sect_', '');
+            worldManager.grantRandomSkill({ sect: sectId, forceSect: true });
+        }
+
+        // --- 军事建筑数值增强系统 ---
+        // 逻辑：每升一级提供 15% 的全局属性增益
+        const multiplier = 1.0 + (level * 0.15); 
+        
+        switch (id) {
+            case 'barracks':
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: multiplier });
+                break;
+            case 'archery_range':
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'damage', multiplier: multiplier });
+                break;
+            case 'stable':
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'damage', multiplier: multiplier });
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_tiance_hp`, side: 'player', unitType: 'tiance', stat: 'hp', multiplier: multiplier });
+                break;
+            case 'sword_forge':
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangjian_bonus`, side: 'player', unitType: 'cangjian', stat: 'damage', multiplier: multiplier });
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangjian_hp`, side: 'player', unitType: 'cangjian', stat: 'hp', multiplier: multiplier });
+                break;
+            case 'martial_shrine':
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: multiplier });
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_dmg`, side: 'player', unitType: 'cangyun', stat: 'damage', multiplier: multiplier });
+                break;
+            case 'mage_guild':
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'damage', multiplier: multiplier });
+                break;
+            case 'medical_pavilion':
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: multiplier });
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'damage', multiplier: multiplier });
+                break;
+        }
+    }
+
+    isBuildingBuilt(buildingId) {
+        return (this.buildingLevels[buildingId] || 0) > 0;
+    }
+
+    getIconKey() {
+        return this.type;
     }
 }
 
@@ -153,9 +204,9 @@ class WorldManager {
     constructor() {
         // 0. 势力定义
         this.availableHeroes = {
-            'qijin': { name: '祁进', title: '紫虚子', icon: 'qijin', sect: 'chunyang', color: '#44ccff' }, // 浅蓝色
-            'lichengen': { name: '李承恩', title: '天策府统领', icon: 'lichengen', sect: 'tiance', color: '#ff4444' }, // 红色
-            'yeying': { name: '叶英', title: '藏剑大庄主', icon: 'cangjian', sect: 'cangjian', color: '#ffcc00' } // 黄色
+            'qijin': { name: '祁进', title: '紫虚子', icon: 'qijin', sect: 'chunyang', color: '#44ccff', primaryStat: '力道' }, 
+            'lichengen': { name: '李承恩', title: '天策府统领', icon: 'lichengen', sect: 'tiance', color: '#ff4444', primaryStat: '力道' }, 
+            'yeying': { name: '叶英', title: '藏剑大庄主', icon: 'cangjian', sect: 'cangjian', color: '#ffcc00', primaryStat: '身法' } 
         };
 
         this.factions = {}; // 记录所有势力数据 { factionId: { heroId, cities: [], army: {} } }
@@ -172,21 +223,18 @@ class WorldManager {
             level: 1,
             xp: 0,
             xpMax: 100, // 下一级所需经验
-            skillPoints: 1, // 初始给 1 点技能点
             hpMax: 500,
             hpCurrent: 500,
             mpMax: 100,
             mpCurrent: 100,
             skills: [],
             stats: {
-                atk: 45,
-                def: 30,
+                soldierAtk: 45,       // 统帅：士兵攻击
+                soldierDef: 30,       // 统帅：士兵防御 (血量)
+                power: 50,            // 武力：英雄体魄与伤害
+                spells: 100,          // 法术：招式强度
                 speed: 0.08,
-                // --- 基础 RPG 属性 ---
-                fali: 100,            // 法力：决定内力上限
-                haste: 0,             // 加速：冷却缩减 (0-1)
-                primaryStatName: '力道', // 主属性名称 (力道/根骨等)
-                primaryStatValue: 50   // 主属性数值
+                haste: 0,
             }
         };
 
@@ -203,7 +251,7 @@ class WorldManager {
 
         // 3. 城镇中的兵力与建设
         this.cities = {
-            'main_city_1': new City('main_city_1', '稻香村')
+            'main_city_1': new City('main_city_1', '稻香村', 'player', 'main_city', 'chunyang')
         };
 
         // 4. 地图持久化状态
@@ -403,8 +451,9 @@ class WorldManager {
             { type: 'archer', requiredBuilding: 'archery_range' },
             { type: 'tiance', requiredBuilding: 'stable' },
             { type: 'chunyang', requiredBuilding: 'mage_guild' },
-            { type: 'cangyun', requiredBuilding: 'shrine' },
-            { type: 'healer', requiredBuilding: 'tavern' }
+            { type: 'cangjian', requiredBuilding: 'sword_forge' },
+            { type: 'cangyun', requiredBuilding: 'martial_shrine' },
+            { type: 'healer', requiredBuilding: 'medical_pavilion' }
         ];
 
         return allPossibleUnits.filter(unit => {
@@ -447,8 +496,11 @@ class WorldManager {
      * 招募士兵到指定城市
      */
     recruitUnit(type, cityId = 'main_city_1') {
-        const cost = this.unitCosts[type].gold;
-        if (this.spendGold(cost)) {
+        const baseCost = this.unitCosts[type].gold;
+        // 应用全局招募折扣 (来自马帮驿站等)
+        const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
+        
+        if (this.spendGold(finalCost)) {
             const city = this.cities[cityId];
             city.availableUnits[type] = (city.availableUnits[type] || 0) + 1;
             return true;
@@ -523,7 +575,7 @@ class WorldManager {
                 cities: [cityId]
             };
 
-            const aiCity = new City(cityId, `${aiHeroInfo.name}的据点`, factionId);
+            const aiCity = new City(cityId, `${aiHeroInfo.name}的据点`, factionId, 'main_city', aiHeroInfo.sect);
             // 稍后在 POI 逻辑中分配位置
             this.cities[cityId] = aiCity;
         });
@@ -540,6 +592,9 @@ class WorldManager {
             pCity.name = "新手村"; 
             pCity.x = px;
             pCity.z = pz;
+            // 关键改动：根据玩家选定的主角门派，修正初始城市的蓝图
+            const playerSect = this.availableHeroes[this.heroData.id]?.sect || 'chunyang';
+            pCity.blueprintId = playerSect;
             
             entities.push({ 
                 id: 'main_city_1', 
@@ -623,7 +678,7 @@ class WorldManager {
                     placed = true;
                 } else if (roll < 0.005) {
                     const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
-                    const sKey = bType === 'gold_mine' ? 'gold_mine_world' : 'sawmill_world';
+                    const sKey = bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2';
                     entities.push({ 
                         id: `${bType}_${x}_${z}`, 
                         type: 'captured_building', 
@@ -695,6 +750,7 @@ class WorldManager {
         const oldHeroId = oldFaction ? oldFaction.heroId : null;
 
         city.owner = 'player';
+        // 备注：学院建筑会自动随 owner 变更而动态切换显示逻辑
         
         // 更新势力的城市列表
         if (oldFaction) {
@@ -907,6 +963,63 @@ class WorldManager {
         window.dispatchEvent(new CustomEvent('building-captured', { detail: { id, type: config.type } }));
     }
 
+    /**
+     * 核心 API：随机授予英雄技能
+     * @param {Object} options { sect: '门派名', count: 1, pool: ['skill_id_1', ...], ignoreSect: boolean, forceSect: boolean }
+     */
+    async grantRandomSkill(options = {}) {
+        const { SkillRegistry, SectSkills } = await import('./SkillSystem.js');
+        const heroData = this.heroData;
+        
+        // 1. 确定备选池
+        let candidateIds = [];
+        
+        if (options.pool) {
+            candidateIds = options.pool;
+        } else if (options.ignoreSect) {
+            // 忽略门派：直接使用全局全池
+            candidateIds = Object.keys(SkillRegistry);
+        } else if (options.sect) {
+            // 门派池
+            candidateIds = SectSkills[options.sect] || [];
+        } else {
+            // 默认兜底：英雄所属门派
+            const heroSect = this.availableHeroes[heroData.id]?.sect || 'chunyang';
+            candidateIds = SectSkills[heroSect] || [];
+        }
+
+        // 2. 过滤掉已经拥有的
+        let availablePool = candidateIds.filter(id => !heroData.skills.includes(id));
+
+        // 3. 智能回退机制：如果不是强制门派(forceSect)，且备选池已空，则尝试全局池
+        if (availablePool.length === 0 && !options.forceSect) {
+            candidateIds = Object.keys(SkillRegistry);
+            availablePool = candidateIds.filter(id => !heroData.skills.includes(id));
+        }
+
+        if (availablePool.length === 0) {
+            this.showNotification("侠客已学贯古今，参透了世间所有的招式。");
+            return null;
+        }
+
+        // 4. 随机抽取
+        const count = options.count || 1;
+        const selected = [];
+        for (let i = 0; i < count && availablePool.length > 0; i++) {
+            const randomIndex = Math.floor(Math.random() * availablePool.length);
+            const skillId = availablePool.splice(randomIndex, 1)[0];
+            selected.push(skillId);
+            
+            heroData.skills.push(skillId);
+            const skill = SkillRegistry[skillId];
+            this.showNotification(`感悟成功！获得了新招式：【${skill.name}】`);
+            console.log(`%c[技能获得] %c侠客感悟了招式: ${skill.name} (${skillId})`, 'color: #ff00ff; font-weight: bold', 'color: #fff');
+        }
+
+        window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+        return selected;
+    }
+
     updateHUD() {
         const resources = ['gold', 'wood'];
         resources.forEach(res => {
@@ -986,30 +1099,41 @@ class WorldManager {
      */
     gainXP(amount) {
         if (amount <= 0) return;
+        
+        // 应用全局阅历获取加成 (来自悦来客栈等)
+        const bonusAmount = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: 'hero' }, 'xp_gain', amount));
+        const finalAmount = bonusAmount;
+
         const data = this.heroData;
-        data.xp += amount;
+        data.xp += finalAmount;
         
         // 派发事件供大世界显示飘字
         window.dispatchEvent(new CustomEvent('resource-gained', { 
-            detail: { type: 'xp', amount: amount } 
+            detail: { type: 'xp', amount: finalAmount } 
         }));
         
         while (data.xp >= data.xpMax) {
             data.xp -= data.xpMax;
             data.level++;
             data.xpMax = Math.floor(data.xpMax * 1.5);
-            data.skillPoints++; // 每升一级给 1 点技能点
             
-            // 升级属性提升 (简单实现)
-            data.hpMax += 50;
+            // --- 属性固定成长系统 ---
+            const s = data.stats;
+            s.power += 5;          // 侠客力道/身法
+            s.spells += 4;         // 侠客法术
+            s.soldierAtk += 2;     // 士兵攻击
+            s.soldierDef += 2;     // 士兵坚韧
+            // s.speed 保持不变
+            s.haste = Math.min(0.5, s.haste + 0.01); // 招式加速 (每级 1%, 上限 50%)
+            
+            // 同步计算英雄血量上限 (200 + 力道 * 3)
+            data.hpMax = 200 + (s.power * 3);
             data.hpCurrent = data.hpMax;
-            data.stats.atk += 5;
-            data.stats.fali += 10;
-            data.mpMax = data.stats.fali;
-            data.mpCurrent = data.mpMax;
-            data.stats.haste = Math.min(0.4, (data.level - 1) * 0.02); // 示例：每级增加 2% 冷却缩减
 
-            console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！获得 1 点技能点`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+            console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+            
+            // 派发事件让 main.js 执行 syncHeroStatsToModifiers()
+            window.dispatchEvent(new CustomEvent('hero-level-up'));
         }
         
         window.dispatchEvent(new CustomEvent('hero-stats-changed'));
@@ -1029,6 +1153,42 @@ class WorldManager {
         parent.classList.remove('res-update-anim');
         void parent.offsetWidth; 
         parent.classList.add('res-update-anim');
+    }
+
+    /**
+     * 获取兵种详情（包含名称、配置及修正后的真实数据）
+     */
+    getUnitDetails(type) {
+        const base = UNIT_STATS_DATA[type];
+        if (!base) return { name: type, hp: 0, atk: 0, dps: 0, rangeType: '', description: '' };
+
+        const dummyUnit = { side: 'player', type: type };
+        
+        // 1. 计算最终气血
+        const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', base.hp));
+        
+        // 2. 计算最终攻击力 (Base Damage)
+        let finalAtk;
+        if (type === 'healer') {
+            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'damage', -base.atk));
+        } else {
+            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'damage', base.atk);
+        }
+
+        // 3. 计算最终攻击频率 (修正后的攻击间隔)
+        // 注意：ModifierManager 处理 attack_speed 时，加速属性会减小这个间隔
+        const finalInterval = modifierManager.getModifiedValue(dummyUnit, 'attack_speed', base.attackSpeed);
+        
+        // 4. 计算秒伤 (DPS = 攻击力 / 间隔秒数)
+        // 向上取整，保持 UI 整洁
+        const dps = Math.ceil((finalAtk / finalInterval) * 1000);
+
+        return {
+            ...base,
+            hp: finalHP,
+            atk: Math.ceil(finalAtk), // 依然保留基础攻击力供内部参考
+            dps: dps
+        };
     }
 
     /**

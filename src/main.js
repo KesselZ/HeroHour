@@ -144,6 +144,11 @@ window.addEventListener('battle-finished', (e) => {
     enterGameState(GameState.WORLD, result);
 });
 
+// 监听英雄升级事件，同步属性修正器
+window.addEventListener('hero-level-up', () => {
+    syncHeroStatsToModifiers();
+});
+
 /**
  * 根据选择的角色应用全局属性加成
  */
@@ -153,91 +158,90 @@ function applyHeroTraits(heroId) {
 
     // 初始化世界管理器的英雄数据
     worldManager.heroData.id = heroId;
+    
+    // 快捷访问 stats
+    const s = worldManager.heroData.stats;
+
     if (heroId === 'qijin') {
-        worldManager.heroData.hpMax = 500;
-        worldManager.heroData.stats.atk = 45;
-        worldManager.heroData.stats.speed = 0.08;
-        // 祁进属性：高力道，法力一般，少量加速
-        worldManager.heroData.stats.primaryStatName = '力道';
-        worldManager.heroData.stats.primaryStatValue = 65;
-        worldManager.heroData.stats.fali = 100; // 法力决定内力上限
-        worldManager.heroData.stats.haste = 0.1; // 10% 冷却缩减
+        // 祁进：武力高，招式强，统帅一般
+        s.power = 70;      
+        s.spells = 120;    
+        s.soldierAtk = 40; 
+        s.soldierDef = 30; 
+        s.speed = 0.07;
+        s.haste = 0; 
         
-        // 祁进技能：剑雨、神剑、镇山河
-        worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe']; 
-        
-        // 祁进天赋：门派领袖 - 纯阳弟子血量和伤害提高 20%
-        modifierManager.addGlobalModifier({
-            id: 'qijin_talent_chunyang_atk',
-            side: 'player',
-            unitType: 'chunyang',
-            stat: 'attack_damage',
-            multiplier: 1.2
-        });
-        modifierManager.addGlobalModifier({
-            id: 'qijin_talent_chunyang_hp',
-            side: 'player',
-            unitType: 'chunyang',
-            stat: 'hp',
-            multiplier: 1.2
-        });
+        // 祁进技能：初始仅习得基础招式
+        worldManager.heroData.skills = ['sword_rain']; 
     } else if (heroId === 'lichengen') {
-        worldManager.heroData.hpMax = 650;
-        worldManager.heroData.stats.atk = 35;
-        worldManager.heroData.stats.speed = 0.06;
-        // 李承恩属性：极高加速，法力充沛（指挥全军）
-        worldManager.heroData.stats.primaryStatName = '力道';
-        worldManager.heroData.stats.primaryStatValue = 55;
-        worldManager.heroData.stats.fali = 150; 
-        worldManager.heroData.stats.haste = 0.2; // 20% 冷却缩减
+        // 李承恩：统帅极强，个人武力中等
+        s.power = 55;      
+        s.spells = 80;     
+        s.soldierAtk = 60; 
+        s.soldierDef = 65; 
+        // 李承恩天赋：初始轻功更高 (0.07 * 1.2 = 0.084)
+        s.speed = 0.084;
+        s.haste = 0; 
         
-        // 李承恩技能：撼如雷、集结令、风来吴山（暂代大风车逻辑）
-        worldManager.heroData.skills = ['battle_shout', 'summon_militia', 'fenglaiwushan']; 
-
-        // 李承恩天赋：骁勇善战 - 大世界移动速度提高 20%，天策兵种血量提高 10%
-        modifierManager.addGlobalModifier({
-            id: 'lichengen_talent_world_speed',
-            side: 'player',
-            unitType: 'hero',
-            stat: 'world_speed',
-            multiplier: 1.2
-        });
-        modifierManager.addGlobalModifier({
-            id: 'lichengen_talent_tiance_hp',
-            side: 'player',
-            unitType: 'tiance',
-            stat: 'hp',
-            multiplier: 1.1
-        });
+        // 李承恩技能：初始仅习得基础招式
+        worldManager.heroData.skills = ['battle_shout']; 
     } else if (heroId === 'yeying') {
-        worldManager.heroData.hpMax = 550;
-        worldManager.heroData.stats.atk = 50;
-        worldManager.heroData.stats.speed = 0.07;
-        // 叶英属性：极高力道，少量加速，内力充沛
-        worldManager.heroData.stats.primaryStatName = '力道';
-        worldManager.heroData.stats.primaryStatValue = 75;
-        worldManager.heroData.stats.fali = 120;
-        worldManager.heroData.stats.haste = 0.15;
+        // 叶英：个人武力极致，招式极强，统帅较弱
+        s.power = 85;      
+        s.spells = 150;    
+        s.soldierAtk = 30; 
+        s.soldierDef = 25; 
+        s.speed = 0.07;
+        s.haste = 0;
 
-        // 叶英技能：目前复用一些剑系或霸气类技能
-        // 暂定：剑雨 (心剑)、风来吴山 (大风车)、神剑 (归宗)
-        worldManager.heroData.skills = ['sword_rain', 'fenglaiwushan', 'divine_sword_rain'];
-
-        // 叶英天赋：藏剑弟子攻击频率提高 20%
-        modifierManager.addGlobalModifier({
-            id: 'yeying_talent_cangjian_speed',
-            side: 'player',
-            unitType: 'cangjian',
-            stat: 'attack_speed',
-            multiplier: 1 / 1.2 // 冷却缩减 20%
-        });
+        // 叶英技能：初始仅习得基础招式
+        worldManager.heroData.skills = ['fenglaiwushan'];
     }
     
-    // 同步更新内力上限
-    worldManager.heroData.mpMax = worldManager.heroData.stats.fali;
-    // 初始生命和内力为满
+    // 核心重构：将统计数据注入全局修正管理器 (供士兵和英雄使用)
+    syncHeroStatsToModifiers();
+
+    // 初始生命和内力
     worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
+    worldManager.heroData.mpMax = 100; // 蓝条固定或随等级
     worldManager.heroData.mpCurrent = worldManager.heroData.mpMax;
+}
+
+/**
+ * 将主角的四维属性转化为全局 Modifier
+ */
+function syncHeroStatsToModifiers() {
+    const s = worldManager.heroData.stats;
+    modifierManager.clear();
+
+    // 1. 统帅：影响所有士兵 (非 HeroUnit)
+    // 每点外功攻击影响 1% 伤害
+    modifierManager.addGlobalModifier({
+        id: 'soldier_atk_bonus',
+        side: 'player',
+        stat: 'damage',
+        multiplier: 1.0 + (s.soldierAtk / 100)
+    });
+    // 每点外功防御影响 1% 血量
+    modifierManager.addGlobalModifier({
+        id: 'soldier_hp_bonus',
+        side: 'player',
+        stat: 'hp',
+        multiplier: 1.0 + (s.soldierDef / 100)
+    });
+
+    // 2. 武力：影响英雄本人 (HeroUnit)
+    // 英雄基础 HP = 200 + 力道 * 3
+    worldManager.heroData.hpMax = 200 + (s.power * 3);
+    
+    // 英雄伤害加成 = 1.0 + (力道 * 0.03)
+    modifierManager.addGlobalModifier({
+        id: 'hero_damage_bonus',
+        side: 'player',
+        unitType: worldManager.heroData.id, // 仅对自己生效
+        stat: 'damage',
+        multiplier: 1.0 + (s.power * 0.03)
+    });
 }
 
 function enterGameState(state, config = null) {
@@ -286,13 +290,16 @@ function enterGameState(state, config = null) {
 }
 
 // 6. 渲染循环
+const clock = new THREE.Clock();
+
 function animate() {
     requestAnimationFrame(animate);
+    const deltaTime = clock.getDelta();
 
     if (currentState === GameState.WORLD && worldInstance) {
-        worldInstance.update();
+        worldInstance.update(deltaTime);
     } else if (currentState === GameState.BATTLE && battleInstance) {
-        battleInstance.update();
+        battleInstance.update(deltaTime);
     }
 
     renderer.render(scene, camera);

@@ -19,7 +19,7 @@ body, html {
     overflow: hidden;
     background-color: #0b1c24;
     color: var(--jx3-ink);
-    font-family: "Microsoft YaHei", "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
 }
 
 #app {
@@ -377,7 +377,7 @@ body, html {
     font-size: 0.85rem;
     font-weight: bold;
     color: var(--jx3-celadon-dark);
-    font-family: "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
 }
 
 .hud-sub {
@@ -478,7 +478,7 @@ body, html {
     color: white;
     border: none;
     padding: 4px 12px;
-    font-family: "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
     font-weight: bold;
     cursor: pointer;
     border-radius: 4px;
@@ -552,7 +552,7 @@ body, html {
     border: 1px solid var(--jx3-celadon-light);
     border-bottom: none;
     cursor: pointer;
-    font-family: "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
     font-weight: bold;
     font-size: 0.9rem;
     border-radius: 5px 5px 0 0;
@@ -885,7 +885,7 @@ body, html {
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
-    font-family: "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
     letter-spacing: 1px;
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
@@ -1062,16 +1062,43 @@ body, html {
     box-sizing: border-box;
 }
 
+.town-header-top-v3 {
+    display: flex;
+    align-items: center; /* 改为居中对齐 */
+    justify-content: space-between;
+    border-bottom: 3px double var(--jx3-celadon);
+    margin-bottom: 10px;
+    padding: 0 5px;
+}
+
 .town-title-v3 {
     font-size: 2.2rem;
     color: var(--jx3-ink);
-    margin: 10px 0 0 0;
+    margin: 0; /* 移除外边距 */
     text-align: center;
-    border-bottom: 3px double var(--jx3-celadon);
-    padding-bottom: 8px;
     letter-spacing: 12px;
     font-weight: 900;
-    font-family: "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
+    flex: 2; 
+    padding-bottom: 5px;
+}
+
+.town-income-v3 {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #333;
+    font-family: "Microsoft YaHei", sans-serif;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.town-income-v3 span {
+    color: var(--jx3-gold); /* 数值高亮 */
+}
+
+.town-title-group-v3 {
+    display: none; /* 移除旧的容器样式 */
 }
 
 .close-btn-v3 {
@@ -1349,7 +1376,7 @@ body, html {
 .world-date-display {
     color: var(--jx3-paper);
     font-weight: bold;
-    font-family: "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
     text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
     font-size: 1.1rem;
     letter-spacing: 2px;
@@ -1638,7 +1665,7 @@ canvas { image-rendering: pixelated; }
     box-shadow: 0 10px 25px rgba(0,0,0,0.4);
     color: var(--jx3-ink);
     font-weight: bold;
-    font-family: "SimSun", serif;
+    font-family: "Microsoft YaHei", sans-serif;
     font-size: 1.1rem;
     letter-spacing: 2px;
     display: flex;
