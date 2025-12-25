@@ -1563,6 +1563,35 @@ body, html {
 }
 
 
+/* --- 小地图系统 (Minimap) --- */
+.minimap-container {
+    position: absolute;
+    bottom: 25px;
+    right: 25px;
+    width: 180px;
+    height: 180px;
+    background: var(--jx3-paper);
+    border: 4px solid var(--jx3-celadon);
+    outline: 2px solid var(--jx3-gold);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    pointer-events: auto;
+    overflow: hidden;
+    z-index: 100;
+    border-radius: 4px;
+    /* 增加一个画卷卷轴的装饰感 */
+    background-image: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, transparent 10%, transparent 90%, rgba(0,0,0,0.05) 100%);
+}
+
+#minimap-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    background: #111;
+    /* 增加一点纸张质感蒙层 */
+    opacity: 0.9;
+}
+
 /* 通用隐藏与 Canvas */
 .hidden { display: none !important; }
 canvas { image-rendering: pixelated; }

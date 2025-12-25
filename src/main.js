@@ -137,8 +137,9 @@ window.addEventListener('start-battle', (e) => {
 });
 
 // 监听战斗结束返回大世界的请求
-window.addEventListener('battle-finished', () => {
-    enterGameState(GameState.WORLD);
+window.addEventListener('battle-finished', (e) => {
+    const result = e.detail;
+    enterGameState(GameState.WORLD, result);
 });
 
 /**
@@ -218,6 +219,10 @@ function enterGameState(state, config = null) {
     if (state === GameState.WORLD) {
         worldInstance = new WorldScene(scene, camera, renderer);
         worldInstance.init(selectedHero);
+        // 如果是从战斗回来，触发回调
+        if (config && config.winner) {
+            worldInstance.onBattleEnd(config);
+        }
         worldInstance.start();
     } else if (state === GameState.BATTLE) {
         if (worldInstance) worldInstance.stop();

@@ -200,7 +200,10 @@ class WorldManager {
             grid: [],           // 地形网格
             heightMap: [],      // 原始高度图 (噪声原值)
             entities: [],       // 大世界物体 { id, type, x, z, config, isRemoved }
-            playerPos: { x: 0, z: 0 } // 记录玩家位置，方便战斗回来后恢复
+            playerPos: { x: 0, z: 0 }, // 记录玩家位置
+            exploredMap: null,  // 新增：小地图探索迷雾数据 (Uint8Array)
+            interactionLocks: new Set(), // 新增：全局交互锁，确保战斗回来后状态保留
+            pendingBattleEnemyId: null   // 新增：正在进行的战斗目标 ID
         };
 
         // 5. 占领建筑状态 (已整合进 entities，保留此数组用于快速结算收益)
@@ -359,23 +362,47 @@ class WorldManager {
 
         console.log("%c[系统] 正在生成全新的江湖地图...", "color: #5b8a8a; font-weight: bold");
         
-        const size = 300; // 地图边长增加三倍
+        const size = 400; // 增加边缘屏障后的总尺寸 (300 内部 + 50*2 边缘)
         const grid = generator.generate(size);
         const entities = [];
 
         // 逻辑填充逻辑移动到这里 (数据生成)
         const halfSize = size / 2;
+        
+        // 5. 确定玩家初始出生点 (选择最大的 POI 之一)
+        let playerSpawnX = -10;
+        let playerSpawnZ = -10;
+        
+        if (generator.pois && generator.pois.length > 0) {
+            // 选择打分最高的聚落作为出生点
+            const startPoi = generator.pois[0]; 
+            playerSpawnX = startPoi.x - halfSize;
+            playerSpawnZ = startPoi.z - halfSize;
+            
+            // 记录初始位置
+            this.mapState.playerPos = { x: playerSpawnX, z: playerSpawnZ };
+            
+            // 在出生点放置主城
+            this.cities['main_city_1'].name = "新手村"; 
+            entities.push({ 
+                id: 'main_city_1', 
+                type: 'city', 
+                x: playerSpawnX, 
+                z: playerSpawnZ 
+            });
+        }
+
         for (let z = 0; z < size; z++) {
             for (let x = 0; x < size; x++) {
-                const type = grid[z][x];
-                if (type !== 'grass') continue;
+                // 使用新的安全判定，确保物品不会生成在山脚或水边
+                if (!generator.isSafeGrass(x, z)) continue;
 
                 const worldX = x - halfSize;
                 const worldZ = z - halfSize;
 
-                // 避开出生点
-                const distToStart = Math.sqrt(Math.pow(worldX + 10, 2) + Math.pow(worldZ + 10, 2));
-                if (distToStart < 12) continue;
+                // 避开出生点周围，防止资源堆在城门口
+                const distToStart = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
+                if (distToStart < 15) continue;
 
                 const roll = Math.random();
                 if (roll < 0.002) {
@@ -395,6 +422,23 @@ class WorldManager {
                         x: worldX, z: worldZ,
                         config: { owner: 'none', type: bType }
                     });
+                } else if (roll < 0.012) {
+                    const templateIds = Object.keys(this.enemyTemplates);
+                    const tId = templateIds[Math.floor(Math.random() * templateIds.length)];
+                    const template = this.enemyTemplates[tId];
+                    const points = Math.floor(Math.random() * (template.pointRange[1] - template.pointRange[0] + 1)) + template.pointRange[0];
+                    
+                    entities.push({ 
+                        id: `enemy_${x}_${z}`, 
+                        type: 'enemy_group', 
+                        templateId: tId,
+                        x: worldX, z: worldZ,
+                        config: {
+                            name: template.name,
+                            unitPool: template.unitPool,
+                            totalPoints: points
+                        }
+                    });
                 } else if (roll < 0.015) {
                     entities.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
                 } else if (roll < 0.017) {
@@ -409,6 +453,9 @@ class WorldManager {
         this.mapState.heightMap = generator.heightMap;
         this.mapState.entities = entities;
         this.mapState.size = size;
+
+        // 初始化全黑的探索迷雾 (0: 未探索, 1: 已探索)
+        this.mapState.exploredMap = new Uint8Array(size * size);
 
         return this.mapState;
     }

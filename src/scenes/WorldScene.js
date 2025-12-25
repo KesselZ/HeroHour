@@ -5,6 +5,7 @@ import { worldManager } from '../core/WorldManager.js'; // 引入数据管家
 import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
 import { timeManager } from '../core/TimeManager.js';
 import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
+import { createWorldObject } from '../entities/WorldObjects.js';
 
 /**
  * 大世界场景类
@@ -22,13 +23,12 @@ export class WorldScene {
         
         // 移动控制
         this.keys = {};
-        this.moveSpeed = 0.04; // 移动速度降低 4 倍 (从 0.15 改为约 0.04)
+        this.moveSpeed = 0.04; 
         
-        // 大世界物体
+        // 交互控制
         this.interactables = [];
-        this.activeCityId = null;       // 当前正打开 UI 的城市
-        this.manuallyClosedCityId = null; // 玩家刚刚手动关闭的城市（离开范围前不再弹窗）
-        this.floatingStack = 0;         // 当前正在飘字的层数，用于防重叠
+        this.activeCityId = null;        
+        this.floatingStack = 0;          
         
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
@@ -40,7 +40,7 @@ export class WorldScene {
      */
     init(heroId) {
         this.heroId = heroId;
-        this.isActive = true; // 确保场景激活
+        this.isActive = true; 
 
         // 1. 显示主世界 UI 容器
         const hud = document.getElementById('world-ui');
@@ -55,32 +55,21 @@ export class WorldScene {
         this.createWater(mapGenerator.size);
         this.createPlayer();
         
-        // 恢复玩家位置
-        if (mapState.playerPos.x !== 0 || mapState.playerPos.z !== 0) {
-            this.playerHero.position.set(mapState.playerPos.x, 0.8, mapState.playerPos.z);
-        }
+        // 初始位置设定
+        this.camera.position.set(this.playerHero.position.x, 15, this.playerHero.position.z + 12);
+        this.camera.lookAt(this.playerHero.position);
 
         this.setupLights();
         this.initUI();
         
-        // 相机初始位置跟随主角
-        this.camera.position.set(this.playerHero.position.x, 15, this.playerHero.position.z + 12);
-        this.camera.lookAt(this.playerHero.position);
-
         const bonus = modifierManager.getModifiedValue({ side: 'player', type: 'hero' }, 'world_speed', 1.0);
         this.moveSpeed *= bonus;
 
         // 4. 根据逻辑数据“摆放”物体
         this.renderWorldEntities(mapState.entities);
 
-        // --- 调试功能：显示噪声预览图 ---
-        this.showNoiseDebugOverlay();
-
-        // 主城这种特殊地标依然手动管理
-        this.spawnMainCity();
-
-        // 在主城附近放置一个测试用的山贼组
-        this.spawnEnemyGroup('bandits', -5, 5); 
+        // --- 初始化小地图 ---
+        this.initMinimap();
     }
 
     /**
@@ -90,56 +79,24 @@ export class WorldScene {
         entities.forEach(data => {
             if (data.isRemoved) return; // 跳过已被捡走的
 
-            switch (data.type) {
-                case 'decoration':
-                    this.spawnDecoration(data.spriteKey, data.x, data.z);
-                    break;
-                case 'pickup':
-                    this.spawnPickup(data.pickupType, data.x, data.z, data.id);
-                    break;
-                case 'captured_building':
-                    this.spawnCapturedBuilding(data.spriteKey, data.buildingType, data.x, data.z, data.id, data.config);
-                    break;
-            }
-        });
-    }
-
-    /**
-     * 重写 spawnPickup 以支持持久化 ID
-     */
-    spawnPickup(key, x, z, id = null) {
-        const sprite = spriteFactory.createUnitSprite(key);
-        sprite.position.set(x, 0.8, z);
-        this.scene.add(sprite);
-        this.interactables.push({
-            id: id || `${key}_${Math.floor(x)}_${Math.floor(z)}`,
-            mesh: sprite,
-            type: 'pickup',
-            pickupType: key
-        });
-    }
-
-    /**
-     * 重写 spawnCapturedBuilding 以支持状态恢复
-     */
-    spawnCapturedBuilding(spriteKey, buildingType, x, z, id = null, config = null) {
-        const sprite = spriteFactory.createUnitSprite(spriteKey);
-        sprite.position.set(x, 1.2, z);
-        this.scene.add(sprite);
-        this.interactables.push({
-            id: id || `${buildingType}_${Math.floor(x)}_${Math.floor(z)}`,
-            mesh: sprite,
-            type: 'captured_building',
-            config: config || {
-                type: buildingType,
-                owner: 'none'
+            const worldObj = createWorldObject(data);
+            worldObj.spawn(this.scene);
+            
+            if (worldObj.isInteractable) {
+                this.interactables.push(worldObj);
             }
         });
     }
 
     initUI() {
-        // ... 原有初始化代码 ...
+        console.log("%c[UI] 正在初始化大世界 UI 监听器...", "color: #44aa44");
+        
+        // 基础信息初始化
         const cityData = worldManager.cities['main_city_1'];
+        if (!cityData) {
+            console.error("[UI] 找不到主城数据 'main_city_1'");
+            return;
+        }
         
         const cityDisplayName = document.getElementById('world-city-display-name');
         if (cityDisplayName) cityDisplayName.innerText = cityData.name;
@@ -150,19 +107,22 @@ export class WorldScene {
             Object.assign(cityPortrait.style, iconStyle);
         }
 
+        // 按钮点击事件
         const closeBtn = document.getElementById('close-town-panel');
         if (closeBtn) {
             closeBtn.onclick = () => {
-                document.getElementById('town-management-panel').classList.add('hidden');
-                // 记录手动关闭状态
-                this.manuallyClosedCityId = this.activeCityId;
-                this.activeCityId = null;
+                console.log("[UI] 手动关闭城镇面板");
+                if (this.activeCityId) {
+                    worldManager.mapState.interactionLocks.add(this.activeCityId);
+                }
+                this.closeTownManagement(); // 无论是否有 ID，强制执行关闭 UI 逻辑
             };
         }
 
         const miniCard = document.getElementById('city-mini-card');
         if (miniCard) {
             miniCard.onclick = () => {
+                console.log("[UI] 点击左下角城镇头像");
                 this.openTownManagement('main_city_1');
             };
         }
@@ -170,6 +130,7 @@ export class WorldScene {
         const heroMiniCard = document.getElementById('hero-mini-card');
         if (heroMiniCard) {
             heroMiniCard.onclick = () => {
+                console.log("[UI] 点击左下角英雄头像");
                 this.openHeroStats();
             };
         }
@@ -189,7 +150,7 @@ export class WorldScene {
         if (skillLearnBtn) {
             skillLearnBtn.onclick = () => {
                 skillLearnPanel.classList.remove('hidden');
-                this.renderLearnableSkills('chunyang'); // 默认显示纯阳
+                this.renderLearnableSkills(worldManager.heroData.id === 'qijin' ? 'chunyang' : 'tiance'); 
             };
         }
 
@@ -209,28 +170,25 @@ export class WorldScene {
             };
         });
 
-        // 监听英雄状态变化事件
-        window.addEventListener('hero-stats-changed', () => {
-            this.updateHeroHUD();
-        });
+        // 移除旧的监听器防止重复
+        window.removeEventListener('hero-stats-changed', this._onHeroStatsChanged);
+        this._onHeroStatsChanged = () => this.updateHeroHUD();
+        window.addEventListener('hero-stats-changed', this._onHeroStatsChanged);
 
-        // 监听资源获得事件，触发大世界飘字
-        window.addEventListener('resource-gained', (e) => {
+        window.removeEventListener('resource-gained', this._onResourceGained);
+        this._onResourceGained = (e) => {
             if (!this.isActive || !this.playerHero) return;
             const { type, amount } = e.detail;
             this.spawnFloatingText(type, amount);
-        });
+        };
+        window.addEventListener('resource-gained', this._onResourceGained);
 
         worldManager.updateHUD();
-        this.updateHeroHUD(); // 初始化英雄头像
+        this.updateHeroHUD(); 
 
-        // 初始化提示框逻辑
         this.setupTooltip();
     }
 
-    /**
-     * 更新左下角英雄 HUD
-     */
     updateHeroHUD() {
         const heroPortrait = document.getElementById('world-hero-portrait');
         const hpBar = document.getElementById('hud-hero-hp-bar');
@@ -254,9 +212,6 @@ export class WorldScene {
         }
     }
 
-    /**
-     * 打开英雄属性面板
-     */
     openHeroStats() {
         const panel = document.getElementById('hero-stats-panel');
         const data = worldManager.heroData;
@@ -265,12 +220,10 @@ export class WorldScene {
         document.getElementById('hero-panel-name').innerText = (data.id === 'qijin' ? '祁进' : '李承恩');
         document.getElementById('hero-panel-title').innerText = (data.id === 'qijin' ? '紫虚子' : '天策府统领');
         
-        // 肖像
         const portrait = document.getElementById('hero-panel-portrait');
         const iconStyle = spriteFactory.getIconStyle(data.id);
         Object.assign(portrait.style, iconStyle);
         
-        // 进度条
         const xpPct = (data.xp / data.xpMax) * 100;
         const hpPct = (data.hpCurrent / data.hpMax) * 100;
         const mpPct = (data.mpCurrent / data.mpMax) * 100;
@@ -289,18 +242,15 @@ export class WorldScene {
         const spDisplay = document.getElementById('hero-skill-points');
         if (spDisplay) spDisplay.innerText = data.skillPoints;
 
-        // 基础属性
         document.getElementById('attr-atk').innerText = data.stats.atk + (data.level - 1) * 5;
         document.getElementById('attr-def').innerText = data.stats.def;
         document.getElementById('attr-speed').innerText = data.stats.speed.toFixed(2);
         
-        // 扩展属性
         document.getElementById('attr-primary-name').innerText = data.stats.primaryStatName;
         document.getElementById('attr-primary-val').innerText = data.stats.primaryStatValue;
         document.getElementById('attr-fali').innerText = data.stats.fali;
         document.getElementById('attr-haste').innerText = Math.floor(data.stats.haste * 100);
         
-        // 渲染技能列表
         const skillsContainer = document.getElementById('hero-panel-skills');
         skillsContainer.innerHTML = '';
         data.skills.forEach(skillId => {
@@ -334,9 +284,6 @@ export class WorldScene {
         panel.classList.remove('hidden');
     }
 
-    /**
-     * 渲染可学习招式列表
-     */
     renderLearnableSkills(sect) {
         const container = document.getElementById('skill-list-to-learn');
         if (!container) return;
@@ -425,6 +372,9 @@ export class WorldScene {
         const panel = document.getElementById('town-management-panel');
         const cityData = worldManager.cities[cityId];
         
+        if (!cityData) return;
+
+        this.activeCityId = cityId; // 必须设置当前激活的城市 ID
         document.getElementById('town-name').innerText = cityData.name;
         panel.classList.remove('hidden');
 
@@ -556,37 +506,6 @@ export class WorldScene {
         return names[type] || type;
     }
 
-    spawnMainCity() {
-        const city = spriteFactory.createUnitSprite('main_city');
-        city.center.set(0.5, 0); 
-        city.position.set(-10, 0, -10); 
-        this.scene.add(city);
-        this.interactables.push({ mesh: city, type: 'city', id: 'main_city_1' });
-    }
-
-    spawnEnemyGroup(templateId, x, z) {
-        const template = worldManager.enemyTemplates[templateId];
-        if (!template) return;
-
-        const groupSprite = spriteFactory.createUnitSprite(template.overworldIcon);
-        groupSprite.position.set(x, 0.8, z);
-        this.scene.add(groupSprite);
-
-        const points = Math.floor(
-            Math.random() * (template.pointRange[1] - template.pointRange[0] + 1)
-        ) + template.pointRange[0];
-
-        this.interactables.push({
-            mesh: groupSprite,
-            type: 'enemy_group',
-            config: {
-                name: template.name,
-                unitPool: template.unitPool,
-                totalPoints: points
-            }
-        });
-    }
-
     createGround(mapData) {
         const size = mapGenerator.size;
         const heightMap = worldManager.mapState.heightMap;
@@ -609,14 +528,12 @@ export class WorldScene {
                     const diff = Math.abs(rawNoise + 0.15);
                     h = -1.5 - (diff * 8.4 + Math.pow(diff, 2) * 14.0); 
                 } else if (type === TILE_TYPES.MOUNTAIN) {
-                    // 山脉颜色：色阶化处理，增加像素感
-                    const step = Math.floor(rawNoise * 5) / 5; // 将连续值量化为 5 个阶梯
+                    const step = Math.floor(rawNoise * 5) / 5;
                     const greyVal = 0.3 + (step * 0.3);
                     color.setRGB(greyVal, greyVal, greyVal * 1.1);
                     const diff = rawNoise - 0.20;
                     h = 2.0 + (diff * 14.0 + Math.pow(diff, 2) * 35.0); 
                 } else {
-                    // 草地颜色：色阶化处理，增强“块状”色彩感
                     const step = Math.floor(rawNoise * 4) / 4;
                     const greenVal = 0.4 + (step * 0.2);
                     color.setRGB(greenVal * 0.4, greenVal, greenVal * 0.2);
@@ -634,14 +551,12 @@ export class WorldScene {
         geometry.computeVertexNormals();
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-        // 创建高度像素化的“MC 风格”贴图
         const canvas = document.createElement('canvas');
-        canvas.width = 16; // 极低分辨率
+        canvas.width = 16;
         canvas.height = 16;
         const ctx = canvas.getContext('2d');
         for (let i = 0; i < 16; i++) {
             for (let j = 0; j < 16; j++) {
-                // 随机生成大色块噪声
                 const noise = Math.random() * 40;
                 const brightness = 210 + noise;
                 ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
@@ -650,18 +565,17 @@ export class WorldScene {
         }
         
         const terrainTex = new THREE.CanvasTexture(canvas);
-        terrainTex.magFilter = THREE.NearestFilter; // 关键：禁用平滑缩放，强制像素方块
+        terrainTex.magFilter = THREE.NearestFilter;
         terrainTex.minFilter = THREE.NearestFilter;
         terrainTex.wrapS = terrainTex.wrapT = THREE.RepeatWrapping;
-        // 再次降低平铺密度一倍 (从 size/2 降至 size/4)，让像素块视觉上再变大一倍
         terrainTex.repeat.set(size / 4, size / 4); 
 
         const material = new THREE.MeshStandardMaterial({ 
             map: terrainTex,
             vertexColors: true,
-            roughness: 1.0, // 增加粗糙度，减少反光带来的平滑感
+            roughness: 1.0,
             metalness: 0.0,
-            flatShading: true // 开启面平滑，产生结实的方块边缘感
+            flatShading: true
         });
 
         const ground = new THREE.Mesh(geometry, material);
@@ -669,7 +583,6 @@ export class WorldScene {
         ground.receiveShadow = true;
         this.scene.add(ground);
 
-        // 辅助网格
         const grid = new THREE.GridHelper(size, size / 10, 0x445544, 0x223322);
         grid.position.y = 0.1;
         grid.material.opacity = 0.05;
@@ -677,13 +590,8 @@ export class WorldScene {
         this.scene.add(grid);
     }
 
-    /**
-     * 创建独立的水位平面
-     */
     createWater(size) {
         const geometry = new THREE.PlaneGeometry(size, size);
-        
-        // 创建流动的水面贴图
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
@@ -695,7 +603,6 @@ export class WorldScene {
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 256, 256);
         
-        // 添加白色的水波纹点点
         ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
         for (let i = 0; i < 100; i++) {
             ctx.beginPath();
@@ -704,41 +611,39 @@ export class WorldScene {
         }
 
         const waterTex = new THREE.CanvasTexture(canvas);
-        waterTex.magFilter = THREE.NearestFilter; // 水面也强制像素化
+        waterTex.magFilter = THREE.NearestFilter;
         waterTex.minFilter = THREE.NearestFilter;
         waterTex.wrapS = waterTex.wrapT = THREE.RepeatWrapping;
-        // 水面平铺密度再次降低一倍 (从 size/4 降至 size/8)
         waterTex.repeat.set(size / 8, size / 8); 
-        this.waterTex = waterTex; // 保存引用以便动画
+        this.waterTex = waterTex;
 
         const material = new THREE.MeshStandardMaterial({
-            color: 0x4488ff, // 给水面一个基础蓝色底色，增强厚重感
+            color: 0x4488ff,
             map: waterTex,
             transparent: true,
             opacity: 0.7,
             roughness: 0.2,
             metalness: 0.3,
             side: THREE.DoubleSide,
-            flatShading: true // 水面也开启面平滑
+            flatShading: true
         });
 
         const water = new THREE.Mesh(geometry, material);
         water.rotation.x = -Math.PI / 2;
-        // 水位高度设定在 -0.8，正好能淹没深谷形成河流，同时不影响平原
         water.position.y = -0.8; 
         this.scene.add(water);
     }
 
     createPlayer() {
         this.playerHero = spriteFactory.createUnitSprite(this.heroId);
-        this.playerHero.position.y = 0.8;
+        const pos = worldManager.mapState.playerPos;
+        this.playerHero.position.set(pos.x, 0.8, pos.z);
         this.scene.add(this.playerHero);
     }
 
     setupLights() {
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); 
         this.scene.add(ambientLight);
-
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.6); 
         dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
@@ -757,6 +662,10 @@ export class WorldScene {
             this.updateHeroHUD();
         }
 
+        // 显示小地图
+        const minimap = document.querySelector('.minimap-container');
+        if (minimap) minimap.classList.remove('hidden');
+
         timeManager.updateUI();
     }
 
@@ -771,6 +680,10 @@ export class WorldScene {
 
         const hud = document.getElementById('world-ui');
         if (hud) hud.classList.add('hidden');
+
+        // 隐藏小地图
+        const minimap = document.querySelector('.minimap-container');
+        if (minimap) minimap.classList.add('hidden');
     }
 
     onKeyDown(e) { this.keys[e.key.toLowerCase()] = true; }
@@ -779,7 +692,6 @@ export class WorldScene {
     update(deltaTime) {
         if (!this.isActive || !this.playerHero) return;
 
-        // 水面流动动画
         if (this.waterTex) {
             this.waterTex.offset.x += 0.005 * deltaTime;
             this.waterTex.offset.y += 0.002 * deltaTime;
@@ -831,6 +743,10 @@ export class WorldScene {
             this.checkInteractions();
         }
 
+        // --- 更新小地图 ---
+        this.updateExploration(); // 更新探索迷雾数据
+        this.updateMinimap();
+
         const targetCamPos = this.playerHero.position.clone().add(new THREE.Vector3(0, 15, 12));
         this.camera.position.lerp(targetCamPos, 0.1);
         this.camera.lookAt(this.playerHero.position);
@@ -880,42 +796,53 @@ export class WorldScene {
         }, 1500);
     }
 
+    onBattleEnd(result) {
+        const ms = worldManager.mapState;
+        const enemyId = ms.pendingBattleEnemyId;
+        
+        if (!enemyId) return;
+
+        console.log(`%c[战斗结束] 结果: ${result.winner}, 目标: ${enemyId}`, "color: #ffaa00");
+
+        if (result && result.winner === 'player') {
+            // 赢了：移除怪物
+            worldManager.removeEntity(enemyId);
+            const item = this.interactables.find(i => i.id === enemyId);
+            if (item) this.scene.remove(item.mesh);
+            this.interactables = this.interactables.filter(i => i.id !== enemyId);
+            // 赢了不需要锁定，因为怪已经没了
+        } else {
+            // 输了或逃了：锁定怪物，防止连续触发
+            ms.interactionLocks.add(enemyId);
+        }
+        
+        ms.pendingBattleEnemyId = null; 
+    }
+
     checkInteractions() {
         const toRemove = [];
+        const playerPos = this.playerHero.position;
+        const ms = worldManager.mapState;
+
         this.interactables.forEach((item, index) => {
-            const dist = this.playerHero.position.distanceTo(item.mesh.position);
-            
-            if (item.type === 'city') {
-                const cityId = item.id || 'main_city_1';
-                if (dist < 3.0) {
-                    if (this.activeCityId !== cityId && this.manuallyClosedCityId !== cityId) {
-                        this.openTownManagement(cityId);
-                        this.activeCityId = cityId;
-                    }
-                } else {
-                    if (this.activeCityId === cityId) {
-                        document.getElementById('town-management-panel').classList.add('hidden');
-                        this.activeCityId = null;
-                    }
-                    if (this.manuallyClosedCityId === cityId) {
-                        this.manuallyClosedCityId = null;
-                    }
+            const dist = playerPos.distanceTo(item.mesh.position);
+            const isLocked = ms.interactionLocks.has(item.id);
+
+            if (isLocked) {
+                const exitDist = item.interactionRadius * 1.5; // 动态解锁半径
+                if (dist > exitDist) {
+                    ms.interactionLocks.delete(item.id);
                 }
-            } else if (item.type === 'enemy_group') {
-                if (dist < 1.5) {
-                    window.dispatchEvent(new CustomEvent('start-battle', { detail: item.config }));
-                }
-            } else if (item.type === 'pickup') {
-                if (dist < 1.2) {
-                    worldManager.handlePickup(item.pickupType);
-                    worldManager.removeEntity(item.id); 
-                    this.scene.remove(item.mesh);
+                return;
+            }
+
+            if (item.canInteract(playerPos)) {
+                const shouldRemove = item.onInteract(this);
+                if (shouldRemove) {
                     toRemove.push(index);
                 }
-            } else if (item.type === 'captured_building') {
-                if (dist < 2.0) {
-                    worldManager.handleCapture(item);
-                }
+            } else if (item.onExitRange) {
+                item.onExitRange(this);
             }
         });
 
@@ -924,31 +851,174 @@ export class WorldScene {
         }
     }
 
-    spawnDecoration(key, x, z) {
-        const sprite = spriteFactory.createUnitSprite(key);
-        sprite.position.set(x, 0.8, z);
-        this.scene.add(sprite);
+    closeTownManagement() {
+        const panel = document.getElementById('town-management-panel');
+        if (panel) panel.classList.add('hidden');
+        this.activeCityId = null;
     }
 
     /**
-     * 在屏幕右上角创建一个调试 Canvas 展现噪声图
+     * 初始化小地图系统
      */
-    showNoiseDebugOverlay() {
-        let canvas = document.getElementById('noise-debug-canvas');
-        if (!canvas) {
-            canvas = document.createElement('canvas');
-            canvas.id = 'noise-debug-canvas';
-            canvas.style.position = 'fixed';
-            canvas.style.top = '10px';
-            canvas.style.right = '10px';
-            canvas.style.width = '200px';
-            canvas.style.height = '200px';
-            canvas.style.zIndex = '9999';
-            canvas.style.border = '2px solid white';
-            canvas.style.backgroundColor = 'black';
-            canvas.style.imageRendering = 'pixelated';
-            document.body.appendChild(canvas);
+    initMinimap() {
+        // --- 开发开关：一键开启/关闭迷雾 ---
+        this.enableFog = false; 
+
+        let container = document.querySelector('.minimap-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'minimap-container';
+            container.innerHTML = `<canvas id="minimap-canvas"></canvas>`;
+            document.body.appendChild(container);
         }
-        mapGenerator.debugDraw(canvas);
+
+        this.minimapCanvas = document.getElementById('minimap-canvas');
+        this.minimapCtx = this.minimapCanvas.getContext('2d');
+        
+        const size = mapGenerator.size;
+        this.cropMargin = 20; // 边缘裁剪宽度
+        const displaySize = size - this.cropMargin * 2;
+        
+        this.minimapCanvas.width = displaySize;
+        this.minimapCanvas.height = displaySize;
+
+        // 预渲染静态地形层
+        this.offscreenMap = document.createElement('canvas');
+        this.offscreenMap.width = size;
+        this.offscreenMap.height = size;
+        mapGenerator.debugDraw(this.offscreenMap);
+
+        // 创建迷雾遮罩 Canvas (用于渲染探索状态)
+        this.fogCanvas = document.createElement('canvas');
+        this.fogCanvas.width = displaySize;
+        this.fogCanvas.height = displaySize;
+        this.fogCtx = this.fogCanvas.getContext('2d');
+    }
+
+    /**
+     * 更新探索区域
+     */
+    updateExploration() {
+        if (!this.playerHero) return;
+        
+        const ms = worldManager.mapState;
+        const size = mapGenerator.size;
+        const halfSize = size / 2;
+        
+        // 获取玩家在 0-400 坐标系下的位置
+        const px = Math.round(this.playerHero.position.x + halfSize);
+        const pz = Math.round(this.playerHero.position.z + halfSize);
+        
+        const revealRadius = 33; // 探索半径 (增大 30% 从 25 -> 33)
+        
+        // 标记已探索
+        for (let dz = -revealRadius; dz <= revealRadius; dz++) {
+            for (let dx = -revealRadius; dx <= revealRadius; dx++) {
+                if (dx * dx + dz * dz > revealRadius * revealRadius) continue;
+                
+                const nx = px + dx;
+                const nz = pz + dz;
+                
+                if (nx >= 0 && nx < size && nz >= 0 && nz < size) {
+                    ms.exploredMap[nz * size + nx] = 1;
+                }
+            }
+        }
+    }
+
+    /**
+     * 每帧更新小地图动态标记
+     */
+    updateMinimap() {
+        if (!this.minimapCtx || !this.playerHero) return;
+
+        const size = mapGenerator.size;
+        const ctx = this.minimapCtx;
+        const margin = this.cropMargin || 0;
+        const displaySize = size - margin * 2;
+        const ms = worldManager.mapState;
+
+        // 1. 如果开启了迷雾，则在内存中构建迷雾遮罩图
+        if (this.enableFog) {
+            const fCtx = this.fogCtx;
+            const fogData = fCtx.createImageData(displaySize, displaySize);
+            for (let y = 0; y < displaySize; y++) {
+                for (let x = 0; x < displaySize; x++) {
+                    const gridX = x + margin;
+                    const gridZ = y + margin;
+                    const isExplored = ms.exploredMap[gridZ * size + gridX];
+                    
+                    const idx = (y * displaySize + x) * 4;
+                    if (isExplored) {
+                        fogData.data[idx] = 0;
+                        fogData.data[idx+1] = 0;
+                        fogData.data[idx+2] = 0;
+                        fogData.data[idx+3] = 0;
+                    } else {
+                        fogData.data[idx] = 0;
+                        fogData.data[idx+1] = 0;
+                        fogData.data[idx+2] = 0;
+                        fogData.data[idx+3] = 255;
+                    }
+                }
+            }
+            fCtx.putImageData(fogData, 0, 0);
+        }
+
+        // 2. 绘制地形层 (底图)
+        ctx.clearRect(0, 0, displaySize, displaySize);
+        ctx.drawImage(this.offscreenMap, margin, margin, displaySize, displaySize, 0, 0, displaySize, displaySize);
+
+        // 3. 如果开启了迷雾，盖上迷雾层
+        if (this.enableFog) {
+            ctx.drawImage(this.fogCanvas, 0, 0);
+        }
+
+        // 4. 坐标转换工具 (World -> Minimap)
+        const worldToMinimap = (wx, wz) => {
+            const halfSize = size / 2;
+            return {
+                x: (wx + halfSize) - margin,
+                y: (wz + halfSize) - margin
+            };
+        };
+
+        // 5. 绘制重要建筑 (如果关闭迷雾，则始终显示)
+        this.interactables.forEach(item => {
+            if (item.type === 'city' || item.type === 'captured_building') {
+                let shouldShow = true;
+                if (this.enableFog) {
+                    const gridX = Math.round(item.mesh.position.x + size/2);
+                    const gridZ = Math.round(item.mesh.position.z + size/2);
+                    shouldShow = ms.exploredMap[gridZ * size + gridX];
+                }
+                
+                if (shouldShow) {
+                    const pos = worldToMinimap(item.mesh.position.x, item.mesh.position.z);
+                    if (pos.x >= 0 && pos.x <= displaySize && pos.y >= 0 && pos.y <= displaySize) {
+                        ctx.fillStyle = (item.type === 'city') ? '#ffcc00' : '#00ffff';
+                        ctx.beginPath();
+                        ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = 'black';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                }
+            }
+        });
+
+        // 6. 绘制玩家位置 (白色点)
+        const playerPos = worldToMinimap(this.playerHero.position.x, this.playerHero.position.z);
+        if (playerPos.x >= 0 && playerPos.x <= displaySize && playerPos.y >= 0 && playerPos.y <= displaySize) {
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1.5;
+            
+            ctx.beginPath();
+            ctx.arc(playerPos.x, playerPos.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
     }
 }

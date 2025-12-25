@@ -1030,8 +1030,10 @@ export class BattleScene {
         if (returnBtn) {
             returnBtn.onclick = () => {
                 panel.classList.add('hidden');
-                // 派发全局事件，通知 main.js 返回大世界
-                window.dispatchEvent(new CustomEvent('battle-finished'));
+                // 派发全局事件，包含战斗结果
+                window.dispatchEvent(new CustomEvent('battle-finished', { 
+                    detail: { winner: isVictory ? 'player' : 'enemy' } 
+                }));
             };
         }
     }
