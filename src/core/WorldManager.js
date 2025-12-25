@@ -7,7 +7,7 @@ import { modifierManager } from './ModifierManager.js';
 const HERO_IDENTITY = {
     'qijin': {
         initialStats: { power: 7, spells: 12, soldierAtk: 4, soldierDef: 3, speed: 11.8 },
-        combatBase: { atk: 28, hpBase: 300, hpScaling: 5 }, // 祁进：基础攻击 28
+        combatBase: { atk: 28, hpBase: 300, hpScaling: 5, mpBase: 100, mpScaling: 2, atkScaling: 0.02 }, // 每点力道+2%伤害
         traits: [
             { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
             { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'damage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
@@ -15,7 +15,7 @@ const HERO_IDENTITY = {
     },
     'lichengen': {
         initialStats: { power: 5, spells: 8, soldierAtk: 8, soldierDef: 7, speed: 11.8 },
-        combatBase: { atk: 40, hpBase: 300, hpScaling: 5 }, // 李承恩：基础攻击 40
+        combatBase: { atk: 40, hpBase: 300, hpScaling: 5, mpBase: 80, mpScaling: 1.5, atkScaling: 0.02 }, // 每点力道+2%伤害
         traits: [
             { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
             { id: 'tiance_sect_hp', unitType: 'tiance', stat: 'hp', multiplier: 1.1, description: '骁勇善战：天策兵种气血提高 10%' }
@@ -23,7 +23,7 @@ const HERO_IDENTITY = {
     },
     'yeying': {
         initialStats: { power: 9, spells: 15, soldierAtk: 2, soldierDef: 2, speed: 11.8 },
-        combatBase: { atk: 8, hpBase: 300, hpScaling: 5 },  // 叶英：基础攻击 8
+        combatBase: { atk: 8, hpBase: 300, hpScaling: 5, mpBase: 120, mpScaling: 2.5, atkScaling: 0.02 },  // 统一系数为 0.02
         traits: [
             { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
         ]
@@ -821,6 +821,33 @@ class WorldManager {
             }
         }
 
+        // --- 4. 自动分配周边矿产逻辑 (圈地系统) ---
+        // 规则：50米范围内的矿产自动归属于最近的敌方主城。
+        // 注意：此逻辑不对玩家生效，玩家需要手动跑位占领以保留探索感。
+        entities.forEach(entity => {
+            if (entity.type === 'captured_building') {
+                let closestCity = null;
+                let minDist = 50; 
+
+                Object.values(this.cities).forEach(city => {
+                    // 核心修改：仅对非玩家城市（AI 势力）生效
+                    if (city.owner === 'player') return;
+
+                    const d = Math.sqrt(Math.pow(entity.x - city.x, 2) + Math.pow(entity.z - city.z, 2));
+                    if (d < minDist) {
+                        minDist = d;
+                        closestCity = city;
+                    }
+                });
+
+                if (closestCity) {
+                    entity.config.owner = closestCity.owner;
+                    // AI 矿产不需要推入 player 的结算数组，AI 势力目前不走玩家同款结算逻辑
+                    console.log(`%c[圈地] %c${entity.config.type} 已划归至敌方据点 ${closestCity.name} 名下`, 'color: #888; font-style: italic', 'color: #fff');
+                }
+            }
+        });
+
         // 记录状态
         this.mapState.isGenerated = true;
         this.mapState.grid = grid;
@@ -1282,11 +1309,14 @@ class WorldManager {
             // s.speed 保持不变
             s.haste = Math.min(0.5, s.haste + 0.01); // 招式加速 (每级 1%, 上限 50%)
             
-            // 同步计算英雄血量与内力上限
-            data.hpMax = 200 + (s.power * 3);
+            // 同步计算英雄血量与内力上限 (从身份表动态获取，彻底消除 Hardcode)
+            const identity = this.getHeroIdentity(data.id);
+            const cb = identity.combatBase;
+
+            data.hpMax = cb.hpBase + (s.power * cb.hpScaling);
             data.hpCurrent = data.hpMax;
             
-            data.mpMax += 20;      // 内力上限每级增加 20
+            data.mpMax = cb.mpBase + (s.spells * cb.mpScaling);
             data.mpCurrent = data.mpMax; // 升级补满状态
 
             console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！`, 'color: #00ff00; font-weight: bold', 'color: #fff');
@@ -1350,7 +1380,10 @@ class WorldManager {
 
             // 英雄的基础数值直接由身份表中的 combatBase 驱动，不再硬编码
             liveStats.hp = cb.hpBase + (s.power * cb.hpScaling); 
-            liveStats.atk = cb.atk;                
+            liveStats.mp = cb.mpBase + (s.spells * cb.mpScaling); 
+            // 英雄本人攻击力 = 基础攻击 * (1 + 力道 * 攻击成长系数)
+            // 采用乘法百分比计算，确保多段攻击职业不会因为固定加成而数值爆炸
+            liveStats.atk = cb.atk * (1 + s.power * (cb.atkScaling || 0.05));                
             liveStats.speed = s.speed;          
         }
 

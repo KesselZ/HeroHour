@@ -1046,7 +1046,7 @@ export class WorldScene {
      */
     initMinimap() {
         // --- 开发开关：一键开启/关闭迷雾 ---
-        this.enableFog = false; 
+        this.enableFog = true; 
 
         let container = document.querySelector('.minimap-container');
         if (!container) {

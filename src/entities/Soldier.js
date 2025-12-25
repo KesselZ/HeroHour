@@ -440,17 +440,19 @@ export class HeroUnit extends BaseUnit {
     static displayName = '主角';
     constructor(side, index, projectileManager) {
         const heroData = worldManager.heroData;
-        const stats = worldManager.getUnitDetails(heroData.id);
+        // 获取英雄的完整详情 (包含基础值和修正值)
+        const details = worldManager.getUnitDetails(heroData.id);
+        const identity = worldManager.getHeroIdentity(heroData.id);
         
         super({
             side,
             index,
             type: heroData.id, 
-            hp: heroData.hpMax, // 血量上限依然由同步后的属性决定
-            speed: stats.speed,
-            attackDamage: stats.rawAtk, // 使用原始配置攻击力
-            attackRange: stats.range,
-            attackSpeed: stats.attackSpeed,
+            hp: identity.combatBase.hpBase + (heroData.stats.power * identity.combatBase.hpScaling), // 使用公式计算的基础血量
+            speed: heroData.stats.speed,
+            attackDamage: identity.combatBase.atk, // 使用身份表里的基础攻击力
+            attackRange: details.range,
+            attackSpeed: details.attackSpeed,
             projectileManager,
             cost: 0,
             mass: 5.0 
@@ -458,7 +460,8 @@ export class HeroUnit extends BaseUnit {
 
         this.isHero = true;
         this.level = heroData.level;
-        this.health = (heroData.hpCurrent !== undefined && heroData.hpCurrent > 0) ? heroData.hpCurrent : heroData.hpMax;
+        // 当前血量：如果之前有记录则用记录的，否则用最大血量
+        this.health = (heroData.hpCurrent !== undefined && heroData.hpCurrent > 0) ? heroData.hpCurrent : this.maxHealth;
         
         // --- 旋风斩逻辑复用 (时间驱动) ---
         this.isSpinning = false; 
@@ -1335,7 +1338,7 @@ export class Chunyang extends BaseUnit {
                                 startPos: spawnPos,
                                 target: this.target,
                                 speed: 0.25,
-                                damage: this.attackDamage / swordCount, 
+                                damage: this.attackDamage, 
                                 type: 'air_sword'
                             });
                         }
