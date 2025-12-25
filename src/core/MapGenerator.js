@@ -76,7 +76,7 @@ export class MapGenerator {
         }
 
         // 寻找并标记聚落兴趣点 (POIs)
-        const pois = this.findPOICandidates(6);
+        const pois = this.findPOICandidates(10);
         this.markPOIs(pois);
         this.pois = pois; 
 
@@ -149,7 +149,7 @@ export class MapGenerator {
      * 寻找适合作为聚落（POI）的平原中心点
      * 优化后的逻辑：探测每个点能支持的最大半径，优先选择最大的平原（自适应探测）
      */
-    findPOICandidates(count = 6) {
+    findPOICandidates(count = 10) {
         const candidates = [];
         const step = 6; 
         const maxRadius = 25; // 最大探测上限

@@ -169,13 +169,16 @@ export class EnemyGroupObject extends WorldObject {
         let color = '#ff0000';
         
         const ratio = playerPower / scaledPoints;
-        if (ratio >= 2.0) {
+        if (ratio > 1.5) {
             difficulty = '简单';
             color = '#00ff00';
-        } else if (ratio >= 1.0) {
+        } else if (ratio >= 1.1) {
             difficulty = '普通';
             color = '#ffff00';
-        } else if (ratio >= 0.6) {
+        } else if (ratio >= 0.8) {
+            difficulty = '挑战';
+            color = '#d4af37'; // 武侠金
+        } else if (ratio >= 0.5) {
             difficulty = '困难';
             color = '#ffaa00';
         }
@@ -214,6 +217,15 @@ export class CityObject extends WorldObject {
         if (!cityData) return false;
 
         if (cityData.owner === 'player') {
+            // 访问自己的城市：补满侠客状态 (内力和气血)
+            const hero = worldManager.heroData;
+            if (hero.mpCurrent < hero.mpMax || hero.hpCurrent < hero.hpMax) {
+                hero.mpCurrent = hero.mpMax;
+                hero.hpCurrent = hero.hpMax;
+                worldManager.showNotification(`回到 ${cityData.name}，侠客状态已补满`);
+                window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+            }
+
             if (worldScene.activeCityId !== this.id) {
                 worldScene.openTownManagement(this.id);
                 worldScene.activeCityId = this.id;

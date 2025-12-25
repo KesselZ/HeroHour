@@ -14,7 +14,8 @@ export const ASSET_REGISTRY = {
         ENEMY: '/assets/enemy.png',
         SKILL1: '/assets/skill.png',
         SKILL2: '/assets/skill2.png',
-        BUILDING2: '/assets/building2.png'
+        BUILDING2: '/assets/building2.png',
+        BUILDING3: '/assets/building3.png'
     },
     UNITS: {
         // --- 技能图标 (Skill Icons) ---
@@ -49,11 +50,32 @@ export const ASSET_REGISTRY = {
         'house_2': { name: '民居二', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 2, scale: 3.0 },
         'house_3': { name: '民居三', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 3, scale: 3.0 },
         'gold_mine_world': { name: '金矿', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
-        'sawmill_world': { name: '伐木场', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 2, scale: 3.5 },
+        'sawmill_world': { name: '伐木场', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
         'dummy_training': { name: '演武木人', sheet: 'ITEMS2', rows: 4, cols: 4, r: 2, c: 3, scale: 1.2 },
 
+        // --- building3.png 系列 (扩展建筑库V2) ---
+        'sawmill_v3': { name: '伐木场', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
+        'training_yard_v3': { name: '校场', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 2, scale: 3.5 },
+        'sect_chunyang_v3': { name: '两仪阁', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 3, scale: 3.5 },
+        'sect_cangjian_v3': { name: '问水阁', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 4, scale: 3.5 },
+        
+        'clinic_v3': { name: '医馆', sheet: 'BUILDING3', rows: 4, cols: 4, r: 2, c: 1, scale: 3.5 },
+        'library_v3': { name: '藏经阁', sheet: 'BUILDING3', rows: 4, cols: 4, r: 2, c: 2, scale: 3.5 },
+        'bell_tower_v3': { name: '钟楼', sheet: 'BUILDING3', rows: 4, cols: 4, r: 2, c: 3, scale: 3.5 },
+        'gate_fortress_v3': { name: '关隘', sheet: 'BUILDING3', rows: 4, cols: 4, r: 2, c: 4, scale: 3.5 },
+        
+        'tea_pavilion_v3': { name: '茶室', sheet: 'BUILDING3', rows: 4, cols: 4, r: 3, c: 1, scale: 3.5 },
+        'watchtower_fire_v3': { name: '烽火台', sheet: 'BUILDING3', rows: 4, cols: 4, r: 3, c: 2, scale: 3.5 },
+        'mansion_v3': { name: '官邸', sheet: 'BUILDING3', rows: 4, cols: 4, r: 3, c: 3, scale: 3.5 },
+        'storage_v3': { name: '仓库', sheet: 'BUILDING3', rows: 4, cols: 4, r: 3, c: 4, scale: 3.5 },
+        
+        'altar_v3': { name: '祭坛', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 1, scale: 3.5 },
+        'bridge_v3': { name: '石桥', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 2, scale: 3.5 },
+        'blacksmith_v3': { name: '铁匠铺', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 3, scale: 3.5 },
+        'thatched_hut_v3': { name: '草屋', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 4, scale: 3.5 },
+
         // --- building2.png 系列 (扩展建筑库) ---
-        'sawmill_v2': { name: '伐木工坊', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 1, scale: 3.0 },
+        'sawmill_v2': { name: '伐木工坊', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 1, scale: 3.0 },
         'gold_mine_v2': { name: '露天金矿', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 2, scale: 3.0 },
         'spell_altar_v2': { name: '法术祭坛V2', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 4, scale: 3.0 },
         

@@ -95,12 +95,9 @@ export class WorldScene {
         window.addEventListener('sect-monsters-cleared', this._onSectMonstersCleared);
 
         // --- 英雄大世界属性应用 ---
-        // 行军速度直接由“轻功”属性决定 (0.6 是世界地图缩放系数)
-        this.moveSpeed = worldManager.heroData.stats.speed * 0.6;
-
-        // 依然保留额外修正器接口 (如以后获得马匹道具)
-        const bonus = modifierManager.getModifiedValue({ side: 'player', type: 'hero' }, 'world_speed', 1.0);
-        this.moveSpeed *= bonus;
+        // 核心修正：行军速度必须读取“最终修正后”的轻功属性，确保李承恩等人的天赋生效
+        const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
+        this.moveSpeed = heroDetails.speed * 0.6; // 0.6 是世界地图缩放系数
 
         // 4. 根据逻辑数据“摆放”物体
         this.renderWorldEntities(mapState.entities);
@@ -251,7 +248,8 @@ export class WorldScene {
         // 核心属性显示
         document.getElementById('attr-atk').innerText = data.stats.soldierAtk;
         document.getElementById('attr-def').innerText = data.stats.soldierDef;
-        document.getElementById('attr-speed').innerText = data.stats.speed.toFixed(3);
+        const details = worldManager.getUnitDetails(data.id);
+        document.getElementById('attr-speed').innerText = details.speed.toFixed(1); 
         
         // 动态修改力道/身法标签
         const powerLabel = document.getElementById('attr-power-label');
@@ -825,16 +823,18 @@ export class WorldScene {
 
         if (moveDir.lengthSq() > 0) {
             moveDir.normalize();
-            const nextPos = this.playerHero.position.clone().addScaledVector(moveDir, this.moveSpeed);
+            // 核心修改：位移 = 速度 * deltaTime，脱离帧率限制
+            const moveStep = this.moveSpeed * deltaTime;
+            const nextPos = this.playerHero.position.clone().addScaledVector(moveDir, moveStep);
             
             if (mapGenerator.isPassable(nextPos.x, nextPos.z)) {
                 this.playerHero.position.copy(nextPos);
             } else {
-                const nextPosX = this.playerHero.position.clone().add(new THREE.Vector3(moveDir.x * this.moveSpeed, 0, 0));
+                const nextPosX = this.playerHero.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
                 if (mapGenerator.isPassable(nextPosX.x, nextPosX.z)) {
                     this.playerHero.position.copy(nextPosX);
                 }
-                const nextPosZ = this.playerHero.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * this.moveSpeed));
+                const nextPosZ = this.playerHero.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
                 if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z)) {
                     this.playerHero.position.copy(nextPosZ);
                 }

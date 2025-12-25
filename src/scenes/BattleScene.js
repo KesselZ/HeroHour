@@ -10,6 +10,7 @@ import {
 } from '../entities/Soldier.js';
 
 import { worldManager } from '../core/WorldManager.js';
+import { modifierManager } from '../core/ModifierManager.js';
 import { spriteFactory } from '../core/SpriteFactory.js';
 import { SkillRegistry } from '../core/SkillSystem.js';
 
@@ -93,6 +94,9 @@ export class BattleScene {
         console.log("剑网三大乱斗：进入部署阶段");
         this.isActive = false; 
         this.isDeployment = true;
+        
+        // 初始化局内蓝条
+        this.updateMPUI();
         
         this.environment = new GrasslandEnvironment(this.scene);
         this.environment.init();
@@ -497,6 +501,7 @@ export class BattleScene {
         if (!skillBar || !skillSlots) return;
 
         skillBar.classList.remove('hidden');
+        this.updateMPUI();
         skillSlots.innerHTML = '';
 
         const heroSkills = worldManager.heroData.skills;
@@ -523,6 +528,20 @@ export class BattleScene {
             };
             skillSlots.appendChild(btn);
         });
+    }
+
+    /**
+     * 更新战斗内的蓝条 UI
+     */
+    updateMPUI() {
+        const fill = document.getElementById('battle-mp-fill');
+        const text = document.getElementById('battle-mp-text');
+        if (!fill || !text) return;
+
+        const data = this.worldManager.heroData;
+        const pct = (data.mpCurrent / data.mpMax) * 100;
+        fill.style.width = `${pct}%`;
+        text.innerText = `内力: ${Math.floor(data.mpCurrent)}/${data.mpMax}`;
     }
 
     onSkillBtnClick(skillId) {
@@ -571,6 +590,7 @@ export class BattleScene {
         if (success) {
             // 只有执行成功才触发 UI 更新
             window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+            this.updateMPUI();
             
             // 计算应用加速后的实际 CD
             const heroData = this.worldManager.heroData;
@@ -964,13 +984,32 @@ export class BattleScene {
         // 2. 计算损耗 (负数代表死亡)
         const armyChanges = {};
         const losses = {};
+        
+        // 获取全局士兵存活率 (由医馆等建筑提供)
+        const survivalRate = modifierManager.getModifiedValue({ side: 'player' }, 'survival_rate', 0);
+        if (survivalRate > 0) {
+            console.log(`%c[医馆结算] %c当前士兵战场存活率: ${(survivalRate * 100).toFixed(0)}%`, 'color: #00ffff', 'color: #fff');
+        }
+
         Object.keys(this.deployedCounts).forEach(type => {
             const deployed = this.deployedCounts[type];
             const survived = survivalCounts[type];
-            const loss = deployed - survived;
-            if (loss > 0) {
-                armyChanges[type] = -loss;
-                losses[type] = loss;
+            const rawLoss = deployed - survived;
+            
+            if (rawLoss > 0) {
+                // 计算实际损失 = 原始损失 * (1 - 存活率)
+                // 使用 floor 保证玩家收益最大化（向下取整损失，即向上取整存活）
+                const finalLoss = Math.max(0, Math.floor(rawLoss * (1 - survivalRate)));
+                const saved = rawLoss - finalLoss;
+                
+                if (saved > 0) {
+                    console.log(`%c[仁心仁术] %c${this.getUnitName(type)} 救治成功: ${saved} 名士兵重返营地`, 'color: #00ff00', 'color: #fff');
+                }
+
+                if (finalLoss > 0) {
+                    armyChanges[type] = -finalLoss;
+                    losses[type] = finalLoss;
+                }
             }
         });
 
@@ -1015,10 +1054,12 @@ export class BattleScene {
         
         list.innerHTML = '';
         const lossTypes = Object.keys(losses);
+        const lossSection = document.querySelector('.loss-section');
         
         if (lossTypes.length === 0) {
-            list.innerHTML = '<div class="loss-item">无人阵亡，全军凯旋！</div>';
+            if (lossSection) lossSection.style.display = 'none';
         } else {
+            if (lossSection) lossSection.style.display = 'block';
             lossTypes.forEach(type => {
                 const item = document.createElement('div');
                 item.className = 'loss-item';

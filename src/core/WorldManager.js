@@ -1,6 +1,43 @@
 import { modifierManager } from './ModifierManager.js';
 
 /**
+ * 英雄初始状态与固有特性 (数据驱动)
+ * 彻底消除 main.js 中的 Hardcode
+ */
+const HERO_IDENTITY = {
+    'qijin': {
+        initialStats: { power: 7, spells: 12, soldierAtk: 4, soldierDef: 3, speed: 11.8 },
+        combatBase: { atk: 28, hpBase: 300, hpScaling: 5 }, // 祁进：基础攻击 28
+        traits: [
+            { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
+            { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'damage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
+        ]
+    },
+    'lichengen': {
+        initialStats: { power: 5, spells: 8, soldierAtk: 8, soldierDef: 7, speed: 11.8 },
+        combatBase: { atk: 40, hpBase: 300, hpScaling: 5 }, // 李承恩：基础攻击 40
+        traits: [
+            { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
+            { id: 'tiance_sect_hp', unitType: 'tiance', stat: 'hp', multiplier: 1.1, description: '骁勇善战：天策兵种气血提高 10%' }
+        ]
+    },
+    'yeying': {
+        initialStats: { power: 9, spells: 15, soldierAtk: 2, soldierDef: 2, speed: 11.8 },
+        combatBase: { atk: 8, hpBase: 300, hpScaling: 5 },  // 叶英：基础攻击 8
+        traits: [
+            { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
+        ]
+    }
+};
+
+/**
+ * 英雄特性配置表 (旧配置，建议合并入 HERO_IDENTITY)
+ */
+const HERO_TRAITS = {
+    // 已废弃，合并入上方 HERO_IDENTITY
+};
+
+/**
  * 1. 建筑全量注册表：定义所有建筑的元数据
  * 这种方式将数据与逻辑彻底分离，以后增加建筑只需在此处添加
  */
@@ -22,32 +59,38 @@ const BUILDING_REGISTRY = {
     
     'spell_altar': { name: '法术祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1200, wood: 600 }, description: '博采众长：每级随机感悟全江湖招式。' },
     'treasure_pavilion': { name: '藏宝阁', category: 'economy', maxLevel: 1, icon: 'treasure_pavilion_v2', cost: { gold: 2000, wood: 800 }, description: '琳琅满目：极其罕见的珍宝汇聚之地。' },
-    'sect_chunyang': { name: '两仪阁', category: 'magic', maxLevel: 3, icon: 'chunyang', cost: { gold: 800, wood: 400 }, description: '纯阳秘所：感悟纯阳专属招式。' },
+    'sect_chunyang': { name: '两仪阁', category: 'magic', maxLevel: 3, icon: 'sect_chunyang_v3', cost: { gold: 800, wood: 400 }, description: '纯阳秘所：感悟纯阳专属招式。' },
     'sect_tiance': { name: '演武场', category: 'magic', maxLevel: 3, icon: 'dummy_training', cost: { gold: 800, wood: 400 }, description: '天策重地：感悟天策专属招式。' },
-    'sect_cangjian': { name: '问水阁', category: 'magic', maxLevel: 3, icon: 'cangjian', cost: { gold: 800, wood: 400 }, description: '藏剑雅处：感悟藏剑专属招式。' }
+    'sect_cangjian': { name: '问水阁', category: 'magic', maxLevel: 3, icon: 'sect_cangjian_v3', cost: { gold: 800, wood: 400 }, description: '藏剑雅处：感悟藏剑专属招式。' },
+    'clinic': { name: '医馆', category: 'magic', maxLevel: 1, icon: 'clinic_v3', cost: { gold: 600, wood: 300 }, description: '仁心仁术：战场上死去的士兵有 20% 概率伤愈归队，减少损耗。' }
 };
 
 /**
  * 2. 门派蓝图：定义每个门派出身的城市所拥有的建筑列表
  */
 const BLUEPRINTS = {
-    'chunyang': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'medical_pavilion', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_chunyang'],
-    'tiance': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_tiance', 'medical_pavilion'],
-    'cangjian': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_cangjian', 'medical_pavilion']
+    'chunyang': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'medical_pavilion', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_chunyang', 'clinic'],
+    'tiance': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_tiance', 'medical_pavilion', 'clinic'],
+    'cangjian': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_cangjian', 'medical_pavilion', 'clinic']
 };
 
 /**
  * 3. 兵种属性与说明注册表：全游戏唯一的兵种属性配置中心
  */
 const UNIT_STATS_DATA = {
-    'melee': { name: '天策弟子', hp: 120, atk: 15, range: 0.8, rangeType: '近战', speed: 0.03, attackSpeed: 1000, description: '天策府的基础步兵，攻守兼备，是战场的中流砥柱。' },
-    'ranged': { name: '长歌弟子', hp: 80, atk: 12, range: 6.0, rangeType: '远程', speed: 0.025, attackSpeed: 1800, description: '以音律伤敌，能够在大后方提供稳定的持续火力。' },
-    'archer': { name: '唐门射手', hp: 70, atk: 18, range: 10.0, rangeType: '极远', speed: 0.03, attackSpeed: 2000, description: '穿心弩箭，百步穿杨，拥有全江湖最远的杀伤距离。' },
-    'tiance': { name: '天策骑兵', hp: 180, atk: 14, range: 1.8, rangeType: '冲锋', speed: 0.05, attackSpeed: 800, description: '铁骑突出刀枪鸣，横扫攻击附带强力击退，极具穿透力。' },
-    'chunyang': { name: '纯阳弟子', hp: 110, atk: 18, range: 10.0, rangeType: '远近结合', speed: 0.035, attackSpeed: 1200, description: '远则御剑气，近则斩青锋，能根据敌人距离切换战斗模式。' },
-    'cangjian': { name: '藏剑弟子', hp: 180, atk: 8, range: 1.5, rangeType: 'AOE', speed: 0.035, attackSpeed: 4000, description: '身负重剑，旋风斩能对周围所有敌人造成多段打击。' },
-    'cangyun': { name: '苍云将士', hp: 250, atk: 12, range: 0.8, rangeType: '盾墙', speed: 0.02, attackSpeed: 1200, description: '陌刀盾甲，不动如山，是江湖中最坚韧的防御力量。' },
-    'healer': { name: '万花补给', hp: 90, atk: 20, range: 5.0, rangeType: '治疗', speed: 0.02, attackSpeed: 2500, description: '妙手仁心，能够为战场上受伤的友军提供持续的气血恢复。' }
+    'melee': { name: '天策弟子', hp: 85, atk: 6, range: 0.8, rangeType: '近战', speed: 5.0, attackSpeed: 1000, description: '天策府的基础步兵，性价比极高，适合作为前排炮灰。' },
+    'ranged': { name: '长歌弟子', hp: 60, atk: 10, range: 6.0, rangeType: '远程', speed: 4.2, attackSpeed: 1800, description: '以音律伤敌，射程适中，生存能力一般。' },
+    'archer': { name: '唐门射手', hp: 55, atk: 15, range: 10.0, rangeType: '极远', speed: 5.0, attackSpeed: 2000, description: '穿心弩箭，百步穿杨，脆皮但高输出。' },
+    'tiance': { name: '天策骑兵', hp: 160, atk: 18, range: 1.8, rangeType: '冲锋', speed: 8.4, attackSpeed: 800, description: '大唐精锐，强大的切入能力与控制力。' },
+    'chunyang': { name: '纯阳弟子', hp: 95, atk: 5, range: 10.0, rangeType: '远近结合', speed: 5.9, attackSpeed: 1500, burstCount: 3, description: '御剑而行，能在大后方提供精准的剑气支援。' },
+    'cangjian': { name: '藏剑弟子', hp: 200, atk: 16, range: 1.5, rangeType: 'AOE', speed: 5.9, attackSpeed: 2000, burstCount: 3, description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
+    'cangyun': { name: '苍云将士', hp: 250, atk: 14, range: 0.8, rangeType: '盾墙', speed: 3.4, attackSpeed: 1200, description: '玄甲军魂，战场上最难以逾越的铁壁。' },
+    'healer': { name: '万花补给', hp: 80, atk: 25, range: 5.0, rangeType: '治疗', speed: 3.4, attackSpeed: 2500, description: '妙手回春，能够有效保障精锐部队的存活。' },
+    
+    // --- 英雄单位注册 (仅保留物理常数，数值动态同步) ---
+    'qijin':      { name: '祁进', range: 6.0, rangeType: '五剑连发', attackSpeed: 1000, burstCount: 5, description: '紫虚子，剑气凌人，擅长远程密集压制。' },
+    'lichengen': { name: '李承恩', range: 2.0, rangeType: '横扫千军', attackSpeed: 1000, description: '天策统领，不动如山，一人可挡万军。' },
+    'yeying':    { name: '叶英', range: 2.5, rangeType: '心剑旋风', attackSpeed: 1000, burstCount: 3, description: '藏剑庄主，心剑合一，周身剑气无坚不摧。' }
 };
 
 /**
@@ -184,6 +227,10 @@ class City {
                 modifierManager.addGlobalModifier({ id: `city_${this.id}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: multiplier });
                 modifierManager.addGlobalModifier({ id: `city_${this.id}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'damage', multiplier: multiplier });
                 break;
+            case 'clinic':
+                // 仁心仁术：每级增加 20% 战场存活率 (修正器 offset 模式)
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.20 });
+                break;
         }
     }
 
@@ -193,6 +240,27 @@ class City {
 
     getIconKey() {
         return this.type;
+    }
+
+    /**
+     * 获取总产出（包含城镇基础产出 + 挂载的外围矿产）
+     */
+    getTotalProduction() {
+        let gold = this.production.gold;
+        let wood = this.production.wood;
+        
+        // 核心逻辑：如果该城市是主城 (main_city_1)，则额外统计全图所有已占领矿产的收益
+        // 这使得“外围矿产”在 UI 显示上更具整体感
+        if (this.id === 'main_city_1' && this.owner === 'player') {
+            worldManager.capturedBuildings.forEach(b => {
+                if (b.owner === 'player') {
+                    if (b.type === 'gold_mine') gold += 200;
+                    if (b.type === 'sawmill') wood += 100;
+                }
+            });
+        }
+        
+        return { gold, wood };
     }
 }
 
@@ -273,10 +341,10 @@ class WorldManager {
         this.unitCosts = {
             'melee': { gold: 50, cost: 2 },
             'ranged': { gold: 80, cost: 2 },
-            'tiance': { gold: 200, cost: 8 },
+            'tiance': { gold: 200, cost: 5 },
             'chunyang': { gold: 150, cost: 5 },
             'cangjian': { gold: 180, cost: 6 },
-            'cangyun': { gold: 160, cost: 7 },
+            'cangyun': { gold: 160, cost: 6 },
             'archer': { gold: 100, cost: 3 },
             'healer': { gold: 120, cost: 4 },
             // 野外单位价格定义 (用于战力平衡计算)
@@ -294,71 +362,97 @@ class WorldManager {
             'pheasant': { gold: 5, cost: 1 },
             'assassin_monk': { gold: 130, cost: 5 },
             'zombie': { gold: 100, cost: 4 },
-            'heavy_knight': { gold: 250, cost: 8 },
-            'shadow_ninja': { gold: 180, cost: 7 }
+            'heavy_knight': { gold: 250, cost: 6 },
+            'shadow_ninja': { gold: 180, cost: 5 }
         };
 
         // 5. 敌人组模板定义 (数据驱动模式)
         this.enemyTemplates = {
-            'wild_animals': {
-                name: '野兽群',
+            'woodland_critters': {
+                name: '林间小生灵',
+                overworldIcon: 'deer', 
+                unitPool: ['deer', 'pheasant', 'bats', 'snake'], 
+                basePoints: 15,        
+                baseWeight: 15, // 大幅调低全图基础权重
+                isBasic: true,
+                description: '林间出没的各种小动物，几乎没有威胁，是新手练手的好对象。'
+            },
+            'fierce_beasts': {
+                name: '深山猛兽',
                 overworldIcon: 'tiger', 
-                unitPool: ['wild_boar', 'wolf', 'tiger', 'bear', 'snake', 'bats'], 
-                basePoints: 10,        
-                baseWeight: 100,
-                isBasic: true, // 基础怪，全图可见
-                description: '一群凶猛的野兽，虽然没有战术，但成群结队极其危险。'
+                unitPool: ['wild_boar', 'wolf', 'tiger', 'bear'], 
+                basePoints: 40,        
+                baseWeight: 80,
+                isBasic: true,
+                description: '饥肠辘辘的猛兽，拥有极强的爆发力和野性。'
             },
             'rebels': {
                 name: '狼牙叛军',
                 overworldIcon: 'rebel_soldier', 
-                unitPool: ['rebel_soldier', 'rebel_axeman', 'bandit_archer', 'heavy_knight'],
-                basePoints: 35,
-                baseWeight: 40,
-                description: '训练有素的叛军正规军，拥有重甲兵和攻坚手。'
+                unitPool: ['rebel_soldier', 'rebel_axeman', 'heavy_knight'],
+                basePoints: 60,
+                baseWeight: 45,
+                description: '训练有素的叛军正规军，装备精良，极难对付。'
             },
             'bandits': {
                 name: '山贼草寇',
                 overworldIcon: 'bandit',
                 unitPool: ['bandit', 'bandit_archer', 'snake'],
-                basePoints: 20,
-                baseWeight: 60,
-                isBasic: true, // 基础怪
-                description: '在林间打劫的流窜山贼，人数众多。'
+                basePoints: 40,
+                baseWeight: 75,
+                isBasic: true,
+                description: '盘踞在要道上的山贼，数量众多，擅长埋伏。'
             },
             'shadow_sect': {
                 name: '影之教派',
                 overworldIcon: 'shadow_ninja', 
                 unitPool: ['shadow_ninja', 'assassin_monk', 'zombie'],
-                basePoints: 60,
-                baseWeight: 20,
+                basePoints: 85,
+                baseWeight: 30,
                 description: '神秘的影之组织，成员全是顶尖刺客和诡异的毒尸。'
+            },
+            'bandit_outpost': {
+                name: '山贼前哨',
+                overworldIcon: 'bandit_archer',
+                unitPool: ['bandit_archer', 'bandit', 'wolf'],
+                basePoints: 30,
+                baseWeight: 10, // 大幅调低全图基础权重
+                isBasic: true,
+                description: '山贼设立的前哨站，由弓手和驯服的野狼守卫。'
+            },
+            'plague_carriers': {
+                name: '瘟疫传播者',
+                overworldIcon: 'zombie',
+                unitPool: ['zombie', 'bats', 'snake'],
+                basePoints: 50,
+                baseWeight: 25,
+                description: '散发着腐烂气息的毒尸和成群的毒虫，令人不寒而栗。'
             },
             'chunyang_changge': {
                 name: '纯阳长歌众',
                 overworldIcon: 'qijin', 
                 unitPool: ['chunyang', 'ranged'],
-                basePoints: 45,
-                baseWeight: 0, // 核心逻辑：全图基础权重为0，仅在势力范围生成
-                sectHero: 'qijin', // 绑定英雄
+                basePoints: 70,
+                baseWeight: 0, 
+                sectHero: 'qijin', 
                 description: '纯阳与长歌的弟子结伴而行，攻守兼备。'
             },
             'tiance_disciples_group': {
                 name: '天策弟子',
                 overworldIcon: 'melee', 
                 unitPool: ['tiance', 'melee'],
-                basePoints: 45,
-                baseWeight: 0, // 核心逻辑：基础权重为0
-                sectHero: 'lichengen', // 绑定英雄
+                basePoints: 70,
+                baseWeight: 0, 
+                sectHero: 'lichengen', 
                 description: '天策府的精锐小队，包含强悍的骑兵和坚韧的步兵。'
             },
             'cangjian_disciples_group': {
                 name: '藏剑弟子',
                 overworldIcon: 'cangjian', 
                 unitPool: ['cangjian', 'melee'],
-                basePoints: 45,
+                basePoints: 70,
                 baseWeight: 0,
-                sectHero: 'yeying', // 绑定英雄
+                sectHero: 'yeying', 
                 description: '西子湖畔藏剑山庄的弟子，擅长剑法。'
             }
         };
@@ -379,13 +473,20 @@ class WorldManager {
             let w = template.baseWeight || 0;
             if (w <= 0 && !template.sectHero) continue; // 排除无权重的非门派单位
 
-            // 新手村平滑保护 (仅影响 70m 内)
-            if (distToPlayer < 70) {
-                const protectionFactor = distToPlayer / 70;
+            // 新手村平滑保护 (仅影响 45m 内)
+            if (distToPlayer < 45) {
+                const protectionFactor = distToPlayer / 45; // 0.0(中心) -> 1.0(边缘)
                 if (template.isBasic) {
-                    w *= (1 + (1 - protectionFactor) * 4); // 简单怪权重提升
+                    // 越简单的怪，在新手村附近的权重提升越夸张
+                    // 特别针对最简单的“林间小生灵”和“山贼前哨”
+                    let simplicityBonus = 5;
+                    if (id === 'woodland_critters') simplicityBonus = 15; // 极大幅度提升
+                    if (id === 'bandit_outpost') simplicityBonus = 10;    // 大幅度提升
+                    
+                    w *= (1 + (1 - protectionFactor) * simplicityBonus);
                 } else {
-                    w *= protectionFactor; // 强力怪权重衰减
+                    // 强力怪在新手村附近几乎绝迹 (使用二次方衰减)
+                    w *= Math.pow(protectionFactor, 2); 
                 }
             }
             
@@ -396,12 +497,12 @@ class WorldManager {
         // --- 2. 注入势力地理权重 (平滑激活门派兵) ---
         Object.values(this.cities).forEach(city => {
             const distToCity = Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2));
-            if (distToCity >= 70) return;
+            if (distToCity >= 45) return;
 
             const faction = this.factions[city.owner];
             if (!faction || faction.heroId === playerHeroId) return;
 
-            const falloff = 1 - (distToCity / 70); // 1.0(中心) -> 0.0(边缘)
+            const falloff = 1 - (distToCity / 45); // 1.0(中心) -> 0.0(边缘)
             
             // 查找所有匹配该城市英雄的模板
             for (const [id, template] of Object.entries(this.enemyTemplates)) {
@@ -469,27 +570,20 @@ class WorldManager {
         let totalGoldGain = 0;
         let totalWoodGain = 0;
         
-        // 1. 城镇产出
+        // 核心改动：现在所有外围矿产的产出都已集成到 City.getTotalProduction() 中（尤其是主城）
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
             if (city.owner === 'player') {
-                totalGoldGain += city.production.gold;
-                totalWoodGain += city.production.wood;
+                const prod = city.getTotalProduction();
+                totalGoldGain += prod.gold;
+                totalWoodGain += prod.wood;
             }
         }
-
-        // 2. 占领建筑产出
-        this.capturedBuildings.forEach(b => {
-            if (b.owner === 'player') {
-                if (b.type === 'gold_mine') totalGoldGain += 200; // 金矿产出更高
-                if (b.type === 'sawmill') totalWoodGain += 100;
-            }
-        });
 
         if (totalGoldGain > 0) this.addGold(totalGoldGain);
         if (totalWoodGain > 0) this.addWood(totalWoodGain);
         
-        console.log(`%c[周产出] %c获得金钱 +${totalGoldGain}, 木材 +${totalWoodGain}`, 'color: #557755; font-weight: bold', 'color: #fff');
+        console.log(`%c[季度结算] %c总收入金钱 +${totalGoldGain}, 木材 +${totalWoodGain}`, 'color: #557755; font-weight: bold', 'color: #fff');
     }
 
     /**
@@ -582,8 +676,13 @@ class WorldManager {
 
         // --- 2. 放置主城逻辑 ---
         if (generator.pois && generator.pois.length >= 3) {
-            // 玩家出生点 (第一个 POI)
-            const playerPoi = generator.pois[0];
+            // 核心优化：不再随机选取，而是计算间距最大的 POI 分布
+            // 势力总数 = 玩家(1) + AI(aiHeroes.length)
+            const factionCount = 1 + aiHeroes.length;
+            const spreadPois = this._selectSpreadPOIs(generator.pois, factionCount);
+
+            // 分配玩家出生点 (从 spreadPois 中取第一个)
+            const playerPoi = spreadPois[0];
             const px = playerPoi.x - halfSize;
             const pz = playerPoi.z - halfSize;
             this.mapState.playerPos = { x: px, z: pz };
@@ -592,7 +691,6 @@ class WorldManager {
             pCity.name = "新手村"; 
             pCity.x = px;
             pCity.z = pz;
-            // 关键改动：根据玩家选定的主角门派，修正初始城市的蓝图
             const playerSect = this.availableHeroes[this.heroData.id]?.sect || 'chunyang';
             pCity.blueprintId = playerSect;
             
@@ -603,13 +701,12 @@ class WorldManager {
                 z: pz 
             });
 
-            // AI 出生点 (分配给选中的 AI)
+            // 分配 AI 出生点 (从 spreadPois 中取剩余的)
             aiHeroes.forEach((aiHeroId, index) => {
                 const factionId = `ai_faction_${index + 1}`;
                 const cityId = `ai_city_${index + 1}`;
                 
-                // 选取最后的 POI 倒着排
-                const aiPoi = generator.pois[generator.pois.length - 1 - index];
+                const aiPoi = spreadPois[index + 1];
                 const ax = aiPoi.x - halfSize;
                 const az = aiPoi.z - halfSize;
                 
@@ -676,7 +773,7 @@ class WorldManager {
                 } else if (roll < 0.004) {
                     entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'wood_small', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.005) {
+                } else if (roll < 0.0045) {
                     const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
                     const sKey = bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2';
                     entities.push({ 
@@ -688,7 +785,7 @@ class WorldManager {
                         config: { owner: 'none', type: bType }
                     });
                     placed = true;
-                } else if (roll < 0.012) {
+                } else if (roll < 0.008) {
                     // --- 核心优化：使用动态权重系统选择敌人类型 ---
                     const tId = this.getDynamicEnemyType(worldX, worldZ);
                     const template = this.enemyTemplates[tId];
@@ -834,12 +931,18 @@ class WorldManager {
      */
     getPlayerTotalPower() {
         let total = 0;
+        
+        // 1. 计算士兵战力
         for (const type in this.heroArmy) {
             const count = this.heroArmy[type];
             if (count > 0 && this.unitCosts[type]) {
                 total += count * (this.unitCosts[type].cost || 0);
             }
         }
+
+        // 2. 计算主将战力：固定为 15 点，不随等级增加
+        total += 15;
+
         return total;
     }
 
@@ -937,30 +1040,83 @@ class WorldManager {
      * 处理占领大世界建筑的接口
      * @param {Object} buildingItem 交互项
      */
-    handleCapture(buildingItem) {
+    /**
+     * 在可选 POI 中选择 n 个彼此间距最大的点
+     * 解决“势力过于拥挤”的问题 (Max-Min 算法)
+     */
+    _selectSpreadPOIs(allPois, count) {
+        if (allPois.length <= count) return allPois;
+
+        const selected = [];
+        // 1. 随机选第一个点作为起点
+        const firstIdx = Math.floor(Math.random() * allPois.length);
+        selected.push(allPois[firstIdx]);
+
+        // 2. 迭代选择剩余的点
+        while (selected.length < count) {
+            let bestPoi = null;
+            let maxMinDist = -1;
+
+            for (let i = 0; i < allPois.length; i++) {
+                const poi = allPois[i];
+                if (selected.includes(poi)) continue;
+
+                // 计算该候选点到已选点集的最小距离
+                let minDist = Infinity;
+                for (const s of selected) {
+                    const d = Math.sqrt(Math.pow(poi.x - s.x, 2) + Math.pow(poi.z - s.z, 2));
+                    if (d < minDist) minDist = d;
+                }
+
+                // 核心：寻找一个让“到已选集合最小距离”最大的点
+                if (minDist > maxMinDist) {
+                    maxMinDist = minDist;
+                    bestPoi = poi;
+                }
+            }
+
+            if (bestPoi) selected.push(bestPoi);
+            else break;
+        }
+
+        return selected;
+    }
+
+    /**
+     * 处理野外矿产/建筑的占领逻辑
+     */
+    handleCapture(buildingItem, newOwner = 'player') {
         const { id, config } = buildingItem;
         
-        // 如果已经是自己的，直接返回
-        if (config.owner === 'player') return;
+        // 如果已经是该势力的，直接返回
+        if (config.owner === newOwner) return;
 
-        // 占领逻辑 (目前简化，直接占领)
-        config.owner = 'player';
+        // 占领逻辑
+        config.owner = newOwner;
         
-        // 如果不在已记录列表中，则添加
-        if (!this.capturedBuildings.find(b => b.id === id)) {
+        // 更新记录列表
+        let recorded = this.capturedBuildings.find(b => b.id === id);
+        if (recorded) {
+            recorded.owner = newOwner;
+        } else {
             this.capturedBuildings.push({
                 id: id,
-                type: config.type, // 'gold_mine' 或 'sawmill'
-                owner: 'player'
+                type: config.type,
+                owner: newOwner
             });
         }
 
         const name = config.type === 'gold_mine' ? '金矿' : '伐木场';
-        this.showNotification(`成功占领了${name}！每季度将产出额外资源。`);
-        console.log(`%c[占领] %c${name} (${id}) 现在归属于 玩家`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        const ownerName = newOwner === 'player' ? '玩家' : (this.factions[newOwner]?.name || '敌方');
         
-        // 触发 UI 刷新或特效 (可选)
-        window.dispatchEvent(new CustomEvent('building-captured', { detail: { id, type: config.type } }));
+        if (newOwner === 'player') {
+            this.showNotification(`成功占领了${name}！每季度将产出额外资源。`);
+        }
+        
+        console.log(`%c[占领] %c${name} (${id}) 现在归属于 ${ownerName}`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        
+        // 触发 UI 刷新或特效
+        window.dispatchEvent(new CustomEvent('building-captured', { detail: { id, type: config.type, owner: newOwner } }));
     }
 
     /**
@@ -1119,16 +1275,19 @@ class WorldManager {
             
             // --- 属性固定成长系统 ---
             const s = data.stats;
-            s.power += 5;          // 侠客力道/身法
+            s.power += 10;         // 侠客力道/身法 (+10)
             s.spells += 4;         // 侠客法术
-            s.soldierAtk += 2;     // 士兵攻击
-            s.soldierDef += 2;     // 士兵坚韧
+            s.soldierAtk += 3;     // 士兵攻击
+            s.soldierDef += 3;     // 士兵坚韧
             // s.speed 保持不变
             s.haste = Math.min(0.5, s.haste + 0.01); // 招式加速 (每级 1%, 上限 50%)
             
-            // 同步计算英雄血量上限 (200 + 力道 * 3)
+            // 同步计算英雄血量与内力上限
             data.hpMax = 200 + (s.power * 3);
             data.hpCurrent = data.hpMax;
+            
+            data.mpMax += 20;      // 内力上限每级增加 20
+            data.mpCurrent = data.mpMax; // 升级补满状态
 
             console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！`, 'color: #00ff00; font-weight: bold', 'color: #fff');
             
@@ -1158,35 +1317,68 @@ class WorldManager {
     /**
      * 获取兵种详情（包含名称、配置及修正后的真实数据）
      */
+    /**
+     * 获取英雄初始身份数据
+     */
+    getHeroIdentity(heroId) {
+        return HERO_IDENTITY[heroId];
+    }
+
+    /**
+     * 获取当前英雄的所有固有特性
+     */
+    getHeroTraits(heroId) {
+        const identity = HERO_IDENTITY[heroId];
+        return identity ? identity.traits : [];
+    }
+
+    /**
+     * 获取兵种详情 (全游戏唯一合法的数据出口，彻底解决显示不一致问题)
+     */
     getUnitDetails(type) {
-        const base = UNIT_STATS_DATA[type];
-        if (!base) return { name: type, hp: 0, atk: 0, dps: 0, rangeType: '', description: '' };
+        const baseBlueprint = UNIT_STATS_DATA[type];
+        if (!baseBlueprint) return { name: type, hp: 0, atk: 0, dps: 0, rangeType: '', description: '' };
+
+        // 浅拷贝蓝图，作为计算基准
+        let liveStats = { ...baseBlueprint };
+
+        // --- 核心重构：如果查询的是当前主角，强制同步面板实时属性 ---
+        if (this.heroData && this.heroData.id === type) {
+            const s = this.heroData.stats;
+            const identity = this.getHeroIdentity(type);
+            const cb = identity.combatBase;
+
+            // 英雄的基础数值直接由身份表中的 combatBase 驱动，不再硬编码
+            liveStats.hp = cb.hpBase + (s.power * cb.hpScaling); 
+            liveStats.atk = cb.atk;                
+            liveStats.speed = s.speed;          
+        }
 
         const dummyUnit = { side: 'player', type: type };
         
-        // 1. 计算最终气血
-        const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', base.hp));
+        // 1. 应用所有动态修正（天赋、装备、技能加成）
+        const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', liveStats.hp));
         
-        // 2. 计算最终攻击力 (Base Damage)
+        // 治疗单位与普通单位伤害修正逻辑
         let finalAtk;
         if (type === 'healer') {
-            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'damage', -base.atk));
+            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'damage', -liveStats.atk));
         } else {
-            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'damage', base.atk);
+            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'damage', liveStats.atk);
         }
-
-        // 3. 计算最终攻击频率 (修正后的攻击间隔)
-        // 注意：ModifierManager 处理 attack_speed 时，加速属性会减小这个间隔
-        const finalInterval = modifierManager.getModifiedValue(dummyUnit, 'attack_speed', base.attackSpeed);
         
-        // 4. 计算秒伤 (DPS = 攻击力 / 间隔秒数)
-        // 向上取整，保持 UI 整洁
-        const dps = Math.ceil((finalAtk / finalInterval) * 1000);
+        const finalSpeed = modifierManager.getModifiedValue(dummyUnit, 'speed', liveStats.speed);
+        const finalInterval = modifierManager.getModifiedValue(dummyUnit, 'attack_speed', liveStats.attackSpeed);
+        
+        // 2. 多段攻击 DPS 换算 ( burstCount 取自蓝图 )
+        const burstCount = liveStats.burstCount || 1;
+        const dps = Math.ceil((finalAtk * burstCount / finalInterval) * 1000);
 
         return {
-            ...base,
+            ...liveStats,
             hp: finalHP,
-            atk: Math.ceil(finalAtk), // 依然保留基础攻击力供内部参考
+            atk: Math.ceil(finalAtk),
+            speed: finalSpeed,
             dps: dps
         };
     }
@@ -1218,3 +1410,4 @@ class WorldManager {
 }
 
 export const worldManager = new WorldManager();
+

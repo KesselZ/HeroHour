@@ -180,7 +180,7 @@ export class BaseUnit extends THREE.Group {
             
             // 如果冲力还很大，暂时打断 AI 寻路 (硬直感)
             if (this.knockbackVelocity.length() > 0.05) {
-                this.applySeparation(allies, enemies); // 击退过程中也要处理碰撞
+                this.applySeparation(allies, enemies, deltaTime); // 击退过程中也要处理碰撞
                 return; 
             }
         }
@@ -189,7 +189,7 @@ export class BaseUnit extends THREE.Group {
         if (this.type === 'cangjian' && this.isSpinning) {
             this.updateWhirlwind(enemies);
             // 旋风斩期间可以缓慢移动或静止，这里保持原地旋转并处理碰撞
-            this.applySeparation(allies, enemies);
+            this.applySeparation(allies, enemies, deltaTime);
             return; 
         }
 
@@ -203,13 +203,13 @@ export class BaseUnit extends THREE.Group {
             this.updateFacing();
 
             if (distance > this.attackRange) {
-                this.moveTowardsTarget();
+                this.moveTowardsTarget(deltaTime);
             } else {
                 this.performAttack(enemies, allies);
             }
             
             // 2. 碰撞挤压逻辑：防止单位完全重叠
-            this.applySeparation(allies, enemies);
+            this.applySeparation(allies, enemies, deltaTime);
             
             // 3. 动态光环逻辑
             const nearestEnemy = this.findNearestEnemy(enemies);
@@ -266,9 +266,9 @@ export class BaseUnit extends THREE.Group {
     /**
      * 优化后的碰撞挤压：考虑质量 (Mass) 和 敌我关系
      */
-    applySeparation(allies, enemies) {
+    applySeparation(allies, enemies, deltaTime) {
         const separationRadius = 0.6; // 基础排斥半径
-        const force = 0.02; // 基础挤开力量
+        const force = 1.2; // 基础挤开力量 (单位/秒)
         const allUnits = [...allies, ...enemies];
 
         for (const other of allUnits) {
@@ -286,8 +286,7 @@ export class BaseUnit extends THREE.Group {
                     .normalize();
                 
                 // 核心逻辑：推挤强度受自身质量影响
-                // 如果我是英雄 (mass=5)，对方是小兵 (mass=1)，我被推开的力量只有 1/5
-                let strength = (1 - dist / effectiveRadius) * force;
+                let strength = (1 - dist / effectiveRadius) * force * deltaTime;
                 strength /= this.mass; 
 
                 // 如果是敌对单位，进一步削弱“日常推挤”，只保留最基本的空间隔离
@@ -354,12 +353,13 @@ export class BaseUnit extends THREE.Group {
         return nearest;
     }
 
-    moveTowardsTarget() {
+    moveTowardsTarget(deltaTime) {
         const dir = new THREE.Vector3()
             .subVectors(this.target.position, this.position)
             .normalize();
         
-        this.position.addScaledVector(dir, this.moveSpeed);
+        // 核心修改：位移 = 速度 * deltaTime，脱离帧率限制
+        this.position.addScaledVector(dir, this.moveSpeed * deltaTime);
         
         // 像素风不需要旋转 Group，Sprite 始终面向相机
     }
@@ -440,55 +440,106 @@ export class HeroUnit extends BaseUnit {
     static displayName = '主角';
     constructor(side, index, projectileManager) {
         const heroData = worldManager.heroData;
-        
-        // 英雄属性计算：直接从同步后的数据获取
-        const hp = heroData.hpMax;
-        const atk = 30; // 英雄基础攻击，会被 Modifier 放大
+        const stats = worldManager.getUnitDetails(heroData.id);
         
         super({
             side,
             index,
             type: heroData.id, 
-            hp: hp,
-            speed: heroData.stats.speed,
-            attackDamage: atk,
-            attackRange: (heroData.id === 'qijin' ? 6.0 : 1.2),
-            attackSpeed: 800, // 英雄攻击频率通常较快
+            hp: heroData.hpMax, // 血量上限依然由同步后的属性决定
+            speed: stats.speed,
+            attackDamage: stats.rawAtk, // 使用原始配置攻击力
+            attackRange: stats.range,
+            attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: 0,
-            mass: 5.0 // 英雄质量极大，普通士兵推不动
+            mass: 5.0 
         });
 
         this.isHero = true;
         this.level = heroData.level;
-        this.health = (heroData.hpCurrent !== undefined && heroData.hpCurrent > 0) ? heroData.hpCurrent : hp;
+        this.health = (heroData.hpCurrent !== undefined && heroData.hpCurrent > 0) ? heroData.hpCurrent : heroData.hpMax;
         
-        // 英雄更加醒目：体型变大 50%
-        this.scale.set(1.5, 1.5, 1.5);
+        // --- 旋风斩逻辑复用 (时间驱动) ---
+        this.isSpinning = false; 
+        this.spinTimer = 0;
+        this.spinDuration = 2.0; // 持续 2 秒 (物理时间)
+        this.hitTimer = 0;       // 伤害判定计时器
+        this.swordVFX = null;
 
-        // 创建英雄专属血条
+        // 英雄更加醒目
+        this.scale.set(1.5, 1.5, 1.5);
         this.createHeroHealthBar();
+    }
+
+    /**
+     * 叶英复用：启动藏剑旋风斩
+     */
+    startWhirlwind() {
+        this.isSpinning = true;
+        this.spinTimer = this.spinDuration;
+        this.hitTimer = 0; // 重置判定计时
+        
+        const vfx = new THREE.Group();
+        const bladeGeo = new THREE.BoxGeometry(2.0, 0.08, 0.2); 
+        const bladeMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.8 });
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.x = 1.0; 
+        vfx.add(blade);
+        vfx.position.y = -0.1;
+        this.add(vfx);
+        this.swordVFX = vfx;
+    }
+
+    /**
+     * 叶英复用：更新旋风斩 (时间步长驱动)
+     */
+    updateWhirlwind(enemies, deltaTime) {
+        if (this.spinTimer <= 0) {
+            this.isSpinning = false;
+            if (this.swordVFX) {
+                this.remove(this.swordVFX);
+                this.swordVFX = null;
+            }
+            this.unitSprite.rotation.y = 0;
+            return;
+        }
+
+        this.spinTimer -= deltaTime;
+        
+        // 视觉旋转 (按角速度计算)
+        this.unitSprite.rotation.y += 12.0 * deltaTime; 
+        if (this.swordVFX) this.swordVFX.rotation.y += 24.0 * deltaTime;
+
+        // 核心修正：基于物理时间判定伤害
+        this.hitTimer += deltaTime * 1000; // 转为毫秒
+        const interval = worldManager.getUnitDetails('yeying').continuousInterval || 166;
+        
+        if (this.hitTimer >= interval) {
+            this.hitTimer = 0; // 触发判定并重置
+            this.executeAOE(enemies, {
+                radius: 2.5,
+                damage: this.attackDamage, 
+                knockbackForce: 0.05
+            });
+        }
     }
 
     /**
      * 创建头顶 3D 血条
      */
     createHeroHealthBar() {
-        // 血条底色 (黑)
         const bgGeo = new THREE.PlaneGeometry(0.8, 0.1);
         const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
         const bg = new THREE.Mesh(bgGeo, bgMat);
-        bg.position.y = 1.2; // 位于头顶
+        bg.position.y = 1.2;
         this.add(bg);
 
-        // 血条填充 (红)
         const fillGeo = new THREE.PlaneGeometry(0.78, 0.08);
         const fillMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
         this.hpFill = new THREE.Mesh(fillGeo, fillMat);
-        this.hpFill.position.set(0, 0, 0.01); // 稍微靠前
+        this.hpFill.position.set(0, 0, 0.01);
         bg.add(this.hpFill);
-
-        // 记录初始宽度用于缩放
         this.hpBarFullWidth = 0.78;
     }
 
@@ -496,93 +547,237 @@ export class HeroUnit extends BaseUnit {
         if (!this.hpFill) return;
         const pct = Math.max(0, this.health / this.maxHealth);
         this.hpFill.scale.x = pct;
-        // 调整位置让它从左侧对齐缩放
         this.hpFill.position.x = -(1 - pct) * (this.hpBarFullWidth / 2);
     }
 
     takeDamage(amount) {
         super.takeDamage(amount);
-        // 实时更新 3D 血条
         this.updateHealthBar();
-        // 实时同步英雄血量到全局数据
         if (this.side === 'player') {
             worldManager.heroData.hpCurrent = this.health;
         }
     }
 
-    // 英雄死亡逻辑重写
     die() {
         if (this.isDead) return;
         super.die();
-        console.log(`%c[战损] %c英雄 ${this.type} 撤离了战场！`, 'color: #ff0000; font-weight: bold', 'color: #fff');
-        
-        // 触发英雄败北事件（可以导致战斗直接结束或士气崩溃）
         if (this.side === 'player') {
             window.dispatchEvent(new CustomEvent('hero-defeated', { detail: { heroId: this.type } }));
         }
     }
 
+    // --- 核心重构：高度复用兵种逻辑 ---
     performAttack(enemies, allies) {
-        // 根据英雄 ID 选择不同的攻击模组
-        const heroData = worldManager.heroData;
-        if (heroData.id === 'qijin') {
-            this.performChunyangAttack(enemies, allies);
-        } else if (heroData.id === 'lichengen') {
-            this.performTianceAttack(enemies, allies);
-        }
-    }
-
-    // 复用或增强纯阳攻击逻辑
-    performChunyangAttack(enemies, allies) {
+        const heroId = worldManager.heroData.id;
         const now = Date.now();
-        if (now - this.lastAttackTime > this.attackCooldownTime) {
-            this.lastAttackTime = now;
+        if (now - this.lastAttackTime < this.attackCooldownTime) return;
+        this.lastAttackTime = now;
+
+        if (heroId === 'yeying') {
+            // 1. 叶英：完全复用藏剑弟子的旋风斩 (不再有额外特效)
+            this.startWhirlwind(); 
+        } else if (heroId === 'qijin') {
+            // 2. 祁进：复用并强化纯阳弟子的“多剑齐发”逻辑
             this.onAttackAnimation();
-            
-            // 英雄版：一次射出 5 把气剑，且带有更强的视觉效果
-            const swordCount = 5;
+            const swordCount = 5; // 弟子是 3，祁进是 5
             for (let i = 0; i < swordCount; i++) {
                 setTimeout(() => {
                     if (this.isDead || !this.target || this.target.isDead) return;
-                    const spawnPos = this.position.clone().add(new THREE.Vector3((i - 2) * 0.3, 1.5, 0));
-                    if (this.projectileManager) {
-                        this.projectileManager.spawn({
-                            startPos: spawnPos,
-                            target: this.target,
-                            speed: 0.3,
-                            damage: this.attackDamage / 3, 
-                            type: 'air_sword'
-                        });
-                    }
+                    const spawnPos = this.position.clone().add(new THREE.Vector3((i - 2) * 0.3, 1.2, 0));
+                    this.projectileManager?.spawn({
+                        startPos: spawnPos,
+                        target: this.target,
+                        speed: 0.3,
+                        damage: this.attackDamage, // 单剑伤害 = 面板伤害
+                        type: 'air_sword'
+                    });
                 }, i * 100);
             }
+        } else if (heroId === 'lichengen') {
+            // 3. 李承恩：复用天策弟子的横扫但范围更大
+            this.onAttackAnimation();
+            this.executeAOE(enemies, {
+                radius: 2.5,
+                angle: Math.PI * 1.5,
+                damage: this.attackDamage,
+                knockbackForce: 0.25
+            });
         }
     }
 
-    // 复用或增强天策横扫逻辑
-    performTianceAttack(enemies, allies) {
-        const now = Date.now();
-        if (now - this.lastAttackTime > this.attackCooldownTime) {
-            this.lastAttackTime = now;
-            this.onAttackAnimation();
+    /**
+     * 重写 update 
+     */
+    update(enemies, allies, deltaTime) {
+        super.update(enemies, allies, deltaTime);
+    }
 
-            // 英雄版：270度超大范围横扫，附带强力击退
-            const radius = 2.5;
-            enemies.forEach(enemy => {
-                if (enemy.isDead) return;
-                const dist = this.position.distanceTo(enemy.position);
-                if (dist < radius) {
-                    const dirToEnemy = enemy.position.clone().sub(this.position).normalize();
-                    const forward = new THREE.Vector3(1, 0, 0); 
-                    const dot = forward.dot(dirToEnemy);
-                    
-                    if (dot > -0.5) { // 270度范围
-                        enemy.takeDamage(this.attackDamage);
-                        enemy.applyKnockback(this.position, 0.15); // 强力击退
-                    }
-                }
-            });
+    /**
+     * 核心重构：高度复用兵种逻辑，彻底解决残留与重叠
+     */
+    performAttack(enemies, allies) {
+        const heroId = worldManager.heroData.id;
+        const now = Date.now();
+        if (now - this.lastAttackTime < this.attackCooldownTime) return;
+        this.lastAttackTime = now;
+
+        const details = worldManager.getUnitDetails(heroId);
+        const burstCount = details.burstCount || 1;
+
+        if (heroId === 'yeying') {
+            // 叶英：心剑旋风 (对齐 3 次爆发，缩小范围)
+            for (let i = 0; i < burstCount; i++) {
+                setTimeout(() => {
+                    if (this.isDead) return;
+                    this.onAttackAnimation();
+                    this.showWhirlwindSword(details.range, 0xffcc00); // 使用注册表范围 (2.5)
+                    this.executeAOE(enemies, {
+                        radius: details.range,
+                        damage: this.attackDamage,
+                        knockbackForce: 0.05
+                    });
+                }, i * 250); // 间隔拉长
+            }
+        } else if (heroId === 'qijin') {
+            // 祁进：五剑齐发 (直接调用内部逻辑，不再双重循环)
+            this.onAttackAnimation();
+            this.performChunyangAttack(enemies);
+        } else if (heroId === 'lichengen') {
+            // 李承恩：复用天策骑兵的横扫千军逻辑
+            this.onAttackAnimation();
+            this.performTianceAttack(enemies);
         }
+    }
+
+    /**
+     * 天策强化：完全复用天策骑兵的横扫千军 (范围、角度、特效完全一致)
+     */
+    performTianceAttack(enemies) {
+        if (!this.target || this.target.isDead) return;
+
+        const sweepRadius = 2.0; // 与天策骑兵完全一致 (2.0)
+
+        // 1. 锁定攻击方向
+        const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
+        attackDir.y = 0;
+
+        // 2. 显示 VFX (完全复用天策骑兵参数)
+        this.showSweepVFX(attackDir, sweepRadius, 0xff4400); 
+
+        // 3. 执行判定 (180度扫击，击退 0.15)
+        this.executeAOE(enemies, {
+            radius: sweepRadius,
+            angle: Math.PI, // 180度，完全一致
+            damage: this.attackDamage,
+            knockbackForce: 0.15, // 完全一致
+            customDir: attackDir 
+        });
+    }
+
+    /**
+     * 视觉：扇形扫击特效 (天策通用，180度参数完全对齐)
+     */
+    showSweepVFX(attackDir, radius, color) {
+        const group = new THREE.Group();
+        const innerRadius = radius * 0.5; // 对齐骑兵比例
+        const outerRadius = radius;
+        
+        // 参数：-PI/2 开始，扫 PI 角度 (即正前方 180 度)
+        const geo = new THREE.RingGeometry(innerRadius, outerRadius, 32, 1, -Math.PI / 2, Math.PI);
+        const mat = new THREE.MeshBasicMaterial({ 
+            color: color, 
+            transparent: true, 
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        group.add(mesh);
+
+        // 调整朝向
+        const angle = Math.atan2(attackDir.x, attackDir.z);
+        group.rotation.y = angle;
+        group.position.y = 0.1;
+        this.add(group);
+
+        const startTime = Date.now();
+        const duration = 300;
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > duration) {
+                this.remove(group);
+                return;
+            }
+            const p = elapsed / duration;
+            // 简单的比例扩散
+            mesh.scale.set(0.8 + p * 0.4, 0.8 + p * 0.4, 1);
+            mat.opacity = 0.6 * (1 - p);
+            requestAnimationFrame(animate);
+        };
+        animate();
+    }
+
+    /**
+     * 纯阳强化：五剑齐发视觉与逻辑
+     */
+    performChunyangAttack(enemies) {
+        if (!this.target || this.target.isDead) return;
+        
+        const swordCount = 5; 
+        for (let i = 0; i < swordCount; i++) {
+            setTimeout(() => {
+                if (this.isDead || !this.target || this.target.isDead) return;
+                
+                const offset = new THREE.Vector3((i-2)*0.5, 1.2, (rng.next()-0.5)*0.5);
+                const spawnPos = this.position.clone().add(offset);
+                
+                this.projectileManager?.spawn({
+                    startPos: spawnPos,
+                    target: this.target,
+                    speed: 0.25,
+                    damage: this.attackDamage, 
+                    type: 'air_sword'
+                });
+            }, i * 100);
+        }
+    }
+
+    /**
+     * 视觉：产生一个极速旋转并消失的重剑 (250ms 完美对齐爆发)
+     */
+    showWhirlwindSword(radius, color) {
+        const vfx = new THREE.Group();
+        const bladeGeo = new THREE.BoxGeometry(radius, 0.08, 0.2);
+        const bladeMat = new THREE.MeshBasicMaterial({ 
+            color: color, 
+            transparent: true, 
+            opacity: 0.8 
+        });
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.x = radius / 2;
+        vfx.add(blade);
+        vfx.position.y = -0.2;
+        this.add(vfx);
+
+        const startTime = Date.now();
+        const duration = 250; // 精准对齐爆发间隔
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > duration || this.isDead) {
+                this.remove(vfx);
+                return;
+            }
+            const progress = elapsed / duration;
+            // 旋转速度放慢 20%：从 4 * PI 降至 3.2 * PI
+            // 在 250ms 内旋转约 1.6 圈，视觉更稳健
+            vfx.rotation.y = progress * Math.PI * 3.2; 
+            
+            // 快速渐隐，避免视觉残留
+            bladeMat.opacity = 0.8 * (1 - progress);
+            requestAnimationFrame(animate);
+        };
+        animate();
     }
 }
 
@@ -738,28 +933,28 @@ export class Healer extends BaseUnit {
 export class WildBoar extends BaseUnit {
     static displayName = '野猪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'wild_boar', hp: 100, speed: 0.03, attackRange: 0.8, attackDamage: 8, cost: 2, projectileManager });
+        super({ side, index, type: 'wild_boar', hp: 100, speed: 5.0, attackRange: 0.8, attackDamage: 8, cost: 2, projectileManager });
     }
 }
 
 export class Wolf extends BaseUnit {
     static displayName = '野狼';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'wolf', hp: 60, speed: 0.04, attackRange: 0.8, attackDamage: 10, cost: 2, projectileManager });
+        super({ side, index, type: 'wolf', hp: 60, speed: 6.7, attackRange: 0.8, attackDamage: 10, cost: 2, projectileManager });
     }
 }
 
 export class Tiger extends BaseUnit {
     static displayName = '猛虎';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'tiger', hp: 250, speed: 0.045, attackRange: 1.2, attackDamage: 25, cost: 5, mass: 2.0, projectileManager });
+        super({ side, index, type: 'tiger', hp: 250, speed: 7.6, attackRange: 1.2, attackDamage: 25, cost: 5, mass: 2.0, projectileManager });
     }
 }
 
 export class Bear extends BaseUnit {
     static displayName = '黑熊';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bear', hp: 400, speed: 0.025, attackRange: 1.0, attackDamage: 30, cost: 6, mass: 3.0, projectileManager });
+        super({ side, index, type: 'bear', hp: 400, speed: 4.2, attackRange: 1.0, attackDamage: 30, cost: 6, mass: 3.0, projectileManager });
     }
 }
 
@@ -767,14 +962,14 @@ export class Bear extends BaseUnit {
 export class Bandit extends BaseUnit {
     static displayName = '山贼刀匪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bandit', hp: 80, speed: 0.03, attackRange: 0.8, attackDamage: 12, cost: 2, projectileManager });
+        super({ side, index, type: 'bandit', hp: 95, speed: 5.0, attackRange: 0.8, attackDamage: 14, cost: 2, projectileManager });
     }
 }
 
 export class BanditArcher extends BaseUnit {
     static displayName = '山贼弩匪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bandit_archer', hp: 80, speed: 0.03, attackRange: 8.0, attackDamage: 15, attackSpeed: 2000, cost: 3, projectileManager });
+        super({ side, index, type: 'bandit_archer', hp: 85, speed: 5.0, attackRange: 8.0, attackDamage: 16, attackSpeed: 2000, cost: 3, projectileManager });
     }
     performAttack(enemies) {
         const now = Date.now();
@@ -795,14 +990,14 @@ export class BanditArcher extends BaseUnit {
 export class RebelSoldier extends BaseUnit {
     static displayName = '叛军甲兵';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'rebel_soldier', hp: 180, speed: 0.025, attackRange: 0.8, attackDamage: 20, cost: 3, mass: 1.5, projectileManager });
+        super({ side, index, type: 'rebel_soldier', hp: 145, speed: 4.2, attackRange: 0.8, attackDamage: 22, cost: 3, mass: 1.5, projectileManager });
     }
 }
 
 export class RebelAxeman extends BaseUnit {
     static displayName = '叛军斧兵';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'rebel_axeman', hp: 160, speed: 0.03, attackRange: 0.8, attackDamage: 22, cost: 3, projectileManager });
+        super({ side, index, type: 'rebel_axeman', hp: 135, speed: 5.0, attackRange: 0.8, attackDamage: 24, cost: 3, projectileManager });
     }
 }
 
@@ -810,28 +1005,28 @@ export class RebelAxeman extends BaseUnit {
 export class Snake extends BaseUnit {
     static displayName = '毒蛇';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'snake', hp: 30, speed: 0.035, attackRange: 0.6, attackDamage: 6, cost: 1, projectileManager });
+        super({ side, index, type: 'snake', hp: 30, speed: 5.9, attackRange: 0.6, attackDamage: 6, cost: 1, projectileManager });
     }
 }
 
 export class Bats extends BaseUnit {
     static displayName = '蝙蝠群';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bats', hp: 20, speed: 0.05, attackRange: 0.5, attackDamage: 4, cost: 1, projectileManager });
+        super({ side, index, type: 'bats', hp: 20, speed: 8.4, attackRange: 0.5, attackDamage: 4, cost: 1, projectileManager });
     }
 }
 
 export class Deer extends BaseUnit {
     static displayName = '林间小鹿';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'deer', hp: 80, speed: 0.05, attackRange: 0.5, attackDamage: 2, cost: 1, projectileManager });
+        super({ side, index, type: 'deer', hp: 80, speed: 8.4, attackRange: 0.5, attackDamage: 2, cost: 1, projectileManager });
     }
 }
 
 export class Pheasant extends BaseUnit {
     static displayName = '山鸡';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'pheasant', hp: 30, speed: 0.04, attackRange: 0.4, attackDamage: 1, cost: 1, projectileManager });
+        super({ side, index, type: 'pheasant', hp: 30, speed: 6.7, attackRange: 0.4, attackDamage: 1, cost: 1, projectileManager });
     }
 }
 
@@ -839,28 +1034,28 @@ export class Pheasant extends BaseUnit {
 export class AssassinMonk extends BaseUnit {
     static displayName = '苦修刺客';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'assassin_monk', hp: 150, speed: 0.045, attackRange: 0.8, attackDamage: 25, attackSpeed: 800, cost: 5, projectileManager });
+        super({ side, index, type: 'assassin_monk', hp: 200, speed: 7.6, attackRange: 0.8, attackDamage: 30, attackSpeed: 800, cost: 5, projectileManager });
     }
 }
 
 export class Zombie extends BaseUnit {
     static displayName = '毒尸傀儡';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'zombie', hp: 300, speed: 0.015, attackRange: 0.7, attackDamage: 15, cost: 4, projectileManager });
+        super({ side, index, type: 'zombie', hp: 450, speed: 2.5, attackRange: 0.7, attackDamage: 18, cost: 4, projectileManager });
     }
 }
 
 export class HeavyKnight extends BaseUnit {
     static displayName = '铁浮屠重骑';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'heavy_knight', hp: 500, speed: 0.02, attackRange: 1.5, attackDamage: 35, cost: 8, mass: 4.0, projectileManager });
+        super({ side, index, type: 'heavy_knight', hp: 450, speed: 3.4, attackRange: 1.5, attackDamage: 40, cost: 6, mass: 4.0, projectileManager });
     }
 }
 
 export class ShadowNinja extends BaseUnit {
     static displayName = '隐之影';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'shadow_ninja', hp: 120, speed: 0.06, attackRange: 0.8, attackDamage: 28, attackSpeed: 600, cost: 7, projectileManager });
+        super({ side, index, type: 'shadow_ninja', hp: 160, speed: 10.1, attackRange: 0.8, attackDamage: 32, attackSpeed: 600, cost: 5, projectileManager });
     }
 }
 
@@ -890,72 +1085,60 @@ export class Cangjian extends BaseUnit {
     }
 
     performAttack(enemies, allies) {
-        if (this.isSpinning) return;
-
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
-            this.startWhirlwind();
+
+            const details = worldManager.getUnitDetails('cangjian');
+            const burstCount = details.burstCount || 3;
+
+            // 核心修正：藏剑弟子也改为爆发模式，缩小范围 (1.5)
+            for (let i = 0; i < burstCount; i++) {
+                setTimeout(() => {
+                    if (this.isDead) return;
+                    this.onAttackAnimation();
+                    this.showWhirlwindSword(details.range, 0xffcc00); // 1.5
+                    this.executeAOE(enemies, {
+                        radius: details.range,
+                        angle: Math.PI * 2,
+                        damage: this.attackDamage,
+                        knockbackForce: 0.05
+                    });
+                }, i * 250); // 间隔拉长
+            }
         }
     }
 
-    startWhirlwind() {
-        this.isSpinning = true;
-        this.spinTimer = this.spinDuration;
-        
-        // 创建单把重剑视觉
+    /**
+     * 视觉：产生一个飞速旋转并消失的重剑 (您喜欢的原本动画)
+     */
+    showWhirlwindSword(radius, color) {
         const vfx = new THREE.Group();
-        const bladeGeo = new THREE.BoxGeometry(2.0, 0.08, 0.2);
+        const bladeGeo = new THREE.BoxGeometry(radius, 0.08, 0.2);
         const bladeMat = new THREE.MeshBasicMaterial({ 
-            color: 0xffcc00, 
+            color: color, 
             transparent: true, 
             opacity: 0.8 
         });
         const blade = new THREE.Mesh(bladeGeo, bladeMat);
-        blade.position.x = 1.0; 
+        blade.position.x = radius / 2;
         vfx.add(blade);
-        vfx.position.y = -0.1;
+        vfx.position.y = -0.2;
         this.add(vfx);
-        this.swordVFX = vfx;
-    }
 
-    /**
-     * 每帧调用的旋风斩逻辑 (丝滑旋转 + AOE)
-     */
-    updateWhirlwind(enemies) {
-        if (this.spinTimer <= 0) {
-            this.isSpinning = false;
-            if (this.swordVFX) {
-                this.remove(this.swordVFX);
-                this.swordVFX = null;
+        const startTime = Date.now();
+        const duration = 500; 
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > duration || this.isDead) {
+                this.remove(vfx);
+                return;
             }
-            this.unitSprite.rotation.y = 0;
-            return;
-        }
-
-        this.spinTimer--;
-
-        // 1. 丝滑旋转：直接随帧率更新角度
-        this.unitSprite.rotation.y += 0.2; 
-        if (this.swordVFX) {
-            this.swordVFX.rotation.y += 0.4; // 剑转得更快
-            const s = 1 + Math.sin(this.spinTimer * 0.2) * 0.1;
-            this.swordVFX.scale.set(s, 1, s);
-        }
-
-        // 2. 攻击反馈
-        this.unitSprite.scale.set(1.6, 1.6, 1.6);
-        setTimeout(() => { if(!this.isDead) this.unitSprite.scale.set(1.4, 1.4, 1.4); }, 30);
-
-        // 3. 真实 AOE 伤害：每 10 帧检测一次周围敌人
-        if (this.spinTimer % 10 === 0) {
-            this.executeAOE(enemies, {
-                radius: 2.5,
-                angle: Math.PI * 2, // 全圆攻击
-                damage: this.attackDamage,
-                knockbackForce: 0.07 // 设为 0.07
-            });
-        }
+            vfx.rotation.y += 0.6;
+            bladeMat.opacity = 0.8 * (1 - elapsed / duration);
+            requestAnimationFrame(animate);
+        };
+        animate();
     }
 }
 
