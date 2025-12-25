@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { spriteFactory } from '../core/SpriteFactory.js';
 import { worldManager } from '../core/WorldManager.js';
+import { timeManager } from '../core/TimeManager.js';
 
 /**
  * 大世界物体的基类
@@ -67,6 +68,13 @@ export class WorldObject {
             scene.remove(this.mesh);
         }
     }
+
+    /**
+     * 获取浮动框信息
+     */
+    getTooltipData() {
+        return null; // 默认不显示
+    }
 }
 
 /**
@@ -105,6 +113,20 @@ export class PickupObject extends WorldObject {
         this.removeFromScene(worldScene.scene);
         return true; // 表示已移除
     }
+
+    getTooltipData() {
+        const names = {
+            'gold_pile': '金币堆',
+            'chest': '宝箱',
+            'wood_small': '散落的木材',
+            'wood_large': '大堆木材'
+        };
+        return {
+            name: names[this.pickupType] || '未知物品',
+            level: '类别',
+            maxLevel: '可收集资源'
+        };
+    }
 }
 
 /**
@@ -126,9 +148,44 @@ export class EnemyGroupObject extends WorldObject {
 
     onInteract(worldScene) {
         worldManager.mapState.pendingBattleEnemyId = this.id;
-        window.dispatchEvent(new CustomEvent('start-battle', { detail: this.config }));
+        
+        // 克隆配置并应用随时间增长的战力缩放
+        const scaledConfig = {
+            ...this.config,
+            totalPoints: Math.floor((this.config.totalPoints || 0) * timeManager.getPowerMultiplier())
+        };
+
+        window.dispatchEvent(new CustomEvent('start-battle', { detail: scaledConfig }));
         worldScene.stop();
         return false; // 不直接移除，战斗结束后再处理
+    }
+
+    getTooltipData() {
+        const template = worldManager.enemyTemplates[this.templateId || 'bandits'];
+        const scaledPoints = Math.floor((this.config.totalPoints || 0) * timeManager.getPowerMultiplier());
+        const playerPower = worldManager.getPlayerTotalPower();
+        
+        let difficulty = '地狱';
+        let color = '#ff0000';
+        
+        const ratio = playerPower / scaledPoints;
+        if (ratio >= 2.0) {
+            difficulty = '简单';
+            color = '#00ff00';
+        } else if (ratio >= 1.0) {
+            difficulty = '普通';
+            color = '#ffff00';
+        } else if (ratio >= 0.6) {
+            difficulty = '困难';
+            color = '#ffaa00';
+        }
+
+        return {
+            name: template ? template.name : '未知敌人',
+            level: '预计难度',
+            maxLevel: difficulty,
+            color: color
+        };
     }
 }
 
@@ -153,9 +210,35 @@ export class CityObject extends WorldObject {
     }
 
     onInteract(worldScene) {
-        if (worldScene.activeCityId !== this.id) {
-            worldScene.openTownManagement(this.id);
-            worldScene.activeCityId = this.id;
+        const cityData = worldManager.cities[this.id];
+        if (!cityData) return false;
+
+        if (cityData.owner === 'player') {
+            if (worldScene.activeCityId !== this.id) {
+                worldScene.openTownManagement(this.id);
+                worldScene.activeCityId = this.id;
+            }
+        } else {
+            // 敌方势力主城：触发攻城战
+            const faction = worldManager.factions[cityData.owner];
+            const heroInfo = worldManager.availableHeroes[faction?.heroId];
+            
+            worldManager.showNotification(`正在对 ${cityData.name} 发起攻城战！`);
+            worldManager.mapState.pendingBattleEnemyId = this.id;
+
+            // 攻城战配置：极高战力，且兵种池固定为该门派
+            const siegeConfig = {
+                name: `${cityData.name} 守军`,
+                // 根据主城类型动态获取兵种池，如果没有则兜底
+                unitPool: faction?.heroId === 'qijin' ? ['chunyang', 'ranged'] : ['tiance', 'melee'],
+                // 暂时逻辑：如果目标是 qijin，难度设为极低 (5点)；否则保持高难度
+                totalPoints: faction?.heroId === 'qijin' ? 5 : Math.floor(200 * timeManager.getPowerMultiplier()), 
+                isCitySiege: true, // 标记为攻城战
+                cityId: this.id
+            };
+
+            window.dispatchEvent(new CustomEvent('start-battle', { detail: siegeConfig }));
+            worldScene.stop();
         }
         return false;
     }
@@ -164,6 +247,26 @@ export class CityObject extends WorldObject {
         if (worldScene.activeCityId === this.id) {
             worldScene.closeTownManagement();
         }
+    }
+
+    getTooltipData() {
+        const cityData = worldManager.cities[this.id];
+        const owner = cityData ? cityData.owner : 'unknown';
+        const factionColor = worldManager.getFactionColor(owner);
+        
+        let ownerName = '未知势力';
+        if (owner === 'player') {
+            ownerName = '你的领地';
+        } else if (worldManager.factions[owner]) {
+            ownerName = worldManager.factions[owner].name;
+        }
+
+        return {
+            name: cityData ? cityData.name : '城镇',
+            level: '归属势力',
+            maxLevel: ownerName,
+            color: factionColor
+        };
     }
 }
 
@@ -195,6 +298,21 @@ export class CapturedBuildingObject extends WorldObject {
             mesh: this.mesh
         });
         return false;
+    }
+
+    getTooltipData() {
+        const owner = this.config.owner || 'none';
+        const ownerFaction = worldManager.factions[owner];
+        const ownerName = owner === 'none' ? '无人占领' : (ownerFaction ? ownerFaction.name : '未知势力');
+        const factionColor = (owner === 'none') ? '#888888' : worldManager.getFactionColor(owner);
+        const typeName = this.buildingType === 'gold_mine' ? '金矿' : '锯木厂';
+        
+        return {
+            name: typeName,
+            level: '当前归属',
+            maxLevel: ownerName,
+            color: factionColor
+        };
     }
 }
 

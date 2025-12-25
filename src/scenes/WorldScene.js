@@ -30,6 +30,11 @@ export class WorldScene {
         this.activeCityId = null;        
         this.floatingStack = 0;          
         
+        // 悬浮检测
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        this.hoveredObject = null;
+
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
     }
@@ -41,6 +46,9 @@ export class WorldScene {
     init(heroId) {
         this.heroId = heroId;
         this.isActive = true; 
+
+        // 同步英雄 ID 到数据管家，确保后续势力生成能正确匹配
+        worldManager.heroData.id = heroId;
 
         // 1. 显示主世界 UI 容器
         const hud = document.getElementById('world-ui');
@@ -59,9 +67,30 @@ export class WorldScene {
         this.camera.position.set(this.playerHero.position.x, 15, this.playerHero.position.z + 12);
         this.camera.lookAt(this.playerHero.position);
 
-        this.setupLights();
         this.initUI();
         
+        // --- 核心改动：监听势力怪物清除事件 ---
+        window.removeEventListener('sect-monsters-cleared', this._onSectMonstersCleared);
+        this._onSectMonstersCleared = (e) => {
+            const { templateIds } = e.detail;
+            // 找到所有属于这些模板的交互对象并移除 Mesh
+            const toRemoveIndices = [];
+            this.interactables.forEach((item, index) => {
+                if (item.templateId && templateIds.includes(item.templateId)) {
+                    item.removeFromScene(this.scene);
+                    toRemoveIndices.push(index);
+                }
+            });
+            // 从交互列表中剔除
+            for (let i = toRemoveIndices.length - 1; i >= 0; i--) {
+                this.interactables.splice(toRemoveIndices[i], 1);
+            }
+            console.log(`%c[视觉更新] 已清除地图上属于该势力的 ${toRemoveIndices.length} 个野怪点`, "color: #44aa44");
+        };
+        window.addEventListener('sect-monsters-cleared', this._onSectMonstersCleared);
+
+        // --- 英雄大世界属性应用 ---
+        // 应用来自 modifierManager 的大世界移动速度修正 (如李承恩天赋)
         const bonus = modifierManager.getModifiedValue({ side: 'player', type: 'hero' }, 'world_speed', 1.0);
         this.moveSpeed *= bonus;
 
@@ -91,21 +120,8 @@ export class WorldScene {
     initUI() {
         console.log("%c[UI] 正在初始化大世界 UI 监听器...", "color: #44aa44");
         
-        // 基础信息初始化
-        const cityData = worldManager.cities['main_city_1'];
-        if (!cityData) {
-            console.error("[UI] 找不到主城数据 'main_city_1'");
-            return;
-        }
-        
-        const cityDisplayName = document.getElementById('world-city-display-name');
-        if (cityDisplayName) cityDisplayName.innerText = cityData.name;
-
-        const cityPortrait = document.getElementById('world-city-portrait');
-        if (cityPortrait) {
-            const iconStyle = spriteFactory.getIconStyle(cityData.getIconKey());
-            Object.assign(cityPortrait.style, iconStyle);
-        }
+        // 初始刷新一次 HUD (包含所有城市)
+        this.refreshWorldHUD();
 
         // 按钮点击事件
         const closeBtn = document.getElementById('close-town-panel');
@@ -116,22 +132,6 @@ export class WorldScene {
                     worldManager.mapState.interactionLocks.add(this.activeCityId);
                 }
                 this.closeTownManagement(); // 无论是否有 ID，强制执行关闭 UI 逻辑
-            };
-        }
-
-        const miniCard = document.getElementById('city-mini-card');
-        if (miniCard) {
-            miniCard.onclick = () => {
-                console.log("[UI] 点击左下角城镇头像");
-                this.openTownManagement('main_city_1');
-            };
-        }
-
-        const heroMiniCard = document.getElementById('hero-mini-card');
-        if (heroMiniCard) {
-            heroMiniCard.onclick = () => {
-                console.log("[UI] 点击左下角英雄头像");
-                this.openHeroStats();
             };
         }
 
@@ -340,6 +340,11 @@ export class WorldScene {
         this.tooltipDesc = this.tooltip.querySelector('.tooltip-desc');
 
         window.addEventListener('mousemove', (e) => {
+            // 1. 更新鼠标归一化坐标用于 Raycaster
+            this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            // 2. 更新浮动框位置
             if (!this.tooltip.classList.contains('hidden')) {
                 const x = e.clientX + 15;
                 const y = e.clientY + 15;
@@ -352,15 +357,82 @@ export class WorldScene {
                 this.tooltip.style.left = `${finalX}px`;
                 this.tooltip.style.top = `${finalY}px`;
             }
+
+            // 3. 执行射线检测
+            this.updateHover();
         });
+    }
+
+    updateHover() {
+        if (!this.isActive) return;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        
+        // 过滤出有 mesh 的交互物体
+        const objectsToIntersect = this.interactables
+            .filter(item => item.mesh)
+            .map(item => item.mesh);
+            
+        const intersects = this.raycaster.intersectObjects(objectsToIntersect, false);
+
+        if (intersects.length > 0) {
+            const hitMesh = intersects[0].object;
+            // 找到对应的 WorldObject
+            const hitObj = this.interactables.find(item => item.mesh === hitMesh);
+            
+            if (hitObj && hitObj !== this.hoveredObject) {
+                const tooltipData = hitObj.getTooltipData();
+                if (tooltipData) {
+                    this.showTooltip(tooltipData);
+                    this.hoveredObject = hitObj;
+                } else {
+                    this.hideTooltip();
+                    this.hoveredObject = null;
+                }
+            }
+        } else {
+            if (this.hoveredObject) {
+                this.hideTooltip();
+                this.hoveredObject = null;
+            }
+        }
     }
 
     showTooltip(data) {
         if (!this.tooltip) return;
         this.tooltipTitle.innerText = data.name;
-        this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
-        this.tooltipEffect.innerText = `● ${data.effect}`;
-        this.tooltipDesc.innerText = data.description;
+        
+        if (data.level !== undefined && data.maxLevel !== undefined) {
+            this.tooltipLevel.innerText = (typeof data.level === 'number') 
+                ? `当前等级: ${data.level} / ${data.maxLevel}`
+                : `${data.level} : ${data.maxLevel}`;
+            
+            // 如果提供了颜色，则应用，否则恢复默认白色
+            if (data.color) {
+                this.tooltipLevel.style.color = data.color;
+            } else {
+                this.tooltipLevel.style.color = '#ffffff';
+            }
+            
+            this.tooltipLevel.classList.remove('hidden');
+        } else {
+            this.tooltipLevel.classList.add('hidden');
+        }
+
+        if (data.effect) {
+            this.tooltipEffect.innerText = `● ${data.effect}`;
+            this.tooltipEffect.classList.remove('hidden');
+        } else {
+            this.tooltipEffect.classList.add('hidden');
+        }
+
+        if (data.description) {
+            this.tooltipDesc.innerText = data.description;
+            this.tooltipDesc.classList.remove('hidden');
+        } else {
+            this.tooltipDesc.classList.add('hidden');
+        }
+
         this.tooltip.classList.remove('hidden');
     }
 
@@ -805,18 +877,87 @@ export class WorldScene {
         console.log(`%c[战斗结束] 结果: ${result.winner}, 目标: ${enemyId}`, "color: #ffaa00");
 
         if (result && result.winner === 'player') {
-            // 赢了：移除怪物
-            worldManager.removeEntity(enemyId);
-            const item = this.interactables.find(i => i.id === enemyId);
-            if (item) this.scene.remove(item.mesh);
-            this.interactables = this.interactables.filter(i => i.id !== enemyId);
-            // 赢了不需要锁定，因为怪已经没了
+            // 检查是否是城镇
+            const cityData = worldManager.cities[enemyId];
+            if (cityData) {
+                // 攻城战胜利
+                worldManager.captureCity(enemyId);
+                // 刷新 HUD 以显示新占领的城市
+                this.refreshWorldHUD();
+            } else {
+                // 普通野怪胜利：移除怪物
+                worldManager.removeEntity(enemyId);
+                const item = this.interactables.find(i => i.id === enemyId);
+                if (item) this.scene.remove(item.mesh);
+                this.interactables = this.interactables.filter(i => i.id !== enemyId);
+            }
         } else {
-            // 输了或逃了：锁定怪物，防止连续触发
+            // 输了或逃了：锁定怪物/城镇，防止连续触发
             ms.interactionLocks.add(enemyId);
         }
         
         ms.pendingBattleEnemyId = null; 
+    }
+
+    /**
+     * 动态刷新左下角 HUD (支持多个城市)
+     */
+    refreshWorldHUD() {
+        const container = document.getElementById('world-hud-bottom-left');
+        if (!container) return;
+
+        // 清空现有内容
+        container.innerHTML = '';
+
+        // 1. 获取所有属于玩家的城市
+        const playerCities = Object.values(worldManager.cities).filter(c => c.owner === 'player');
+
+        // 2. 为每个城市创建一个卡片
+        playerCities.forEach(city => {
+            const cityCard = document.createElement('div');
+            cityCard.className = 'hud-card hud-card-city';
+            cityCard.id = `card-city-${city.id}`;
+            
+            const iconStyle = spriteFactory.getIconStyle(city.getIconKey());
+            
+            cityCard.innerHTML = `
+                <div class="hud-portrait" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                <div class="hud-info">
+                    <span class="hud-name">${city.name}</span>
+                    <span class="hud-sub">${city.id === 'main_city_1' ? '大本营' : '占领据点'}</span>
+                </div>
+            `;
+
+            cityCard.onclick = () => {
+                this.openTownManagement(city.id);
+            };
+
+            container.appendChild(cityCard);
+        });
+
+        // 3. 添加英雄卡片 (始终在最后)
+        const heroData = worldManager.heroData;
+        const heroIconStyle = spriteFactory.getIconStyle(heroData.id);
+        
+        const heroCard = document.createElement('div');
+        heroCard.className = 'hud-card hud-card-hero';
+        heroCard.id = 'hero-mini-card';
+        
+        heroCard.innerHTML = `
+            <div class="hud-portrait" id="world-hero-portrait" style="background-image: ${heroIconStyle.backgroundImage}; background-position: ${heroIconStyle.backgroundPosition}; background-size: ${heroIconStyle.backgroundSize};"></div>
+            <div class="hud-info">
+                <div class="hud-mini-bars">
+                    <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp" style="width: ${(heroData.hpCurrent/heroData.hpMax)*100}%"></div></div>
+                    <div class="mini-bar-bg"><div id="hud-hero-mp-bar" class="mini-bar-fill mp" style="width: ${(heroData.mpCurrent/heroData.mpMax)*100}%"></div></div>
+                </div>
+            </div>
+        `;
+
+        heroCard.onclick = () => {
+            this.openHeroStats();
+        };
+
+        container.appendChild(heroCard);
     }
 
     checkInteractions() {
@@ -996,13 +1137,27 @@ export class WorldScene {
                 if (shouldShow) {
                     const pos = worldToMinimap(item.mesh.position.x, item.mesh.position.z);
                     if (pos.x >= 0 && pos.x <= displaySize && pos.y >= 0 && pos.y <= displaySize) {
-                        ctx.fillStyle = (item.type === 'city') ? '#ffcc00' : '#00ffff';
-                        ctx.beginPath();
-                        ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
-                        ctx.fill();
                         ctx.strokeStyle = 'black';
                         ctx.lineWidth = 1;
-                        ctx.stroke();
+
+                        if (item.type === 'city') {
+                            const cityData = worldManager.cities[item.id];
+                            const factionColor = worldManager.getFactionColor(cityData?.owner);
+                            
+                            // 主城：正方形
+                            ctx.fillStyle = factionColor;
+                            ctx.fillRect(pos.x - 4, pos.y - 4, 8, 8);
+                            ctx.strokeRect(pos.x - 4, pos.y - 4, 8, 8);
+                        } else if (item.type === 'captured_building') {
+                            // 资源建筑：圆形
+                            const owner = item.config?.owner || 'none';
+                            ctx.fillStyle = (owner === 'none') ? '#888888' : worldManager.getFactionColor(owner);
+                            
+                            ctx.beginPath();
+                            ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.stroke();
+                        }
                     }
                 }
             }

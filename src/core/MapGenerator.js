@@ -110,7 +110,9 @@ export class MapGenerator {
                 const nx = gridX + dx;
                 const nz = gridZ + dz;
                 if (nx < 0 || nx >= this.size || nz < 0 || nz >= this.size) return false;
-                if (this.grid[nz][nx] !== TILE_TYPES.GRASS) return false;
+                const type = this.grid[nz][nx];
+                // 允许在普通草地和聚落平原（POI）上生成物体
+                if (type !== TILE_TYPES.GRASS && type !== TILE_TYPES.POI) return false;
             }
         }
         return true;

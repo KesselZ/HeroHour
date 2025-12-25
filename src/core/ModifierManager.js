@@ -16,11 +16,10 @@ class ModifierManager {
     addGlobalModifier(mod) {
         // 防止重复添加同一个 ID 的修正器
         if (this.globalModifiers.find(m => m.id === mod.id)) {
-            console.warn(`Modifier with id ${mod.id} already exists.`);
-            return;
+            // 如果 ID 相同，通常是更新逻辑，先移除旧的
+            this.removeModifier(mod.id);
         }
         this.globalModifiers.push(mod);
-        console.log(`%c[属性加成] %c已应用: ${mod.id}`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
     }
 
     /**

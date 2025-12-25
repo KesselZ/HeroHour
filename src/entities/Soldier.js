@@ -40,7 +40,8 @@ export class BaseUnit extends THREE.Group {
         this.attackRange = modifierManager.getModifiedValue(this, 'range', attackRange);
         this.attackDamage = modifierManager.getModifiedValue(this, 'damage', attackDamage);
         
-        this.attackCooldownTime = attackSpeed;
+        // 核心改动：攻击频率修正 (攻击间隔的倒数即频率，增加频率等于减小间隔)
+        this.attackCooldownTime = modifierManager.getModifiedValue(this, 'attack_speed', attackSpeed);
         
         this.isDead = false;
         this.target = null;

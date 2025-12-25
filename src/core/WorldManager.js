@@ -4,11 +4,14 @@ import { modifierManager } from './ModifierManager.js';
  * 城镇类：管理单个城镇的属性和逻辑
  */
 class City {
-    constructor(id, name, type = 'main_city') {
+    constructor(id, name, owner = 'player', type = 'main_city') {
         this.id = id;
         this.name = name;
+        this.owner = owner; // 'player' or 'ai_faction_id'
         this.type = type; // 决定图标
         this.level = 1;
+        this.x = 0; // 初始化位置
+        this.z = 0;
         
         // 建筑分类与效果定义预留
         this.buildings = {
@@ -148,10 +151,19 @@ class City {
  */
 class WorldManager {
     constructor() {
-        // 1. 基础资源 (仅保留金钱和木材)
+        // 0. 势力定义
+        this.availableHeroes = {
+            'qijin': { name: '祁进', title: '紫虚子', icon: 'qijin', sect: 'chunyang', color: '#44ccff' }, // 浅蓝色
+            'lichengen': { name: '李承恩', title: '天策府统领', icon: 'lichengen', sect: 'tiance', color: '#ff4444' }, // 红色
+            'yeying': { name: '叶英', title: '藏剑大庄主', icon: 'cangjian', sect: 'cangjian', color: '#ffcc00' } // 黄色
+        };
+
+        this.factions = {}; // 记录所有势力数据 { factionId: { heroId, cities: [], army: {} } }
+
+        // 1. 基础资源 (初始资源调低，增加探索动力)
         this.resources = {
-            gold: 10000,
-            wood: 2000
+            gold: 1000,
+            wood: 500
         };
 
         // 2. 英雄数据 (持久化状态)
@@ -179,8 +191,8 @@ class WorldManager {
         };
 
         this.heroArmy = {
-            'melee': 50,
-            'ranged': 20,
+            'melee': 10,
+            'ranged': 5,
             'tiance': 0,
             'chunyang': 0,
             'cangjian': 0,
@@ -211,64 +223,173 @@ class WorldManager {
 
         // 6. 兵种价格定义
         this.unitCosts = {
-            'melee': { gold: 50 },
-            'ranged': { gold: 80 },
-            'tiance': { gold: 200 },
-            'chunyang': { gold: 150 },
-            'cangjian': { gold: 180 },
-            'cangyun': { gold: 160 },
-            'archer': { gold: 100 },
-            'healer': { gold: 120 },
+            'melee': { gold: 50, cost: 2 },
+            'ranged': { gold: 80, cost: 2 },
+            'tiance': { gold: 200, cost: 8 },
+            'chunyang': { gold: 150, cost: 5 },
+            'cangjian': { gold: 180, cost: 6 },
+            'cangyun': { gold: 160, cost: 7 },
+            'archer': { gold: 100, cost: 3 },
+            'healer': { gold: 120, cost: 4 },
             // 野外单位价格定义 (用于战力平衡计算)
-            'wild_boar': { gold: 40 },
-            'wolf': { gold: 40 },
-            'tiger': { gold: 120 },
-            'bear': { gold: 150 },
-            'bandit': { gold: 45 },
-            'bandit_archer': { gold: 60 },
-            'rebel_soldier': { gold: 70 },
-            'rebel_axeman': { gold: 75 },
-            'snake': { gold: 20 },
-            'bats': { gold: 15 },
-            'deer': { gold: 10 },
-            'pheasant': { gold: 5 },
-            'assassin_monk': { gold: 130 },
-            'zombie': { gold: 100 },
-            'heavy_knight': { gold: 250 },
-            'shadow_ninja': { gold: 180 }
+            'wild_boar': { gold: 40, cost: 2 },
+            'wolf': { gold: 40, cost: 2 },
+            'tiger': { gold: 120, cost: 5 },
+            'bear': { gold: 150, cost: 6 },
+            'bandit': { gold: 45, cost: 2 },
+            'bandit_archer': { gold: 60, cost: 3 },
+            'rebel_soldier': { gold: 70, cost: 3 },
+            'rebel_axeman': { gold: 75, cost: 3 },
+            'snake': { gold: 20, cost: 1 },
+            'bats': { gold: 15, cost: 1 },
+            'deer': { gold: 10, cost: 1 },
+            'pheasant': { gold: 5, cost: 1 },
+            'assassin_monk': { gold: 130, cost: 5 },
+            'zombie': { gold: 100, cost: 4 },
+            'heavy_knight': { gold: 250, cost: 8 },
+            'shadow_ninja': { gold: 180, cost: 7 }
         };
 
-        // 5. 敌人组模板定义 (局外单位 -> 局内兵力映射)
+        // 5. 敌人组模板定义 (数据驱动模式)
         this.enemyTemplates = {
             'wild_animals': {
                 name: '野兽群',
                 overworldIcon: 'tiger', 
                 unitPool: ['wild_boar', 'wolf', 'tiger', 'bear', 'snake', 'bats'], 
-                pointRange: [40, 150],        
+                basePoints: 10,        
+                baseWeight: 100,
+                isBasic: true, // 基础怪，全图可见
                 description: '一群凶猛的野兽，虽然没有战术，但成群结队极其危险。'
             },
             'rebels': {
                 name: '狼牙叛军',
                 overworldIcon: 'rebel_soldier', 
                 unitPool: ['rebel_soldier', 'rebel_axeman', 'bandit_archer', 'heavy_knight'],
-                pointRange: [100, 300],
+                basePoints: 35,
+                baseWeight: 40,
                 description: '训练有素的叛军正规军，拥有重甲兵和攻坚手。'
             },
             'bandits': {
                 name: '山贼草寇',
                 overworldIcon: 'bandit',
                 unitPool: ['bandit', 'bandit_archer', 'snake'],
-                pointRange: [50, 120],
+                basePoints: 20,
+                baseWeight: 60,
+                isBasic: true, // 基础怪
                 description: '在林间打劫的流窜山贼，人数众多。'
             },
             'shadow_sect': {
                 name: '影之教派',
                 overworldIcon: 'shadow_ninja', 
                 unitPool: ['shadow_ninja', 'assassin_monk', 'zombie'],
-                pointRange: [150, 400],
+                basePoints: 60,
+                baseWeight: 20,
                 description: '神秘的影之组织，成员全是顶尖刺客和诡异的毒尸。'
+            },
+            'chunyang_changge': {
+                name: '纯阳长歌众',
+                overworldIcon: 'qijin', 
+                unitPool: ['chunyang', 'ranged'],
+                basePoints: 45,
+                baseWeight: 0, // 核心逻辑：全图基础权重为0，仅在势力范围生成
+                sectHero: 'qijin', // 绑定英雄
+                description: '纯阳与长歌的弟子结伴而行，攻守兼备。'
+            },
+            'tiance_disciples_group': {
+                name: '天策弟子',
+                overworldIcon: 'melee', 
+                unitPool: ['tiance', 'melee'],
+                basePoints: 45,
+                baseWeight: 0, // 核心逻辑：基础权重为0
+                sectHero: 'lichengen', // 绑定英雄
+                description: '天策府的精锐小队，包含强悍的骑兵和坚韧的步兵。'
+            },
+            'cangjian_disciples_group': {
+                name: '藏剑弟子',
+                overworldIcon: 'cangjian', 
+                unitPool: ['cangjian', 'melee'],
+                basePoints: 45,
+                baseWeight: 0,
+                sectHero: 'yeying', // 绑定英雄
+                description: '西子湖畔藏剑山庄的弟子，擅长剑法。'
             }
         };
+    }
+
+    /**
+     * 工业级动态权重系统：完全基于地理生态的敌人生成
+     */
+    getDynamicEnemyType(worldX, worldZ) {
+        const playerHeroId = this.heroData.id;
+        const distToPlayer = Math.sqrt(Math.pow(worldX - this.mapState.playerPos.x, 2) + Math.pow(worldZ - this.mapState.playerPos.z, 2));
+        
+        const tempWeights = {};
+        let sumBaseWeights = 0;
+
+        // --- 1. 计算环境基础权重 ---
+        for (const [id, template] of Object.entries(this.enemyTemplates)) {
+            let w = template.baseWeight || 0;
+            if (w <= 0 && !template.sectHero) continue; // 排除无权重的非门派单位
+
+            // 新手村平滑保护 (仅影响 70m 内)
+            if (distToPlayer < 70) {
+                const protectionFactor = distToPlayer / 70;
+                if (template.isBasic) {
+                    w *= (1 + (1 - protectionFactor) * 4); // 简单怪权重提升
+                } else {
+                    w *= protectionFactor; // 强力怪权重衰减
+                }
+            }
+            
+            tempWeights[id] = w;
+            sumBaseWeights += w;
+        }
+
+        // --- 2. 注入势力地理权重 (平滑激活门派兵) ---
+        Object.values(this.cities).forEach(city => {
+            const distToCity = Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2));
+            if (distToCity >= 70) return;
+
+            const faction = this.factions[city.owner];
+            if (!faction || faction.heroId === playerHeroId) return;
+
+            const falloff = 1 - (distToCity / 70); // 1.0(中心) -> 0.0(边缘)
+            
+            // 查找所有匹配该城市英雄的模板
+            for (const [id, template] of Object.entries(this.enemyTemplates)) {
+                if (template.sectHero === faction.heroId) {
+                    // 动态注入权重：在中心处占比 80% (即其他总分的 4 倍)
+                    const bonus = (sumBaseWeights * 4) * falloff;
+                    tempWeights[id] = (tempWeights[id] || 0) + bonus;
+                }
+            }
+
+            // 敌对城市周围的基础威胁度加成
+            if (city.owner !== 'player') {
+                ['rebels', 'shadow_sect'].forEach(id => {
+                    if (tempWeights[id]) tempWeights[id] *= (1 + falloff * 2);
+                });
+            }
+        });
+
+        return this.weightedRandomSelect(tempWeights);
+    }
+
+    /**
+     * 通用的加权随机选择算法
+     */
+    weightedRandomSelect(weights) {
+        const entries = Object.entries(weights);
+        if (entries.length === 0) return 'bandits'; // 兜底
+
+        const totalWeight = entries.reduce((sum, [_, w]) => sum + w, 0);
+        let random = Math.random() * totalWeight;
+
+        for (const [id, weight] of entries) {
+            if (random < weight) return id;
+            random -= weight;
+        }
+        return entries[0][0];
     }
 
     /**
@@ -302,8 +423,10 @@ class WorldManager {
         // 1. 城镇产出
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
-            totalGoldGain += city.production.gold;
-            totalWoodGain += city.production.wood;
+            if (city.owner === 'player') {
+                totalGoldGain += city.production.gold;
+                totalWoodGain += city.production.wood;
+            }
         }
 
         // 2. 占领建筑产出
@@ -362,55 +485,142 @@ class WorldManager {
 
         console.log("%c[系统] 正在生成全新的江湖地图...", "color: #5b8a8a; font-weight: bold");
         
-        const size = 400; // 增加边缘屏障后的总尺寸 (300 内部 + 50*2 边缘)
+        const size = 400; 
         const grid = generator.generate(size);
         const entities = [];
-
-        // 逻辑填充逻辑移动到这里 (数据生成)
         const halfSize = size / 2;
+
+        // --- 1. 势力初始化逻辑 ---
+        const playerHeroId = this.heroData.id;
+        const playerHeroInfo = this.availableHeroes[playerHeroId] || { name: '未知侠客' };
         
-        // 5. 确定玩家初始出生点 (选择最大的 POI 之一)
-        let playerSpawnX = -10;
-        let playerSpawnZ = -10;
+        // 初始化玩家势力
+        this.factions['player'] = {
+            id: 'player',
+            name: playerHeroInfo.name, // 直接使用人名
+            heroId: playerHeroId,
+            isPlayer: true,
+            cities: ['main_city_1']
+        };
+
+        // 识别潜在对手 (排除玩家选中的)
+        const opponentPool = Object.keys(this.availableHeroes).filter(id => id !== playerHeroId);
         
-        if (generator.pois && generator.pois.length > 0) {
-            // 选择打分最高的聚落作为出生点
-            const startPoi = generator.pois[0]; 
-            playerSpawnX = startPoi.x - halfSize;
-            playerSpawnZ = startPoi.z - halfSize;
+        // 随机选择两个对手
+        const shuffledPool = [...opponentPool].sort(() => Math.random() - 0.5);
+        const aiHeroes = shuffledPool.slice(0, 2);
+
+        aiHeroes.forEach((aiHeroId, index) => {
+            const aiHeroInfo = this.availableHeroes[aiHeroId];
+            const factionId = `ai_faction_${index + 1}`;
+            const cityId = `ai_city_${index + 1}`;
+
+            this.factions[factionId] = {
+                id: factionId,
+                name: aiHeroInfo.name,
+                heroId: aiHeroId,
+                isPlayer: false,
+                cities: [cityId]
+            };
+
+            const aiCity = new City(cityId, `${aiHeroInfo.name}的据点`, factionId);
+            // 稍后在 POI 逻辑中分配位置
+            this.cities[cityId] = aiCity;
+        });
+
+        // --- 2. 放置主城逻辑 ---
+        if (generator.pois && generator.pois.length >= 3) {
+            // 玩家出生点 (第一个 POI)
+            const playerPoi = generator.pois[0];
+            const px = playerPoi.x - halfSize;
+            const pz = playerPoi.z - halfSize;
+            this.mapState.playerPos = { x: px, z: pz };
             
-            // 记录初始位置
-            this.mapState.playerPos = { x: playerSpawnX, z: playerSpawnZ };
+            const pCity = this.cities['main_city_1'];
+            pCity.name = "新手村"; 
+            pCity.x = px;
+            pCity.z = pz;
             
-            // 在出生点放置主城
-            this.cities['main_city_1'].name = "新手村"; 
             entities.push({ 
                 id: 'main_city_1', 
                 type: 'city', 
-                x: playerSpawnX, 
-                z: playerSpawnZ 
+                x: px, 
+                z: pz 
+            });
+
+            // AI 出生点 (分配给选中的 AI)
+            aiHeroes.forEach((aiHeroId, index) => {
+                const factionId = `ai_faction_${index + 1}`;
+                const cityId = `ai_city_${index + 1}`;
+                
+                // 选取最后的 POI 倒着排
+                const aiPoi = generator.pois[generator.pois.length - 1 - index];
+                const ax = aiPoi.x - halfSize;
+                const az = aiPoi.z - halfSize;
+                
+                const aiCity = this.cities[cityId];
+                aiCity.x = ax;
+                aiCity.z = az;
+
+                entities.push({ 
+                    id: cityId, 
+                    type: 'city', 
+                    x: ax, 
+                    z: az 
+                });
             });
         }
 
+        // --- 3. 随机实体生成 ---
+        const playerSpawnX = this.mapState.playerPos.x;
+        const playerSpawnZ = this.mapState.playerPos.z;
+
+        // 新增：使用占据图来确保物体不紧贴
+        const occupied = new Uint8Array(size * size); 
+
         for (let z = 0; z < size; z++) {
             for (let x = 0; x < size; x++) {
-                // 使用新的安全判定，确保物品不会生成在山脚或水边
                 if (!generator.isSafeGrass(x, z)) continue;
+
+                // 检查相邻格子是否已有物体 (相邻 8 格)
+                let hasAdjacent = false;
+                for (let dz = -1; dz <= 1; dz++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dz === 0) continue;
+                        const nx = x + dx;
+                        const nz = z + dz;
+                        if (nx >= 0 && nx < size && nz >= 0 && nz < size) {
+                            if (occupied[nz * size + nx]) {
+                                hasAdjacent = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (hasAdjacent) break;
+                }
+                if (hasAdjacent) continue;
 
                 const worldX = x - halfSize;
                 const worldZ = z - halfSize;
 
-                // 避开出生点周围，防止资源堆在城门口
-                const distToStart = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
-                if (distToStart < 15) continue;
+                // 避开玩家和 AI 出生点
+                const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
+                const aiCity = this.cities['ai_city_1'];
+                const distToAI = aiCity ? Math.sqrt(Math.pow(worldX - aiCity.x, 2) + Math.pow(worldZ - aiCity.z, 2)) : 100;
+
+                if (distToPlayer < 10 || distToAI < 10) continue;
 
                 const roll = Math.random();
+                let placed = false;
                 if (roll < 0.002) {
                     entities.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
+                    placed = true;
                 } else if (roll < 0.003) {
                     entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
+                    placed = true;
                 } else if (roll < 0.004) {
-                    entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_small', x: worldX, z: worldZ });
+                    entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'wood_small', x: worldX, z: worldZ });
+                    placed = true;
                 } else if (roll < 0.005) {
                     const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
                     const sKey = bType === 'gold_mine' ? 'gold_mine_world' : 'sawmill_world';
@@ -422,11 +632,16 @@ class WorldManager {
                         x: worldX, z: worldZ,
                         config: { owner: 'none', type: bType }
                     });
+                    placed = true;
                 } else if (roll < 0.012) {
-                    const templateIds = Object.keys(this.enemyTemplates);
-                    const tId = templateIds[Math.floor(Math.random() * templateIds.length)];
+                    // --- 核心优化：使用动态权重系统选择敌人类型 ---
+                    const tId = this.getDynamicEnemyType(worldX, worldZ);
                     const template = this.enemyTemplates[tId];
-                    const points = Math.floor(Math.random() * (template.pointRange[1] - template.pointRange[0] + 1)) + template.pointRange[0];
+                    
+                    // 统一计算逻辑：基础战力 + 正负 15% 的随机波动
+                    const variance = 0.15;
+                    const randomFactor = 1 + (Math.random() * variance * 2 - variance);
+                    const points = Math.max(1, Math.floor(template.basePoints * randomFactor));
                     
                     entities.push({ 
                         id: `enemy_${x}_${z}`, 
@@ -439,10 +654,17 @@ class WorldManager {
                             totalPoints: points
                         }
                     });
+                    placed = true;
                 } else if (roll < 0.015) {
                     entities.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
+                    placed = true;
                 } else if (roll < 0.017) {
                     entities.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
+                    placed = true;
+                }
+
+                if (placed) {
+                    occupied[z * size + x] = 1;
                 }
             }
         }
@@ -458,6 +680,111 @@ class WorldManager {
         this.mapState.exploredMap = new Uint8Array(size * size);
 
         return this.mapState;
+    }
+
+    /**
+     * 处理攻城战胜利后的城市占领
+     * @param {string} cityId 
+     */
+    captureCity(cityId) {
+        const city = this.cities[cityId];
+        if (!city) return;
+
+        const oldOwner = city.owner;
+        const oldFaction = this.factions[oldOwner];
+        const oldHeroId = oldFaction ? oldFaction.heroId : null;
+
+        city.owner = 'player';
+        
+        // 更新势力的城市列表
+        if (oldFaction) {
+            oldFaction.cities = oldFaction.cities.filter(id => id !== cityId);
+        }
+        
+        if (!this.factions['player'].cities.includes(cityId)) {
+            this.factions['player'].cities.push(cityId);
+        }
+
+        // --- 核心改动 1：移除地图上对应门派的弟子野怪 ---
+        if (oldHeroId) {
+            // 找到所有绑定到该英雄的敌人模板 ID
+            const templateIdsToRemove = Object.entries(this.enemyTemplates)
+                .filter(([_, t]) => t.sectHero === oldHeroId)
+                .map(([id, _]) => id);
+
+            this.mapState.entities.forEach(entity => {
+                if (entity.type === 'enemy_group' && templateIdsToRemove.includes(entity.templateId)) {
+                    entity.isRemoved = true; // 标记为逻辑移除
+                }
+            });
+            
+            // 派发事件让场景层立即清除对应 Mesh
+            window.dispatchEvent(new CustomEvent('sect-monsters-cleared', { detail: { templateIds: templateIdsToRemove } }));
+        }
+
+        // --- 核心改动 2：接收该势力名下的所有产业 (矿产等) ---
+        this.mapState.entities.forEach(entity => {
+            if (entity.type === 'captured_building' && entity.config.owner === oldOwner) {
+                entity.config.owner = 'player';
+                
+                // 同步更新 capturedBuildings 数组以便收益计算
+                const recorded = this.capturedBuildings.find(b => b.id === entity.id);
+                if (recorded) {
+                    recorded.owner = 'player';
+                } else {
+                    this.capturedBuildings.push({
+                        id: entity.id,
+                        type: entity.config.type,
+                        owner: 'player'
+                    });
+                }
+            }
+        });
+
+        this.showNotification(`成功收复了 ${city.name}！其势力范围内的野怪已溃散，产业已归收。`);
+        console.log(`%c[攻城胜利] %c${city.name} 及其附属产业现在归属于玩家势力`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+
+        // 检查是否所有敌方主城都被占领
+        this.checkVictoryCondition();
+    }
+
+    /**
+     * 检查是否达成最终胜利（消灭所有 AI 势力）
+     */
+    checkVictoryCondition() {
+        const remainingAiCities = Object.values(this.cities).filter(c => c.owner !== 'player');
+        
+        if (remainingAiCities.length === 0) {
+            setTimeout(() => {
+                alert("恭喜！你已统一江湖，消灭了所有割据势力，达成最终胜利！");
+                // 可以在这里触发更复杂的胜利 UI 或返回主菜单
+            }, 1000);
+        }
+    }
+
+    /**
+     * 获取指定势力的颜色
+     */
+    getFactionColor(factionId) {
+        const faction = this.factions[factionId];
+        if (!faction) return '#888888'; // 默认灰色 (中立)
+        
+        const heroInfo = this.availableHeroes[faction.heroId];
+        return heroInfo ? heroInfo.color : '#ffffff';
+    }
+
+    /**
+     * 获取玩家当前队伍的总战斗力
+     */
+    getPlayerTotalPower() {
+        let total = 0;
+        for (const type in this.heroArmy) {
+            const count = this.heroArmy[type];
+            if (count > 0 && this.unitCosts[type]) {
+                total += count * (this.unitCosts[type].cost || 0);
+            }
+        }
+        return total;
     }
 
     /**

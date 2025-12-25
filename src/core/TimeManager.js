@@ -1,4 +1,5 @@
 import { worldManager } from './WorldManager.js';
+import { modifierManager } from './ModifierManager.js';
 
 /**
  * 时间管理器：管理游戏内的日期、季节和季度更替
@@ -14,6 +15,9 @@ class TimeManager {
         this.currentTime = 0; // 当前季度的进度 (0 到 seasonDuration)
         
         this.isPaused = false;
+        
+        // 初始化难度系数
+        this.updateDifficultyModifiers();
     }
 
     update() {
@@ -47,11 +51,36 @@ class TimeManager {
         const dateStr = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
         console.log(`%c[时节更替] %c${dateStr}`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
         
+        // 更新难度修正器
+        this.updateDifficultyModifiers();
+        
         // 使用全局通知系统
         worldManager.showNotification(`时节更替：${dateStr}`);
+    }
+
+    /**
+     * 更新全局难度修正器
+     */
+    updateDifficultyModifiers() {
+        const statMult = this.getStatMultiplier();
         
-        // 这里可以触发大世界的资源产出结算
-        // worldManager.processResourceProduction();
+        // 注入 HP 修正
+        modifierManager.addGlobalModifier({
+            id: 'difficulty_hp',
+            side: 'enemy',
+            stat: 'hp',
+            multiplier: statMult
+        });
+
+        // 注入伤害修正
+        modifierManager.addGlobalModifier({
+            id: 'difficulty_damage',
+            side: 'enemy',
+            stat: 'damage',
+            multiplier: statMult
+        });
+        
+        console.log(`%c[难度缩放] %c当前敌军属性系数: x${statMult.toFixed(2)}`, 'color: #ff4444; font-weight: bold', 'color: #fff');
     }
 
     updateUI() {
@@ -70,6 +99,29 @@ class TimeManager {
 
     getDateString() {
         return `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
+    }
+
+    /**
+     * 获取全局进度（已过的季度总数）
+     */
+    getGlobalProgress() {
+        return (this.year - 3) * 4 + this.seasonIndex;
+    }
+
+    /**
+     * 获取战力缩放系数（影响大世界怪物的 totalPoints）
+     * 每季度增加 4%，最高 3 倍
+     */
+    getPowerMultiplier() {
+        return Math.min(3.0, 1.0 + this.getGlobalProgress() * 0.04);
+    }
+
+    /**
+     * 获取数值缩放系数（影响怪物的 HP 和 Damage）
+     * 每季度增加 4%，最高 3 倍
+     */
+    getStatMultiplier() {
+        return Math.min(3.0, 1.0 + this.getGlobalProgress() * 0.04);
     }
 }
 

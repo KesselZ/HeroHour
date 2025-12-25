@@ -30,6 +30,7 @@ export const ASSET_REGISTRY = {
         // --- 主角 ---
         'qijin': { name: '祁进', sheet: 'CHARS3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'left' },
         'lichengen': { name: '李承恩', sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },
+        'yeying': { name: '叶英', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
         
         // --- 环境与建筑 ---
         'main_city': { name: '主城', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 2, scale: 4.0 }, 

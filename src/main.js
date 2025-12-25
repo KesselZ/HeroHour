@@ -58,8 +58,10 @@ function initUIIcons() {
     // 1. 初始化角色选择界面的肖像
     const qijinPortrait = document.querySelector('.qijin-portrait');
     const lichengenPortrait = document.querySelector('.lichengen-portrait');
+    const yeyingPortrait = document.querySelector('.yeying-portrait');
     if (qijinPortrait) Object.assign(qijinPortrait.style, spriteFactory.getIconStyle('qijin'));
     if (lichengenPortrait) Object.assign(lichengenPortrait.style, spriteFactory.getIconStyle('lichengen'));
+    if (yeyingPortrait) Object.assign(yeyingPortrait.style, spriteFactory.getIconStyle('yeying'));
 
     // 2. 初始化部署界面的兵种图标
     const slots = document.querySelectorAll('.unit-slot');
@@ -164,7 +166,21 @@ function applyHeroTraits(heroId) {
         // 祁进技能：剑雨、神剑、镇山河
         worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe']; 
         
-        // ... (modifierManager 逻辑保持不变)
+        // 祁进天赋：门派领袖 - 纯阳弟子血量和伤害提高 20%
+        modifierManager.addGlobalModifier({
+            id: 'qijin_talent_chunyang_atk',
+            side: 'player',
+            unitType: 'chunyang',
+            stat: 'attack_damage',
+            multiplier: 1.2
+        });
+        modifierManager.addGlobalModifier({
+            id: 'qijin_talent_chunyang_hp',
+            side: 'player',
+            unitType: 'chunyang',
+            stat: 'hp',
+            multiplier: 1.2
+        });
     } else if (heroId === 'lichengen') {
         worldManager.heroData.hpMax = 650;
         worldManager.heroData.stats.atk = 35;
@@ -177,6 +193,44 @@ function applyHeroTraits(heroId) {
         
         // 李承恩技能：撼如雷、集结令、风来吴山（暂代大风车逻辑）
         worldManager.heroData.skills = ['battle_shout', 'summon_militia', 'fenglaiwushan']; 
+
+        // 李承恩天赋：骁勇善战 - 大世界移动速度提高 20%，天策兵种血量提高 10%
+        modifierManager.addGlobalModifier({
+            id: 'lichengen_talent_world_speed',
+            side: 'player',
+            unitType: 'hero',
+            stat: 'world_speed',
+            multiplier: 1.2
+        });
+        modifierManager.addGlobalModifier({
+            id: 'lichengen_talent_tiance_hp',
+            side: 'player',
+            unitType: 'tiance',
+            stat: 'hp',
+            multiplier: 1.1
+        });
+    } else if (heroId === 'yeying') {
+        worldManager.heroData.hpMax = 550;
+        worldManager.heroData.stats.atk = 50;
+        worldManager.heroData.stats.speed = 0.07;
+        // 叶英属性：极高力道，少量加速，内力充沛
+        worldManager.heroData.stats.primaryStatName = '力道';
+        worldManager.heroData.stats.primaryStatValue = 75;
+        worldManager.heroData.stats.fali = 120;
+        worldManager.heroData.stats.haste = 0.15;
+
+        // 叶英技能：目前复用一些剑系或霸气类技能
+        // 暂定：剑雨 (心剑)、风来吴山 (大风车)、神剑 (归宗)
+        worldManager.heroData.skills = ['sword_rain', 'fenglaiwushan', 'divine_sword_rain'];
+
+        // 叶英天赋：藏剑弟子攻击频率提高 20%
+        modifierManager.addGlobalModifier({
+            id: 'yeying_talent_cangjian_speed',
+            side: 'player',
+            unitType: 'cangjian',
+            stat: 'attack_speed',
+            multiplier: 1 / 1.2 // 冷却缩减 20%
+        });
     }
     
     // 同步更新内力上限
