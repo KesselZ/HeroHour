@@ -5,6 +5,7 @@ import { spriteFactory } from './core/SpriteFactory.js';
 import { setSeed } from './core/Random.js';
 import { modifierManager } from './core/ModifierManager.js';
 import { worldManager } from './core/WorldManager.js';
+import { SkillRegistry } from './core/SkillRegistry.js';
 
 // 游戏状态管理
 const GameState = {
@@ -141,6 +142,8 @@ window.addEventListener('start-battle', (e) => {
 // 监听战斗结束返回大世界的请求
 window.addEventListener('battle-finished', (e) => {
     const result = e.detail;
+    // 关键修复：战斗结束后重置所有技能冷却
+    SkillRegistry.resetAllCooldowns();
     enterGameState(GameState.WORLD, result);
 });
 
@@ -167,12 +170,11 @@ function applyHeroTraits(heroId) {
     if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'];
     if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe'];
 
-    // 3. 执行同步与修正注册
+    // 3. 执行同步与修正注册 (这里会根据 identity 动态计算 hpMax 和 mpMax)
     syncHeroStatsToModifiers();
 
-    // 4. 初始化资源状态
+    // 4. 初始化资源状态 (补满血蓝)
     worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
-    worldManager.heroData.mpMax = 100;
     worldManager.heroData.mpCurrent = worldManager.heroData.mpMax;
 }
 
@@ -184,18 +186,25 @@ function syncHeroStatsToModifiers() {
     const heroId = worldManager.heroData.id;
     modifierManager.clear();
 
+    // 0. 获取英雄身份数据用于计算上限 (彻底消除 Hardcode)
+    const identity = worldManager.getHeroIdentity(heroId);
+    if (!identity) return;
+    const cb = identity.combatBase;
+
     // 1. 统帅：军队影响士兵攻击和血量
     modifierManager.addGlobalModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'damage', multiplier: 1.0 + (s.morale / 100) });
     modifierManager.addGlobalModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100) });
 
-    // 2. 武力：影响英雄本人
-    worldManager.heroData.hpMax = 300 + (s.power * 5);
+    // 2. 武力与功法：根据身份表动态计算上限
+    worldManager.heroData.hpMax = cb.hpBase + (s.power * cb.hpScaling);
+    worldManager.heroData.mpMax = cb.mpBase + (s.spells * cb.mpScaling);
+    
     modifierManager.addGlobalModifier({
         id: 'hero_damage_bonus',
         side: 'player',
         unitType: heroId, 
         stat: 'damage',
-        multiplier: 1.0 + (s.power * 0.04)
+        multiplier: 1.0 + (s.power * (cb.atkScaling || 0.05))
     });
 
     // 3. 核心重构：自动加载英雄固有天赋 (数据驱动)

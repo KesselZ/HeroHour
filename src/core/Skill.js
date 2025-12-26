@@ -10,6 +10,7 @@ export class Skill {
         this.name = config.name;
         this.level = config.level || '初级';
         this.icon = config.icon;
+        this.category = config.category || '通用';
         this.cost = config.cost || 0;
         this.cooldown = config.cooldown || 0;
         this.targeting = config.targeting || { type: 'instant' };

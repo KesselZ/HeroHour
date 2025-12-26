@@ -542,7 +542,40 @@ export class WorldScene {
         }
 
         // 3. 刷新可招募列表
-        // ... (招募列表不受物理限制，用户说招募没问题)
+        const recruitList = document.getElementById('town-recruit-list');
+        if (recruitList) {
+            recruitList.innerHTML = '';
+            worldManager.getAvailableRecruits(cityId).forEach(unitInfo => {
+                const type = unitInfo.type;
+                const details = worldManager.getUnitDetails(type);
+                const item = document.createElement('div');
+                item.className = 'recruit-item';
+                
+                // 计算最终招募价格
+                const baseCost = worldManager.unitCosts[type].gold;
+                const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
+
+                item.innerHTML = `
+                    <div class="slot-icon" style="${this.getIconStyleString(type)}"></div>
+                    <div class="unit-info">
+                        <span class="unit-name">${details.name}</span>
+                        <span class="unit-cost">💰${finalCost}</span>
+                    </div>
+                    <button class="wuxia-btn wuxia-btn-small">招募</button>
+                `;
+
+                this.bindUnitTooltip(item, type);
+                item.querySelector('button').onclick = (e) => {
+                    e.stopPropagation();
+                    if (worldManager.recruitUnit(type, cityId)) {
+                        this.refreshTownUI(cityId);
+                    } else {
+                        worldManager.showNotification('金钱不足！');
+                    }
+                };
+                recruitList.appendChild(item);
+            });
+        }
 
         // 4. 刷新侠客队伍
         const heroArmyList = document.getElementById('hero-army-list');

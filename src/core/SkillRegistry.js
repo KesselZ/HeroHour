@@ -22,9 +22,21 @@ export const SkillRegistry = {
         return stats;
     },
 
+    /**
+     * 重置所有技能冷却
+     */
+    resetAllCooldowns() {
+        Object.values(this).forEach(skill => {
+            if (skill instanceof Skill) {
+                skill.lastUsed = 0;
+            }
+        });
+    },
+
     'sword_rain': new Skill('sword_rain', {
         name: '五方行尽',
         level: '初级',
+        category: '紫霞功',
         icon: 'skill_wanjiangui_zong',
         cost: 35,
         cooldown: 6000,
@@ -38,6 +50,7 @@ export const SkillRegistry = {
     'divine_sword_rain': new Skill('divine_sword_rain', {
         name: '六合独尊',
         level: '高级',
+        category: '紫霞功',
         icon: 'skill_liuhe',
         cost: 55,
         cooldown: 10000,
@@ -51,6 +64,7 @@ export const SkillRegistry = {
     'battle_shout': new Skill('battle_shout', {
         name: '撼如雷',
         level: '高级',
+        category: '战术',
         icon: 'skill_hanrulei',
         cost: 45,
         cooldown: 10000,
@@ -64,6 +78,7 @@ export const SkillRegistry = {
     'summon_militia': new Skill('summon_militia', {
         name: '集结令',
         level: '高级',
+        category: '战术',
         icon: 'skill_jijieling',
         cost: 30,
         cooldown: 15000,
@@ -77,6 +92,7 @@ export const SkillRegistry = {
     'zhenshanhe': new Skill('zhenshanhe', {
         name: '镇山河',
         level: '高级',
+        category: '气场',
         icon: 'skill_zhenshanhe',
         cost: 75,
         cooldown: 25000,
@@ -90,6 +106,7 @@ export const SkillRegistry = {
     'fenglaiwushan': new Skill('fenglaiwushan', {
         name: '风来吴山',
         level: '高级',
+        category: '重剑招式',
         icon: 'skill_fenglaiwushan',
         cost: 50,
         cooldown: 12000,
@@ -103,6 +120,7 @@ export const SkillRegistry = {
     'renchicheng': new Skill('renchicheng', {
         name: '任驰骋',
         level: '高级',
+        category: '战术',
         icon: 'skill_renchicheng',
         cost: 40,
         cooldown: 15000,
@@ -122,6 +140,7 @@ export const SkillRegistry = {
     'shourushan': new Skill('shourushan', {
         name: '守如山',
         level: '高级',
+        category: '搏杀',
         icon: 'skill_shourushan',
         cost: 60,
         cooldown: 30000,
@@ -142,6 +161,7 @@ export const SkillRegistry = {
     'zhanbafang': new Skill('zhanbafang', {
         name: '战八方',
         level: '初级',
+        category: '搏杀',
         icon: 'skill_zhanbafang',
         cost: 30,
         cooldown: 8000,
@@ -155,6 +175,7 @@ export const SkillRegistry = {
     'xiaoruhu': new Skill('xiaoruhu', {
         name: '啸如虎',
         level: '绝技',
+        category: '搏杀',
         icon: 'skill_xiaoruhu',
         cost: 50,
         cooldown: 25000,
@@ -174,6 +195,7 @@ export const SkillRegistry = {
     'pochongwei': new Skill('pochongwei', {
         name: '破重围',
         level: '高级',
+        category: '搏杀',
         icon: 'skill_pochongwei',
         cost: 45,
         cooldown: 18000,
@@ -188,6 +210,7 @@ export const SkillRegistry = {
     'tu': new Skill('tu', {
         name: '突',
         level: '初级',
+        category: '搏杀',
         icon: 'skill_tu',
         cost: 35,
         cooldown: 12000,
@@ -201,6 +224,7 @@ export const SkillRegistry = {
     'shengtaiji': new Skill('shengtaiji', {
         name: '生太极',
         level: '初级',
+        category: '气场',
         icon: 'skill_shengtaiji',
         cost: 40,
         cooldown: 12000,
@@ -220,6 +244,7 @@ export const SkillRegistry = {
     'tunriyue': new Skill('tunriyue', {
         name: '吞日月',
         level: '高级',
+        category: '气场',
         icon: 'skill_tunriyue',
         cost: 45,
         cooldown: 15000,
@@ -239,6 +264,7 @@ export const SkillRegistry = {
     'sixiang': new Skill('sixiang', {
         name: '四象轮回',
         level: '初级',
+        category: '紫霞功',
         icon: 'skill_sixiang', // 假设图标已存在或后续添加
         cost: 25,
         cooldown: 3000,
@@ -259,6 +285,7 @@ export const SkillRegistry = {
     'liangyi': new Skill('liangyi', {
         name: '两仪化形',
         level: '高级',
+        category: '紫霞功',
         icon: 'skill_liangyi',
         cost: 40,
         cooldown: 8000,
@@ -279,6 +306,7 @@ export const SkillRegistry = {
     'wanshi': new Skill('wanshi', {
         name: '万世不竭',
         level: '绝技',
+        category: '紫霞功',
         icon: 'skill_wanshi',
         cost: 80,
         cooldown: 20000,
@@ -299,6 +327,7 @@ export const SkillRegistry = {
     'huasanqing': new Skill('huasanqing', {
         name: '化三清',
         level: '高级',
+        category: '气场',
         icon: 'skill_huasanqing',
         cost: 60,
         cooldown: 18000,
@@ -318,6 +347,7 @@ export const SkillRegistry = {
     'hegui': new Skill('hegui', {
         name: '鹤归孤山',
         level: '初级',
+        category: '重剑招式',
         icon: 'skill_hegui',
         cost: 40,
         cooldown: 12000,
@@ -340,6 +370,7 @@ export const SkillRegistry = {
     'fengcha': new Skill('fengcha', {
         name: '峰插云景',
         level: '高级',
+        category: '重剑招式',
         icon: 'skill_fengcha',
         cost: 30,
         cooldown: 8000,
@@ -353,6 +384,7 @@ export const SkillRegistry = {
     'songshe': new Skill('songshe', {
         name: '松舍问霞',
         level: '绝技',
+        category: '重剑招式',
         icon: 'skill_songshe',
         cost: 65,
         cooldown: 15000,

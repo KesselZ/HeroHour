@@ -432,19 +432,60 @@ export class BattleScene {
 
     initSkillUI() {
         const skillBar = document.getElementById('battle-skill-bar');
-        const skillSlots = document.getElementById('skill-slots');
-        if (!skillBar || !skillSlots) return;
+        const filterContainer = document.getElementById('skill-category-filters');
+        if (!skillBar || !filterContainer) return;
 
         skillBar.classList.remove('hidden');
         this.updateMPUI();
-        skillSlots.innerHTML = '';
 
         const heroData = this.worldManager.heroData;
         const heroSkills = heroData.skills;
         
+        // 1. 提取所有已拥有的技能类别
+        const categories = new Set();
+        heroSkills.forEach(id => {
+            const skill = SkillRegistry[id];
+            if (skill && skill.category) categories.add(skill.category);
+        });
+
+        // 2. 初始化过滤器按钮
+        filterContainer.innerHTML = '<button class="filter-btn active" data-category="all">所有</button>';
+        categories.forEach(cat => {
+            const btn = document.createElement('button');
+            btn.className = 'filter-btn';
+            btn.dataset.category = cat;
+            btn.innerText = cat;
+            filterContainer.appendChild(btn);
+        });
+
+        // 3. 绑定过滤器点击事件
+        const filterBtns = filterContainer.querySelectorAll('.filter-btn');
+        filterBtns.forEach(btn => {
+            btn.onclick = () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.renderSkills(btn.dataset.category);
+            };
+        });
+
+        // 4. 初始渲染所有技能
+        this.renderSkills('all');
+    }
+
+    renderSkills(categoryFilter = 'all') {
+        const skillSlots = document.getElementById('skill-slots');
+        if (!skillSlots) return;
+
+        skillSlots.innerHTML = '';
+        const heroData = this.worldManager.heroData;
+        const heroSkills = heroData.skills;
+
         heroSkills.forEach(skillId => {
             const skill = SkillRegistry[skillId];
             if (!skill) return;
+
+            // 类别过滤
+            if (categoryFilter !== 'all' && skill.category !== categoryFilter) return;
 
             const btn = document.createElement('div');
             btn.className = 'skill-btn';
@@ -466,6 +507,14 @@ export class BattleScene {
             btn.onmouseleave = () => uiManager.hideTooltip();
             btn.onclick = (e) => { e.stopPropagation(); this.onSkillBtnClick(skillId); };
             skillSlots.appendChild(btn);
+
+            // 如果技能正在冷却中，需要重新启动动画（如果是中途切换分类）
+            const now = Date.now();
+            const actualCD = skill.cooldown * (1 - (heroData.stats.haste || 0));
+            const elapsed = now - skill.lastUsed;
+            if (elapsed < actualCD) {
+                this.startSkillCDAnimation(skillId, actualCD, elapsed);
+            }
         });
     }
 
@@ -531,16 +580,23 @@ export class BattleScene {
         this.activeSkill = null;
     }
 
-    startSkillCDAnimation(skillId, cooldown) {
+    startSkillCDAnimation(skillId, cooldown, initialElapsed = 0) {
         const overlay = document.getElementById(`cd-${skillId}`);
         if (!overlay) return;
-        overlay.style.height = '100%';
-        const startTime = Date.now();
+        
+        const startTime = Date.now() - initialElapsed;
         const update = () => {
+            // 检查元素是否还在 DOM 中（分类切换时按钮会被销毁重建）
+            const currentOverlay = document.getElementById(`cd-${skillId}`);
+            if (!currentOverlay) return;
+
             const elapsed = Date.now() - startTime;
             const progress = Math.max(0, 1 - elapsed / cooldown);
-            overlay.style.height = `${progress * 100}%`;
-            if (progress > 0) requestAnimationFrame(update);
+            currentOverlay.style.height = `${progress * 100}%`;
+            
+            if (progress > 0 && this.isActive) {
+                requestAnimationFrame(update);
+            }
         };
         update();
     }
