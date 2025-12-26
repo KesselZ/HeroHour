@@ -594,6 +594,19 @@ export class HeroUnit extends BaseUnit {
         this.hpFill.position.x = -(1 - pct) * (this.hpBarFullWidth / 2);
     }
 
+    /**
+     * 英雄数据的代理接口：
+     * 允许 BattleScene 中的 Buff 像操作普通属性一样操作功法和调息，并自动同步回 WorldManager
+     */
+    get spells() { return worldManager.heroData.stats.spells; }
+    set spells(v) { worldManager.heroData.stats.spells = v; }
+    
+    get haste() { return worldManager.heroData.stats.haste; }
+    set haste(v) { 
+        // 调息上限锁定在 0.5 (50%)
+        worldManager.heroData.stats.haste = Math.max(0, Math.min(0.5, v)); 
+    }
+
     takeDamage(amount) {
         super.takeDamage(amount);
         this.updateHealthBar();

@@ -1,4 +1,5 @@
 import { modifierManager } from './ModifierManager.js';
+import { SkillRegistry } from './SkillRegistry.js';
 
 /**
  * 英雄初始状态与固有特性 (数据驱动)
@@ -7,7 +8,7 @@ import { modifierManager } from './ModifierManager.js';
 const HERO_IDENTITY = {
     'qijin': {
         initialStats: { power: 7, spells: 12, morale: 6, speed: 11.8, leadership: 20 },
-        combatBase: { atk: 28, hpBase: 300, hpScaling: 5, mpBase: 100, mpScaling: 2, atkScaling: 0.02 }, // 每点力道+2%伤害
+        combatBase: { atk: 28, hpBase: 300, hpScaling: 5, mpBase: 500, mpScaling: 2, atkScaling: 0.02 }, // 暂时提高 MP 至 500
         traits: [
             { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
             { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'damage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
@@ -15,7 +16,7 @@ const HERO_IDENTITY = {
     },
     'lichengen': {
         initialStats: { power: 5, spells: 8, morale: 10, speed: 11.8, leadership: 25 }, // 李承恩统帅更高
-        combatBase: { atk: 40, hpBase: 300, hpScaling: 5, mpBase: 80, mpScaling: 1.5, atkScaling: 0.02 }, // 每点力道+2%伤害
+        combatBase: { atk: 40, hpBase: 300, hpScaling: 5, mpBase: 500, mpScaling: 1.5, atkScaling: 0.02 }, // 暂时提高 MP 至 500
         traits: [
             { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
             { id: 'tiance_sect_hp', unitType: 'tiance', stat: 'hp', multiplier: 1.1, description: '骁勇善战：天策兵种气血提高 10%' }
@@ -23,7 +24,7 @@ const HERO_IDENTITY = {
     },
     'yeying': {
         initialStats: { power: 10, spells: 18, morale: 2, speed: 11.8, leadership: 15 }, // 叶英更注重个人武力
-        combatBase: { atk: 8, hpBase: 300, hpScaling: 5, mpBase: 120, mpScaling: 2.5, atkScaling: 0.02 },  // 统一系数为 0.02
+        combatBase: { atk: 8, hpBase: 300, hpScaling: 5, mpBase: 500, mpScaling: 2.5, atkScaling: 0.02 },  // 暂时提高 MP 至 500
         traits: [
             { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
         ]
@@ -131,6 +132,39 @@ class City {
     }
 
     /**
+     * 获取建筑的动态最大等级
+     * 针对门派技能建筑，最大等级 = 对应等级的技能总数
+     */
+    getBuildingMaxLevel(buildingId) {
+        const meta = BUILDING_REGISTRY[buildingId];
+        if (!meta) return 0;
+
+        // 如果是门派招式研习建筑 (如 sect_chunyang_basic)
+        if (buildingId.startsWith('sect_')) {
+            const parts = buildingId.split('_');
+            const sectId = parts[1];
+            const levelType = parts[2];
+            
+            const levelMap = {
+                'basic': '初级',
+                'advanced': '高级',
+                'ultimate': '绝技'
+            };
+            
+            const stats = SkillRegistry.getSectSkillStats(sectId);
+            const levelKey = levelMap[levelType];
+            
+            if (levelKey && stats[levelKey] !== undefined) {
+                // 核心逻辑：该等级有几个技能，建筑最高就能升到几级
+                return stats[levelKey];
+            }
+        }
+
+        // 默认返回配置中的固定值
+        return meta.maxLevel;
+    }
+
+    /**
      * 动态获取当前城市所有的建筑列表
      * 基于城市自身的 blueprintId，与当前 owner 无关，实现了“夺城而不改制”的战略感
      */
@@ -144,6 +178,7 @@ class City {
                 list[meta.category].push({ 
                     id, 
                     ...meta, 
+                    maxLevel: this.getBuildingMaxLevel(id), // 使用动态最大等级
                     level: this.buildingLevels[id] || 0 
                 });
             }
@@ -158,8 +193,9 @@ class City {
     upgradeBuilding(buildingId) {
         const meta = BUILDING_REGISTRY[buildingId];
         const currentLevel = this.buildingLevels[buildingId] || 0;
+        const maxLevel = this.getBuildingMaxLevel(buildingId); // 获取动态最大等级
         
-        if (meta && currentLevel < meta.maxLevel) {
+        if (meta && currentLevel < maxLevel) {
             this.buildingLevels[buildingId] = currentLevel + 1;
             this._applyEffect(buildingId, this.buildingLevels[buildingId]);
             return true;

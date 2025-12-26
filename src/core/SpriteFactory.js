@@ -16,6 +16,8 @@ export const ASSET_REGISTRY = {
         SKILL2: '/assets/skill2.png',
         SKILL3: '/assets/skill3.png',
         SKILL4: '/assets/skill4.png',
+        SKILL5: '/assets/skill5.png',
+        SKILL6: '/assets/skill6.png',
         SKILL7: '/assets/skill7.png',
         SKILL8: '/assets/skill8.png',
         BUILDING2: '/assets/building2.png',
@@ -38,6 +40,9 @@ export const ASSET_REGISTRY = {
         'skill_liangyi':         { name: '两仪化形图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 4, c: 3 },
         'skill_wanshi':          { name: '万世不竭图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 3, c: 3 },
         'skill_huasanqing':      { name: '化三清图标', sheet: 'SKILL8', rows: 4, cols: 4, r: 3, c: 1 },
+        'skill_hegui':           { name: '鹤归孤山图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 2, c: 2 },
+        'skill_fengcha':         { name: '峰插云景图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 2, c: 2 },
+        'skill_songshe':         { name: '松舍问霞图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 4, c: 3 },
 
         // skill4.png 天策系列
         'skill_renchicheng': { name: '任驰骋图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 1, c: 1 },

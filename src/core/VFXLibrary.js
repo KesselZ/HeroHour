@@ -230,6 +230,34 @@ export class VFXLibrary {
             }
         };
         anim();
+
+        // 核心修复：添加地震践踏的渣渣粒子效果
+        this.createParticleSystem({
+            pos: pos.clone(),
+            color: 0x887766, // 泥土颜色
+            duration: 500,
+            density: 10.0, // 数量提升 5 倍 (之前是 2.0)
+            spawnRate: 30, // 频率提高 (之前是 50)
+            geometry: new THREE.BoxGeometry(0.12, 0.12, 0.12),
+            initFn: (p) => {
+                const r = Math.random() * radius;
+                const theta = Math.random() * Math.PI * 2;
+                p.position.set(Math.cos(theta) * r, 0, Math.sin(theta) * r);
+                p.userData.velY = 0.15 + Math.random() * 0.15; // 爆发力增强
+                p.rotation.set(Math.random() * 10, Math.random() * 10, Math.random() * 10);
+            },
+            updateFn: (p, prg) => {
+                // 向上跳起后落下
+                p.position.y += p.userData.velY;
+                p.userData.velY -= 0.01; // 简单的重力模拟
+                if (p.position.y < 0) p.position.y = 0;
+                
+                p.rotation.x += 0.1;
+                p.rotation.z += 0.1;
+                p.material.opacity = 0.8 * (1 - prg);
+                p.scale.setScalar(1 - prg);
+            }
+        });
     }
 
     createTornadoVFX(pos, radius, color, duration) {

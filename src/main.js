@@ -165,7 +165,7 @@ function applyHeroTraits(heroId) {
     // 2. 设定初始技能 (这些也可以数据化，目前暂留)
     if (heroId === 'qijin') worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing'];
     if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'];
-    if (heroId === 'yeying') worldManager.heroData.skills = ['fenglaiwushan'];
+    if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe'];
 
     // 3. 执行同步与修正注册
     syncHeroStatsToModifiers();

@@ -48,6 +48,8 @@ import { ProjectileManager } from '../core/ProjectileManager.js';
 import { VFXLibrary } from '../core/VFXLibrary.js';
 import { rng, setSeed } from '../core/Random.js';
 
+import { uiManager } from '../core/UIManager.js';
+
 export class BattleScene {
     constructor(scene, camera, enemyConfig = null) {
         this.scene = scene;
@@ -440,12 +442,6 @@ export class BattleScene {
         const heroData = this.worldManager.heroData;
         const heroSkills = heroData.skills;
         
-        const tooltip = document.getElementById('game-tooltip');
-        const tooltipTitle = tooltip?.querySelector('.tooltip-title');
-        const tooltipDesc = tooltip?.querySelector('.tooltip-desc');
-        const tooltipLevel = tooltip?.querySelector('.tooltip-level');
-        const tooltipEffect = tooltip?.querySelector('.tooltip-effect');
-
         heroSkills.forEach(skillId => {
             const skill = SkillRegistry[skillId];
             if (!skill) return;
@@ -464,35 +460,12 @@ export class BattleScene {
             `;
 
             btn.onmouseenter = () => {
-                if (!tooltip || !tooltipTitle || !tooltipDesc) return;
-                const haste = heroData.stats.haste || 0;
-                const actualCD = (skill.cooldown * (1 - haste) / 1000).toFixed(1);
-                const actualCost = Math.floor(skill.cost * (1 - haste));
-                tooltipTitle.innerHTML = `<span>${skill.name}</span><span class="skill-level-tag level-${skill.level}">${skill.level}</span>`;
-                tooltipDesc.innerHTML = skill.getDescription(heroData);
-                if (tooltipLevel) tooltipLevel.innerHTML = `<span>消耗: ${actualCost} 内力</span><span>冷却: ${actualCD}s</span>`;
-                if (tooltipEffect) tooltipEffect.classList.add('hidden');
-                tooltip.classList.remove('hidden');
-                tooltipLevel?.classList.remove('hidden');
-                tooltipEffect?.classList.remove('hidden');
+                uiManager.showSkillTooltip(skillId, heroData);
             };
 
-            btn.onmouseleave = () => tooltip?.classList.add('hidden');
+            btn.onmouseleave = () => uiManager.hideTooltip();
             btn.onclick = (e) => { e.stopPropagation(); this.onSkillBtnClick(skillId); };
             skillSlots.appendChild(btn);
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            if (tooltip && !tooltip.classList.contains('hidden')) {
-                const x = e.clientX + 15;
-                const y = e.clientY + 15;
-                const tooltipWidth = tooltip.offsetWidth;
-                const tooltipHeight = tooltip.offsetHeight;
-                const finalX = (x + tooltipWidth > window.innerWidth) ? (e.clientX - tooltipWidth - 15) : x;
-                const finalY = (y + tooltipHeight > window.innerHeight) ? (e.clientY - tooltipHeight - 15) : y;
-                tooltip.style.left = `${finalX}px`;
-                tooltip.style.top = `${finalY}px`;
-            }
         });
     }
 
@@ -527,7 +500,20 @@ export class BattleScene {
         this.raycaster.setFromCamera(this.mouse, this.camera);
         const intersects = this.raycaster.intersectObject(this.ground);
         if (intersects.length > 0) {
-            this.executeSkill(this.activeSkill, intersects[0].point);
+            let targetPos = intersects[0].point.clone();
+            
+            // 核心修复：点击释放时也进行范围钳制
+            const skill = SkillRegistry[this.activeSkill];
+            const range = (skill && skill.targeting) ? (skill.targeting.range || 0) : 0;
+            if (range > 0 && this.heroUnit) {
+                const dist = targetPos.distanceTo(this.heroUnit.position);
+                if (dist > range) {
+                    const dir = targetPos.clone().sub(this.heroUnit.position).normalize();
+                    targetPos = this.heroUnit.position.clone().add(dir.multiplyScalar(range));
+                }
+            }
+
+            this.executeSkill(this.activeSkill, targetPos);
             this.hideSkillIndicator();
         }
     }
@@ -561,9 +547,25 @@ export class BattleScene {
 
     showSkillIndicator(config) {
         this.hideSkillIndicator();
-        const { shape = 'circle', radius = 1 } = config;
+        // range: 释放距离, impactRadius: 生效半径, radius: 兼容旧逻辑
+        const { shape = 'circle', radius = 1, impactRadius, range = 0 } = config;
+        const visualRadius = impactRadius || radius;
+        
         const group = new THREE.Group();
-        let geo = (shape === 'circle') ? new THREE.CircleGeometry(radius, 32) : new THREE.PlaneGeometry(radius * 2, radius * 2);
+        
+        // 1. 释放范围圈 (指示英雄可以放多远)
+        if (range > 0) {
+            const rangeGeo = new THREE.RingGeometry(range, range + 0.1, 64);
+            const rangeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
+            const rangeMesh = new THREE.Mesh(rangeGeo, rangeMat);
+            rangeMesh.rotation.x = -Math.PI / 2;
+            rangeMesh.position.y = 0.01;
+            this.rangeIndicator = rangeMesh;
+            this.scene.add(this.rangeIndicator);
+        }
+
+        // 2. 技能生效预览圈 (随鼠标移动)
+        let geo = (shape === 'circle') ? new THREE.CircleGeometry(visualRadius, 32) : new THREE.PlaneGeometry(visualRadius * 2, visualRadius * 2);
         const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.2, depthWrite: false });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = -Math.PI / 2;
@@ -582,6 +584,12 @@ export class BattleScene {
             this.scene.remove(this.skillIndicator);
             this.skillIndicator.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
             this.skillIndicator = null;
+        }
+        if (this.rangeIndicator) {
+            this.scene.remove(this.rangeIndicator);
+            this.rangeIndicator.geometry.dispose();
+            this.rangeIndicator.material.dispose();
+            this.rangeIndicator = null;
         }
     }
 
@@ -724,6 +732,18 @@ export class BattleScene {
             if (unit.isDead) return false;
             if (shape === 'circle') return unit.position.distanceTo(center) < radius;
             if (shape === 'square') return Math.abs(unit.position.x - center.x) < radius && Math.abs(unit.position.z - center.z) < radius;
+            if (shape === 'sector') {
+                // 扇形判定：距离 + 角度
+                const dist = unit.position.distanceTo(center);
+                if (dist > radius) return false;
+                
+                // 计算单位相对于中心的方向
+                const dirToUnit = new THREE.Vector3().subVectors(unit.position, center).normalize();
+                // 如果没有传入具体朝向，默认取中心点前向 (z轴负方向) 或者通过 caster 传入
+                const forward = config.facing || new THREE.Vector3(0, 0, 1);
+                const angle = dirToUnit.angleTo(forward);
+                return angle < (config.angle || Math.PI / 4); // 默认 90 度扇形
+            }
             return false;
         });
     }
@@ -736,33 +756,57 @@ export class BattleScene {
     }
 
     applyBuffToUnits(units, options) {
-        const { stat, multiplier, duration, color, vfxName } = options;
+        const { stat, multiplier, offset, duration, color, vfxName } = options;
+
         units.forEach(unit => {
             if (vfxName) this.playVFX(vfxName, { unit, duration, color: color || 0xffffff, radius: unit.isHero ? 1.5 : 0.8 });
             const stats = Array.isArray(stat) ? stat : [stat];
             const multipliers = Array.isArray(multiplier) ? multiplier : [multiplier];
+            const offsets = Array.isArray(offset) ? offset : [offset];
+
             stats.forEach((s, i) => {
-                const m = multipliers[i] || multipliers[0];
-                if (s === 'attackDamage') unit.attackDamage *= m;
-                if (s === 'moveSpeed') unit.moveSpeed *= m;
-                if (s === 'attackSpeed') unit.attackCooldownTime *= (1 / m);
-                if (s === 'invincible') unit.isInvincible = true;
-                if (s === 'controlImmune') unit.isControlImmune = true;
-                if (s === 'damageResist') unit.damageResist = Math.max(unit.damageResist, m);
-                if (s === 'tigerHeart') unit.isTigerHeart = true;
+                const m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
+                const o = offsets[i] !== undefined ? offsets[i] : (offsets[0] !== undefined ? offsets[0] : 0);
+
+                // 核心优雅改动：不再特判英雄，直接操作 unit[s]
+                // 只要 HeroUnit 实现了对应的 getter/setter，数据就会自动同步
+                if (unit[s] !== undefined) {
+                    unit[s] = unit[s] * m + o;
+                } else if (s === 'attackSpeed') {
+                    unit.attackCooldownTime *= (1 / m);
+                } else if (s === 'invincible') {
+                    unit.isInvincible = true;
+                } else if (s === 'controlImmune') {
+                    unit.isControlImmune = true;
+                } else if (s === 'damageResist') {
+                    unit.damageResist = Math.max(unit.damageResist, m);
+                } else if (s === 'tigerHeart') {
+                    unit.isTigerHeart = true;
+                }
             });
+
             if (color) unit.unitSprite.material.color.setHex(color);
+
+            // 定时恢复
             setTimeout(() => {
                 if (!unit.isDead) {
                     stats.forEach((s, i) => {
-                        const m = multipliers[i] || multipliers[0];
-                        if (s === 'attackDamage') unit.attackDamage /= m;
-                        if (s === 'moveSpeed') unit.moveSpeed /= m;
-                        if (s === 'attackSpeed') unit.attackCooldownTime /= (1 / m);
-                        if (s === 'invincible') unit.isInvincible = false;
-                        if (s === 'controlImmune') unit.isControlImmune = false;
-                        if (s === 'damageResist') unit.damageResist = 0;
-                        if (s === 'tigerHeart') unit.isTigerHeart = false;
+                        const m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
+                        const o = offsets[i] !== undefined ? offsets[i] : (offsets[0] !== undefined ? offsets[0] : 0);
+
+                        if (unit[s] !== undefined) {
+                            unit[s] = (unit[s] - o) / m;
+                        } else if (s === 'attackSpeed') {
+                            unit.attackCooldownTime /= (1 / m);
+                        } else if (s === 'invincible') {
+                            unit.isInvincible = false;
+                        } else if (s === 'controlImmune') {
+                            unit.isControlImmune = false;
+                        } else if (s === 'damageResist') {
+                            unit.damageResist = 0;
+                        } else if (s === 'tigerHeart') {
+                            unit.isTigerHeart = false;
+                        }
                     });
                     if (color) unit.unitSprite.material.color.setHex(0xffffff);
                 }
@@ -779,7 +823,7 @@ export class BattleScene {
     }
 
     executeMovement(unit, type, targetPos, options = {}) {
-        const { duration = 300, damage = 0, knockback = 0, onHit = null, onComplete = null } = options;
+        const { duration = 300, damage = 0, knockback = 0, jumpHeight = 0, onHit = null, onComplete = null } = options;
         if (type === 'dash') {
             const startPos = unit.position.clone();
             const startTime = Date.now();
@@ -787,8 +831,15 @@ export class BattleScene {
             const animate = () => {
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(1, elapsed / duration);
+                
+                // 1. 水平位移
                 unit.position.lerpVectors(startPos, targetPos, progress);
-                unit.position.y = 0.6;
+                
+                // 2. 垂直位移 (抛物线)
+                // y = baseHeight + 4 * jumpHeight * progress * (1 - progress)
+                const jumpY = jumpHeight > 0 ? (4 * jumpHeight * progress * (1 - progress)) : 0;
+                unit.position.y = 0.6 + jumpY;
+
                 if (damage > 0 || knockback > 0 || onHit) {
                     this.getUnitsInArea(unit.position, { shape: 'circle', radius: 1.5 }, 'enemy').forEach(target => {
                         if (!hitUnits.has(target)) {
@@ -799,7 +850,12 @@ export class BattleScene {
                         }
                     });
                 }
-                if (progress < 1) requestAnimationFrame(animate); else if (onComplete) onComplete();
+                
+                if (progress < 1) requestAnimationFrame(animate); 
+                else {
+                    unit.position.y = 0.6; // 落地校准
+                    if (onComplete) onComplete();
+                }
             };
             animate();
         } else if (type === 'blink') {
@@ -812,15 +868,41 @@ export class BattleScene {
     update(deltaTime) {
         this.camera.position.set(0, 15, 18); 
         this.camera.lookAt(0, 0, 0);
+        
+        // 处理技能指示器逻辑
         if (this.activeSkill && this.skillIndicator) {
+            const skill = SkillRegistry[this.activeSkill];
+            const range = (skill && skill.targeting) ? (skill.targeting.range || 0) : 0;
+            
+            // 1. 让释放范围圈始终跟随英雄
+            if (this.rangeIndicator && this.heroUnit) {
+                this.rangeIndicator.position.copy(this.heroUnit.position);
+                this.rangeIndicator.position.y = 0.01;
+            }
+
+            // 2. 更新鼠标位置对应的技能预览圈
             this.raycaster.setFromCamera(this.mouse, this.camera);
             const intersects = this.raycaster.intersectObject(this.ground);
             if (intersects.length > 0) {
-                this.skillIndicator.position.x = intersects[0].point.x;
-                this.skillIndicator.position.z = intersects[0].point.z;
+                let targetPos = intersects[0].point.clone();
+                
+                // 3. 如果有范围限制，进行向心钳制 (Clamping)
+                if (range > 0 && this.heroUnit) {
+                    const dist = targetPos.distanceTo(this.heroUnit.position);
+                    if (dist > range) {
+                        const dir = targetPos.clone().sub(this.heroUnit.position).normalize();
+                        targetPos = this.heroUnit.position.clone().add(dir.multiplyScalar(range));
+                    }
+                }
+
+                this.skillIndicator.position.copy(targetPos);
+                this.skillIndicator.position.y = 0.05;
                 this.skillIndicator.visible = true;
-            } else this.skillIndicator.visible = false;
+            } else {
+                this.skillIndicator.visible = false;
+            }
         }
+        
         if (this.isDeployment || !this.isActive) return;
         this.playerUnits.forEach(u => u.update(this.enemyUnits, this.playerUnits, deltaTime));
         this.enemyUnits.forEach(u => u.update(this.playerUnits, this.enemyUnits, deltaTime));

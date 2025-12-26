@@ -11,6 +11,8 @@ import { createWorldObject } from '../entities/WorldObjects.js';
  * 大世界场景类
  * 负责探索、移动、资源收集和城镇管理
  */
+import { uiManager } from '../core/UIManager.js';
+
 export class WorldScene {
     constructor(scene, camera, renderer) {
         this.scene = scene;
@@ -307,18 +309,9 @@ export class WorldScene {
             `;
 
             slot.onmouseenter = () => {
-                const haste = data.stats.haste || 0;
-                const actualCD = (skill.cooldown * (1 - haste) / 1000).toFixed(1);
-                const actualCost = Math.floor(skill.cost * (1 - haste));
-                this.showTooltip({
-                    name: skill.name,
-                    level: skill.level,
-                    mpCost: `消耗: ${actualCost} 内力`,
-                    cdText: `冷却: ${actualCD}s`,
-                    description: skill.getDescription(data)
-                });
+                uiManager.showSkillTooltip(skillId, data);
             };
-            slot.onmouseleave = () => this.hideTooltip();
+            slot.onmouseleave = () => uiManager.hideTooltip();
 
             skillsContainer.appendChild(slot);
         });
@@ -331,8 +324,8 @@ export class WorldScene {
     bindAttrTooltip(id, name, desc) {
         const el = document.getElementById(id);
         if (el) {
-            el.onmouseenter = () => this.showTooltip({ name, description: desc });
-            el.onmouseleave = () => this.hideTooltip();
+            el.onmouseenter = () => uiManager.showTooltip({ name, description: desc });
+            el.onmouseleave = () => uiManager.hideTooltip();
         }
     }
 
@@ -362,7 +355,7 @@ export class WorldScene {
             item.onmouseenter = () => {
                 const haste = heroData.stats.haste || 0;
                 const actualCost = Math.floor(skill.cost * (1 - haste));
-                this.showTooltip({
+                uiManager.showTooltip({
                     name: skill.name,
                     level: skill.level,
                     mpCost: `消耗: ${actualCost} 内力`,
@@ -371,41 +364,19 @@ export class WorldScene {
                     description: skill.getDescription(heroData)
                 });
             };
-            item.onmouseleave = () => this.hideTooltip();
+            item.onmouseleave = () => uiManager.hideTooltip();
 
             container.appendChild(item);
         });
     }
 
     setupTooltip() {
-        this.tooltip = document.getElementById('game-tooltip');
-        if (!this.tooltip) return;
-        
-        this.tooltipTitle = this.tooltip.querySelector('.tooltip-title');
-        this.tooltipLevel = this.tooltip.querySelector('.tooltip-level');
-        this.tooltipEffect = this.tooltip.querySelector('.tooltip-effect');
-        this.tooltipDesc = this.tooltip.querySelector('.tooltip-desc');
-
         window.addEventListener('mousemove', (e) => {
             // 1. 更新鼠标归一化坐标用于 Raycaster
             this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
-            // 2. 更新浮动框位置
-            if (!this.tooltip.classList.contains('hidden')) {
-                const x = e.clientX + 15;
-                const y = e.clientY + 15;
-                const tooltipWidth = this.tooltip.offsetWidth;
-                const tooltipHeight = this.tooltip.offsetHeight;
-                
-                const finalX = (x + tooltipWidth > window.innerWidth) ? (e.clientX - tooltipWidth - 15) : x;
-                const finalY = (y + tooltipHeight > window.innerHeight) ? (e.clientY - tooltipHeight - 15) : y;
-                
-                this.tooltip.style.left = `${finalX}px`;
-                this.tooltip.style.top = `${finalY}px`;
-            }
-
-            // 3. 执行射线检测
+            // 2. 执行射线检测
             this.updateHover();
         });
     }
@@ -424,7 +395,7 @@ export class WorldScene {
 
         if (isUIOpen) {
             if (this.hoveredObject) {
-                this.hideTooltip();
+                uiManager.hideTooltip();
                 this.hoveredObject = null;
             }
             return;
@@ -447,80 +418,19 @@ export class WorldScene {
             if (hitObj && hitObj !== this.hoveredObject) {
                 const tooltipData = hitObj.getTooltipData();
                 if (tooltipData) {
-                    this.showTooltip(tooltipData);
+                    uiManager.showTooltip(tooltipData);
                     this.hoveredObject = hitObj;
                 } else {
-                    this.hideTooltip();
+                    uiManager.hideTooltip();
                     this.hoveredObject = null;
                 }
             }
         } else {
             if (this.hoveredObject) {
-                this.hideTooltip();
+                uiManager.hideTooltip();
                 this.hoveredObject = null;
             }
         }
-    }
-
-    showTooltip(data) {
-        if (!this.tooltip) return;
-
-        // 核心改动：支持带等级的标题渲染
-        if (data.level && (data.level === '初级' || data.level === '高级' || data.level === '绝技')) {
-            this.tooltipTitle.innerHTML = `
-                <span>${data.name}</span>
-                <span class="skill-level-tag level-${data.level}">${data.level}</span>
-            `;
-        } else {
-            this.tooltipTitle.innerText = data.name;
-        }
-        
-        // 修正：智能处理不同类型的提示框数据
-        if (data.mpCost || data.level !== undefined || data.cdText) {
-            // 如果是技能且有 MP 消耗或冷却
-            if (data.mpCost || data.cdText) {
-                this.tooltipLevel.innerHTML = `
-                    <span>${data.mpCost || ''}</span>
-                    <span>${data.cdText || ''}</span>
-                `;
-            } else if (typeof data.level === 'number' && data.maxLevel !== undefined) {
-                // 建筑等级模式：当前等级 / 最高等级
-                this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
-            } else if (typeof data.level === 'string' && data.maxLevel !== undefined) {
-                // 键值对模式：例如 "预计难度: 简单"
-                this.tooltipLevel.innerText = `${data.level}: ${data.maxLevel}`;
-            } else if (data.status) {
-                // 学习列表模式
-                this.tooltipLevel.innerText = data.status;
-            } else {
-                // 兵种属性模式：直接显示传入的字符串
-                this.tooltipLevel.innerText = data.level;
-            }
-            
-            if (data.color) {
-                this.tooltipLevel.style.color = data.color;
-            } else {
-                this.tooltipLevel.style.color = '#ffffff';
-            }
-            this.tooltipLevel.classList.remove('hidden');
-        } else {
-            this.tooltipLevel.classList.add('hidden');
-        }
-
-        // 技能冷却等显眼信息现在合并到了 tooltipLevel 中，因此隐藏 tooltipEffect
-        if (data.description) {
-            this.tooltipEffect.classList.add('hidden'); // 确保显眼的特效行被隐藏
-            this.tooltipDesc.innerHTML = data.description;
-            this.tooltipDesc.classList.remove('hidden');
-        } else {
-            this.tooltipDesc.classList.add('hidden');
-        }
-
-        this.tooltip.classList.remove('hidden');
-    }
-
-    hideTooltip() {
-        if (this.tooltip) this.tooltip.classList.add('hidden');
     }
 
     openTownManagement(cityId, isPhysical = false) {
@@ -591,8 +501,8 @@ export class WorldScene {
                     <span class="building-cost">${isMax ? '已满级' : `💰${build.cost.gold} 🪵${build.cost.wood}`}</span>
                 `;
                 
-                card.onmouseenter = () => this.showTooltip(build);
-                card.onmouseleave = () => this.hideTooltip();
+                card.onmouseenter = () => uiManager.showTooltip(build);
+                card.onmouseleave = () => uiManager.hideTooltip();
 
                 card.onclick = () => {
                     if (isMax) return;
@@ -668,13 +578,13 @@ export class WorldScene {
         // 遵照要求：UI 上依然统一显示为“伤害”，不再显示“秒伤”等现代术语
         const label = '伤害'; 
         
-        element.onmouseenter = () => this.showTooltip({
+        element.onmouseenter = () => uiManager.showTooltip({
             name: stats.name,
             level: `气血:${stats.hp} | ${label}:${stats.dps} | 占用:${cost}`,
             description: stats.description,
             color: '#d4af37' // 武侠金色
         });
-        element.onmouseleave = () => this.hideTooltip();
+        element.onmouseleave = () => uiManager.hideTooltip();
     }
 
     createArmySlot(type, count, onClick) {

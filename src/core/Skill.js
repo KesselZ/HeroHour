@@ -132,107 +132,114 @@ export class Skill {
 
         // 2. 顺序执行 Actions
         this.actions.forEach(action => {
-            // 功式强度系数
             const skillPower = 1 + (heroStats.spells || 0) / 100;
             const center = targetPos || caster.position;
-
-            switch (action.type) {
-                case 'vfx':
-                    const vfxParams = { ...action.params };
-                    // 同样支持 VFX 持续时间受功法强度加成
-                    if (vfxParams.duration && (action.applySkillPowerToDuration || vfxParams.applySkillPowerToDuration)) {
-                        vfxParams.duration *= skillPower;
-                    }
-                    battleScene.playVFX(action.name, {
-                        pos: center,
-                        ...vfxParams
-                    });
-                    break;
-
-                case 'damage_aoe':
-                    const targets = battleScene.getUnitsInArea(center, this.targeting, 'enemy');
-                    battleScene.applyDamageToUnits(targets, action.value * skillPower, center, action.knockback);
-                    break;
-
-                case 'buff_aoe':
-                    const buffTargets = battleScene.getUnitsInArea(center, this.targeting, action.side || 'all');
-                    const isDynamicBuff = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
-                    
-                    const buffParams = { ...action.params };
-                    
-                    // 处理倍率型加成
-                    if (buffParams.multiplier) {
-                        buffParams.multiplier = Array.isArray(buffParams.multiplier) 
-                            ? buffParams.multiplier.map(m => 1.0 + (m - 1.0) * skillPower)
-                            : (1.0 + (buffParams.multiplier - 1.0) * skillPower);
-                    }
-                    
-                    // 处理偏移型加成 (如化三清)
-                    if (buffParams.offset) {
-                        buffParams.offset = Array.isArray(buffParams.offset)
-                            ? buffParams.offset.map(o => o * skillPower)
-                            : (buffParams.offset * skillPower);
-                    }
-
-                    battleScene.applyBuffToUnits(buffTargets, {
-                        ...buffParams,
-                        duration: isDynamicBuff 
-                            ? action.params.duration * skillPower 
-                            : action.params.duration
-                    });
-                    break;
-
-                case 'tick_effect':
-                    const isDynamicTick = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
-                    battleScene.applyTickEffect(center, this.targeting, {
-                        duration: isDynamicTick ? action.duration * skillPower : action.duration,
-                        interval: action.interval,
-                        targetSide: 'enemy',
-                        onTick: (enemies) => {
-                            if (action.onTickDamage) {
-                                battleScene.applyDamageToUnits(enemies, action.onTickDamage * skillPower, center, action.knockback);
-                            }
-                        }
-                    });
-                    break;
-
-                case 'summon':
-                    battleScene.spawnSupportUnits(action.unitType, action.count, center);
-                    break;
-
-                case 'movement':
-                    battleScene.executeMovement(caster, action.moveType, center, {
-                        duration: action.duration,
-                        damage: action.damage * skillPower,
-                        knockback: action.knockback
-                    });
-                    break;
-
-                case 'status_aoe':
-                    const statusTargets = battleScene.getUnitsInArea(center, this.targeting, 'enemy');
-                    battleScene.applyStatusToUnits(statusTargets, action.status, action.duration);
-                    break;
-
-                case 'projectile':
-                    // 获取初始目标
-                    const initialTargets = battleScene.getUnitsInArea(center, this.targeting, 'enemy');
-                    battleScene.spawnProjectiles({
-                        count: action.count || 1,
-                        interval: action.interval || 100,
-                        startPos: caster.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
-                        target: initialTargets[0], 
-                        damage: action.damage * skillPower,
-                        speed: action.speed || 0.2,
-                        type: action.projType || 'air_sword',
-                        color: action.color || 0x88ffff,
-                        autoTarget: action.autoTarget !== false, // 默认开启自动寻敌
-                        targetMode: action.targetMode || 'random', // 新增：支持索敌模式
-                        spread: action.spread || 0.5
-                    });
-                    break;
-            }
+            this._executeAction(action, battleScene, caster, center, skillPower);
         });
 
         return true;
+    }
+
+    /**
+     * 内部方法：执行单个动作逻辑（实现高度复用）
+     */
+    _executeAction(action, battleScene, caster, center, skillPower) {
+        switch (action.type) {
+            case 'vfx':
+                const vfxParams = { ...action.params };
+                if (vfxParams.duration && (action.applySkillPowerToDuration || vfxParams.applySkillPowerToDuration)) {
+                    vfxParams.duration *= skillPower;
+                }
+                battleScene.playVFX(action.name, { pos: center, ...vfxParams });
+                break;
+
+            case 'damage_aoe':
+                const dmgTargeting = { ...this.targeting, ...(action.targeting || {}) };
+                if (dmgTargeting.shape === 'sector') {
+                    dmgTargeting.facing = caster.getWorldDirection(new THREE.Vector3());
+                }
+                const targets = battleScene.getUnitsInArea(center, dmgTargeting, 'enemy');
+                battleScene.applyDamageToUnits(targets, action.value * skillPower, center, action.knockback);
+                break;
+
+            case 'buff_aoe':
+                const buffTargets = battleScene.getUnitsInArea(center, this.targeting, action.side || 'all');
+                const isDynamicBuff = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
+                const buffParams = { ...action.params };
+                if (buffParams.multiplier) {
+                    buffParams.multiplier = Array.isArray(buffParams.multiplier) 
+                        ? buffParams.multiplier.map(m => 1.0 + (m - 1.0) * skillPower)
+                        : (1.0 + (buffParams.multiplier - 1.0) * skillPower);
+                }
+                if (buffParams.offset) {
+                    buffParams.offset = Array.isArray(buffParams.offset)
+                        ? buffParams.offset.map(o => o * skillPower)
+                        : (buffParams.offset * skillPower);
+                }
+                battleScene.applyBuffToUnits(buffTargets, {
+                    ...buffParams,
+                    duration: isDynamicBuff ? action.params.duration * skillPower : action.params.duration
+                });
+                break;
+
+            case 'tick_effect':
+                const isDynamicTick = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
+                battleScene.applyTickEffect(center, this.targeting, {
+                    duration: isDynamicTick ? action.duration * skillPower : action.duration,
+                    interval: action.interval,
+                    targetSide: 'enemy',
+                    onTick: (enemies) => {
+                        if (action.onTickDamage) {
+                            battleScene.applyDamageToUnits(enemies, action.onTickDamage * skillPower, center, action.knockback);
+                        }
+                    }
+                });
+                break;
+
+            case 'summon':
+                battleScene.spawnSupportUnits(action.unitType, action.count, center);
+                break;
+
+            case 'movement':
+                const moveOptions = {
+                    duration: action.duration,
+                    damage: (action.damage || 0) * skillPower,
+                    knockback: action.knockback || 0,
+                    jumpHeight: action.jumpHeight || 0 // 新增：支持跳跃弧线
+                };
+
+                // 优雅复用：落地时递归调用 _executeAction
+                if (action.landActions) {
+                    moveOptions.onComplete = () => {
+                        action.landActions.forEach(la => {
+                            this._executeAction(la, battleScene, caster, caster.position.clone(), skillPower);
+                        });
+                    };
+                }
+                battleScene.executeMovement(caster, action.moveType, center, moveOptions);
+                break;
+
+            case 'status_aoe':
+                const statusTargets = battleScene.getUnitsInArea(center, this.targeting, 'enemy');
+                battleScene.applyStatusToUnits(statusTargets, action.status, action.duration);
+                break;
+
+            case 'projectile':
+                const initialTargets = battleScene.getUnitsInArea(center, this.targeting, 'enemy');
+                battleScene.spawnProjectiles({
+                    count: action.count || 1,
+                    interval: action.interval || 100,
+                    startPos: caster.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
+                    target: initialTargets[0], 
+                    damage: action.damage * skillPower,
+                    speed: action.speed || 0.2,
+                    type: action.projType || 'air_sword',
+                    color: action.color || 0x88ffff,
+                    autoTarget: action.autoTarget !== false,
+                    targetMode: action.targetMode || 'random',
+                    spread: action.spread || 0.5
+                });
+                break;
+        }
     }
 }
