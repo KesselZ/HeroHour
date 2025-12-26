@@ -536,11 +536,11 @@ class WorldManager {
             let w = template.baseWeight || 0;
             if (w <= 0 && !template.sectHero) continue; // 排除无权重的非门派单位
 
-            // 新手村平滑保护 (仅影响 45m 内)
+            // 稻香村平滑保护 (仅影响 45m 内)
             if (distToPlayer < 45) {
                 const protectionFactor = distToPlayer / 45; // 0.0(中心) -> 1.0(边缘)
                 if (template.isBasic) {
-                    // 越简单的怪，在新手村附近的权重提升越夸张
+                    // 越简单的怪，在稻香村附近的权重提升越夸张
                     // 特别针对最简单的“林间小生灵”和“山贼前哨”
                     let simplicityBonus = 5;
                     if (id === 'woodland_critters') simplicityBonus = 15; // 极大幅度提升
@@ -548,7 +548,7 @@ class WorldManager {
                     
                     w *= (1 + (1 - protectionFactor) * simplicityBonus);
                 } else {
-                    // 强力怪在新手村附近几乎绝迹 (使用二次方衰减)
+                    // 强力怪在稻香村附近几乎绝迹 (使用二次方衰减)
                     w *= Math.pow(protectionFactor, 2); 
                 }
             }
@@ -801,7 +801,7 @@ class WorldManager {
             this.mapState.playerPos = { x: px, z: pz };
             
             const pCity = this.cities['main_city_1'];
-            pCity.name = "新手村"; 
+            pCity.name = "稻香村"; 
             pCity.x = px;
             pCity.z = pz;
             const playerSect = this.availableHeroes[this.heroData.id]?.sect || 'chunyang';

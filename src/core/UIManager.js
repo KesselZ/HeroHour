@@ -1,6 +1,7 @@
 import { spriteFactory } from './SpriteFactory.js';
 import { SkillRegistry, SectSkills } from './SkillRegistry.js';
 import { worldManager } from './WorldManager.js';
+import { SECT_INTRO } from '../data/HowToPlayContent.js';
 
 /**
  * UIManager: 统一管理全局 UI 逻辑（如 Tooltip、面板切换等）
@@ -70,6 +71,18 @@ class UIManager {
         if (!container) return;
 
         container.innerHTML = '';
+
+        // 1. 注入门派介绍（简化版一段话）
+        const introText = SECT_INTRO[sect];
+        if (introText) {
+            const introCard = document.createElement('div');
+            introCard.className = 'sect-intro-card';
+            introCard.innerHTML = `
+                <div class="sect-intro-desc">${introText}</div>
+            `;
+            container.appendChild(introCard);
+        }
+
         const skillIds = SectSkills[sect] || [];
         
         // 招式图谱作为展示工具，不再受当前英雄属性影响，显示原始属性
@@ -132,14 +145,17 @@ class UIManager {
                     <span>${data.mpCost || ''}</span>
                     <span>${data.cdText || ''}</span>
                 `;
-            } else if (typeof data.level === 'number' && data.maxLevel !== undefined) {
-                // 建筑等级模式
+            } else if (typeof data.level === 'number' && data.maxLevel !== undefined && typeof data.maxLevel === 'number') {
+                // 建筑等级模式 (数字型)
                 this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
             } else if (data.status) {
                 // 状态模式
                 this.tooltipLevel.innerText = data.status;
+            } else if (data.level && data.maxLevel) {
+                // 通用双行模式 (例如：预计难度: 简单)
+                this.tooltipLevel.innerText = `${data.level}: ${data.maxLevel}`;
             } else {
-                // 通用文字模式
+                // 通用单文字模式
                 this.tooltipLevel.innerText = data.level || '';
             }
 

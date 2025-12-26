@@ -95,7 +95,7 @@ export class BattleScene {
     }
 
     start() {
-        console.log("剑网三大乱斗：进入部署阶段");
+        console.log("稻香村发展计划：进入部署阶段");
         this.isActive = false; 
         this.isDeployment = true;
         

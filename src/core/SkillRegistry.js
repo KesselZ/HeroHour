@@ -72,7 +72,7 @@ export const SkillRegistry = {
         description: '激发起全军斗志，所有友军攻击力提升 {bonus}%，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'pulse', params: { color: 0xffaa00, duration: 800, radius: 10 } },
-            { type: 'buff_aoe', side: 'player', params: { stat: 'attackDamage', multiplier: 1.5, duration: 5000, color: 0xffaa00, radius: 12 } }
+            { type: 'buff_aoe', side: 'player', params: { stat: 'attackDamage', multiplier: 1.3, duration: 5000, color: 0xffaa00, radius: 12 } }
         ]
     }),
     'summon_militia': new Skill('summon_militia', {
@@ -359,7 +359,7 @@ export const SkillRegistry = {
         cost: 40,
         cooldown: 10000,
         targeting: { type: 'location', range: 8, impactRadius: 2.5 },
-        description: '【重剑招式】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害并强力击退敌人',
+        description: '【重剑招式】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害、强力击退并眩晕敌人 2 秒',
         actions: [
             { 
                 type: 'movement', 
@@ -369,7 +369,8 @@ export const SkillRegistry = {
                 landActions: [
                     // 修复：增大落地半径至 2.5
                     { type: 'vfx', name: 'stomp', params: { color: 0xffcc00, radius: 2.5, duration: 800 } },
-                    { type: 'damage_aoe', value: 80, knockback: 0.5, targeting: { shape: 'circle', radius: 2.5 } }
+                    { type: 'damage_aoe', value: 80, knockback: 0.5, targeting: { shape: 'circle', radius: 2.5 } },
+                    { type: 'status_aoe', status: 'stun', duration: 2000, targeting: { shape: 'circle', radius: 2.5 } }
                 ]
             }
         ]
@@ -395,7 +396,7 @@ export const SkillRegistry = {
         icon: 'skill_songshe',
         cost: 65,
         cooldown: 7500,
-        targeting: { type: 'location', range: 10, impactRadius: 0.5 },
+        targeting: { type: 'location', range: 10, impactRadius: 1.0 },
         description: '【重剑绝学】以极速俯冲目标，造成 {damage} 点高额爆发伤害并击退周围敌人',
         actions: [
             { 
@@ -404,9 +405,9 @@ export const SkillRegistry = {
                 duration: 350, 
                 jumpHeight: 0, // 修复：松舍问霞改为突的冲锋感，高度为 0
                 landActions: [
-                    // 修复：极小范围点杀，半径设为 0.5
-                    { type: 'vfx', name: 'stomp', params: { color: 0xff4400, radius: 0.5, duration: 1000 } },
-                    { type: 'damage_aoe', value: 145, knockback: 0.3, targeting: { shape: 'circle', radius: 0.5 } }
+                    // 修复：范围扩大一倍至 1.0
+                    { type: 'vfx', name: 'stomp', params: { color: 0xff4400, radius: 1.0, duration: 1000 } },
+                    { type: 'damage_aoe', value: 145, knockback: 0.3, targeting: { shape: 'circle', radius: 1.0 } }
                 ]
             }
         ]

@@ -39,6 +39,7 @@ export class WorldScene {
 
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
+        this.onPointerMove = this.onPointerMove.bind(this); // 核心修复：绑定指针移动事件
     }
 
     /**
@@ -185,8 +186,6 @@ export class WorldScene {
 
         worldManager.updateHUD();
         this.updateHeroHUD(); 
-
-        this.setupTooltip();
     }
 
     updateHeroHUD() {
@@ -301,15 +300,15 @@ export class WorldScene {
         }
     }
 
-    setupTooltip() {
-        window.addEventListener('mousemove', (e) => {
-            // 1. 更新鼠标归一化坐标用于 Raycaster
-            this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    onPointerMove(e) {
+        if (!this.isActive) return;
+        
+        // 1. 更新鼠标归一化坐标用于 Raycaster
+        this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
-            // 2. 执行射线检测
-            this.updateHover();
-        });
+        // 2. 执行射线检测
+        this.updateHover();
     }
 
     updateHover() {
@@ -339,12 +338,20 @@ export class WorldScene {
             .filter(item => item.mesh)
             .map(item => item.mesh);
             
-        const intersects = this.raycaster.intersectObjects(objectsToIntersect, false);
+        // 核心修复：开启递归检测 (true)，支持 Group 等复合对象
+        const intersects = this.raycaster.intersectObjects(objectsToIntersect, true);
 
         if (intersects.length > 0) {
             const hitMesh = intersects[0].object;
-            // 找到对应的 WorldObject
-            const hitObj = this.interactables.find(item => item.mesh === hitMesh);
+            // 核心修复：不仅匹配顶层 mesh，也匹配子级 mesh 所属的 WorldObject
+            const hitObj = this.interactables.find(item => {
+                if (item.mesh === hitMesh) return true;
+                let found = false;
+                item.mesh.traverse(child => {
+                    if (child === hitMesh) found = true;
+                });
+                return found;
+            });
             
             if (hitObj && hitObj !== this.hoveredObject) {
                 const tooltipData = hitObj.getTooltipData();
@@ -719,6 +726,7 @@ export class WorldScene {
         this.isActive = true;
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
+        window.addEventListener('pointermove', this.onPointerMove); // 核心修复：注册指针监听
         
         const hud = document.getElementById('world-ui');
         if (hud) {
@@ -738,6 +746,7 @@ export class WorldScene {
         this.isActive = false;
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
+        window.removeEventListener('pointermove', this.onPointerMove); // 核心修复：移除指针监听
         
         if (this.playerHero) {
             worldManager.savePlayerPos(this.playerHero.position.x, this.playerHero.position.z);

@@ -239,7 +239,7 @@ export class VFXLibrary {
         this.createParticleSystem({
             pos: pos.clone(),
             parent: actualParent,
-            color: 0x887766, // 泥土颜色
+            color: 0x887766, // 恢复原本的泥土/灰色
             duration: 500,
             density: 10.0, // 数量提升 5 倍 (之前是 2.0)
             spawnRate: 30, // 频率提高 (之前是 50)
@@ -248,13 +248,13 @@ export class VFXLibrary {
                 const r = Math.random() * radius;
                 const theta = Math.random() * Math.PI * 2;
                 p.position.set(Math.cos(theta) * r, 0, Math.sin(theta) * r);
-                p.userData.velY = 0.15 + Math.random() * 0.15; // 爆发力增强
+                p.userData.velY = 0.1 + Math.random() * 0.1; // 降低高度
                 p.rotation.set(Math.random() * 10, Math.random() * 10, Math.random() * 10);
             },
             updateFn: (p, prg) => {
                 // 向上跳起后落下
                 p.position.y += p.userData.velY;
-                p.userData.velY -= 0.01; // 简单的重力模拟
+                p.userData.velY -= 0.015; // 增加重力模拟，落地更快
                 if (p.position.y < 0) p.position.y = 0;
                 
                 p.rotation.x += 0.1;
