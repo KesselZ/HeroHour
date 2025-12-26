@@ -49,73 +49,79 @@ export class Skill {
         let foundDuration = null;
         let isDurationDynamic = false;
 
-        this.actions.forEach(action => {
-            // 1. 伤害数值处理
-            const damageVal = action.value || action.damage || action.onTickDamage;
-            if (damageVal) {
-                const finalDmg = Math.floor(damageVal * skillPower);
-                desc = desc.split('{damage}').join(hl(finalDmg));
-                desc = desc.split('{tickDamage}').join(hl(finalDmg));
-            }
-
-            // 2. 持续时间预处理：如果是 VFX 且持续时间很短，除非没有别的选择，否则不作为主 duration
-            const baseDur = action.duration || (action.params && action.params.duration);
-            if (baseDur) {
-                const isVFX = action.type === 'vfx';
-                const isDynamic = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
-                
-                // 优先级：逻辑动作 > VFX 动作；长持续时间 > 短持续时间
-                if (foundDuration === null || (!isVFX && baseDur > 1000)) {
-                    foundDuration = baseDur;
-                    isDurationDynamic = isDynamic;
+        const processActions = (actions) => {
+            actions.forEach(action => {
+                // 1. 伤害数值处理
+                const damageVal = action.value || action.damage || action.onTickDamage;
+                if (damageVal) {
+                    const finalDmg = Math.floor(damageVal * skillPower);
+                    desc = desc.split('{damage}').join(hl(finalDmg));
+                    desc = desc.split('{tickDamage}').join(hl(finalDmg));
                 }
-            }
 
-            // 3. 控制时长
-            if (action.type === 'status_aoe' && action.duration) {
-                const dur = (action.duration / 1000).toFixed(1);
-                desc = desc.split('{stunDuration}').join(normal(dur));
-            }
-
-            // 4. Buff 加成
-            if (action.type === 'buff_aoe' && action.params) {
-                const p = action.params;
-                const isMultDynamic = action.applySkillPowerToMultiplier !== false;
-                
-                if (p.multiplier) {
-                    const multipliers = Array.isArray(p.multiplier) ? p.multiplier : [p.multiplier];
-                    const stats = Array.isArray(p.stat) ? p.stat : [p.stat];
-
-                    multipliers.forEach((m, idx) => {
-                        const statName = stats[idx] || stats[0];
-                        const currentPower = isMultDynamic ? skillPower : 1.0;
-                        
-                        let bonusPct;
-                        if (statName === 'damageResist') {
-                            // 核心修复：0.2 应该显示为 80% (1 - 0.2)
-                            bonusPct = Math.abs(Math.round((1.0 - m) * currentPower * 100));
-                        } else {
-                            // 增益类：1.5 应该显示为 50%
-                            bonusPct = Math.abs(Math.round((m - 1.0) * currentPower * 100));
-                        }
-                        
-                        const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
-                        desc = desc.split(placeholder).join(isMultDynamic ? hl(bonusPct) : normal(bonusPct));
-                    });
+                // 2. 持续时间预处理：如果是 VFX 且持续时间很短，除非没有别的选择，否则不作为主 duration
+                const baseDur = action.duration || (action.params && action.params.duration);
+                if (baseDur) {
+                    const isVFX = action.type === 'vfx';
+                    const isDynamic = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
+                    
+                    // 优先级：逻辑动作 > VFX 动作；长持续时间 > 短持续时间
+                    if (foundDuration === null || (!isVFX && baseDur > 1000)) {
+                        foundDuration = baseDur;
+                        isDurationDynamic = isDynamic;
+                    }
                 }
-                // ... offset 处理保持不变 ...
-                if (p.offset) {
-                    const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
-                    offsets.forEach((o, idx) => {
-                        const finalVal = Math.abs(o) < 1 ? Math.round(o * skillPower * 100) : Math.round(o * skillPower);
-                        const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
-                        desc = desc.split(placeholder).join(hl(finalVal));
-                    });
-                }
-            }
 
-            if (action.count) desc = desc.split('{count}').join(normal(action.count));
-        });
+                // 3. 控制时长
+                if (action.type === 'status_aoe' && action.duration) {
+                    const dur = (action.duration / 1000).toFixed(1);
+                    desc = desc.split('{stunDuration}').join(normal(dur));
+                }
+
+                // 4. Buff 加成
+                if (action.type === 'buff_aoe' && action.params) {
+                    const p = action.params;
+                    const isMultDynamic = action.applySkillPowerToMultiplier !== false;
+                    
+                    if (p.multiplier) {
+                        const multipliers = Array.isArray(p.multiplier) ? p.multiplier : [p.multiplier];
+                        const stats = Array.isArray(p.stat) ? p.stat : [p.stat];
+
+                        multipliers.forEach((m, idx) => {
+                            const statName = stats[idx] || stats[0];
+                            const currentPower = isMultDynamic ? skillPower : 1.0;
+                            
+                            let bonusPct;
+                            if (statName === 'damageResist') {
+                                bonusPct = Math.abs(Math.round((1.0 - m) * currentPower * 100));
+                            } else {
+                                bonusPct = Math.abs(Math.round((m - 1.0) * currentPower * 100));
+                            }
+                            
+                            const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
+                            desc = desc.split(placeholder).join(isMultDynamic ? hl(bonusPct) : normal(bonusPct));
+                        });
+                    }
+                    if (p.offset) {
+                        const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
+                        offsets.forEach((o, idx) => {
+                            const finalVal = Math.abs(o) < 1 ? Math.round(o * skillPower * 100) : Math.round(o * skillPower);
+                            const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
+                            desc = desc.split(placeholder).join(hl(finalVal));
+                        });
+                    }
+                }
+
+                if (action.count) desc = desc.split('{count}').join(normal(action.count));
+
+                // 递归处理子动作（如 movement 的 landActions）
+                if (action.landActions) {
+                    processActions(action.landActions);
+                }
+            });
+        };
+
+        processActions(this.actions);
 
         // 最后替换持续时间
         if (foundDuration !== null) {
@@ -139,6 +145,15 @@ export class Skill {
         
         battleScene.worldManager.heroData.mpCurrent -= actualCost;
         this.lastUsed = Date.now();
+
+        // 核心逻辑：根据技能类别自动切换藏剑形态
+        if (caster.isHero && caster.type === 'yeying') {
+            if (this.category.includes('重剑')) {
+                caster.cangjianStance = 'heavy';
+            } else if (this.category.includes('轻剑')) {
+                caster.cangjianStance = 'light';
+            }
+        }
 
         this.actions.forEach(action => {
             const skillPower = 1 + (heroStats.spells || 0) / 100;

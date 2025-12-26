@@ -697,8 +697,8 @@ export class BattleScene {
             case 'rain': 
                 this.vfxLibrary.createRainVFX(vfxPos, radius, color, duration, density, speed); 
                 break;
-            case 'tornado': 
-                this.vfxLibrary.createTornadoVFX(vfxPos, radius, color, duration, parent); 
+            case 'mega_whirlwind': 
+                this.vfxLibrary.createMegaWhirlwindVFX(vfxPos, radius, color, duration, parent); 
                 break;
             case 'field':
                 this.vfxLibrary.createFieldVFX(vfxPos, radius, color, duration);
@@ -713,6 +713,9 @@ export class BattleScene {
                     initFn: p => { p.position.set((Math.random()-0.5)*0.4, 0, (Math.random()-0.5)*0.4); },
                     updateFn: (p, prg) => { p.position.y += 0.03; p.scale.setScalar(0.5 * (1 - prg)); p.material.opacity = 0.6 * (1 - prg); }
                 });
+                break;
+            case 'butterfly_particles':
+                this.vfxLibrary.createButterflyVFX(parent, color, duration);
                 break;
         }
     }
@@ -814,7 +817,7 @@ export class BattleScene {
     }
 
     applyBuffToUnits(units, options) {
-        const { stat, multiplier, offset, duration, color, vfxName } = options;
+        const { stat, multiplier, offset, duration, color, vfxName, tag } = options;
 
         units.forEach(unit => {
             if (vfxName) this.playVFX(vfxName, { unit, duration, color: color || 0xffffff, radius: unit.isHero ? 1.5 : 0.8 });
@@ -835,7 +838,6 @@ export class BattleScene {
                 } else if (s === 'controlImmune') {
                     unit.isControlImmune = true;
                 } else if (s === 'damageResist') {
-                    // 彻底删除特殊判断，减伤只是一次乘法
                     unit.damageMultiplier *= m;
                 } else if (s === 'tigerHeart') {
                     unit.isTigerHeart = true;
@@ -844,8 +846,8 @@ export class BattleScene {
 
             if (color) unit.unitSprite.material.color.setHex(color);
 
-            // 定时恢复
-            setTimeout(() => {
+            // 定时恢复函数
+            const cleanup = () => {
                 if (!unit.isDead) {
                     stats.forEach((s, i) => {
                         const m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
@@ -867,7 +869,19 @@ export class BattleScene {
                     });
                     if (color) unit.unitSprite.material.color.setHex(0xffffff);
                 }
-            }, duration);
+                // 从单位的 activeBuffs 中移除自己
+                if (tag && unit.activeBuffs) {
+                    unit.activeBuffs = unit.activeBuffs.filter(b => b.timer !== timer);
+                }
+            };
+
+            const timer = setTimeout(cleanup, duration);
+
+            // 如果有 tag，记录到单位身上以便中途取消
+            if (tag) {
+                if (!unit.activeBuffs) unit.activeBuffs = [];
+                unit.activeBuffs.push({ tag, timer, cleanup });
+            }
         });
     }
 

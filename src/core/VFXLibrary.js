@@ -265,22 +265,6 @@ export class VFXLibrary {
         });
     }
 
-    createTornadoVFX(pos, radius, color, duration, parent = null) {
-        this.createParticleSystem({
-            pos, parent, color, duration, density: 2,
-            spawnRate: 50,
-            geometry: new THREE.TorusGeometry(radius * 0.5, 0.05, 8, 24),
-            initFn: p => { p.rotation.x = Math.PI / 2; p.userData.yPos = 0; },
-            updateFn: (p, prg) => {
-                p.rotation.z += 0.2;
-                p.userData.yPos += 0.1;
-                p.position.y = p.userData.yPos;
-                p.scale.setScalar(1 + prg * 2);
-                p.material.opacity = 0.6 * (1 - prg);
-            }
-        });
-    }
-
     createDomeVFX(pos, radius, color, duration) {
         const geo = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
         const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 });
@@ -338,35 +322,300 @@ export class VFXLibrary {
 
     createWhirlwindVFX(pos, radius, color, duration, parent = null) {
         const actualParent = parent || this.scene;
-        const vfx = new THREE.Group();
-        
-        // 核心修复：如果挂载在单位身上，抵消掉单位的缩放，确保 radius 是绝对物理半径
+        const group = new THREE.Group();
+        group.position.copy(pos);
+        group.position.y = 0.5;
+        actualParent.add(group);
+
+        // 抵消父级缩放
         if (parent && parent.scale) {
-            vfx.scale.set(1/parent.scale.x, 1/parent.scale.y, 1/parent.scale.z);
+            group.scale.set(1/parent.scale.x, 1/parent.scale.y, 1/parent.scale.z);
         }
 
-        const bladeGeo = new THREE.BoxGeometry(radius, 0.08, 0.2);
-        const bladeMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
-        const blade = new THREE.Mesh(bladeGeo, bladeMat);
-        // 刀锋中心偏移 radius/2，让旋转半径刚好等于 radius
-        blade.position.x = radius / 2;
-        vfx.add(blade);
-        vfx.position.copy(pos).y = 0.4;
-        actualParent.add(vfx);
+        // 1. 创建多层旋转剑气圆环 (Sword Trails)
+        const trailCount = 3;
+        const meshes = [];
+        for (let i = 0; i < trailCount; i++) {
+            const innerR = radius * (0.6 + i * 0.1);
+            const outerR = radius * (0.8 + i * 0.1);
+            // 使用 RingGeometry 模拟剑气轨迹
+            const geo = new THREE.RingGeometry(innerR, outerR, 32, 1, Math.random() * Math.PI, Math.PI * 1.2);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color, 
+                transparent: true, 
+                opacity: 0.5 - i * 0.1,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.y = i * 0.15;
+            group.add(mesh);
+            meshes.push({ mesh, mat, speed: 0.15 + i * 0.05 });
+        }
 
-        const start = Date.now();
+        // 2. 核心金光
+        const coreGeo = new THREE.SphereGeometry(radius * 0.3, 16, 16);
+        const coreMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        group.add(core);
+
+        const startTime = Date.now();
         const anim = () => {
-            const prg = (Date.now() - start) / duration;
+            const elapsed = Date.now() - startTime;
+            const prg = elapsed / duration;
+
             if (prg < 1) {
-                vfx.rotation.y = prg * Math.PI * 4;
-                bladeMat.opacity = 0.8 * (1 - prg);
+                // 旋转各层轨迹
+                meshes.forEach(item => {
+                    item.mesh.rotation.z += item.speed;
+                    item.mat.opacity = (0.5 - (meshes.indexOf(item) * 0.1)) * (1 - prg);
+                });
+                
+                core.scale.setScalar(1 + Math.sin(elapsed * 0.01) * 0.2);
+                coreMat.opacity = 0.3 * (1 - prg);
+                
                 requestAnimationFrame(anim);
             } else {
-                actualParent.remove(vfx);
-                bladeGeo.dispose(); bladeMat.dispose();
+                actualParent.remove(group);
+                coreGeo.dispose(); coreMat.dispose();
+                meshes.forEach(item => { item.mesh.geometry.dispose(); item.mat.dispose(); });
             }
         };
         anim();
+
+        // 3. 伴随旋转粒子 (Sparks)
+        this.createParticleSystem({
+            pos: pos.clone(),
+            parent: actualParent,
+            color,
+            duration,
+            density: 2,
+            spawnRate: 60,
+            geometry: new THREE.BoxGeometry(0.1, 0.1, 0.1),
+            initFn: (p) => {
+                const angle = Math.random() * Math.PI * 2;
+                const r = radius * (0.5 + Math.random() * 0.5);
+                p.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+                p.userData.angle = angle;
+                p.userData.r = r;
+            },
+            updateFn: (p, prg) => {
+                p.userData.angle += 0.15;
+                p.position.x = Math.cos(p.userData.angle) * p.userData.r;
+                p.position.z = Math.sin(p.userData.angle) * p.userData.r;
+                p.position.y += 0.02;
+                p.material.opacity = 0.8 * (1 - prg);
+                p.scale.setScalar(1 - prg);
+            }
+        });
+    }
+
+    /**
+     * 风来吴山专属特效：巨大巨剑旋风斩
+     */
+    createMegaWhirlwindVFX(pos, radius, color, duration, parent = null) {
+        const actualParent = parent || this.scene;
+        const group = new THREE.Group();
+        group.position.copy(pos);
+        group.position.y = 0.8; // 稍微抬高一点，显得宏大
+        actualParent.add(group);
+
+        if (parent && parent.scale) {
+            group.scale.set(1/parent.scale.x, 1/parent.scale.y, 1/parent.scale.z);
+        }
+
+        // 1. 核心巨剑幻影 (多个长方体模拟巨剑)
+        const swordCount = 4;
+        const swords = [];
+        const swordGeo = new THREE.BoxGeometry(radius * 1.8, 0.2, 0.4); // 很长很宽的剑
+        for (let i = 0; i < swordCount; i++) {
+            const swordMat = new THREE.MeshBasicMaterial({ 
+                color: color, 
+                transparent: true, 
+                opacity: 0.7,
+                depthWrite: false 
+            });
+            const sword = new THREE.Mesh(swordGeo, swordMat);
+            sword.rotation.y = (i * Math.PI * 2) / swordCount;
+            group.add(sword);
+            swords.push({ mesh: sword, mat: swordMat });
+        }
+
+        // 2. 华丽的旋转气浪
+        const waveCount = 5;
+        const waves = [];
+        for (let i = 0; i < waveCount; i++) {
+            const innerR = radius * (0.4 + i * 0.15);
+            const outerR = radius * (0.7 + i * 0.15);
+            const geo = new THREE.RingGeometry(innerR, outerR, 64, 1, Math.random() * Math.PI, Math.PI * 1.5);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: i % 2 === 0 ? color : 0xffffff, // 交替白光和金光
+                transparent: true, 
+                opacity: 0.4,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const wave = new THREE.Mesh(geo, mat);
+            wave.rotation.x = -Math.PI / 2;
+            wave.position.y = (i - 2) * 0.2; // 错落有致
+            group.add(wave);
+            waves.push({ mesh: wave, mat, speed: 0.2 + i * 0.05 });
+        }
+
+        // 3. 底部金色法阵
+        const circleGeo = new THREE.CircleGeometry(radius, 32);
+        const circleMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15 });
+        const circle = new THREE.Mesh(circleGeo, circleMat);
+        circle.rotation.x = -Math.PI / 2;
+        circle.position.y = -0.7;
+        group.add(circle);
+
+        const startTime = Date.now();
+        const anim = () => {
+            const elapsed = Date.now() - startTime;
+            const prg = elapsed / duration;
+
+            if (prg < 1) {
+                // 巨剑旋转：从 0.25 降为 0.1，让巨剑轨迹清晰可见
+                group.rotation.y += 0.1;
+                
+                // 气浪旋转和错动：同样减速，增加厚重感
+                waves.forEach(w => {
+                    w.mesh.rotation.z += w.speed * 0.5;
+                    w.mat.opacity = 0.4 * (1 - prg);
+                });
+
+                swords.forEach(s => {
+                    s.mat.opacity = 0.7 * (1 - prg);
+                });
+
+                circleMat.opacity = 0.15 * (1 - prg);
+                
+                requestAnimationFrame(anim);
+            } else {
+                actualParent.remove(group);
+                swordGeo.dispose();
+                circleGeo.dispose();
+                swords.forEach(s => s.mat.dispose());
+                waves.forEach(w => { w.mesh.geometry.dispose(); w.mat.dispose(); });
+                circleMat.dispose();
+            }
+        };
+        anim();
+
+        // 4. 大量喷发粒子
+        this.createParticleSystem({
+            pos: pos.clone(),
+            parent: actualParent,
+            color: 0xffcc00,
+            duration: duration,
+            density: 4,
+            spawnRate: 40,
+            geometry: new THREE.BoxGeometry(0.15, 0.15, 0.15),
+            initFn: (p) => {
+                const angle = Math.random() * Math.PI * 2;
+                const r = radius * Math.random();
+                p.position.set(Math.cos(angle) * r, -0.5, Math.sin(angle) * r);
+                p.userData.vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.2,
+                    0.1 + Math.random() * 0.2,
+                    (Math.random() - 0.5) * 0.2
+                );
+            },
+            updateFn: (p, prg) => {
+                p.position.add(p.userData.vel);
+                p.rotation.x += 0.2;
+                p.rotation.y += 0.2;
+                p.material.opacity = 0.8 * (1 - prg);
+                p.scale.setScalar(1.5 * (1 - prg));
+            }
+        });
+    }
+
+    /**
+     * 仙女/蝴蝶粒子效果：
+     * 粒子紧随英雄，但在移动时会留下平滑的延迟轨迹
+     */
+    createButterflyVFX(parent, color, duration) {
+        if (!parent) return;
+
+        const startTime = Date.now();
+        const pGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+
+        // 提高发射频率 (30ms)，确保高速移动下轨迹平滑连贯
+        const interval = setInterval(() => {
+            // 如果英雄死亡或效果到期，停止发射
+            if (Date.now() - startTime > duration || parent.isDead) {
+                clearInterval(interval);
+                pGeo.dispose();
+                return;
+            }
+
+            // 每一跳生成 1 个精细粒子
+            const pMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+            const p = new THREE.Mesh(pGeo, pMat);
+            
+            // 初始位置：覆盖整个身体范围，并增加水平散布
+            const angle = Math.random() * Math.PI * 2;
+            const r = 0.2 + Math.random() * 0.8; // 增加水平范围
+            p.position.set(
+                parent.position.x + Math.cos(angle) * r,
+                parent.position.y + Math.random() * 1.2, // 覆盖从脚到头的高度 (假设单位高约 1.2)
+                parent.position.z + Math.sin(angle) * r
+            );
+            
+            // 为每个粒子分配一个独立的追随高度偏置，并增加一个水平轨道偏置，防止其完全汇聚到一点
+            p.userData.targetYOffset = 0.2 + Math.random() * 1.0;
+            const orbitAngle = Math.random() * Math.PI * 2;
+            const orbitR = 0.3 + Math.random() * 0.7; // 粒子会趋向于角色周围的这个点，而不是角色中心
+            p.userData.orbitX = Math.cos(orbitAngle) * orbitR;
+            p.userData.orbitZ = Math.sin(orbitAngle) * orbitR;
+            
+            // 直接加入场景，使其拥有独立的世界坐标
+            this.scene.add(p);
+
+            const pStart = Date.now();
+            const pDur = 800 + Math.random() * 400; // 粒子寿命稍长一些，让轨迹更明显
+            
+            // 粒子个体的摆动相位
+            const phase = Math.random() * Math.PI * 2;
+
+            const anim = () => {
+                const elapsed = Date.now() - pStart;
+                const prg = elapsed / pDur;
+                
+                if (prg < 1 && !parent.isDead) {
+                    // 1. 追随逻辑：向角色周围的“舒适区”缓慢汇聚
+                    const targetPos = parent.position.clone().add(new THREE.Vector3(
+                        p.userData.orbitX, 
+                        p.userData.targetYOffset, 
+                        p.userData.orbitZ
+                    ));
+                    
+                    // 降低系数至 0.03，产生极强的滞后感和丝滑感
+                    p.position.lerp(targetPos, 0.03);
+                    
+                    // 2. 浮动逻辑：更大幅度的随机晃动
+                    const time = Date.now() * 0.003;
+                    p.position.x += Math.sin(time + phase) * 0.02;
+                    p.position.y += Math.cos(time * 0.7 + phase) * 0.02;
+                    p.position.z += Math.sin(time * 1.2 + phase) * 0.02;
+                    
+                    // 3. 视觉演变
+                    p.rotation.x += 0.1;
+                    p.rotation.z += 0.1;
+                    p.material.opacity = 0.8 * (1 - prg); // 逐渐透明
+                    p.scale.setScalar(1 - prg * 0.8);      // 逐渐变小
+                    
+                    requestAnimationFrame(anim);
+                } else {
+                    this.scene.remove(p);
+                    pMat.dispose();
+                }
+            };
+            anim();
+        }, 30);
     }
 }
 

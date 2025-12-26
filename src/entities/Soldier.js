@@ -515,6 +515,13 @@ export class HeroUnit extends BaseUnit {
         // 当前血量：如果之前有记录则用记录的，否则用最大血量
         this.health = (heroData.hpCurrent !== undefined && heroData.hpCurrent > 0) ? heroData.hpCurrent : this.maxHealth;
         
+        // --- 藏剑双形态逻辑 ---
+        if (heroData.id === 'yeying') {
+            this._cangjianStance = 'heavy'; // 默认重剑
+            this.unitSprite.material.color.setHex(0xffcc00); // 重剑初始金色
+            this.scale.set(1.5, 1.5, 1.5);
+        }
+        
         // --- 旋风斩逻辑复用 (时间驱动) ---
         this.isSpinning = false; 
         this.spinTimer = 0;
@@ -606,6 +613,42 @@ export class HeroUnit extends BaseUnit {
     }
 
     /**
+     * 藏剑形态管理
+     */
+    get cangjianStance() { return this._cangjianStance; }
+    set cangjianStance(v) {
+        if (this._cangjianStance === v) return;
+        this._cangjianStance = v;
+        
+        const details = worldManager.getUnitDetails('yeying');
+
+        // 切换到重剑形态时，强制中断轻剑特有 Buff (如梦泉虎跑)
+        if (v === 'heavy') {
+            this.clearBuffs('mengquan');
+            this.unitSprite.material.color.setHex(0xffcc00); // 金色
+            this.scale.set(1.5, 1.5, 1.5);
+            this.attackRange = details.range; // 恢复心剑范围 (2.5)
+        } else {
+            this.unitSprite.material.color.setHex(0xffffff); // 原色
+            this.scale.set(1.5, 1.5, 1.5);
+            this.attackRange = 1.0; // 轻剑单体攻击范围缩短
+        }
+    }
+
+    /**
+     * 清除指定标记的 Buff
+     */
+    clearBuffs(tag) {
+        if (!this.activeBuffs) return;
+        const toClear = this.activeBuffs.filter(b => b.tag === tag);
+        toClear.forEach(b => {
+            clearTimeout(b.timer);
+            b.cleanup();
+        });
+        this.activeBuffs = this.activeBuffs.filter(b => b.tag !== tag);
+    }
+
+    /**
      * 英雄数据的代理接口：
      * 允许 BattleScene 中的 Buff 像操作普通属性一样操作功法和调息，并自动同步回 WorldManager
      */
@@ -640,26 +683,41 @@ export class HeroUnit extends BaseUnit {
     performAttack(enemies, allies) {
         const heroId = worldManager.heroData.id;
         const now = Date.now();
-        if (now - this.lastAttackTime < this.attackCooldownTime) return;
+        
+        // 藏剑根据形态决定攻速
+        let actualCD = this.attackCooldownTime;
+        if (heroId === 'yeying') {
+            actualCD = this.cangjianStance === 'heavy' ? this.attackCooldownTime * 1.5 : this.attackCooldownTime * 0.6;
+        }
+
+        if (now - this.lastAttackTime < actualCD) return;
         this.lastAttackTime = now;
 
         const details = worldManager.getUnitDetails(heroId);
         const burstCount = details.burstCount || 1;
 
         if (heroId === 'yeying') {
-            // 叶英：心剑旋风 (对齐爆发次数)
-            for (let i = 0; i < burstCount; i++) {
-                setTimeout(() => {
-                    if (this.isDead) return;
-                    this.onAttackAnimation();
-                    // 自动对齐方向与坐标
-                    window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: details.range, color: 0xffcc00, duration: 250 });
-                    this.executeAOE(enemies, {
-                        radius: details.range,
-                        damage: this.attackDamage,
-                        knockbackForce: 0.05
-                    });
-                }, i * 250);
+            if (this.cangjianStance === 'heavy') {
+                // 重剑模式：心剑旋风 (对齐爆发次数)
+                for (let i = 0; i < burstCount; i++) {
+                    setTimeout(() => {
+                        if (this.isDead) return;
+                        this.onAttackAnimation();
+                        // 自动对齐方向与坐标
+                        window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: details.range, color: 0xffcc00, duration: 250 });
+                        this.executeAOE(enemies, {
+                            radius: details.range,
+                            damage: this.attackDamage,
+                            knockbackForce: 0.05
+                        });
+                    }, i * 250);
+                }
+            } else {
+                // 轻剑模式：普通的单体快速攻击 (类似天策弟子)
+                this.onAttackAnimation();
+                if (this.target && !this.target.isDead) {
+                    this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5);
+                }
             }
         } else if (heroId === 'qijin') {
             this.onAttackAnimation();

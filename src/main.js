@@ -210,7 +210,7 @@ function applyHeroTraits(heroId) {
     // 2. 设定初始技能 (这些也可以数据化，目前暂留)
     if (heroId === 'qijin') worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing'];
     if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'];
-    if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe'];
+    if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'fenglaiwushan'];
 
     // 3. 执行同步与修正注册 (这里会根据 identity 动态计算 hpMax 和 mpMax)
     syncHeroStatsToModifiers();
@@ -239,7 +239,8 @@ function syncHeroStatsToModifiers() {
 
     // 2. 武力与功法：根据身份表动态计算上限
     worldManager.heroData.hpMax = cb.hpBase + (s.power * cb.hpScaling);
-    worldManager.heroData.mpMax = cb.mpBase + (s.spells * cb.mpScaling);
+    // 核心修改：所有人统一 160 基础，每级 +14
+    worldManager.heroData.mpMax = 160 + (worldManager.heroData.level - 1) * 14;
     
     modifierManager.addGlobalModifier({
         id: 'hero_damage_bonus',

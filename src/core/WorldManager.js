@@ -8,7 +8,7 @@ import { SkillRegistry } from './SkillRegistry.js';
 const HERO_IDENTITY = {
     'qijin': {
         initialStats: { power: 7, spells: 12, morale: 6, speed: 11.8, leadership: 20 },
-        combatBase: { atk: 28, hpBase: 300, hpScaling: 5, mpBase: 500, mpScaling: 2, atkScaling: 0.02 }, // 暂时提高 MP 至 500
+        combatBase: { atk: 28, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
             { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
             { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'damage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
@@ -16,7 +16,7 @@ const HERO_IDENTITY = {
     },
     'lichengen': {
         initialStats: { power: 5, spells: 8, morale: 10, speed: 11.8, leadership: 25 }, // 李承恩统帅更高
-        combatBase: { atk: 40, hpBase: 300, hpScaling: 5, mpBase: 500, mpScaling: 1.5, atkScaling: 0.02 }, // 暂时提高 MP 至 500
+        combatBase: { atk: 40, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
             { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
             { id: 'tiance_sect_hp', unitType: 'tiance', stat: 'hp', multiplier: 1.1, description: '骁勇善战：天策兵种气血提高 10%' }
@@ -24,7 +24,7 @@ const HERO_IDENTITY = {
     },
     'yeying': {
         initialStats: { power: 10, spells: 18, morale: 2, speed: 11.8, leadership: 15 }, // 叶英更注重个人武力
-        combatBase: { atk: 8, hpBase: 300, hpScaling: 5, mpBase: 500, mpScaling: 2.5, atkScaling: 0.02 },  // 暂时提高 MP 至 500
+        combatBase: { atk: 8, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
             { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
         ]
@@ -356,8 +356,8 @@ class WorldManager {
             xpMax: 100, // 下一级所需经验
             hpMax: 500,
             hpCurrent: 500,
-            mpMax: 100,
-            mpCurrent: 100,
+            mpMax: 160,
+            mpCurrent: 160,
             skills: [],
             stats: {
                 morale: 40,           // 统帅：军队 (同时影响士兵攻击和血量)
@@ -1434,7 +1434,8 @@ class WorldManager {
             data.hpMax = cb.hpBase + (s.power * cb.hpScaling);
             data.hpCurrent = data.hpMax;
             
-            data.mpMax = cb.mpBase + (s.spells * cb.mpScaling);
+            // 核心修改：所有人统一 160 基础，每级 +14
+            data.mpMax = 160 + (data.level - 1) * 14;
             data.mpCurrent = data.mpMax; // 升级补满状态
 
             console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！`, 'color: #00ff00; font-weight: bold', 'color: #fff');
@@ -1498,7 +1499,7 @@ class WorldManager {
 
             // 英雄的基础数值直接由身份表中的 combatBase 驱动，不再硬编码
             liveStats.hp = cb.hpBase + (s.power * cb.hpScaling); 
-            liveStats.mp = cb.mpBase + (s.spells * cb.mpScaling); 
+            liveStats.mp = 160 + (this.heroData.level - 1) * 14; 
             // 英雄本人攻击力 = 基础攻击 * (1 + 力道 * 攻击成长系数)
             // 采用乘法百分比计算，确保多段攻击职业不会因为固定加成而数值爆炸
             liveStats.atk = cb.atk * (1 + s.power * (cb.atkScaling || 0.05));                

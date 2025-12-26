@@ -870,6 +870,9 @@ export class WorldScene {
 
         console.log(`%c[战斗结束] 结果: ${result.winner}, 目标: ${enemyId}`, "color: #ffaa00");
 
+        // 核心修改：无论输赢，战后血量回满 (侠客不死)，但蓝量保持持久化状态
+        worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
+
         if (result && result.winner === 'player') {
             // 检查是否是城镇
             const cityData = worldManager.cities[enemyId];

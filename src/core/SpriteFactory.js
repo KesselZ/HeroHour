@@ -42,7 +42,9 @@ export const ASSET_REGISTRY = {
         'skill_huasanqing':      { name: '化三清图标', sheet: 'SKILL8', rows: 4, cols: 4, r: 3, c: 1 },
         'skill_hegui':           { name: '鹤归孤山图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 2, c: 2 },
         'skill_fengcha':         { name: '峰插云景图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 2, c: 2 },
-        'skill_songshe':         { name: '松舍问霞图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 4, c: 3 },
+        'skill_songshe':         { name: '松舍问霞图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 2, c: 3 },
+        'skill_mengquan':        { name: '梦泉虎跑图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 4, c: 4 },
+        'skill_pinghu':          { name: '平湖断月图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 1, c: 1 },
 
         // skill4.png 天策系列
         'skill_renchicheng': { name: '任驰骋图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 1, c: 1 },
