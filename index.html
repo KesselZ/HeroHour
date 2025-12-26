@@ -109,29 +109,29 @@
                                 <span>—— 基础潜能 ——</span>
                             </div>
                             <div class="attributes-grid-v4">
-                                <div class="attr-box" id="attr-box-atk">
-                                    <div class="attr-label">攻击</div>
-                                    <div class="attr-val" id="attr-atk">45</div>
+                                <div class="attr-box highlighted" id="attr-box-morale">
+                                    <div class="attr-label">军队</div>
+                                    <div class="attr-val" id="attr-morale">40</div>
                                 </div>
-                                <div class="attr-box" id="attr-box-def">
-                                    <div class="attr-label">坚韧</div>
-                                    <div class="attr-val" id="attr-def">30</div>
+                                <div class="attr-box highlighted" id="attr-box-leadership">
+                                    <div class="attr-label">统御</div>
+                                    <div class="attr-val" id="attr-leadership-max">20</div>
                                 </div>
-                                <div class="attr-box" id="attr-box-power">
+                                <div class="attr-box highlighted" id="attr-box-power">
                                     <div class="attr-label" id="attr-power-label">力道</div>
                                     <div class="attr-val" id="attr-primary-val">50</div>
                                 </div>
                                 <div class="attr-box highlighted" id="attr-box-spells">
-                                    <div class="attr-label">法术</div>
+                                    <div class="attr-label">功法</div>
                                     <div class="attr-val" id="attr-fali">100</div>
+                                </div>
+                                <div class="attr-box highlighted" id="attr-box-haste">
+                                    <div class="attr-label">调息</div>
+                                    <div class="attr-val"><span id="attr-haste">10</span>%</div>
                                 </div>
                                 <div class="attr-box" id="attr-box-speed">
                                     <div class="attr-label">轻功</div>
                                     <div class="attr-val" id="attr-speed">0.08</div>
-                                </div>
-                                <div class="attr-box" id="attr-box-haste">
-                                    <div class="attr-label">加速</div>
-                                    <div class="attr-val"><span id="attr-haste">10</span>%</div>
                                 </div>
                             </div>
                         </div>
@@ -209,7 +209,10 @@
                             <div class="army-label">驻守兵力</div>
                             <div id="town-units-list" class="army-slots-v3"></div>
                         </div>
-                        <div class="army-transfer-divider">⇅</div>
+                        <div class="army-transfer-actions">
+                            <button id="collect-all-btn" class="transfer-btn" title="全部领取至队伍">▶</button>
+                            <button id="deposit-all-btn" class="transfer-btn" title="队伍全部驻守">◀</button>
+                        </div>
                         <div class="army-container hero-army">
                             <div class="army-label">我的队伍</div>
                             <div id="hero-army-list" class="army-slots-v3"></div>
@@ -359,5 +362,6 @@
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>
+
 
 

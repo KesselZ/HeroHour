@@ -44,6 +44,11 @@ export class BaseUnit extends THREE.Group {
         this.attackCooldownTime = modifierManager.getModifiedValue(this, 'attack_speed', attackSpeed);
         
         this.isDead = false;
+        this.isInvincible = false;
+        this.isControlImmune = false; // 新增：控制免疫 (生太极)
+        this.damageResist = 0; // 减伤比例 (0-1)
+        this.isTigerHeart = false; // 啸如虎：锁血状态
+        this.stunnedUntil = 0; // 眩晕截止时间戳
         this.target = null;
         this.lastAttackTime = 0;
         
@@ -102,7 +107,7 @@ export class BaseUnit extends THREE.Group {
      * @param {number} force 击退强度（冲量）
      */
     applyKnockback(fromPosition, force = 0.5) {
-        if (this.isDead) return;
+        if (this.isDead || this.isControlImmune) return;
         
         // 计算从发起点到受击点的方向
         const dir = new THREE.Vector3()
@@ -121,6 +126,11 @@ export class BaseUnit extends THREE.Group {
                 this.unitSprite.material.color.setHex(0xffffff);
             }
         }, 150);
+    }
+
+    applyStun(duration) {
+        if (this.isControlImmune) return;
+        this.stunnedUntil = Math.max(this.stunnedUntil, Date.now() + duration);
     }
 
     /**
@@ -170,6 +180,28 @@ export class BaseUnit extends THREE.Group {
 
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
+
+        // 0. 眩晕状态判定
+        if (Date.now() < this.stunnedUntil) {
+            // 眩晕时变灰
+            if (this.unitSprite) this.unitSprite.material.color.setHex(0x888888);
+            
+            // 眩晕时也要处理物理冲力 (击退)
+            if (this.knockbackVelocity.lengthSq() > 0.0001) {
+                this.position.add(this.knockbackVelocity);
+                this.knockbackVelocity.multiplyScalar(this.knockbackFriction);
+            }
+            // 处理碰撞挤压
+            this.applySeparation(allies, enemies, deltaTime);
+            return;
+        } else {
+            // 恢复颜色 (如果之前是灰的且没有其他 buff 颜色)
+            // 注意：这里可能跟 applyBuffToUnits 的颜色冲突，
+            // 生产环境下建议用一个状态机管理颜色，这里先简单处理
+            if (this.unitSprite && this.unitSprite.material.color.getHex() === 0x888888) {
+                this.unitSprite.material.color.setHex(0xffffff);
+            }
+        }
 
         // 1. 处理物理冲力 (击退位移)
         if (this.knockbackVelocity.lengthSq() > 0.0001) {
@@ -390,7 +422,16 @@ export class BaseUnit extends THREE.Group {
 
     takeDamage(amount) {
         if (this.isDead || this.isInvincible) return;
-        this.health -= amount;
+        
+        // 1. 应用百分比减伤 (如守如山)
+        let finalAmount = amount * (1 - this.damageResist);
+        
+        // 2. 啸如虎：锁血 1 点逻辑
+        if (this.isTigerHeart) {
+            this.health = Math.max(1, this.health - finalAmount);
+        } else {
+            this.health -= finalAmount;
+        }
         
         // 通用受击反馈：强烈的红色闪烁
         const originalColor = 0xffffff;
@@ -633,7 +674,7 @@ export class HeroUnit extends BaseUnit {
                 setTimeout(() => {
                     if (this.isDead) return;
                     this.onAttackAnimation();
-                    this.showWhirlwindSword(details.range, 0xffcc00); // 使用注册表范围 (2.5)
+                    window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: details.range, color: 0xffcc00, duration: 250 });
                     this.executeAOE(enemies, {
                         radius: details.range,
                         damage: this.attackDamage,
@@ -664,8 +705,8 @@ export class HeroUnit extends BaseUnit {
         const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
         attackDir.y = 0;
 
-        // 2. 显示 VFX (完全复用天策骑兵参数)
-        this.showSweepVFX(attackDir, sweepRadius, 0xff4400); 
+        // 2. 显示 VFX (通过全局接口)
+        window.battle.playVFX('tiance_sweep', { pos: this.position, dir: attackDir, radius: sweepRadius, color: 0xff4400, duration: 300 });
 
         // 3. 执行判定 (180度扫击，击退 0.15)
         this.executeAOE(enemies, {
@@ -675,50 +716,6 @@ export class HeroUnit extends BaseUnit {
             knockbackForce: 0.15, // 完全一致
             customDir: attackDir 
         });
-    }
-
-    /**
-     * 视觉：扇形扫击特效 (天策通用，180度参数完全对齐)
-     */
-    showSweepVFX(attackDir, radius, color) {
-        const group = new THREE.Group();
-        const innerRadius = radius * 0.5; // 对齐骑兵比例
-        const outerRadius = radius;
-        
-        // 参数：-PI/2 开始，扫 PI 角度 (即正前方 180 度)
-        const geo = new THREE.RingGeometry(innerRadius, outerRadius, 32, 1, -Math.PI / 2, Math.PI);
-        const mat = new THREE.MeshBasicMaterial({ 
-            color: color, 
-            transparent: true, 
-            opacity: 0.6,
-            side: THREE.DoubleSide,
-            depthWrite: false
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.rotation.x = -Math.PI / 2;
-        group.add(mesh);
-
-        // 调整朝向
-        const angle = Math.atan2(attackDir.x, attackDir.z);
-        group.rotation.y = angle;
-        group.position.y = 0.1;
-        this.add(group);
-
-        const startTime = Date.now();
-        const duration = 300;
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            if (elapsed > duration) {
-                this.remove(group);
-                return;
-            }
-            const p = elapsed / duration;
-            // 简单的比例扩散
-            mesh.scale.set(0.8 + p * 0.4, 0.8 + p * 0.4, 1);
-            mat.opacity = 0.6 * (1 - p);
-            requestAnimationFrame(animate);
-        };
-        animate();
     }
 
     /**
@@ -744,43 +741,6 @@ export class HeroUnit extends BaseUnit {
                 });
             }, i * 100);
         }
-    }
-
-    /**
-     * 视觉：产生一个极速旋转并消失的重剑 (250ms 完美对齐爆发)
-     */
-    showWhirlwindSword(radius, color) {
-        const vfx = new THREE.Group();
-        const bladeGeo = new THREE.BoxGeometry(radius, 0.08, 0.2);
-        const bladeMat = new THREE.MeshBasicMaterial({ 
-            color: color, 
-            transparent: true, 
-            opacity: 0.8 
-        });
-        const blade = new THREE.Mesh(bladeGeo, bladeMat);
-        blade.position.x = radius / 2;
-        vfx.add(blade);
-        vfx.position.y = -0.2;
-        this.add(vfx);
-
-        const startTime = Date.now();
-        const duration = 250; // 精准对齐爆发间隔
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            if (elapsed > duration || this.isDead) {
-                this.remove(vfx);
-                return;
-            }
-            const progress = elapsed / duration;
-            // 旋转速度放慢 20%：从 4 * PI 降至 3.2 * PI
-            // 在 250ms 内旋转约 1.6 圈，视觉更稳健
-            vfx.rotation.y = progress * Math.PI * 3.2; 
-            
-            // 快速渐隐，避免视觉残留
-            bladeMat.opacity = 0.8 * (1 - progress);
-            requestAnimationFrame(animate);
-        };
-        animate();
     }
 }
 
@@ -1100,7 +1060,7 @@ export class Cangjian extends BaseUnit {
                 setTimeout(() => {
                     if (this.isDead) return;
                     this.onAttackAnimation();
-                    this.showWhirlwindSword(details.range, 0xffcc00); // 1.5
+                    window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: details.range, color: 0xffcc00, duration: 500 });
                     this.executeAOE(enemies, {
                         radius: details.range,
                         angle: Math.PI * 2,
@@ -1110,38 +1070,6 @@ export class Cangjian extends BaseUnit {
                 }, i * 250); // 间隔拉长
             }
         }
-    }
-
-    /**
-     * 视觉：产生一个飞速旋转并消失的重剑 (您喜欢的原本动画)
-     */
-    showWhirlwindSword(radius, color) {
-        const vfx = new THREE.Group();
-        const bladeGeo = new THREE.BoxGeometry(radius, 0.08, 0.2);
-        const bladeMat = new THREE.MeshBasicMaterial({ 
-            color: color, 
-            transparent: true, 
-            opacity: 0.8 
-        });
-        const blade = new THREE.Mesh(bladeGeo, bladeMat);
-        blade.position.x = radius / 2;
-        vfx.add(blade);
-        vfx.position.y = -0.2;
-        this.add(vfx);
-
-        const startTime = Date.now();
-        const duration = 500; 
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            if (elapsed > duration || this.isDead) {
-                this.remove(vfx);
-                return;
-            }
-            vfx.rotation.y += 0.6;
-            bladeMat.opacity = 0.8 * (1 - elapsed / duration);
-            requestAnimationFrame(animate);
-        };
-        animate();
     }
 }
 
@@ -1200,8 +1128,8 @@ export class Tiance extends BaseUnit {
             const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
             attackDir.y = 0;
 
-            // 2. 显示 VFX
-            this.showSweepVFX(attackDir); 
+            // 2. 显示 VFX (通过全局接口)
+            window.battle.playVFX('tiance_sweep', { pos: this.position, dir: attackDir, radius: this.sweepRadius, color: 0xff4400, duration: 250 });
 
             // 3. 执行判定
             this.executeAOE(enemies, {
@@ -1212,57 +1140,6 @@ export class Tiance extends BaseUnit {
                 customDir: attackDir 
             });
         }
-    }
-
-    showSweepVFX(attackDir) {
-        const group = new THREE.Group();
-        
-        // 使用 RingGeometry 制作平贴地面的扇形波，比 Torus 更像“横扫剑气”
-        const innerRadius = this.sweepRadius * 0.5;
-        const outerRadius = this.sweepRadius;
-        
-        // 创建一个 180 度的扇形，起点设在 -PI/2，这样其中轴线正好对着正方向
-        const geo = new THREE.RingGeometry(innerRadius, outerRadius, 32, 1, -Math.PI/2, Math.PI);
-        const mat = new THREE.MeshBasicMaterial({ 
-            color: 0xff4400, 
-            transparent: true, 
-            opacity: 0.6,
-            side: THREE.DoubleSide,
-            depthWrite: false
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        
-        // 关键：让扇形平躺在地面
-        mesh.rotation.x = -Math.PI / 2;
-        group.add(mesh);
-
-        // 设置位置并利用 lookAt 指向目标方向点 (复用远程攻击逻辑)
-        group.position.copy(this.position);
-        group.position.y = 0.15;
-        
-        const lookTarget = this.position.clone().add(attackDir);
-        group.lookAt(lookTarget);
-        
-        this.parent.add(group);
-
-        // 特效动画
-        const startTime = Date.now();
-        const duration = 250;
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = elapsed / duration;
-            if (progress < 1) {
-                // 模拟剑气扩散
-                group.scale.set(1 + progress * 0.5, 1 + progress * 0.5, 1);
-                mesh.material.opacity = 0.6 * (1 - progress);
-                requestAnimationFrame(animate);
-            } else {
-                if (group.parent) group.parent.remove(group);
-                geo.dispose();
-                mat.dispose();
-            }
-        };
-        animate();
     }
 }
 
@@ -1314,9 +1191,25 @@ export class Chunyang extends BaseUnit {
             this.onAttackAnimation();
 
             if (this.isMeleeMode) {
-                // 近战：剑击（再次弱化 2 倍：0.06 -> 0.03）
-                this.target.takeDamage(this.attackDamage * 1.5);
-                this.target.applyKnockback(this.position, 0.03); 
+                // 近战：蓝色 120 度顺劈 (调用天策同款特效接口)
+                const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
+                window.battle.playVFX('tiance_sweep', { 
+                    pos: this.position, 
+                    dir: attackDir, 
+                    radius: 1.5, 
+                    color: 0x00ccff, // 纯阳蓝色
+                    angle: Math.PI * 2 / 3, // 120 度
+                    duration: 200 
+                });
+
+                // 造成 AOE 伤害而非单体
+                this.executeAOE(enemies, {
+                    radius: 1.5,
+                    angle: Math.PI * 2 / 3,
+                    damage: this.attackDamage * 1.5,
+                    knockbackForce: 0.03,
+                    customDir: attackDir
+                });
             } else {
                 // 远程：依次射出 3 把气剑
                 const swordCount = 3;

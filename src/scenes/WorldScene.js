@@ -140,6 +140,27 @@ export class WorldScene {
             };
         }
 
+        // --- 调兵按钮逻辑 ---
+        const collectAllBtn = document.getElementById('collect-all-btn');
+        if (collectAllBtn) {
+            collectAllBtn.onclick = () => {
+                if (this.activeCityId) {
+                    worldManager.collectAllFromCity(this.activeCityId);
+                    this.refreshTownUI(this.activeCityId);
+                }
+            };
+        }
+
+        const depositAllBtn = document.getElementById('deposit-all-btn');
+        if (depositAllBtn) {
+            depositAllBtn.onclick = () => {
+                if (this.activeCityId) {
+                    worldManager.depositAllToCity(this.activeCityId);
+                    this.refreshTownUI(this.activeCityId);
+                }
+            };
+        }
+
         const closeHeroBtn = document.getElementById('close-hero-panel');
         if (closeHeroBtn) {
             closeHeroBtn.onclick = () => {
@@ -245,9 +266,9 @@ export class WorldScene {
         const levelDisplay = document.getElementById('hero-level-val');
         if (levelDisplay) levelDisplay.innerText = data.level;
 
-        // 核心属性显示
-        document.getElementById('attr-atk').innerText = data.stats.soldierAtk;
-        document.getElementById('attr-def').innerText = data.stats.soldierDef;
+        // 军队显示
+        const moraleVal = document.getElementById('attr-morale');
+        if (moraleVal) moraleVal.innerText = data.stats.morale;
         const details = worldManager.getUnitDetails(data.id);
         document.getElementById('attr-speed').innerText = details.speed.toFixed(1); 
         
@@ -259,14 +280,17 @@ export class WorldScene {
         document.getElementById('attr-primary-val').innerText = data.stats.power;
         document.getElementById('attr-fali').innerText = data.stats.spells;
         document.getElementById('attr-haste').innerText = Math.floor(data.stats.haste * 100);
+        
+        const leaderMax = document.getElementById('attr-leadership-max');
+        if (leaderMax) leaderMax.innerText = data.stats.leadership;
 
         // 绑定属性 Tooltip (简化介绍，隐藏具体数值)
-        this.bindAttrTooltip('attr-box-atk', '攻击', `统率三军，提升帐下所有士兵的进攻能力`);
-        this.bindAttrTooltip('attr-box-def', '坚韧', `严明军纪，磨炼士卒意志，提升士兵的生存能力`);
+        this.bindAttrTooltip('attr-box-morale', '军队', `统御三军，提升帐下所有士兵的攻击能力与气血上限`);
         this.bindAttrTooltip('attr-box-power', powerName, `修习内功外招，增强侠客自身的体质与劈砍威力`);
-        this.bindAttrTooltip('attr-box-spells', '法术', `通过玄妙法门增强招式威力，使技能爆发出更强的效果`);
+        this.bindAttrTooltip('attr-box-spells', '功法', `通过玄妙法门增强招式威力，使技能爆发出更强的效果`);
         this.bindAttrTooltip('attr-box-speed', '轻功', `身轻如燕，提升侠客行走江湖与临阵对敌时的移动速度`);
-        this.bindAttrTooltip('attr-box-haste', '加速', `提升招式运转速度，使其冷却时间缩短`);
+        this.bindAttrTooltip('attr-box-haste', '调息', `提升招式运转速度，使其冷却时间缩短并降低内力消耗`);
+        this.bindAttrTooltip('attr-box-leadership', '统御', `侠客带兵容量上限，每种兵力产生不同的占用点数`);
         
         const skillsContainer = document.getElementById('hero-panel-skills');
         skillsContainer.innerHTML = '';
@@ -283,12 +307,15 @@ export class WorldScene {
             `;
 
             slot.onmouseenter = () => {
-                const actualCD = (skill.cooldown * (1 - (data.stats.haste || 0)) / 1000).toFixed(1);
+                const haste = data.stats.haste || 0;
+                const actualCD = (skill.cooldown * (1 - haste) / 1000).toFixed(1);
+                const actualCost = Math.floor(skill.cost * (1 - haste));
                 this.showTooltip({
                     name: skill.name,
-                    level: `消耗: ${skill.cost} 内力`,
-                    effect: `冷却: ${actualCD} 秒 (原始: ${skill.cooldown / 1000}s)`,
-                    description: skill.description
+                    level: skill.level,
+                    mpCost: `消耗: ${actualCost} 内力`,
+                    cdText: `冷却: ${actualCD}s`,
+                    description: skill.getDescription(data)
                 });
             };
             slot.onmouseleave = () => this.hideTooltip();
@@ -333,10 +360,15 @@ export class WorldScene {
             `;
 
             item.onmouseenter = () => {
+                const haste = heroData.stats.haste || 0;
+                const actualCost = Math.floor(skill.cost * (1 - haste));
                 this.showTooltip({
                     name: skill.name,
-                    level: isOwned ? '【已习得】' : '【未参透】',
-                    description: skill.description
+                    level: skill.level,
+                    mpCost: `消耗: ${actualCost} 内力`,
+                    cdText: `冷却: ${(skill.cooldown * (1 - haste) / 1000).toFixed(1)}s`,
+                    status: isOwned ? '【已习得】' : '【未参透】',
+                    description: skill.getDescription(heroData)
                 });
             };
             item.onmouseleave = () => this.hideTooltip();
@@ -381,6 +413,23 @@ export class WorldScene {
     updateHover() {
         if (!this.isActive) return;
 
+        // --- 核心修复：防止 Tooltip 穿透 UI 面板 ---
+        const heroPanel = document.getElementById('hero-stats-panel');
+        const townPanel = document.getElementById('town-management-panel');
+        const skillLearnPanel = document.getElementById('skill-learn-panel');
+        
+        const isUIOpen = (heroPanel && !heroPanel.classList.contains('hidden')) || 
+                         (townPanel && !townPanel.classList.contains('hidden')) ||
+                         (skillLearnPanel && !skillLearnPanel.classList.contains('hidden'));
+
+        if (isUIOpen) {
+            if (this.hoveredObject) {
+                this.hideTooltip();
+                this.hoveredObject = null;
+            }
+            return;
+        }
+
         this.raycaster.setFromCamera(this.mouse, this.camera);
         
         // 过滤出有 mesh 的交互物体
@@ -415,16 +464,34 @@ export class WorldScene {
 
     showTooltip(data) {
         if (!this.tooltip) return;
-        this.tooltipTitle.innerText = data.name;
+
+        // 核心改动：支持带等级的标题渲染
+        if (data.level && (data.level === '初级' || data.level === '高级' || data.level === '绝技')) {
+            this.tooltipTitle.innerHTML = `
+                <span>${data.name}</span>
+                <span class="skill-level-tag level-${data.level}">${data.level}</span>
+            `;
+        } else {
+            this.tooltipTitle.innerText = data.name;
+        }
         
         // 修正：智能处理不同类型的提示框数据
-        if (data.level !== undefined) {
-            if (typeof data.level === 'number' && data.maxLevel !== undefined) {
+        if (data.mpCost || data.level !== undefined || data.cdText) {
+            // 如果是技能且有 MP 消耗或冷却
+            if (data.mpCost || data.cdText) {
+                this.tooltipLevel.innerHTML = `
+                    <span>${data.mpCost || ''}</span>
+                    <span>${data.cdText || ''}</span>
+                `;
+            } else if (typeof data.level === 'number' && data.maxLevel !== undefined) {
                 // 建筑等级模式：当前等级 / 最高等级
                 this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
             } else if (typeof data.level === 'string' && data.maxLevel !== undefined) {
                 // 键值对模式：例如 "预计难度: 简单"
                 this.tooltipLevel.innerText = `${data.level}: ${data.maxLevel}`;
+            } else if (data.status) {
+                // 学习列表模式
+                this.tooltipLevel.innerText = data.status;
             } else {
                 // 兵种属性模式：直接显示传入的字符串
                 this.tooltipLevel.innerText = data.level;
@@ -440,15 +507,10 @@ export class WorldScene {
             this.tooltipLevel.classList.add('hidden');
         }
 
-        if (data.effect) {
-            this.tooltipEffect.innerText = `● ${data.effect}`;
-            this.tooltipEffect.classList.remove('hidden');
-        } else {
-            this.tooltipEffect.classList.add('hidden');
-        }
-
+        // 技能冷却等显眼信息现在合并到了 tooltipLevel 中，因此隐藏 tooltipEffect
         if (data.description) {
-            this.tooltipDesc.innerText = data.description;
+            this.tooltipEffect.classList.add('hidden'); // 确保显眼的特效行被隐藏
+            this.tooltipDesc.innerHTML = data.description;
             this.tooltipDesc.classList.remove('hidden');
         } else {
             this.tooltipDesc.classList.add('hidden');
@@ -461,13 +523,15 @@ export class WorldScene {
         if (this.tooltip) this.tooltip.classList.add('hidden');
     }
 
-    openTownManagement(cityId) {
+    openTownManagement(cityId, isPhysical = false) {
         const panel = document.getElementById('town-management-panel');
         const cityData = worldManager.cities[cityId];
         
         if (!cityData) return;
 
         this.activeCityId = cityId; // 必须设置当前激活的城市 ID
+        this.isPhysicalVisit = isPhysical; // 记录是否亲临现场
+
         document.getElementById('town-name').innerText = cityData.name;
         panel.classList.remove('hidden');
 
@@ -483,6 +547,32 @@ export class WorldScene {
         const woodIncome = document.getElementById('town-income-wood');
         if (goldIncome) goldIncome.innerText = cityData.production.gold;
         if (woodIncome) woodIncome.innerText = cityData.production.wood;
+
+        // 更新统御力显示
+        const heroLeadershipLabel = document.querySelector('.hero-army .army-label');
+        if (heroLeadershipLabel) {
+            const current = worldManager.getHeroCurrentLeadership();
+            const max = worldManager.heroData.stats.leadership;
+            heroLeadershipLabel.innerHTML = `我的队伍 <span style="color: ${current > max * 0.8 ? '#ff4444' : 'var(--jx3-celadon)'}">(${current}/${max})</span>`;
+        }
+
+        // --- 核心限制：远程访问不允许调兵 ---
+        const canTransfer = this.isPhysicalVisit;
+        const collectBtn = document.getElementById('collect-all-btn');
+        const depositBtn = document.getElementById('deposit-all-btn');
+        
+        if (collectBtn) {
+            collectBtn.disabled = !canTransfer;
+            collectBtn.title = canTransfer ? "全部领取至队伍" : "必须亲临城市才能领兵";
+            collectBtn.style.opacity = canTransfer ? "1" : "0.3";
+            collectBtn.style.cursor = canTransfer ? "pointer" : "not-allowed";
+        }
+        if (depositBtn) {
+            depositBtn.disabled = !canTransfer;
+            depositBtn.title = canTransfer ? "队伍全部驻守" : "必须亲临城市才能遣散";
+            depositBtn.style.opacity = canTransfer ? "1" : "0.3";
+            depositBtn.style.cursor = canTransfer ? "pointer" : "not-allowed";
+        }
 
         // 1. 刷新建筑面板
         ['economy', 'military', 'magic'].forEach(cat => {
@@ -524,47 +614,25 @@ export class WorldScene {
             const count = cityData.availableUnits[type];
             if (count > 0) {
                 const slot = this.createArmySlot(type, count, () => {
+                    if (!this.isPhysicalVisit) {
+                        worldManager.showNotification("必须亲临城市才能领兵！");
+                        return;
+                    }
                     worldManager.transferToHero(type, 1, cityId);
                     this.refreshTownUI(cityId);
                 });
                 this.bindUnitTooltip(slot, type);
+                // 远程访问样式
+                if (!this.isPhysicalVisit) {
+                    slot.style.opacity = "0.6";
+                    slot.style.cursor = "not-allowed";
+                }
                 townUnitsList.appendChild(slot);
             }
         }
 
         // 3. 刷新可招募列表
-        const recruitList = document.getElementById('town-recruit-list');
-        recruitList.innerHTML = '';
-        worldManager.getAvailableRecruits(cityId).forEach(unitInfo => {
-            const type = unitInfo.type;
-            const details = worldManager.getUnitDetails(type);
-            const item = document.createElement('div');
-            item.className = 'recruit-item';
-            
-            // 计算最终招募价格
-            const baseCost = worldManager.unitCosts[type].gold;
-            const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
-
-            item.innerHTML = `
-                <div class="slot-icon" style="${this.getIconStyleString(type)}"></div>
-                <div class="unit-info">
-                    <span class="unit-name">${details.name}</span>
-                    <span class="unit-cost">💰${finalCost}</span>
-                </div>
-                <button class="wuxia-btn tiny-btn">招募</button>
-            `;
-
-            this.bindUnitTooltip(item, type);
-            item.querySelector('button').onclick = (e) => {
-                e.stopPropagation();
-                if (worldManager.recruitUnit(type, cityId)) {
-                    this.refreshTownUI(cityId);
-                } else {
-                    worldManager.showNotification('金钱不足！');
-                }
-            };
-            recruitList.appendChild(item);
-        });
+        // ... (招募列表不受物理限制，用户说招募没问题)
 
         // 4. 刷新侠客队伍
         const heroArmyList = document.getElementById('hero-army-list');
@@ -573,10 +641,19 @@ export class WorldScene {
             const count = worldManager.heroArmy[type];
             if (count > 0) {
                 const slot = this.createArmySlot(type, count, () => {
+                    if (!this.isPhysicalVisit) {
+                        worldManager.showNotification("必须亲临城市才能调动部队！");
+                        return;
+                    }
                     worldManager.transferToCity(type, 1, cityId);
                     this.refreshTownUI(cityId);
                 });
                 this.bindUnitTooltip(slot, type);
+                // 远程访问样式
+                if (!this.isPhysicalVisit) {
+                    slot.style.opacity = "0.6";
+                    slot.style.cursor = "not-allowed";
+                }
                 heroArmyList.appendChild(slot);
             }
         }
@@ -587,12 +664,13 @@ export class WorldScene {
      */
     bindUnitTooltip(element, type) {
         const stats = worldManager.getUnitDetails(type);
+        const cost = worldManager.unitCosts[type]?.cost || 0;
         // 遵照要求：UI 上依然统一显示为“伤害”，不再显示“秒伤”等现代术语
         const label = '伤害'; 
         
         element.onmouseenter = () => this.showTooltip({
             name: stats.name,
-            level: `气血:${stats.hp} | ${label}:${stats.dps} (${stats.rangeType})`,
+            level: `气血:${stats.hp} | ${label}:${stats.dps} | 占用:${cost}`,
             description: stats.description,
             color: '#d4af37' // 武侠金色
         });

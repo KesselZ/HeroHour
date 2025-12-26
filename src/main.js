@@ -163,8 +163,8 @@ function applyHeroTraits(heroId) {
     }
     
     // 2. 设定初始技能 (这些也可以数据化，目前暂留)
-    if (heroId === 'qijin') worldManager.heroData.skills = ['sword_rain'];
-    if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout'];
+    if (heroId === 'qijin') worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing'];
+    if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'];
     if (heroId === 'yeying') worldManager.heroData.skills = ['fenglaiwushan'];
 
     // 3. 执行同步与修正注册
@@ -184,9 +184,9 @@ function syncHeroStatsToModifiers() {
     const heroId = worldManager.heroData.id;
     modifierManager.clear();
 
-    // 1. 统帅：影响所有士兵 (非 HeroUnit)
-    modifierManager.addGlobalModifier({ id: 'soldier_atk_bonus', side: 'player', stat: 'damage', multiplier: 1.0 + (s.soldierAtk / 100) });
-    modifierManager.addGlobalModifier({ id: 'soldier_hp_bonus', side: 'player', stat: 'hp', multiplier: 1.0 + (s.soldierDef / 100) });
+    // 1. 统帅：军队影响士兵攻击和血量
+    modifierManager.addGlobalModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'damage', multiplier: 1.0 + (s.morale / 100) });
+    modifierManager.addGlobalModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100) });
 
     // 2. 武力：影响英雄本人
     worldManager.heroData.hpMax = 300 + (s.power * 5);

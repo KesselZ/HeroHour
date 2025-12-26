@@ -1051,12 +1051,12 @@ body, html {
 .town-panel-v3 {
     width: 1150px;
     max-width: 96vw;
-    padding: 50px 30px; /* 增加上下边距从 20px 到 50px，避开 40px 高的装饰条 */
+    padding: 42px 30px 45px 30px; /* 恢复底部边距至 45px 以上，以避开 40px 高的底部装饰条 */
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
     background: #f4f0e0;
-    max-height: 94vh;
+    max-height: 96vh;
     border: 6px solid var(--jx3-celadon);
     outline: 2px solid var(--jx3-gold);
     box-sizing: border-box;
@@ -1067,12 +1067,12 @@ body, html {
     align-items: center; /* 改为居中对齐 */
     justify-content: space-between;
     border-bottom: 3px double var(--jx3-celadon);
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     padding: 0 5px;
 }
 
 .town-title-v3 {
-    font-size: 2.2rem;
+    font-size: 1.8rem;
     color: var(--jx3-ink);
     margin: 0; /* 移除外边距 */
     text-align: center;
@@ -1131,7 +1131,7 @@ body, html {
 .town-main-content {
     display: grid;
     grid-template-columns: 1fr 320px;
-    gap: 20px;
+    gap: 12px;
     min-height: 0;
     flex-grow: 1;
 }
@@ -1147,33 +1147,33 @@ body, html {
 }
 
 .construction-container {
-    padding: 15px;
+    padding: 10px;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.construction-category {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
+.construction-category {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
 .cat-label {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: bold;
     color: var(--jx3-celadon);
     border-left: 5px solid var(--jx3-gold);
-    padding: 2px 12px;
+    padding: 1px 12px;
     background: #f9f9f9;
 }
 
 .building-grid {
     display: flex;
     overflow-x: auto;
-    gap: 15px;
-    padding: 10px 5px;
+    gap: 10px;
+    padding: 5px 5px;
     scrollbar-width: thin;
     scrollbar-color: var(--jx3-celadon) transparent;
 }
@@ -1188,15 +1188,15 @@ body, html {
 }
 
 .building-card {
-    flex: 0 0 125px; /* 宽度从 160px 缩减到 125px */
+    flex: 0 0 115px; /* 进一步缩窄宽度 */
     background: white;
     border: 1px solid #e0e0e0;
-    padding: 10px 8px;
+    padding: 6px 6px;
     border-radius: 4px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     position: relative;
@@ -1234,13 +1234,13 @@ body, html {
 }
 
 .building-icon {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 2px;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 1px;
 }
 
 .building-name {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: bold;
     color: #333;
     text-align: center;
@@ -1251,10 +1251,10 @@ body, html {
 }
 
 .building-cost {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #a68b44;
     background: #fdfaf2;
-    padding: 2px 4px;
+    padding: 1px 4px;
     border-radius: 3px;
     width: 100%;
     text-align: center;
@@ -1308,7 +1308,7 @@ body, html {
     gap: 10px;
     align-items: center;
     background: #fff;
-    padding: 12px;
+    padding: 8px; /* 压缩内边距 */
     border: 2px solid var(--jx3-celadon);
     border-radius: 4px;
 }
@@ -1317,14 +1317,14 @@ body, html {
     background: #f9f9f9;
     border: 1px solid #ddd;
     border-radius: 4px;
-    padding: 8px;
+    padding: 8px 8px 12px 8px; /* 增加底部内边距，防止兵力文字被截断 */
 }
 
 .army-slots-v3 {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    min-height: 60px;
+    min-height: 70px; /* 恢复高度，确保两排或一排大尺寸图标不被截断 */
     justify-content: center;
     padding: 8px;
 }
@@ -1339,11 +1339,41 @@ body, html {
     border-bottom: 1px solid #eee;
 }
 
-.army-transfer-divider {
-    font-size: 2rem;
+.army-transfer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+}
+
+.transfer-btn {
+    background: #fdfaf2;
+    border: 2px solid var(--jx3-celadon);
     color: var(--jx3-celadon);
-    text-align: center;
-    opacity: 0.5;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0;
+}
+
+.transfer-btn:hover {
+    background: var(--jx3-celadon);
+    color: white;
+    transform: scale(1.1);
+    border-color: var(--jx3-gold);
+}
+
+.transfer-btn:active {
+    transform: scale(0.95);
 }
 
 .town-footer-v3 {
@@ -1417,19 +1447,42 @@ body, html {
 }
 
 .tooltip-level {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--jx3-paper);
-    opacity: 0.8;
-    margin-top: -4px;
+    opacity: 0.7;
+    margin-top: -2px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .tooltip-title {
     font-size: 1.1rem;
     font-weight: bold;
     color: var(--jx3-gold);
-    border-bottom: 1px solid rgba(166, 139, 68, 0.3);
+    /* 移除标题下划线，改到消耗行下方，更自然 */
     padding-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
+
+.skill-level-tag {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(166, 139, 68, 0.2);
+    color: var(--jx3-paper);
+    border: 1px solid var(--jx3-gold);
+}
+
+.level-初级 { color: #aaa; border-color: #666; background: rgba(100, 100, 100, 0.2); }
+.level-高级 { color: #ffcc00; border-color: #ffcc00; background: rgba(255, 204, 0, 0.1); }
+.level-绝技 { color: #ff4400; border-color: #ff4400; background: rgba(255, 68, 0, 0.2); text-shadow: 0 0 5px rgba(255, 68, 0, 0.5); }
+
 
 .tooltip-effect {
     font-size: 0.85rem;
@@ -1441,6 +1494,15 @@ body, html {
     font-size: 0.8rem;
     line-height: 1.4;
     color: #ccc;
+}
+
+/* 技能数值高亮 - 修复原本 .stat-value 的绝对定位冲突 */
+.skill-num-highlight {
+    color: #ffcc00;
+    font-weight: 900;
+    font-family: monospace;
+    padding: 0 2px;
+    text-shadow: 0 0 5px rgba(255, 204, 0, 0.3);
 }
 
 /* 结算界面特有样式 */

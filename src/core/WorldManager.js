@@ -6,7 +6,7 @@ import { modifierManager } from './ModifierManager.js';
  */
 const HERO_IDENTITY = {
     'qijin': {
-        initialStats: { power: 7, spells: 12, soldierAtk: 4, soldierDef: 3, speed: 11.8 },
+        initialStats: { power: 7, spells: 12, morale: 6, speed: 11.8, leadership: 20 },
         combatBase: { atk: 28, hpBase: 300, hpScaling: 5, mpBase: 100, mpScaling: 2, atkScaling: 0.02 }, // 每点力道+2%伤害
         traits: [
             { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
@@ -14,7 +14,7 @@ const HERO_IDENTITY = {
         ]
     },
     'lichengen': {
-        initialStats: { power: 5, spells: 8, soldierAtk: 8, soldierDef: 7, speed: 11.8 },
+        initialStats: { power: 5, spells: 8, morale: 10, speed: 11.8, leadership: 25 }, // 李承恩统帅更高
         combatBase: { atk: 40, hpBase: 300, hpScaling: 5, mpBase: 80, mpScaling: 1.5, atkScaling: 0.02 }, // 每点力道+2%伤害
         traits: [
             { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
@@ -22,7 +22,7 @@ const HERO_IDENTITY = {
         ]
     },
     'yeying': {
-        initialStats: { power: 9, spells: 15, soldierAtk: 2, soldierDef: 2, speed: 11.8 },
+        initialStats: { power: 10, spells: 18, morale: 2, speed: 11.8, leadership: 15 }, // 叶英更注重个人武力
         combatBase: { atk: 8, hpBase: 300, hpScaling: 5, mpBase: 120, mpScaling: 2.5, atkScaling: 0.02 },  // 统一系数为 0.02
         traits: [
             { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
@@ -57,11 +57,24 @@ const BUILDING_REGISTRY = {
     'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 1000, wood: 500 }, description: '招募纯阳弟子。每级增加纯阳弟子 15% 属性。' },
     'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '招募万花弟子。每级增加万花弟子 15% 气血与疗效。' },
     
-    'spell_altar': { name: '法术祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1200, wood: 600 }, description: '博采众长：每级随机感悟全江湖招式。' },
+    'spell_altar': { name: '功法祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1200, wood: 600 }, description: '博采众长：每级随机感悟全江湖招式。' },
     'treasure_pavilion': { name: '藏宝阁', category: 'economy', maxLevel: 1, icon: 'treasure_pavilion_v2', cost: { gold: 2000, wood: 800 }, description: '琳琅满目：极其罕见的珍宝汇聚之地。' },
-    'sect_chunyang': { name: '两仪阁', category: 'magic', maxLevel: 3, icon: 'sect_chunyang_v3', cost: { gold: 800, wood: 400 }, description: '纯阳秘所：感悟纯阳专属招式。' },
-    'sect_tiance': { name: '演武场', category: 'magic', maxLevel: 3, icon: 'dummy_training', cost: { gold: 800, wood: 400 }, description: '天策重地：感悟天策专属招式。' },
-    'sect_cangjian': { name: '问水阁', category: 'magic', maxLevel: 3, icon: 'sect_cangjian_v3', cost: { gold: 800, wood: 400 }, description: '藏剑雅处：感悟藏剑专属招式。' },
+    
+    // 纯阳：招式研习
+    'sect_chunyang_basic': { name: '两仪馆', category: 'magic', maxLevel: 2, icon: 'sect_chunyang_v3', cost: { gold: 400, wood: 200 }, description: '纯阳基础：感悟纯阳【初级】招式。' },
+    'sect_chunyang_advanced': { name: '太极殿', category: 'magic', maxLevel: 5, icon: 'sect_chunyang_v3', cost: { gold: 1000, wood: 500 }, description: '纯阳进阶：感悟纯阳【高级】招式。' },
+    'sect_chunyang_ultimate': { name: '纯阳宫', category: 'magic', maxLevel: 1, icon: 'sect_chunyang_v3', cost: { gold: 2500, wood: 1200 }, description: '纯阳绝学：感悟纯阳【绝技】招式。' },
+
+    // 天策：招式研习
+    'sect_tiance_basic': { name: '演武场', category: 'magic', maxLevel: 2, icon: 'dummy_training', cost: { gold: 400, wood: 200 }, description: '天策基础：感悟天策【初级】招式。' },
+    'sect_tiance_advanced': { name: '凌烟阁', category: 'magic', maxLevel: 5, icon: 'dummy_training', cost: { gold: 1000, wood: 500 }, description: '天策进阶：感悟天策【高级】招式。' },
+    'sect_tiance_ultimate': { name: '天策府', category: 'magic', maxLevel: 1, icon: 'dummy_training', cost: { gold: 2500, wood: 1200 }, description: '天策绝学：感悟天策【绝技】招式。' },
+
+    // 藏剑：招式研习
+    'sect_cangjian_basic': { name: '问水亭', category: 'magic', maxLevel: 2, icon: 'sect_cangjian_v3', cost: { gold: 400, wood: 200 }, description: '藏剑基础：感悟藏剑【初级】招式。' },
+    'sect_cangjian_advanced': { name: '山外山', category: 'magic', maxLevel: 5, icon: 'sect_cangjian_v3', cost: { gold: 1000, wood: 500 }, description: '藏剑进阶：感悟藏剑【高级】招式。' },
+    'sect_cangjian_ultimate': { name: '藏剑庐', category: 'magic', maxLevel: 1, icon: 'sect_cangjian_v3', cost: { gold: 2500, wood: 1200 }, description: '藏剑绝学：感悟藏剑【绝技】招式。' },
+
     'clinic': { name: '医馆', category: 'magic', maxLevel: 1, icon: 'clinic_v3', cost: { gold: 600, wood: 300 }, description: '仁心仁术：战场上死去的士兵有 20% 概率伤愈归队，减少损耗。' }
 };
 
@@ -69,9 +82,9 @@ const BUILDING_REGISTRY = {
  * 2. 门派蓝图：定义每个门派出身的城市所拥有的建筑列表
  */
 const BLUEPRINTS = {
-    'chunyang': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'medical_pavilion', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_chunyang', 'clinic'],
-    'tiance': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_tiance', 'medical_pavilion', 'clinic'],
-    'cangjian': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_cangjian', 'medical_pavilion', 'clinic']
+    'chunyang': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'medical_pavilion', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_chunyang_basic', 'sect_chunyang_advanced', 'sect_chunyang_ultimate', 'clinic'],
+    'tiance': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_tiance_basic', 'sect_tiance_advanced', 'sect_tiance_ultimate', 'medical_pavilion', 'clinic'],
+    'cangjian': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_cangjian_basic', 'sect_cangjian_advanced', 'sect_cangjian_ultimate', 'medical_pavilion', 'clinic']
 };
 
 /**
@@ -113,7 +126,7 @@ class City {
             'barracks': 1
         };
 
-        this.availableUnits = { 'melee': 100, 'ranged': 50 };
+        this.availableUnits = { 'melee': 8, 'ranged': 5 };
         this.production = { gold: 1000, wood: 200 };
     }
 
@@ -193,8 +206,21 @@ class City {
         else if (id === 'spell_altar') {
             worldManager.grantRandomSkill({ ignoreSect: true });
         } else if (id.startsWith('sect_')) {
-            const sectId = id.replace('sect_', '');
-            worldManager.grantRandomSkill({ sect: sectId, forceSect: true });
+            const parts = id.split('_');
+            const sectId = parts[1];
+            const levelType = parts[2]; // basic, advanced, ultimate
+            
+            const levelMap = {
+                'basic': '初级',
+                'advanced': '高级',
+                'ultimate': '绝技'
+            };
+            
+            worldManager.grantRandomSkill({ 
+                sect: sectId, 
+                level: levelMap[levelType],
+                forceSect: true 
+            });
         }
 
         // --- 军事建筑数值增强系统 ---
@@ -297,18 +323,18 @@ class WorldManager {
             mpCurrent: 100,
             skills: [],
             stats: {
-                soldierAtk: 45,       // 统帅：士兵攻击
-                soldierDef: 30,       // 统帅：士兵防御 (血量)
+                morale: 40,           // 统帅：军队 (同时影响士兵攻击和血量)
                 power: 50,            // 武力：英雄体魄与伤害
-                spells: 100,          // 法术：招式强度
+                spells: 100,          // 功法：招式强度
                 speed: 0.08,
                 haste: 0,
+                leadership: 20,       // 带兵容量上限
             }
         };
 
         this.heroArmy = {
-            'melee': 10,
-            'ranged': 5,
+            'melee': 4,
+            'ranged': 3,
             'tiance': 0,
             'chunyang': 0,
             'cangjian': 0,
@@ -603,19 +629,69 @@ class WorldManager {
     }
 
     /**
-     * 将城市中的所有士兵转移到英雄身上
+     * 将城市中的所有士兵转移到英雄身上 (受统御力限制)
+     * 改进版：采用轮询机制，尽量让每一类兵种都能领到一点，而不是优先领满某一类
      */
     collectAllFromCity(cityId = 'main_city_1') {
         const city = this.cities[cityId];
         let count = 0;
-        for (const type in city.availableUnits) {
+        let leadershipGained = 0;
+        
+        const currentLeadership = this.getHeroCurrentLeadership();
+        const maxLeadership = this.heroData.stats.leadership;
+        let remainingLeadership = maxLeadership - currentLeadership;
+
+        // 获取所有有余量且有成本的兵种
+        const types = Object.keys(city.availableUnits).filter(type => {
             const amount = city.availableUnits[type];
-            this.heroArmy[type] += amount;
-            city.availableUnits[type] = 0;
-            count += amount;
+            const unitCost = this.unitCosts[type]?.cost || 0;
+            return amount > 0 && unitCost > 0;
+        });
+
+        if (types.length === 0) return;
+
+        // 轮询分配：每次尝试领取 1 个单位，直到领不动或领完为止
+        let changed = true;
+        while (changed && remainingLeadership > 0) {
+            changed = false;
+            for (const type of types) {
+                const amount = city.availableUnits[type];
+                if (amount <= 0) continue;
+
+                const unitCost = this.unitCosts[type].cost;
+                if (remainingLeadership >= unitCost) {
+                    this.heroArmy[type] = (this.heroArmy[type] || 0) + 1;
+                    city.availableUnits[type] -= 1;
+                    count += 1;
+                    leadershipGained += unitCost;
+                    remainingLeadership -= unitCost;
+                    changed = true;
+                }
+            }
+        }
+
+        if (count > 0) {
+            console.log(`%c[调兵] %c英雄从 ${city.name} 智能领取了 ${count} 名士兵 (总占用: ${leadershipGained})`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+        } else if (Object.values(city.availableUnits).some(v => v > 0)) {
+            this.showNotification("统御占用已达上限，无法领取更多士兵！");
+        }
+        this.updateHUD();
+    }
+
+    /**
+     * 将英雄队伍中的所有士兵转移到城市 (全部驻守)
+     */
+    depositAllToCity(cityId = 'main_city_1') {
+        let count = 0;
+        for (const type in this.heroArmy) {
+            const amount = this.heroArmy[type];
+            if (amount > 0) {
+                this.transferToCity(type, amount, cityId);
+                count += amount;
+            }
         }
         if (count > 0) {
-            console.log(`%c[调兵] %c英雄从 ${city.name} 领取了 ${count} 名士兵`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+            console.log(`%c[调兵] %c英雄将 ${count} 名士兵遣回驻守`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
         }
         this.updateHUD();
     }
@@ -1148,7 +1224,7 @@ class WorldManager {
 
     /**
      * 核心 API：随机授予英雄技能
-     * @param {Object} options { sect: '门派名', count: 1, pool: ['skill_id_1', ...], ignoreSect: boolean, forceSect: boolean }
+     * @param {Object} options { sect: '门派名', level: '初级|高级|绝技', count: 1, pool: ['skill_id_1', ...], ignoreSect: boolean, forceSect: boolean }
      */
     async grantRandomSkill(options = {}) {
         const { SkillRegistry, SectSkills } = await import('./SkillSystem.js');
@@ -1171,11 +1247,16 @@ class WorldManager {
             candidateIds = SectSkills[heroSect] || [];
         }
 
-        // 2. 过滤掉已经拥有的
-        let availablePool = candidateIds.filter(id => !heroData.skills.includes(id));
+        // 2. 过滤掉已经拥有的，并根据等级过滤
+        let availablePool = candidateIds.filter(id => {
+            const skill = SkillRegistry[id];
+            if (!skill || heroData.skills.includes(id)) return false;
+            if (options.level && skill.level !== options.level) return false;
+            return true;
+        });
 
-        // 3. 智能回退机制：如果不是强制门派(forceSect)，且备选池已空，则尝试全局池
-        if (availablePool.length === 0 && !options.forceSect) {
+        // 3. 智能回退机制：如果不是强制门派且没有特定等级要求，且备选池已空，则尝试全局池
+        if (availablePool.length === 0 && !options.forceSect && !options.level) {
             candidateIds = Object.keys(SkillRegistry);
             availablePool = candidateIds.filter(id => !heroData.skills.includes(id));
         }
@@ -1302,12 +1383,12 @@ class WorldManager {
             
             // --- 属性固定成长系统 ---
             const s = data.stats;
-            s.power += 10;         // 侠客力道/身法 (+10)
-            s.spells += 4;         // 侠客法术
-            s.soldierAtk += 3;     // 士兵攻击
-            s.soldierDef += 3;     // 士兵坚韧
+            s.power += 8;          // 侠客力道/身法 (+8)
+            s.spells += 4;         // 侠客功法
+            s.morale += 3;         // 统帅军队 (+3%)
+            s.leadership += 6;     // 带兵上限每级 +6
             // s.speed 保持不变
-            s.haste = Math.min(0.5, s.haste + 0.01); // 招式加速 (每级 1%, 上限 50%)
+            s.haste = Math.min(0.5, s.haste + 0.01); // 招式调息 (每级 1%, 上限 50%)
             
             // 同步计算英雄血量与内力上限 (从身份表动态获取，彻底消除 Hardcode)
             const identity = this.getHeroIdentity(data.id);
@@ -1429,10 +1510,35 @@ class WorldManager {
     }
 
     /**
+     * 计算英雄当前队伍的总领导力消耗 (带兵量)
+     */
+    getHeroCurrentLeadership() {
+        let current = 0;
+        for (const type in this.heroArmy) {
+            const count = this.heroArmy[type];
+            if (count > 0 && this.unitCosts[type]) {
+                current += count * (this.unitCosts[type].cost || 0);
+            }
+        }
+        return current;
+    }
+
+    /**
      * 从城市移动士兵到英雄队伍
      */
     transferToHero(type, amount, cityId = 'main_city_1') {
         const city = this.cities[cityId];
+        const unitCost = this.unitCosts[type]?.cost || 0;
+        const totalCostToAdd = amount * unitCost;
+        
+        const currentLeadership = this.getHeroCurrentLeadership();
+        const maxLeadership = this.heroData.stats.leadership;
+
+        if (currentLeadership + totalCostToAdd > maxLeadership) {
+            this.showNotification(`统御容量不足！当前占用: ${currentLeadership}/${maxLeadership}，该操作需额外占用 ${totalCostToAdd} 点数`);
+            return false;
+        }
+
         if (city.availableUnits[type] >= amount) {
             city.availableUnits[type] -= amount;
             this.heroArmy[type] = (this.heroArmy[type] || 0) + amount;

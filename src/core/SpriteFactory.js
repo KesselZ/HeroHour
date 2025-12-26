@@ -14,6 +14,10 @@ export const ASSET_REGISTRY = {
         ENEMY: '/assets/enemy.png',
         SKILL1: '/assets/skill.png',
         SKILL2: '/assets/skill2.png',
+        SKILL3: '/assets/skill3.png',
+        SKILL4: '/assets/skill4.png',
+        SKILL7: '/assets/skill7.png',
+        SKILL8: '/assets/skill8.png',
         BUILDING2: '/assets/building2.png',
         BUILDING3: '/assets/building3.png'
     },
@@ -22,12 +26,26 @@ export const ASSET_REGISTRY = {
         // skill.png 第一行
         'skill_zhenshanhe':   { name: '镇山河图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 1 },
         'skill_fenglaiwushan': { name: '风来吴山图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 2 },
-        'skill_hanrulei':      { name: '撼如雷图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 4 },
+        'skill_hanrulei':      { name: '撼如雷图标', sheet: 'SKILL3', rows: 4, cols: 4, r: 4, c: 4 },
         
         // skill2.png 第一行
-        'skill_wanjiangui_zong': { name: '万剑归宗图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 1 },
-        'skill_shenjian_zong':   { name: '神剑归宗图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 2 }, // 选了第二个红色的剑气
-        'skill_jijieling':       { name: '集结令图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 2, c: 2 }, // 选了那个小金人，很有号召感
+        'skill_wanjiangui_zong': { name: '五方行尽图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 1 },
+        'skill_liuhe':           { name: '六合独尊图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 1, c: 2 },
+        'skill_shengtaiji':      { name: '生太极图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 3 },
+        'skill_jijieling':       { name: '集结令图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 2, c: 2 }, 
+        'skill_tunriyue':        { name: '吞日月图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 3, c: 4 },
+        'skill_sixiang':         { name: '四象轮回图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 2, c: 3 },
+        'skill_liangyi':         { name: '两仪化形图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 4, c: 3 },
+        'skill_wanshi':          { name: '万世不竭图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 3, c: 3 },
+        'skill_huasanqing':      { name: '化三清图标', sheet: 'SKILL8', rows: 4, cols: 4, r: 3, c: 1 },
+
+        // skill4.png 天策系列
+        'skill_renchicheng': { name: '任驰骋图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 1, c: 1 },
+        'skill_shourushan': { name: '守如山图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 1, c: 2 },
+        'skill_zhanbafang': { name: '战八方图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 1, c: 3 },
+        'skill_xiaoruhu': { name: '啸如虎图标', sheet: 'SKILL3', rows: 4, cols: 4, r: 4, c: 2 },
+        'skill_pochongwei': { name: '破重围图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 3, c: 3 },
+        'skill_tu': { name: '突图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 2, c: 1 },
 
         // --- 主角 ---
         'qijin': { name: '祁进', sheet: 'CHARS3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'left' },
@@ -77,7 +95,7 @@ export const ASSET_REGISTRY = {
         // --- building2.png 系列 (扩展建筑库) ---
         'sawmill_v2': { name: '伐木工坊', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 1, scale: 3.0 },
         'gold_mine_v2': { name: '露天金矿', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 2, scale: 3.0 },
-        'spell_altar_v2': { name: '法术祭坛V2', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 4, scale: 3.0 },
+        'spell_altar_v2': { name: '功法祭坛V2', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 4, scale: 3.0 },
         
         'pagoda_library': { name: '万文阁', sheet: 'BUILDING2', rows: 4, cols: 4, r: 2, c: 1, scale: 3.5 },
         'training_camp': { name: '演武校场', sheet: 'BUILDING2', rows: 4, cols: 4, r: 2, c: 4, scale: 3.5 },

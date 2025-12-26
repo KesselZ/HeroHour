@@ -227,7 +227,7 @@ export class CityObject extends WorldObject {
             }
 
             if (worldScene.activeCityId !== this.id) {
-                worldScene.openTownManagement(this.id);
+                worldScene.openTownManagement(this.id, true); // 亲自到场访问
                 worldScene.activeCityId = this.id;
             }
         } else {
