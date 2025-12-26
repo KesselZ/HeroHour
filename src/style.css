@@ -1765,17 +1765,19 @@ canvas { image-rendering: pixelated; }
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     z-index: 1000;
     
-    /* 改为垂直排列以容纳蓝条 */
+    /* 核心改进：稳定性与过渡 */
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
+    min-width: 520px; /* 设定最小基准宽度，防止面板过窄 */
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1); /* 让面板宽度变化变得丝滑 */
 }
 
 .battle-mp-status {
-    width: 100%;
+    width: 480px; /* 关键改进：蓝条采用固定宽度，不再随容器跳动 */
     display: flex;
-    flex-direction: column; /* 改为垂直排列，蓝条在上面 */
+    flex-direction: column;
     align-items: center;
     gap: 5px;
     margin-bottom: 8px;
@@ -1784,7 +1786,7 @@ canvas { image-rendering: pixelated; }
 }
 
 .mp-bar-bg {
-    width: 100%; /* 宽度撑满容器 */
+    width: 100%; /* 这里的 100% 现在是指向 480px 的固定宽度 */
     height: 10px; 
     background: rgba(0, 0, 0, 0.1);
     border-radius: 5px;

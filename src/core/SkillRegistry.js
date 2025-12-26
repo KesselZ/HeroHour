@@ -64,7 +64,7 @@ export const SkillRegistry = {
     'battle_shout': new Skill('battle_shout', {
         name: '撼如雷',
         level: '高级',
-        category: '战术',
+        category: '虎牙令',
         icon: 'skill_hanrulei',
         cost: 45,
         cooldown: 10000,
@@ -78,7 +78,7 @@ export const SkillRegistry = {
     'summon_militia': new Skill('summon_militia', {
         name: '集结令',
         level: '高级',
-        category: '战术',
+        category: '奔雷枪法',
         icon: 'skill_jijieling',
         cost: 30,
         cooldown: 15000,
@@ -120,7 +120,7 @@ export const SkillRegistry = {
     'renchicheng': new Skill('renchicheng', {
         name: '任驰骋',
         level: '高级',
-        category: '战术',
+        category: '奔雷枪法',
         icon: 'skill_renchicheng',
         cost: 40,
         cooldown: 15000,
@@ -140,28 +140,35 @@ export const SkillRegistry = {
     'shourushan': new Skill('shourushan', {
         name: '守如山',
         level: '高级',
-        category: '搏杀',
+        category: '虎牙令',
         icon: 'skill_shourushan',
         cost: 60,
         cooldown: 30000,
         targeting: { type: 'instant' },
         description: '钢铁意志：获得 80% 减伤效果，持续 {duration} 秒',
         actions: [
+            // 特效层：短持续时间
             { type: 'vfx', name: 'pulse', params: { color: 0x666666, duration: 800, radius: 5 } },
-            { type: 'buff_aoe', side: 'player', params: { 
-                stat: 'damageResist', 
-                multiplier: 0.8, 
-                duration: 4000, 
-                applySkillPowerToDuration: true,
-                color: 0xaaaaaa,
-                vfxName: 'shield'
-            } }
+            // 逻辑层：减伤设为 0.2 (即受损 20%，减伤 80%)
+            { 
+                type: 'buff_aoe', 
+                side: 'player', 
+                applySkillPowerToMultiplier: false, // 核心修复：减伤百分比固定为 80%
+                applySkillPowerToDuration: true,    // 核心修复：只有持续时间随功法提升
+                params: { 
+                    stat: 'damageResist', 
+                    multiplier: 0.2, // 减伤 80% = 受损 0.2 倍
+                    duration: 4000, 
+                    color: 0xaaaaaa,
+                    vfxName: 'shield'
+                } 
+            }
         ]
     }),
     'zhanbafang': new Skill('zhanbafang', {
         name: '战八方',
         level: '初级',
-        category: '搏杀',
+        category: '奔雷枪法',
         icon: 'skill_zhanbafang',
         cost: 30,
         cooldown: 8000,
@@ -175,7 +182,7 @@ export const SkillRegistry = {
     'xiaoruhu': new Skill('xiaoruhu', {
         name: '啸如虎',
         level: '绝技',
-        category: '搏杀',
+        category: '虎牙令',
         icon: 'skill_xiaoruhu',
         cost: 50,
         cooldown: 25000,
@@ -195,7 +202,7 @@ export const SkillRegistry = {
     'pochongwei': new Skill('pochongwei', {
         name: '破重围',
         level: '高级',
-        category: '搏杀',
+        category: '奔雷枪法',
         icon: 'skill_pochongwei',
         cost: 45,
         cooldown: 18000,
@@ -210,7 +217,7 @@ export const SkillRegistry = {
     'tu': new Skill('tu', {
         name: '突',
         level: '初级',
-        category: '搏杀',
+        category: '奔雷枪法',
         icon: 'skill_tu',
         cost: 35,
         cooldown: 12000,

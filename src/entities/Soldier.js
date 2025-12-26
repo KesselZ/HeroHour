@@ -46,7 +46,10 @@ export class BaseUnit extends THREE.Group {
         this.isDead = false;
         this.isInvincible = false;
         this.isControlImmune = false; // 新增：控制免疫 (生太极)
-        this.damageResist = 0; // 减伤比例 (0-1)
+        
+        // 核心精简：全部统一使用 getModifiedValue，减伤只是受损倍率为 0.85
+        this.damageMultiplier = modifierManager.getModifiedValue(this, 'damage_reduction', 1.0);
+        
         this.isTigerHeart = false; // 啸如虎：锁血状态
         this.stunnedUntil = 0; // 眩晕截止时间戳
         this.target = null;
@@ -423,8 +426,8 @@ export class BaseUnit extends THREE.Group {
     takeDamage(amount) {
         if (this.isDead || this.isInvincible) return;
         
-        // 1. 应用百分比减伤 (如守如山)
-        let finalAmount = amount * (1 - this.damageResist);
+        // 1. 应用百分比减伤 (核心重构：采用乘法叠加逻辑)
+        let finalAmount = amount * this.damageMultiplier;
         
         // 2. 啸如虎：锁血 1 点逻辑
         if (this.isTigerHeart) {

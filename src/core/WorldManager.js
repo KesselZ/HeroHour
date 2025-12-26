@@ -280,7 +280,8 @@ class City {
                 break;
             case 'martial_shrine':
                 modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: multiplier });
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_dmg`, side: 'player', unitType: 'cangyun', stat: 'damage', multiplier: multiplier });
+                // 核心重构：直接增加 15% 减伤百分点，不再做 2 - x 的复杂换算
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damage_reduction', offset: level * 0.15 });
                 break;
             case 'mage_guild':
                 modifierManager.addGlobalModifier({ id: `city_${this.id}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'damage', multiplier: multiplier });

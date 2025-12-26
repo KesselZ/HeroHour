@@ -37,31 +37,28 @@ class ModifierManager {
      * @param {number} baseValue 基础数值
      */
     getModifiedValue(unit, statName, baseValue) {
-        let multiplierTotal = 1.0;
+        let totalMultiplier = 1.0;
         let offsetTotal = 0;
 
         for (const mod of this.globalModifiers) {
-            // 1. 检查阵营是否匹配 (side: 'player' | 'enemy')
-            if (mod.side && unit.side !== mod.side) continue;
-            
-            // 2. 检查兵种是否匹配 (支持通用 'hero' 标签)
-            const isTypeMatch = mod.unitType && (unit.type === mod.unitType || (mod.unitType === 'hero' && unit.isHero));
-            if (mod.unitType && !isTypeMatch) continue;
-            
-            // 3. 检查属性名是否匹配
-            if (mod.stat !== statName) continue;
+            if (!this._isMatch(mod, unit, statName)) continue;
 
-            // 叠加倍率 (加法叠算，如两个 20% 叠加为 1 + 0.2 + 0.2 = 1.4)
-            if (mod.multiplier) {
-                multiplierTotal += (mod.multiplier - 1);
-            }
-            // 叠加固定值
-            if (mod.offset) {
-                offsetTotal += mod.offset;
-            }
+            // 核心重构：全部采用乘法叠算，极致简单
+            if (mod.multiplier) totalMultiplier *= mod.multiplier;
+            if (mod.offset) offsetTotal += mod.offset;
         }
 
-        return baseValue * multiplierTotal + offsetTotal;
+        return baseValue * totalMultiplier + offsetTotal;
+    }
+
+    /**
+     * 内部辅助：检查修正器是否匹配单位
+     */
+    _isMatch(mod, unit, statName) {
+        if (mod.stat !== statName) return false;
+        if (mod.side && unit.side !== mod.side) return false;
+        const isTypeMatch = !mod.unitType || unit.type === mod.unitType || (mod.unitType === 'hero' && unit.isHero);
+        return isTypeMatch;
     }
 
     /**

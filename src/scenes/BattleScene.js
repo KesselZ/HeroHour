@@ -824,8 +824,6 @@ export class BattleScene {
                 const m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
                 const o = offsets[i] !== undefined ? offsets[i] : (offsets[0] !== undefined ? offsets[0] : 0);
 
-                // 核心优雅改动：不再特判英雄，直接操作 unit[s]
-                // 只要 HeroUnit 实现了对应的 getter/setter，数据就会自动同步
                 if (unit[s] !== undefined) {
                     unit[s] = unit[s] * m + o;
                 } else if (s === 'attackSpeed') {
@@ -835,7 +833,8 @@ export class BattleScene {
                 } else if (s === 'controlImmune') {
                     unit.isControlImmune = true;
                 } else if (s === 'damageResist') {
-                    unit.damageResist = Math.max(unit.damageResist, m);
+                    // 彻底删除特殊判断，减伤只是一次乘法
+                    unit.damageMultiplier *= m;
                 } else if (s === 'tigerHeart') {
                     unit.isTigerHeart = true;
                 }
@@ -859,7 +858,7 @@ export class BattleScene {
                         } else if (s === 'controlImmune') {
                             unit.isControlImmune = false;
                         } else if (s === 'damageResist') {
-                            unit.damageResist = 0;
+                            unit.damageMultiplier /= m;
                         } else if (s === 'tigerHeart') {
                             unit.isTigerHeart = false;
                         }

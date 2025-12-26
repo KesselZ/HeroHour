@@ -40,17 +40,17 @@ export class Skill {
      */
     getDescription(heroData) {
         let desc = this.description;
-        // 剑网三设定：功法属性 (spells) 提升招式强度
-        // 1点功法提升 1% 招式强度，基础值为 1.0 (100%)
         const skillPower = 1 + (heroData.stats.spells || 0) / 100;
         
-        // 定义高亮和普通处理函数
         const hl = (val) => `<span class="skill-num-highlight">${val}</span>`;
         const normal = (val) => val; 
 
-        // 收集所有 actions 中的潜在数值
+        // 收集所有数值，最后统一替换，确保逻辑动作优先
+        let foundDuration = null;
+        let isDurationDynamic = false;
+
         this.actions.forEach(action => {
-            // 1. 处理伤害数值 (包含 value, damage, onTickDamage) -> 总是受系数影响 -> 高亮
+            // 1. 伤害数值处理
             const damageVal = action.value || action.damage || action.onTickDamage;
             if (damageVal) {
                 const finalDmg = Math.floor(damageVal * skillPower);
@@ -58,61 +58,71 @@ export class Skill {
                 desc = desc.split('{tickDamage}').join(hl(finalDmg));
             }
 
-            // 2. 处理持续时间 {duration}
-            // 兼容 action 根节点 (tick_effect) 或 params 里的 duration (buff_aoe/vfx)
+            // 2. 持续时间预处理：如果是 VFX 且持续时间很短，除非没有别的选择，否则不作为主 duration
             const baseDur = action.duration || (action.params && action.params.duration);
             if (baseDur) {
-                // 检查是否开启了系数加成 (支持根节点或 params 节点)
+                const isVFX = action.type === 'vfx';
                 const isDynamic = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
-                const finalDur = isDynamic ? (baseDur * skillPower) : baseDur;
-                const durStr = (finalDur / 1000).toFixed(1);
-                // 只有动态受系数影响的才高亮，否则普通显示
-                desc = desc.split('{duration}').join(isDynamic ? hl(durStr) : normal(durStr));
+                
+                // 优先级：逻辑动作 > VFX 动作；长持续时间 > 短持续时间
+                if (foundDuration === null || (!isVFX && baseDur > 1000)) {
+                    foundDuration = baseDur;
+                    isDurationDynamic = isDynamic;
+                }
             }
 
-            // 3. 处理控制时长 (stunDuration) -> 通常固定
+            // 3. 控制时长
             if (action.type === 'status_aoe' && action.duration) {
                 const dur = (action.duration / 1000).toFixed(1);
                 desc = desc.split('{stunDuration}').join(normal(dur));
             }
 
-            // 4. 处理 Buff 加成 (bonus) -> 总是受系数影响 -> 高亮
+            // 4. Buff 加成
             if (action.type === 'buff_aoe' && action.params) {
                 const p = action.params;
+                const isMultDynamic = action.applySkillPowerToMultiplier !== false;
                 
-                // 处理 multiplier 类型的加成
                 if (p.multiplier) {
                     const multipliers = Array.isArray(p.multiplier) ? p.multiplier : [p.multiplier];
+                    const stats = Array.isArray(p.stat) ? p.stat : [p.stat];
+
                     multipliers.forEach((m, idx) => {
-                        const bonusPct = Math.abs(Math.round((m - 1.0) * skillPower * 100));
+                        const statName = stats[idx] || stats[0];
+                        const currentPower = isMultDynamic ? skillPower : 1.0;
+                        
+                        let bonusPct;
+                        if (statName === 'damageResist') {
+                            // 核心修复：0.2 应该显示为 80% (1 - 0.2)
+                            bonusPct = Math.abs(Math.round((1.0 - m) * currentPower * 100));
+                        } else {
+                            // 增益类：1.5 应该显示为 50%
+                            bonusPct = Math.abs(Math.round((m - 1.0) * currentPower * 100));
+                        }
+                        
                         const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
-                        desc = desc.split(placeholder).join(hl(bonusPct));
+                        desc = desc.split(placeholder).join(isMultDynamic ? hl(bonusPct) : normal(bonusPct));
                     });
                 }
-                
-                // 处理 offset 类型的加成 (如化三清的功法提升)
+                // ... offset 处理保持不变 ...
                 if (p.offset) {
                     const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
                     offsets.forEach((o, idx) => {
-                        let finalVal;
-                        // 如果是数值（如 20点功法），直接乘系数
-                        // 如果是小数（如 0.1 调息），转为百分比再乘系数
-                        if (Math.abs(o) < 1) {
-                            finalVal = Math.round(o * skillPower * 100);
-                        } else {
-                            finalVal = Math.round(o * skillPower);
-                        }
+                        const finalVal = Math.abs(o) < 1 ? Math.round(o * skillPower * 100) : Math.round(o * skillPower);
                         const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
                         desc = desc.split(placeholder).join(hl(finalVal));
                     });
                 }
             }
 
-            // 5. 处理特殊计数 (如召唤数量 {count}) -> 固定
-            if (action.count) {
-                desc = desc.split('{count}').join(normal(action.count));
-            }
+            if (action.count) desc = desc.split('{count}').join(normal(action.count));
         });
+
+        // 最后替换持续时间
+        if (foundDuration !== null) {
+            const finalDur = isDurationDynamic ? (foundDuration * skillPower) : foundDuration;
+            const durStr = (finalDur / 1000).toFixed(1);
+            desc = desc.split('{duration}').join(isDurationDynamic ? hl(durStr) : normal(durStr));
+        }
 
         return desc;
     }
@@ -127,11 +137,9 @@ export class Skill {
         const haste = heroStats.haste || 0;
         const actualCost = Math.floor(this.cost * (1 - haste));
         
-        // 1. 扣除消耗
         battleScene.worldManager.heroData.mpCurrent -= actualCost;
         this.lastUsed = Date.now();
 
-        // 2. 顺序执行 Actions
         this.actions.forEach(action => {
             const skillPower = 1 + (heroStats.spells || 0) / 100;
             const center = targetPos || caster.position;
@@ -141,14 +149,11 @@ export class Skill {
         return true;
     }
 
-    /**
-     * 内部方法：执行单个动作逻辑（实现高度复用）
-     */
     _executeAction(action, battleScene, caster, center, skillPower) {
         switch (action.type) {
             case 'vfx':
                 const vfxParams = { ...action.params };
-                if (vfxParams.duration && (action.applySkillPowerToDuration || vfxParams.applySkillPowerToDuration)) {
+                if (vfxParams.duration && (action.applySkillPowerToDuration || vfxParams.durationPrefix)) {
                     vfxParams.duration *= skillPower;
                 }
                 battleScene.playVFX(action.name, { pos: center, ...vfxParams });
@@ -166,11 +171,14 @@ export class Skill {
             case 'buff_aoe':
                 const buffTargets = battleScene.getUnitsInArea(center, this.targeting, action.side || 'all');
                 const isDynamicBuff = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
+                const isMultDynamic = action.applySkillPowerToMultiplier !== false; // 默认随功法提升
+                
                 const buffParams = { ...action.params };
                 if (buffParams.multiplier) {
+                    const currentPower = isMultDynamic ? skillPower : 1.0;
                     buffParams.multiplier = Array.isArray(buffParams.multiplier) 
-                        ? buffParams.multiplier.map(m => 1.0 + (m - 1.0) * skillPower)
-                        : (1.0 + (buffParams.multiplier - 1.0) * skillPower);
+                        ? buffParams.multiplier.map(m => 1.0 + (m - 1.0) * currentPower)
+                        : (1.0 + (buffParams.multiplier - 1.0) * currentPower);
                 }
                 if (buffParams.offset) {
                     buffParams.offset = Array.isArray(buffParams.offset)
