@@ -666,19 +666,21 @@ export class BattleScene {
             angle = Math.PI 
         } = options;
         
+        // 核心优化：智能方向补全
+        const finalDir = dir || (unit ? unit.getForwardVector() : null);
         const vfxPos = unit ? new THREE.Vector3(0, 0, 0) : pos;
         const parent = unit || this.scene;
 
         switch (type) {
             case 'tiance_sweep': 
-                this.vfxLibrary.createSweepVFX(vfxPos, dir, radius, color, duration, angle); 
+                this.vfxLibrary.createSweepVFX(vfxPos, finalDir, radius, color, duration, angle, parent); 
                 break;
             case 'cangjian_whirlwind': 
-                this.vfxLibrary.createWhirlwindVFX(vfxPos, radius, color, duration); 
+                this.vfxLibrary.createWhirlwindVFX(vfxPos, radius, color, duration, parent); 
                 break;
             case 'rising_particles': 
                 this.vfxLibrary.createParticleSystem({
-                    pos: vfxPos, color, duration, density,
+                    pos: vfxPos, parent, color, duration, density,
                     initFn: p => p.position.set((Math.random()-0.5)*0.6, 0, (Math.random()-0.5)*0.6),
                     updateFn: (p, prg) => { p.position.y += 0.02; p.scale.setScalar(1 - prg); p.material.opacity = 0.8 * (1 - prg); }
                 });
@@ -687,16 +689,16 @@ export class BattleScene {
                 this.vfxLibrary.createShieldVFX(parent, vfxPos, radius, color, duration); 
                 break;
             case 'stomp': 
-                this.vfxLibrary.createStompVFX(vfxPos, radius, color, duration); 
+                this.vfxLibrary.createStompVFX(vfxPos, radius, color, duration, parent); 
                 break;
             case 'pulse': 
-                this.vfxLibrary.createPulseVFX(vfxPos, radius, color, duration); 
+                this.vfxLibrary.createPulseVFX(vfxPos, radius, color, duration, parent); 
                 break;
             case 'rain': 
                 this.vfxLibrary.createRainVFX(vfxPos, radius, color, duration, density, speed); 
                 break;
             case 'tornado': 
-                this.vfxLibrary.createTornadoVFX(vfxPos, radius, color, duration); 
+                this.vfxLibrary.createTornadoVFX(vfxPos, radius, color, duration, parent); 
                 break;
             case 'field':
                 this.vfxLibrary.createFieldVFX(vfxPos, radius, color, duration);

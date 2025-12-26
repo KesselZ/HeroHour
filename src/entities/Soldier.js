@@ -144,13 +144,8 @@ export class BaseUnit extends THREE.Group {
     executeAOE(targets, options) {
         const { radius = 2.0, angle = Math.PI * 2, damage = 10, knockbackForce = 0.5, customDir = null } = options;
         
-        // 获取当前朝向：优先使用传入的 customDir（用于同步 VFX），否则朝向目标
-        const forward = new THREE.Vector3(1, 0, 0);
-        if (customDir) {
-            forward.copy(customDir);
-        } else if (this.target) {
-            forward.subVectors(this.target.position, this.position).normalize();
-        }
+        // 核心重构：如果没有传 customDir，自动调用统一的面向逻辑
+        const forward = customDir || this.getForwardVector();
 
         targets.forEach(target => {
             if (target === this || target.isDead) return;
@@ -423,6 +418,20 @@ export class BaseUnit extends THREE.Group {
 
 
 
+    /**
+     * 获取单位当前的逻辑面向（优先目标方向，其次移动方向）
+     */
+    getForwardVector() {
+        if (this.target && !this.target.isDead) {
+            return new THREE.Vector3().subVectors(this.target.position, this.position).normalize().setY(0);
+        }
+        // 如果没有目标，则根据 Sprite 翻转状态返回左或右
+        // 注意：repeat.x 为正则面朝右（对应 standard），为负正面朝左（对应 flipped）
+        // 但我们要根据 spriteFactory.cols 来精确判断，这里简化处理：
+        const isFlipped = this.unitSprite.material.map.repeat.x < 0;
+        return new THREE.Vector3(isFlipped ? -1 : 1, 0, 0);
+    }
+
     takeDamage(amount) {
         if (this.isDead || this.isInvincible) return;
         
@@ -626,52 +635,6 @@ export class HeroUnit extends BaseUnit {
         }
     }
 
-    // --- 核心重构：高度复用兵种逻辑 ---
-    performAttack(enemies, allies) {
-        const heroId = worldManager.heroData.id;
-        const now = Date.now();
-        if (now - this.lastAttackTime < this.attackCooldownTime) return;
-        this.lastAttackTime = now;
-
-        if (heroId === 'yeying') {
-            // 1. 叶英：完全复用藏剑弟子的旋风斩 (不再有额外特效)
-            this.startWhirlwind(); 
-        } else if (heroId === 'qijin') {
-            // 2. 祁进：复用并强化纯阳弟子的“多剑齐发”逻辑
-            this.onAttackAnimation();
-            const swordCount = 5; // 弟子是 3，祁进是 5
-            for (let i = 0; i < swordCount; i++) {
-                setTimeout(() => {
-                    if (this.isDead || !this.target || this.target.isDead) return;
-                    const spawnPos = this.position.clone().add(new THREE.Vector3((i - 2) * 0.3, 1.2, 0));
-                    this.projectileManager?.spawn({
-                        startPos: spawnPos,
-                        target: this.target,
-                        speed: 0.3,
-                        damage: this.attackDamage, // 单剑伤害 = 面板伤害
-                        type: 'air_sword'
-                    });
-                }, i * 100);
-            }
-        } else if (heroId === 'lichengen') {
-            // 3. 李承恩：复用天策弟子的横扫但范围更大
-            this.onAttackAnimation();
-            this.executeAOE(enemies, {
-                radius: 2.5,
-                angle: Math.PI * 1.5,
-                damage: this.attackDamage,
-                knockbackForce: 0.25
-            });
-        }
-    }
-
-    /**
-     * 重写 update 
-     */
-    update(enemies, allies, deltaTime) {
-        super.update(enemies, allies, deltaTime);
-    }
-
     /**
      * 核心重构：高度复用兵种逻辑，彻底解决残留与重叠
      */
@@ -685,52 +648,38 @@ export class HeroUnit extends BaseUnit {
         const burstCount = details.burstCount || 1;
 
         if (heroId === 'yeying') {
-            // 叶英：心剑旋风 (对齐 3 次爆发，缩小范围)
+            // 叶英：心剑旋风 (对齐爆发次数)
             for (let i = 0; i < burstCount; i++) {
                 setTimeout(() => {
                     if (this.isDead) return;
                     this.onAttackAnimation();
-                    window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: details.range, color: 0xffcc00, duration: 250 });
+                    // 自动对齐方向与坐标
+                    window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: details.range, color: 0xffcc00, duration: 250 });
                     this.executeAOE(enemies, {
                         radius: details.range,
                         damage: this.attackDamage,
                         knockbackForce: 0.05
                     });
-                }, i * 250); // 间隔拉长
+                }, i * 250);
             }
         } else if (heroId === 'qijin') {
-            // 祁进：五剑齐发 (直接调用内部逻辑，不再双重循环)
             this.onAttackAnimation();
             this.performChunyangAttack(enemies);
         } else if (heroId === 'lichengen') {
-            // 李承恩：复用天策骑兵的横扫千军逻辑
             this.onAttackAnimation();
             this.performTianceAttack(enemies);
         }
     }
 
-    /**
-     * 天策强化：完全复用天策骑兵的横扫千军 (范围、角度、特效完全一致)
-     */
     performTianceAttack(enemies) {
         if (!this.target || this.target.isDead) return;
-
-        const sweepRadius = 2.0; // 与天策骑兵完全一致 (2.0)
-
-        // 1. 锁定攻击方向
-        const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
-        attackDir.y = 0;
-
-        // 2. 显示 VFX (通过全局接口)
-        window.battle.playVFX('tiance_sweep', { pos: this.position, dir: attackDir, radius: sweepRadius, color: 0xff4400, duration: 300 });
-
-        // 3. 执行判定 (180度扫击，击退 0.15)
+        const sweepRadius = 2.0;
+        window.battle.playVFX('tiance_sweep', { unit: this, radius: sweepRadius, color: 0xff4400, duration: 300 });
         this.executeAOE(enemies, {
             radius: sweepRadius,
-            angle: Math.PI, // 180度，完全一致
+            angle: Math.PI, 
             damage: this.attackDamage,
-            knockbackForce: 0.15, // 完全一致
-            customDir: attackDir 
+            knockbackForce: 0.15
         });
     }
 
@@ -739,15 +688,12 @@ export class HeroUnit extends BaseUnit {
      */
     performChunyangAttack(enemies) {
         if (!this.target || this.target.isDead) return;
-        
         const swordCount = 5; 
         for (let i = 0; i < swordCount; i++) {
             setTimeout(() => {
                 if (this.isDead || !this.target || this.target.isDead) return;
-                
                 const offset = new THREE.Vector3((i-2)*0.5, 1.2, (rng.next()-0.5)*0.5);
                 const spawnPos = this.position.clone().add(offset);
-                
                 this.projectileManager?.spawn({
                     startPos: spawnPos,
                     target: this.target,
@@ -1140,20 +1086,14 @@ export class Tiance extends BaseUnit {
             this.lastAttackTime = now;
             this.onAttackAnimation();
 
-            // 1. 锁定攻击方向：基于当前主目标，确保 VFX 和逻辑完美同步
-            const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
-            attackDir.y = 0;
+            // 真正的精简：VFX 和 AOE 判定现在都能自动识别面向
+            window.battle.playVFX('tiance_sweep', { unit: this, radius: this.sweepRadius, color: 0xff4400, duration: 250 });
 
-            // 2. 显示 VFX (通过全局接口)
-            window.battle.playVFX('tiance_sweep', { pos: this.position, dir: attackDir, radius: this.sweepRadius, color: 0xff4400, duration: 250 });
-
-            // 3. 执行判定
             this.executeAOE(enemies, {
                 radius: this.sweepRadius,
                 angle: Math.PI, 
                 damage: this.attackDamage,
-                knockbackForce: 0.15,
-                customDir: attackDir 
+                knockbackForce: 0.15
             });
         }
     }
@@ -1207,24 +1147,21 @@ export class Chunyang extends BaseUnit {
             this.onAttackAnimation();
 
             if (this.isMeleeMode) {
-                // 近战：蓝色 120 度顺劈 (调用天策同款特效接口)
-                const attackDir = new THREE.Vector3().subVectors(this.target.position, this.position).normalize();
+                this.onAttackAnimation();
+                // 真正的精简：全自动
                 window.battle.playVFX('tiance_sweep', { 
-                    pos: this.position, 
-                    dir: attackDir, 
+                    unit: this, 
                     radius: 1.5, 
-                    color: 0x00ccff, // 纯阳蓝色
-                    angle: Math.PI * 2 / 3, // 120 度
+                    color: 0x00ccff, 
+                    angle: Math.PI * 2 / 3, 
                     duration: 200 
                 });
 
-                // 造成 AOE 伤害而非单体
                 this.executeAOE(enemies, {
                     radius: 1.5,
                     angle: Math.PI * 2 / 3,
                     damage: this.attackDamage * 1.5,
-                    knockbackForce: 0.03,
-                    customDir: attackDir
+                    knockbackForce: 0.03
                 });
             } else {
                 // 远程：依次射出 3 把气剑

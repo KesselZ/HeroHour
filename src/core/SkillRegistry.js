@@ -96,11 +96,11 @@ export const SkillRegistry = {
         icon: 'skill_zhenshanhe',
         cost: 75,
         cooldown: 25000,
-        targeting: { type: 'location', shape: 'circle', range: 5, radius: 2.5 },
+        targeting: { type: 'location', shape: 'circle', range: 12, radius: 4.5 },
         description: '【气场】产生无敌气场，保护范围内友军免受伤害，持续 {duration} 秒',
         actions: [
-            { type: 'vfx', name: 'dome', params: { color: 0x88ccff, duration: 3000, radius: 2.5, applySkillPowerToDuration: true } },
-            { type: 'buff_aoe', params: { stat: 'invincible', duration: 3000, color: 0x88ccff, applySkillPowerToDuration: true, radius: 2.5 } }
+            { type: 'vfx', name: 'dome', params: { color: 0x88ccff, duration: 3000, radius: 4.5, applySkillPowerToDuration: true } },
+            { type: 'buff_aoe', params: { stat: 'invincible', duration: 3000, color: 0x88ccff, applySkillPowerToDuration: true, radius: 4.5 } }
         ]
     }),
     'fenglaiwushan': new Skill('fenglaiwushan', {
@@ -235,16 +235,16 @@ export const SkillRegistry = {
         icon: 'skill_shengtaiji',
         cost: 40,
         cooldown: 12000,
-        targeting: { type: 'location', shape: 'circle', range: 8, radius: 3.5 },
+        targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
         description: '【气场】产生生太极气场，使范围内友军移速提升 {bonus}%，伤害提升 {bonus2}%，并免疫控制，持续 {duration} 秒',
         actions: [
-            { type: 'vfx', name: 'field', params: { color: 0x00ffcc, duration: 5000, radius: 3.5 } },
+            { type: 'vfx', name: 'field', params: { color: 0x00ffcc, duration: 5000, radius: 6.0 } },
             { type: 'buff_aoe', side: 'player', params: { 
                 stat: ['moveSpeed', 'attackDamage', 'controlImmune'], 
                 multiplier: [1.1, 1.2, 1.0], 
                 duration: 5000, 
                 color: 0x00ffcc,
-                radius: 3.5
+                radius: 6.0
             } }
         ]
     }),
@@ -255,16 +255,16 @@ export const SkillRegistry = {
         icon: 'skill_tunriyue',
         cost: 45,
         cooldown: 15000,
-        targeting: { type: 'location', shape: 'circle', range: 8, radius: 3.5 },
+        targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
         description: '【气场】产生吞日月气场，使范围内敌人移速降低 {bonus}%，伤害降低 {bonus2}%，持续 {duration} 秒',
         actions: [
-            { type: 'vfx', name: 'field', params: { color: 0xff3300, duration: 5000, radius: 3.5 } },
+            { type: 'vfx', name: 'field', params: { color: 0xff3300, duration: 5000, radius: 6.0 } },
             { type: 'buff_aoe', side: 'enemy', params: { 
                 stat: ['moveSpeed', 'attackDamage'], 
                 multiplier: [0.8, 0.8], 
                 duration: 5000, 
                 color: 0xff3300,
-                radius: 3.5
+                radius: 6.0
             } }
         ]
     }),
@@ -338,16 +338,16 @@ export const SkillRegistry = {
         icon: 'skill_huasanqing',
         cost: 60,
         cooldown: 18000,
-        targeting: { type: 'location', shape: 'circle', range: 8, radius: 4 },
+        targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
         description: '【气场】产生化三清气场，使范围内友军功法提升 {bonus} 点，调息提升 {bonus2}%，持续 {duration} 秒',
         actions: [
-            { type: 'vfx', name: 'field', params: { color: 0x4488ff, duration: 8000, radius: 4 } },
+            { type: 'vfx', name: 'field', params: { color: 0x4488ff, duration: 8000, radius: 6.0 } },
             { type: 'buff_aoe', side: 'player', params: { 
                 stat: ['spells', 'haste'], 
                 offset: [20, 0.1], // spells 提升 20点，haste 提升 10%
                 duration: 8000, 
                 color: 0x4488ff,
-                radius: 4
+                radius: 6.0
             } }
         ]
     }),
@@ -358,7 +358,7 @@ export const SkillRegistry = {
         icon: 'skill_hegui',
         cost: 40,
         cooldown: 12000,
-        targeting: { type: 'location', range: 8, impactRadius: 0.8 },
+        targeting: { type: 'location', range: 8, impactRadius: 2.5 },
         description: '【重剑招式】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害并强力击退敌人',
         actions: [
             { 
@@ -367,9 +367,9 @@ export const SkillRegistry = {
                 duration: 500, 
                 jumpHeight: 2.0, // 鹤归孤山有明显的跳跃感
                 landActions: [
-                    // 修复：减小落地半径至 0.8
-                    { type: 'vfx', name: 'stomp', params: { color: 0xffcc00, radius: 0.8, duration: 800 } },
-                    { type: 'damage_aoe', value: 100, knockback: 0.5, targeting: { shape: 'circle', radius: 0.8 } }
+                    // 修复：增大落地半径至 2.5
+                    { type: 'vfx', name: 'stomp', params: { color: 0xffcc00, radius: 2.5, duration: 800 } },
+                    { type: 'damage_aoe', value: 100, knockback: 0.5, targeting: { shape: 'circle', radius: 2.5 } }
                 ]
             }
         ]
@@ -381,11 +381,11 @@ export const SkillRegistry = {
         icon: 'skill_fengcha',
         cost: 30,
         cooldown: 8000,
-        targeting: { type: 'instant', shape: 'sector', radius: 1.5, angle: Math.PI / 3 }, // 1.5 范围，60度扇形
+        targeting: { type: 'instant', shape: 'sector', radius: 4.0, angle: Math.PI / 2 }, 
         description: '【重剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害并大幅击退',
         actions: [
-            { type: 'vfx', name: 'sweep', params: { color: 0xffcc00, duration: 400, radius: 1.5 } },
-            { type: 'damage_aoe', value: 40, knockback: 1.2 }
+            { type: 'vfx', name: 'tiance_sweep', params: { color: 0xffcc00, duration: 400, radius: 4.0, angle: Math.PI / 2 } },
+            { type: 'damage_aoe', value: 40, knockback: 1.6 }
         ]
     }),
     'songshe': new Skill('songshe', {

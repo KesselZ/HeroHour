@@ -156,13 +156,20 @@ export class Skill {
                 if (vfxParams.duration && (action.applySkillPowerToDuration || vfxParams.durationPrefix)) {
                     vfxParams.duration *= skillPower;
                 }
-                battleScene.playVFX(action.name, { pos: center, ...vfxParams });
+                // 核心重构：无需再手动计算方向，playVFX 内部会自动补全
+                const vfxUnit = (this.targeting.type === 'instant') ? caster : null;
+                battleScene.playVFX(action.name, { pos: center, unit: vfxUnit, ...vfxParams });
                 break;
 
             case 'damage_aoe':
                 const dmgTargeting = { ...this.targeting, ...(action.targeting || {}) };
                 if (dmgTargeting.shape === 'sector') {
-                    dmgTargeting.facing = caster.getWorldDirection(new THREE.Vector3());
+                    // 核心修复：如果是瞬发扇形技能，优先朝向当前目标，否则朝向移动方向
+                    if (caster.target) {
+                        dmgTargeting.facing = new THREE.Vector3().subVectors(caster.target.position, caster.position).normalize();
+                    } else {
+                        dmgTargeting.facing = caster.getWorldDirection(new THREE.Vector3());
+                    }
                 }
                 const targets = battleScene.getUnitsInArea(center, dmgTargeting, 'enemy');
                 battleScene.applyDamageToUnits(targets, action.value * skillPower, center, action.knockback);

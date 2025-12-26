@@ -15,6 +15,7 @@ export class VFXLibrary {
     createParticleSystem(options) {
         const { 
             pos = new THREE.Vector3(), 
+            parent = null, // 新增：支持指定父容器（如单位自身）
             color = 0xffffff, 
             duration = 1000, 
             density = 1,
@@ -24,9 +25,10 @@ export class VFXLibrary {
             updateFn = (p, progress) => {}
         } = options;
 
+        const actualParent = parent || this.scene;
         const group = new THREE.Group();
         group.position.copy(pos);
-        this.scene.add(group);
+        actualParent.add(group);
 
         const pGeo = geometry || new THREE.BoxGeometry(0.1, 0.1, 0.1);
         const startTime = Date.now();
@@ -35,7 +37,7 @@ export class VFXLibrary {
             if (Date.now() - startTime > duration) {
                 clearInterval(interval);
                 setTimeout(() => {
-                    this.scene.remove(group);
+                    actualParent.remove(group);
                     if (!geometry) pGeo.dispose();
                 }, 1500);
                 return;
@@ -127,7 +129,8 @@ export class VFXLibrary {
         });
     }
 
-    createPulseVFX(pos, radius, color, duration) {
+    createPulseVFX(pos, radius, color, duration, parent = null) {
+        const actualParent = parent || this.scene;
         for (let i = 0; i < 3; i++) {
             setTimeout(() => {
                 const geo = new THREE.RingGeometry(0.1, 0.15, 64);
@@ -135,7 +138,7 @@ export class VFXLibrary {
                 const ring = new THREE.Mesh(geo, mat);
                 ring.rotation.x = -Math.PI / 2;
                 ring.position.copy(pos).y = 0.1 + i * 0.05;
-                this.scene.add(ring);
+                actualParent.add(ring);
 
                 const start = Date.now();
                 const anim = () => {
@@ -146,7 +149,7 @@ export class VFXLibrary {
                         mat.opacity = 0.8 * (1 - prg);
                         requestAnimationFrame(anim);
                     } else {
-                        this.scene.remove(ring);
+                        actualParent.remove(ring);
                         geo.dispose(); mat.dispose();
                     }
                 };
@@ -209,13 +212,14 @@ export class VFXLibrary {
         anim();
     }
 
-    createStompVFX(pos, radius, color, duration) {
+    createStompVFX(pos, radius, color, duration, parent = null) {
+        const actualParent = parent || this.scene;
         const ringGeo = new THREE.RingGeometry(radius * 0.1, radius, 32);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x554433, transparent: true, opacity: 0.6, depthWrite: false });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
         ring.position.copy(pos).y = 0.05;
-        this.scene.add(ring);
+        actualParent.add(ring);
 
         const start = Date.now();
         const anim = () => {
@@ -225,7 +229,7 @@ export class VFXLibrary {
                 ringMat.opacity = 0.6 * (1 - prg);
                 requestAnimationFrame(anim);
             } else {
-                this.scene.remove(ring);
+                actualParent.remove(ring);
                 ringGeo.dispose(); ringMat.dispose();
             }
         };
@@ -234,6 +238,7 @@ export class VFXLibrary {
         // 核心修复：添加地震践踏的渣渣粒子效果
         this.createParticleSystem({
             pos: pos.clone(),
+            parent: actualParent,
             color: 0x887766, // 泥土颜色
             duration: 500,
             density: 10.0, // 数量提升 5 倍 (之前是 2.0)
@@ -260,9 +265,9 @@ export class VFXLibrary {
         });
     }
 
-    createTornadoVFX(pos, radius, color, duration) {
+    createTornadoVFX(pos, radius, color, duration, parent = null) {
         this.createParticleSystem({
-            pos, color, duration, density: 2,
+            pos, parent, color, duration, density: 2,
             spawnRate: 50,
             geometry: new THREE.TorusGeometry(radius * 0.5, 0.05, 8, 24),
             initFn: p => { p.rotation.x = Math.PI / 2; p.userData.yPos = 0; },
@@ -298,8 +303,15 @@ export class VFXLibrary {
         anim();
     }
 
-    createSweepVFX(pos, dir, radius, color, duration, angle) {
+    createSweepVFX(pos, dir, radius, color, duration, angle, parent = null) {
+        const actualParent = parent || this.scene;
         const group = new THREE.Group();
+
+        // 核心修复：抵消单位缩放
+        if (parent && parent.scale) {
+            group.scale.set(1/parent.scale.x, 1/parent.scale.y, 1/parent.scale.z);
+        }
+
         const geo = new THREE.RingGeometry(radius * 0.5, radius, 32, 1, -Math.PI / 2 - angle / 2, angle);
         const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
         const mesh = new THREE.Mesh(geo, mat);
@@ -307,7 +319,7 @@ export class VFXLibrary {
         group.add(mesh);
         if (dir) group.rotation.y = Math.atan2(dir.x, dir.z);
         group.position.copy(pos).y = 0.15;
-        this.scene.add(group);
+        actualParent.add(group);
 
         const start = Date.now();
         const anim = () => {
@@ -317,22 +329,30 @@ export class VFXLibrary {
                 mat.opacity = 0.6 * (1 - prg);
                 requestAnimationFrame(anim);
             } else {
-                this.scene.remove(group);
+                actualParent.remove(group);
                 geo.dispose(); mat.dispose();
             }
         };
         anim();
     }
 
-    createWhirlwindVFX(pos, radius, color, duration) {
+    createWhirlwindVFX(pos, radius, color, duration, parent = null) {
+        const actualParent = parent || this.scene;
         const vfx = new THREE.Group();
+        
+        // 核心修复：如果挂载在单位身上，抵消掉单位的缩放，确保 radius 是绝对物理半径
+        if (parent && parent.scale) {
+            vfx.scale.set(1/parent.scale.x, 1/parent.scale.y, 1/parent.scale.z);
+        }
+
         const bladeGeo = new THREE.BoxGeometry(radius, 0.08, 0.2);
         const bladeMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
         const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        // 刀锋中心偏移 radius/2，让旋转半径刚好等于 radius
         blade.position.x = radius / 2;
         vfx.add(blade);
         vfx.position.copy(pos).y = 0.4;
-        this.scene.add(vfx);
+        actualParent.add(vfx);
 
         const start = Date.now();
         const anim = () => {
@@ -342,7 +362,7 @@ export class VFXLibrary {
                 bladeMat.opacity = 0.8 * (1 - prg);
                 requestAnimationFrame(anim);
             } else {
-                this.scene.remove(vfx);
+                actualParent.remove(vfx);
                 bladeGeo.dispose(); bladeMat.dispose();
             }
         };
