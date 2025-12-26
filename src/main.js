@@ -6,6 +6,9 @@ import { setSeed } from './core/Random.js';
 import { modifierManager } from './core/ModifierManager.js';
 import { worldManager } from './core/WorldManager.js';
 import { SkillRegistry } from './core/SkillRegistry.js';
+import { uiManager } from './core/UIManager.js';
+
+import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
 // 游戏状态管理
 const GameState = {
@@ -47,6 +50,8 @@ window.addEventListener('resize', () => {
 
 // 5. UI 逻辑
 const startBtn = document.querySelector('#start-btn');
+const skillGalleryBtn = document.querySelector('#open-skill-learn-btn'); // 招式图谱按钮
+const howToPlayBtn = document.querySelector('#how-to-play-btn'); // 江湖指南按钮
 const mainMenu = document.querySelector('#main-menu');
 const charSelectMenu = document.querySelector('#character-select');
 const charCards = document.querySelectorAll('.char-card');
@@ -77,6 +82,43 @@ function initUIIcons() {
 
 // 在 DOM 加载或脚本执行时初始化
 initUIIcons();
+
+// 点击“招式图谱”
+if (skillGalleryBtn) {
+    skillGalleryBtn.addEventListener('click', () => {
+        const skillLearnPanel = document.getElementById('skill-learn-panel');
+        if (skillLearnPanel) {
+            skillLearnPanel.classList.remove('hidden');
+            // 默认显示纯阳招式
+            uiManager.renderLearnableSkills('chunyang');
+        }
+    });
+}
+
+// 点击“江湖指南”
+if (howToPlayBtn) {
+    howToPlayBtn.addEventListener('click', () => {
+        const panel = document.getElementById('how-to-play-panel');
+        const textContainer = document.getElementById('how-to-play-text');
+        const closeBtn = document.getElementById('close-how-to-play');
+
+        if (panel && textContainer) {
+            // 填充内容
+            textContainer.innerHTML = HOW_TO_PLAY.sections.map(section => `
+                <div class="htp-section">
+                    <div class="htp-subtitle">${section.subtitle}</div>
+                    <div class="htp-content">${section.content}</div>
+                </div>
+            `).join('');
+
+            panel.classList.remove('hidden');
+
+            if (closeBtn) {
+                closeBtn.onclick = () => panel.classList.add('hidden');
+            }
+        }
+    });
+}
 
 // 点击“闯荡江湖”进入角色选择
 startBtn.addEventListener('click', () => {

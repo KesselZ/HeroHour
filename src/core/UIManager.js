@@ -1,5 +1,6 @@
 import { spriteFactory } from './SpriteFactory.js';
-import { SkillRegistry } from './SkillRegistry.js';
+import { SkillRegistry, SectSkills } from './SkillRegistry.js';
+import { worldManager } from './WorldManager.js';
 
 /**
  * UIManager: 统一管理全局 UI 逻辑（如 Tooltip、面板切换等）
@@ -14,6 +15,7 @@ class UIManager {
         this.tooltipDesc = this.tooltip?.querySelector('.tooltip-desc');
 
         this.initTooltipEvents();
+        this.initSkillGalleryEvents();
     }
 
     initTooltipEvents() {
@@ -30,6 +32,78 @@ class UIManager {
                 this.tooltip.style.left = `${finalX}px`;
                 this.tooltip.style.top = `${finalY}px`;
             }
+        });
+    }
+
+    /**
+     * 初始化招式图谱面板的交互事件（关闭按钮、标签切换）
+     */
+    initSkillGalleryEvents() {
+        const closeSkillLearnBtn = document.getElementById('close-skill-learn');
+        const skillLearnPanel = document.getElementById('skill-learn-panel');
+        if (closeSkillLearnBtn && skillLearnPanel) {
+            closeSkillLearnBtn.onclick = () => {
+                skillLearnPanel.classList.add('hidden');
+            };
+        }
+
+        // 标签切换
+        const tabs = document.querySelectorAll('.skill-learn-tabs .tab-btn');
+        tabs.forEach(tab => {
+            tab.onclick = () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                const sect = tab.dataset.sect;
+                this.renderLearnableSkills(sect);
+            };
+        });
+    }
+
+    /**
+     * 渲染可学习/图谱技能
+     * @param {string} sect 门派
+     * @param {Object} heroData 当前英雄数据（可选，用于判断是否已习得）
+     */
+    renderLearnableSkills(sect) {
+        const container = document.getElementById('skill-list-to-learn');
+        if (!container) return;
+
+        container.innerHTML = '';
+        const skillIds = SectSkills[sect] || [];
+        
+        // 招式图谱作为展示工具，不再受当前英雄属性影响，显示原始属性
+        const baseStats = { haste: 0 }; 
+
+        skillIds.forEach(id => {
+            const skill = SkillRegistry[id];
+            if (!skill) return;
+
+            const item = document.createElement('div');
+            item.className = 'learn-item';
+
+            const iconStyle = spriteFactory.getIconStyle(skill.icon);
+            item.innerHTML = `
+                <div class="skill-learn-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                <div class="skill-learn-name">${skill.name}</div>
+            `;
+
+            item.onmouseenter = () => {
+                // 强制使用原始数值（不计入调息/缩减）
+                const actualCost = skill.cost;
+                const actualCD = (skill.cooldown / 1000).toFixed(1);
+                
+                this.showTooltip({
+                    name: skill.name,
+                    level: skill.level,
+                    mpCost: `消耗: ${actualCost} 内力`,
+                    cdText: `冷却: ${actualCD}s`,
+                    description: skill.getDescription({ stats: baseStats })
+                });
+            };
+            item.onmouseleave = () => this.hideTooltip();
+
+            container.appendChild(item);
         });
     }
 

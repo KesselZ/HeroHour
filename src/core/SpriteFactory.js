@@ -175,7 +175,6 @@ class SpriteFactory {
         }
 
         const texture = this.cache.get(path).clone();
-        texture.needsUpdate = true;
         texture.repeat.set(1 / cols, 1 / rows);
         texture.offset.set((c - 1) / cols, (rows - r) / rows);
 
@@ -245,7 +244,40 @@ class SpriteFactory {
         };
     }
 
-    load() { return Promise.resolve(); }
+    /**
+     * 预加载资源注册表中的所有贴图集
+     */
+    async load() {
+        const paths = Object.values(ASSET_REGISTRY.SHEETS);
+        const promises = paths.map(path => {
+            if (this.cache.has(path)) return Promise.resolve(this.cache.get(path));
+            
+            return new Promise((resolve, reject) => {
+                this.textureLoader.load(path, 
+                    (texture) => {
+                        texture.magFilter = THREE.NearestFilter;
+                        texture.minFilter = THREE.NearestFilter;
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                        this.cache.set(path, texture);
+                        resolve(texture);
+                    },
+                    undefined,
+                    (err) => {
+                        console.error(`贴图加载失败: ${path}`, err);
+                        reject(err);
+                    }
+                );
+            });
+        });
+
+        try {
+            await Promise.all(promises);
+            this.isLoaded = true;
+            console.log('%c[资源加载] %c所有贴图加载完成', 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+        } catch (error) {
+            console.error('资源预加载过程中出错:', error);
+        }
+    }
 
     /**
      * 关键：适配 Soldier.js 中对 unitConfig[type].row 和 .col 的访问

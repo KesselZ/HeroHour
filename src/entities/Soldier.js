@@ -286,7 +286,6 @@ export class BaseUnit extends THREE.Group {
             
             texture.repeat.x = targetRepeatX;
             texture.offset.x = targetOffsetX;
-            texture.needsUpdate = true;
         }
     }
 

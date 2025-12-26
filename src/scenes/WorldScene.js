@@ -170,34 +170,6 @@ export class WorldScene {
             };
         }
 
-        // --- 招式学习逻辑 ---
-        const skillLearnBtn = document.getElementById('open-skill-learn-btn');
-        const skillLearnPanel = document.getElementById('skill-learn-panel');
-        const closeSkillLearnBtn = document.getElementById('close-skill-learn');
-
-        if (skillLearnBtn) {
-            skillLearnBtn.onclick = () => {
-                skillLearnPanel.classList.remove('hidden');
-                this.renderLearnableSkills(worldManager.heroData.id === 'qijin' ? 'chunyang' : 'tiance'); 
-            };
-        }
-
-        if (closeSkillLearnBtn) {
-            closeSkillLearnBtn.onclick = () => {
-                skillLearnPanel.classList.add('hidden');
-            };
-        }
-
-        // 标签切换
-        const tabs = document.querySelectorAll('.skill-learn-tabs .tab-btn');
-        tabs.forEach(tab => {
-            tab.onclick = () => {
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                this.renderLearnableSkills(tab.dataset.sect);
-            };
-        });
-
         // 移除旧的监听器防止重复
         window.removeEventListener('hero-stats-changed', this._onHeroStatsChanged);
         this._onHeroStatsChanged = () => this.updateHeroHUD();
@@ -327,47 +299,6 @@ export class WorldScene {
             el.onmouseenter = () => uiManager.showTooltip({ name, description: desc });
             el.onmouseleave = () => uiManager.hideTooltip();
         }
-    }
-
-    renderLearnableSkills(sect) {
-        const container = document.getElementById('skill-list-to-learn');
-        if (!container) return;
-
-        container.innerHTML = '';
-        const skillIds = SectSkills[sect] || [];
-        const heroData = worldManager.heroData;
-
-        skillIds.forEach(id => {
-            const skill = SkillRegistry[id];
-            if (!skill) return;
-
-            const isOwned = heroData.skills.includes(id);
-            const item = document.createElement('div');
-            item.className = `learn-item ${isOwned ? 'owned' : ''}`;
-
-            const iconStyle = spriteFactory.getIconStyle(skill.icon);
-            item.innerHTML = `
-                <div class="skill-learn-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
-                <div class="skill-learn-name">${skill.name}</div>
-                <div class="skill-learn-status">${isOwned ? '已习得' : '未参透'}</div>
-            `;
-
-            item.onmouseenter = () => {
-                const haste = heroData.stats.haste || 0;
-                const actualCost = Math.floor(skill.cost * (1 - haste));
-                uiManager.showTooltip({
-                    name: skill.name,
-                    level: skill.level,
-                    mpCost: `消耗: ${actualCost} 内力`,
-                    cdText: `冷却: ${(skill.cooldown * (1 - haste) / 1000).toFixed(1)}s`,
-                    status: isOwned ? '【已习得】' : '【未参透】',
-                    description: skill.getDescription(heroData)
-                });
-            };
-            item.onmouseleave = () => uiManager.hideTooltip();
-
-            container.appendChild(item);
-        });
     }
 
     setupTooltip() {
@@ -873,7 +804,6 @@ export class WorldScene {
                 if (texture.repeat.x !== targetRepeatX) {
                     texture.repeat.x = targetRepeatX;
                     texture.offset.x = shouldFlip ? (config.col / 4) : ((config.col - 1) / 4);
-                    texture.needsUpdate = true;
                 }
             }
             this.checkInteractions();

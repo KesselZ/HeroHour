@@ -20,8 +20,8 @@
                 <h1 class="game-title">剑网三<span>大乱斗</span></h1>
                 <div class="menu-options">
                     <button id="start-btn" class="wuxia-btn">闯荡江湖</button>
-                    <button id="collection-btn" class="wuxia-btn">侠客名录</button>
-                    <button id="options-btn" class="wuxia-btn">江湖设置</button>
+                    <button id="open-skill-learn-btn" class="wuxia-btn">招式图谱</button>
+                    <button id="how-to-play-btn" class="wuxia-btn">江湖指南</button>
                     <button id="exit-btn" class="wuxia-btn">退出游戏</button>
                 </div>
                 <div class="menu-decoration-bottom"></div>
@@ -140,30 +140,10 @@
                         <div class="hero-skills-section-v4">
                             <div class="section-header-v4">
                                 <div class="label-with-icon">習得招式</div>
-                                <button id="open-skill-learn-btn" class="learn-skill-btn-v4">招式图谱</button>
                             </div>
                             <div id="hero-panel-skills" class="hero-skills-list-v4">
                                 <!-- 动态填充技能图标 -->
                             </div>
-                        </div>
-                    </div>
-                    <div class="menu-decoration-bottom"></div>
-                </div>
-
-                <!-- 招式学习面板 (独立于属性面板，确保居中) -->
-                <div id="skill-learn-panel" class="hidden skill-learn-v3">
-                    <div class="menu-decoration-top">招式图谱</div>
-                    <button id="close-skill-learn" class="close-btn-v3">×</button>
-                    <div class="skill-learn-content">
-                        <div class="skill-learn-header-row">
-                            <div class="skill-learn-tabs">
-                                <button class="tab-btn active" data-sect="chunyang">纯阳招式</button>
-                                <button class="tab-btn" data-sect="tiance">天策招式</button>
-                                <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
-                            </div>
-                        </div>
-                        <div id="skill-list-to-learn" class="skill-grid-v3">
-                            <!-- 动态生成待学习技能 -->
                         </div>
                     </div>
                     <div class="menu-decoration-bottom"></div>
@@ -228,6 +208,37 @@
                     </div>
                     <div class="world-date-display">天宝 三年 · 春</div>
                 </div>
+            </div>
+
+            <!-- 招式学习面板 (独立于属性面板，确保居中) -->
+            <div id="skill-learn-panel" class="hidden skill-learn-v3">
+                <div class="menu-decoration-top">招式图谱</div>
+                <button id="close-skill-learn" class="close-btn-v3">×</button>
+                <div class="skill-learn-content">
+                    <div class="skill-learn-header-row">
+                        <div class="skill-learn-tabs">
+                            <button class="tab-btn active" data-sect="chunyang">纯阳招式</button>
+                            <button class="tab-btn" data-sect="tiance">天策招式</button>
+                            <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
+                        </div>
+                    </div>
+                    <div id="skill-list-to-learn" class="skill-grid-v3">
+                        <!-- 动态生成待学习技能 -->
+                    </div>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 江湖指南面板 -->
+            <div id="how-to-play-panel" class="hidden skill-learn-v3">
+                <div class="menu-decoration-top">江湖指南</div>
+                <button id="close-how-to-play" class="close-btn-v3">×</button>
+                <div class="how-to-play-content">
+                    <div id="how-to-play-text" class="how-to-play-scroll">
+                        <!-- 动态生成指南内容 -->
+                    </div>
+                </div>
+                <div class="menu-decoration-bottom"></div>
             </div>
 
             <!-- 角色选择界面 -->
