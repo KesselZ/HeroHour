@@ -32,6 +32,8 @@ export class BaseUnit extends THREE.Group {
         this.cost = cost;
         this.mass = mass; // 质量越大，越难被推开
         this.maxHealth = modifierManager.getModifiedValue(this, 'hp', hp);
+        console.log(`%c[BaseUnit] %c${this.type} %c初始化: 传入hp=${hp}, 计算出的maxHealth=${this.maxHealth}`, 
+            'color: #d4af37; font-weight: bold', 'color: #fff', 'color: #aaa');
         this.health = this.maxHealth;
         
         // 基础移速叠加随机微差后，再应用全局修正
@@ -491,22 +493,27 @@ export class BaseUnit extends THREE.Group {
     takeDamage(amount) {
         if (this.isDead || this.isInvincible) return;
         
-        // 概率播放受击音效
-        audioManager.play('onhit', { volume: 0.3, chance: 0.4 });
-
         // 1. 应用百分比减伤 (核心重构：采用乘法叠加逻辑)
         let finalAmount = amount * this.damageMultiplier;
         
+        if (finalAmount > 0) {
+            // 只有受到伤害时才播受击音效和闪红
+            audioManager.play('onhit', { volume: 0.3, chance: 0.4 });
+            this.hitFlashUntil = Date.now() + 150;
+        }
+
         // 2. 啸如虎：锁血 1 点逻辑
         if (this.isTigerHeart) {
             this.health = Math.max(1, this.health - finalAmount);
         } else {
             this.health -= finalAmount;
         }
-        
-        // 通用受击反馈：记录时间，由 updateVisualState 统一处理
-        this.hitFlashUntil = Date.now() + 150;
 
+        // 3. 治疗上限限制：不允许超过最大血量
+        if (this.health > this.maxHealth) {
+            this.health = this.maxHealth;
+        }
+        
         if (this.health <= 0) this.die();
     }
 
@@ -543,13 +550,13 @@ export class HeroUnit extends BaseUnit {
     static displayName = '主角';
     constructor(side, index, projectileManager) {
         const heroData = worldManager.heroData;
-        const details = worldManager.getUnitDetails(heroData.id);
+        const details = worldManager.getUnitBlueprint(heroData.id);
         
         super({
             side,
             index,
             type: heroData.id, 
-            hp: details.hp, // 直接使用 getUnitDetails 返回的、包含成长和全局加成的最终血量
+            hp: details.hp, // 使用蓝图基础血量 (BaseUnit 会应用全局修正)
             speed: details.speed,
             attackDamage: details.atk, // 使用包含力道成长的最终攻击力
             attackRange: details.range,
@@ -561,8 +568,24 @@ export class HeroUnit extends BaseUnit {
 
         this.isHero = true;
         this.level = heroData.level;
-        // 当前血量：如果之前有记录则用记录的，否则用最大血量
-        this.health = (heroData.hpCurrent !== undefined && heroData.hpCurrent > 0) ? heroData.hpCurrent : this.maxHealth;
+
+        // --- 优雅的血量同步逻辑：百分比映射 ---
+        // 1. 获取该英雄在大世界的基础最大血量 (即蓝图值)
+        const baseMaxHP = details.hp; 
+        // 2. 获取大世界当前的实时血量 (如果没有记录，则默认为满血)
+        const worldCurrentHP = (heroData.hpCurrent !== undefined) ? heroData.hpCurrent : baseMaxHP;
+        
+        // 3. 计算血量百分比 (0.0 - 1.0)
+        const healthRatio = Math.min(1.0, worldCurrentHP / baseMaxHP);
+
+        // 4. 将百分比应用到战场的 maxHealth 上 (maxHealth 已由 BaseUnit 应用了全局 Buff)
+        if (healthRatio >= 0.99) {
+            this.health = this.maxHealth; // 接近满血则强制满血，处理浮点数误差
+        } else {
+            this.health = this.maxHealth * healthRatio;
+        }
+
+        console.log(`%c[HeroUnit] %c主角入场同步: 大世界状态(${worldCurrentHP.toFixed(1)}/${baseMaxHP.toFixed(1)}) -> 战场状态(${this.health.toFixed(1)}/${this.maxHealth.toFixed(1)})`);
         
         // --- 藏剑双形态逻辑 ---
         if (heroData.id === 'yeying') {
@@ -623,7 +646,7 @@ export class HeroUnit extends BaseUnit {
 
         // 核心修正：基于物理时间判定伤害
         this.hitTimer += deltaTime * 1000; // 转为毫秒
-        const interval = worldManager.getUnitDetails('yeying').continuousInterval || 166;
+        const interval = worldManager.getUnitBlueprint('yeying').continuousInterval || 166;
         
         if (this.hitTimer >= interval) {
             this.hitTimer = 0; // 触发判定并重置
@@ -668,7 +691,7 @@ export class HeroUnit extends BaseUnit {
         if (this._cangjianStance === v) return;
         this._cangjianStance = v;
         
-        const details = worldManager.getUnitDetails('yeying');
+        const details = worldManager.getUnitBlueprint('yeying');
 
         // 切换到重剑形态时，强制中断轻剑特有 Buff (如梦泉虎跑)
         if (v === 'heavy') {
@@ -731,7 +754,7 @@ export class HeroUnit extends BaseUnit {
     performAttack(enemies, allies) {
         const heroId = worldManager.heroData.id;
         const now = Date.now();
-        const details = worldManager.getUnitDetails(heroId);
+        const details = worldManager.getUnitBlueprint(heroId);
         
         // 核心优化：攻速逻辑完全数据驱动，消除硬编码，且支持 Buff 缩放
         let actualCD = this.attackCooldownTime;
@@ -834,7 +857,7 @@ export class HeroUnit extends BaseUnit {
 export class MeleeSoldier extends BaseUnit {
     static displayName = '天策弟子';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('melee');
+        const stats = worldManager.getUnitBlueprint('melee');
         super({
             side,
             index,
@@ -853,7 +876,7 @@ export class MeleeSoldier extends BaseUnit {
 export class RangedSoldier extends BaseUnit {
     static displayName = '长歌弟子';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('ranged');
+        const stats = worldManager.getUnitBlueprint('ranged');
         super({
             side,
             index,
@@ -896,7 +919,7 @@ export class RangedSoldier extends BaseUnit {
 export class Archer extends BaseUnit {
     static displayName = '唐门射手';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('archer');
+        const stats = worldManager.getUnitBlueprint('archer');
         super({
             side,
             index,
@@ -907,7 +930,7 @@ export class Archer extends BaseUnit {
             attackDamage: stats.atk,
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 3
+            cost: stats.cost
         });
     }
 
@@ -938,7 +961,7 @@ export class Archer extends BaseUnit {
 export class Healer extends BaseUnit {
     static displayName = '万花补给';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('healer');
+        const stats = worldManager.getUnitBlueprint('healer');
         super({
             side,
             index,
@@ -954,8 +977,12 @@ export class Healer extends BaseUnit {
     }
 
     updateAI(enemies, allies) {
-        // 1. 寻找任意受伤的盟友 (简单 find，不强求最低血量，自然分散治疗压力)
-        this.target = allies.find(u => !u.isDead && u.health < u.maxHealth);
+        // 1. 寻找任意受伤的盟友 (增加 1 点血量的容差，防止浮点数精度导致的误判)
+        this.target = allies.find(u => !u.isDead && u.health < (u.maxHealth - 1));
+        
+        if (this.target && this.target.health < (this.target.maxHealth - 1)) {
+            console.log(`%c[Healer AI] %c锁定受伤目标: ${this.target.type}, HP: ${this.target.health.toFixed(2)}/${this.target.maxHealth.toFixed(2)}`);
+        }
         
         // 2. 如果全员健康，则把主角作为跟随目标
         if (!this.target) {
@@ -970,11 +997,12 @@ export class Healer extends BaseUnit {
     }
 
     performAttack(enemies, allies) {
-        // --- 核心安全性检查：只奶受伤的自己人 ---
-        if (!this.target || this.target.side !== this.side || this.target.health >= this.target.maxHealth) return;
+        // --- 核心安全性检查：只奶受伤的自己人，同样增加 1 点血量容差 ---
+        if (!this.target || this.target.side !== this.side || this.target.health >= (this.target.maxHealth - 1)) return;
 
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime) {
+            console.log(`%c[Healer Attack] %c发射治疗 -> ${this.target.type}, 当前HP: ${this.target.health.toFixed(2)}`);
             this.lastAttackTime = now;
             this.onAttackAnimation();
             
@@ -999,7 +1027,7 @@ export class Healer extends BaseUnit {
 export class WildBoar extends BaseUnit {
     static displayName = '野猪';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('wild_boar');
+        const stats = worldManager.getUnitBlueprint('wild_boar');
         super({ side, index, type: 'wild_boar', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1007,7 +1035,7 @@ export class WildBoar extends BaseUnit {
 export class Wolf extends BaseUnit {
     static displayName = '野狼';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('wolf');
+        const stats = worldManager.getUnitBlueprint('wolf');
         super({ side, index, type: 'wolf', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1015,7 +1043,7 @@ export class Wolf extends BaseUnit {
 export class Tiger extends BaseUnit {
     static displayName = '猛虎';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('tiger');
+        const stats = worldManager.getUnitBlueprint('tiger');
         super({ side, index, type: 'tiger', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 2.0, projectileManager });
     }
 }
@@ -1023,7 +1051,7 @@ export class Tiger extends BaseUnit {
 export class Bear extends BaseUnit {
     static displayName = '黑熊';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('bear');
+        const stats = worldManager.getUnitBlueprint('bear');
         super({ side, index, type: 'bear', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 3.0, projectileManager });
     }
 }
@@ -1032,7 +1060,7 @@ export class Bear extends BaseUnit {
 export class Bandit extends BaseUnit {
     static displayName = '山贼刀匪';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('bandit');
+        const stats = worldManager.getUnitBlueprint('bandit');
         super({ side, index, type: 'bandit', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1040,7 +1068,7 @@ export class Bandit extends BaseUnit {
 export class BanditArcher extends BaseUnit {
     static displayName = '山贼弩匪';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('bandit_archer');
+        const stats = worldManager.getUnitBlueprint('bandit_archer');
         super({ side, index, type: 'bandit_archer', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
     }
     performAttack(enemies) {
@@ -1065,7 +1093,7 @@ export class BanditArcher extends BaseUnit {
 export class RebelSoldier extends BaseUnit {
     static displayName = '叛军甲兵';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('rebel_soldier');
+        const stats = worldManager.getUnitBlueprint('rebel_soldier');
         super({ side, index, type: 'rebel_soldier', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 1.5, projectileManager });
     }
 }
@@ -1073,7 +1101,7 @@ export class RebelSoldier extends BaseUnit {
 export class RebelAxeman extends BaseUnit {
     static displayName = '叛军斧兵';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('rebel_axeman');
+        const stats = worldManager.getUnitBlueprint('rebel_axeman');
         super({ side, index, type: 'rebel_axeman', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1082,7 +1110,7 @@ export class RebelAxeman extends BaseUnit {
 export class Snake extends BaseUnit {
     static displayName = '毒蛇';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('snake');
+        const stats = worldManager.getUnitBlueprint('snake');
         super({ side, index, type: 'snake', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1090,7 +1118,7 @@ export class Snake extends BaseUnit {
 export class Bats extends BaseUnit {
     static displayName = '蝙蝠群';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('bats');
+        const stats = worldManager.getUnitBlueprint('bats');
         super({ side, index, type: 'bats', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1098,7 +1126,7 @@ export class Bats extends BaseUnit {
 export class Deer extends BaseUnit {
     static displayName = '林间小鹿';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('deer');
+        const stats = worldManager.getUnitBlueprint('deer');
         super({ side, index, type: 'deer', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1106,7 +1134,7 @@ export class Deer extends BaseUnit {
 export class Pheasant extends BaseUnit {
     static displayName = '山鸡';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('pheasant');
+        const stats = worldManager.getUnitBlueprint('pheasant');
         super({ side, index, type: 'pheasant', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1115,7 +1143,7 @@ export class Pheasant extends BaseUnit {
 export class AssassinMonk extends BaseUnit {
     static displayName = '苦修刺客';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('assassin_monk');
+        const stats = worldManager.getUnitBlueprint('assassin_monk');
         super({ side, index, type: 'assassin_monk', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
     }
 }
@@ -1123,7 +1151,7 @@ export class AssassinMonk extends BaseUnit {
 export class Zombie extends BaseUnit {
     static displayName = '毒尸傀儡';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('zombie');
+        const stats = worldManager.getUnitBlueprint('zombie');
         super({ side, index, type: 'zombie', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
@@ -1131,7 +1159,7 @@ export class Zombie extends BaseUnit {
 export class HeavyKnight extends BaseUnit {
     static displayName = '铁浮屠重骑';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('heavy_knight');
+        const stats = worldManager.getUnitBlueprint('heavy_knight');
         super({ side, index, type: 'heavy_knight', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 4.0, projectileManager });
     }
 }
@@ -1139,7 +1167,7 @@ export class HeavyKnight extends BaseUnit {
 export class ShadowNinja extends BaseUnit {
     static displayName = '隐之影';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('shadow_ninja');
+        const stats = worldManager.getUnitBlueprint('shadow_ninja');
         super({ side, index, type: 'shadow_ninja', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
     }
 }
@@ -1150,7 +1178,7 @@ export class ShadowNinja extends BaseUnit {
 export class Cangjian extends BaseUnit {
     static displayName = '藏剑弟子';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('cangjian');
+        const stats = worldManager.getUnitBlueprint('cangjian');
         super({
             side,
             index,
@@ -1174,7 +1202,7 @@ export class Cangjian extends BaseUnit {
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
 
-            const details = worldManager.getUnitDetails('cangjian');
+            const details = worldManager.getUnitBlueprint('cangjian');
             const burstCount = details.burstCount || 3;
 
             // 核心修正：藏剑弟子也改为爆发模式，缩小范围 (1.5)
@@ -1201,7 +1229,7 @@ export class Cangjian extends BaseUnit {
 export class Cangyun extends BaseUnit {
     static displayName = '苍云将士';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('cangyun');
+        const stats = worldManager.getUnitBlueprint('cangyun');
         super({
             side,
             index,
@@ -1224,7 +1252,7 @@ export class Cangyun extends BaseUnit {
 export class Tiance extends BaseUnit {
     static displayName = '天策骑兵';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('tiance');
+        const stats = worldManager.getUnitBlueprint('tiance');
         super({
             side,
             index,
@@ -1265,7 +1293,7 @@ export class Tiance extends BaseUnit {
 export class Chunyang extends BaseUnit {
     static displayName = '纯阳弟子';
     constructor(side, index, projectileManager) {
-        const stats = worldManager.getUnitDetails('chunyang');
+        const stats = worldManager.getUnitBlueprint('chunyang');
         super({
             side,
             index,

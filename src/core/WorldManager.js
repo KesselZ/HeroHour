@@ -1411,62 +1411,65 @@ class WorldManager {
     }
 
     /**
-     * 获取兵种详情 (全游戏唯一合法的数据出口，彻底解决显示不一致问题)
+     * 获取兵种蓝图 (基础属性 + 英雄成长)
+     * 职责：专供战斗单位构造函数使用，作为计算基准，不包含全局 Buff
      */
-    getUnitDetails(type) {
-        // 关键修复：先检查是否是英雄，即使数据表中没有基础属性，英雄同步逻辑也应执行
+    getUnitBlueprint(type) {
         const baseBlueprint = UNIT_STATS_DATA_INTERNAL[type];
-        
-        // 1. 获取统御消耗 (Cost)
         const cost = this.unitCosts[type]?.cost || 0;
 
-        // 浅拷贝蓝图，作为计算基准 (如果没有蓝图，先给个空壳，确保基础字段存在)
-        let liveStats = baseBlueprint ? { ...baseBlueprint, cost } : { 
+        // 基础数据克隆
+        let stats = baseBlueprint ? { ...baseBlueprint, cost } : { 
             name: type, hp: 0, atk: 0, speed: 0, attackSpeed: 1000, cost 
         };
 
-        // --- 核心重构：如果查询的是当前主角，强制同步面板实时属性 ---
+        // --- 英雄成长逻辑 (属于基础属性的一部分) ---
         if (this.heroData && this.heroData.id === type) {
             const s = this.heroData.stats;
             const identity = this.getHeroIdentity(type);
             const cb = identity.combatBase;
 
-            // 英雄的基础数值直接由身份表中的 combatBase 驱动，不再硬编码
-            liveStats.hp = cb.hpBase + (s.power * cb.hpScaling); 
-            liveStats.mp = 160 + (this.heroData.level - 1) * 14; 
-            // 英雄本人攻击力 = 基础攻击 * (1 + 力道 * 攻击成长系数)
-            // 采用乘法百分比计算，确保多段攻击职业不会因为固定加成而数值爆炸
-            liveStats.atk = cb.atk * (1 + s.power * (cb.atkScaling || 0.05));                
-            liveStats.speed = s.speed;          
+            stats.hp = cb.hpBase + (s.power * cb.hpScaling); 
+            stats.mp = 160 + (this.heroData.level - 1) * 14; 
+            stats.atk = cb.atk * (1 + s.power * (cb.atkScaling || 0.05));                
+            stats.speed = s.speed;          
         }
 
-        const dummyUnit = { side: 'player', type: type };
+        return stats;
+    }
+
+    /**
+     * 获取兵种最终详情 (蓝图 + 全局修正)
+     * 职责：全游戏唯一合法的显示数据出口，解决 UI 显示不一致问题
+     */
+    getUnitDetails(type, side = 'player') {
+        const blueprint = this.getUnitBlueprint(type);
+        const dummyUnit = { side: side, type: type };
         
-        // 1. 应用所有动态修正（天赋、装备、技能加成）
-        const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', liveStats.hp));
+        // 1. 应用所有全局动态修正
+        const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', blueprint.hp));
         
-        // 治疗单位与普通单位伤害修正逻辑
         let finalAtk;
         if (type === 'healer') {
-            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'damage', -liveStats.atk));
+            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'damage', -blueprint.atk));
         } else {
-            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'damage', liveStats.atk);
+            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'damage', blueprint.atk);
         }
         
-        const finalSpeed = modifierManager.getModifiedValue(dummyUnit, 'speed', liveStats.speed);
-        const finalInterval = modifierManager.getModifiedValue(dummyUnit, 'attack_speed', liveStats.attackSpeed);
+        const finalSpeed = modifierManager.getModifiedValue(dummyUnit, 'speed', blueprint.speed);
+        const finalInterval = modifierManager.getModifiedValue(dummyUnit, 'attack_speed', blueprint.attackSpeed);
         
-        // 2. 多段攻击 DPS 换算 ( burstCount 取自蓝图 )
-        const burstCount = liveStats.burstCount || 1;
+        // 2. DPS 换算
+        const burstCount = blueprint.burstCount || 1;
         const dps = Math.ceil((finalAtk * burstCount / finalInterval) * 1000);
 
         return {
-            ...liveStats,
+            ...blueprint,
             hp: finalHP,
             atk: Math.ceil(finalAtk),
             speed: finalSpeed,
             dps: dps,
-            cost: cost // 确保返回 cost
+            cost: blueprint.cost
         };
     }
 
