@@ -288,7 +288,8 @@ export class Skill {
                     color: action.color || 0x88ffff,
                     autoTarget: action.autoTarget !== false,
                     targetMode: action.targetMode || 'random',
-                    spread: action.spread || 0.5
+                    spread: action.spread || 0.5,
+                    scale: action.scale || 1.0
                 });
                 break;
         }

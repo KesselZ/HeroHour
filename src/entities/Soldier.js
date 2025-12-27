@@ -34,7 +34,7 @@ export class BaseUnit extends THREE.Group {
         this.health = this.maxHealth;
         
         // 基础移速叠加随机微差后，再应用全局修正
-        const rawSpeed = (speed + (rng.next() - 0.5) * 0.01) * 0.7; // 全局移速降低 30%
+        const rawSpeed = (speed + (rng.next() - 0.5) * 0.01) * 0.5; // 全局移速再降低 30% (总计约降低 50%)
         this.moveSpeed = modifierManager.getModifiedValue(this, 'speed', rawSpeed);
         this.baseMoveSpeed = this.moveSpeed; // 记录基础移速，用于判定减速特效
         
@@ -53,6 +53,10 @@ export class BaseUnit extends THREE.Group {
         
         this.isTigerHeart = false; // 啸如虎：锁血状态
         this.stunnedUntil = 0; // 眩晕截止时间戳
+        this.hitFlashUntil = 0; // 受击闪红截止时间戳
+        this.activeColors = new Map(); // 记录当前生效的 Buff 颜色 (Tag -> Color)
+        this.baseColor = 0xffffff; // 单位的基础颜色
+        
         this.target = null;
         this.lastAttackTime = 0;
         
@@ -123,13 +127,8 @@ export class BaseUnit extends THREE.Group {
         // 注入初速度
         this.knockbackVelocity.addScaledVector(dir, force);
         
-        // 受击视觉反馈：变红
-        this.unitSprite.material.color.setHex(0xff8888);
-        setTimeout(() => {
-            if (!this.isDead && this.unitSprite) {
-                this.unitSprite.material.color.setHex(0xffffff);
-            }
-        }, 150);
+        // 受击视觉反馈：记录时间，由 updateVisualState 统一处理
+        this.hitFlashUntil = Date.now() + 150;
     }
 
     applyStun(duration) {
@@ -182,8 +181,39 @@ export class BaseUnit extends THREE.Group {
         }
     }
 
+    /**
+     * 统一视觉状态更新：解决颜色冲突 (受击 > 眩晕 > Buff > 基础色)
+     */
+    updateVisualState() {
+        if (this.isDead || !this.unitSprite) return;
+
+        let targetColor = this.baseColor;
+
+        // 1. Buff/气场颜色 (取最后加入的颜色)
+        if (this.activeColors.size > 0) {
+            targetColor = Array.from(this.activeColors.values()).pop();
+        }
+
+        // 2. 眩晕状态 (优先级高于 Buff)
+        if (Date.now() < this.stunnedUntil) {
+            targetColor = 0x888888;
+        }
+
+        // 3. 受击反馈 (最高优先级，短促闪烁)
+        if (Date.now() < this.hitFlashUntil) {
+            targetColor = 0xff3333;
+        }
+
+        if (this.unitSprite.material.color.getHex() !== targetColor) {
+            this.unitSprite.material.color.setHex(targetColor);
+        }
+    }
+
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
+
+        // 0. 统一视觉状态更新
+        this.updateVisualState();
 
         // 0. 状态特效判定：减速
         if (this.moveSpeed < this.baseMoveSpeed * 0.95) {
@@ -194,9 +224,6 @@ export class BaseUnit extends THREE.Group {
 
         // 0. 眩晕状态判定
         if (Date.now() < this.stunnedUntil) {
-            // 眩晕时变灰
-            if (this.unitSprite) this.unitSprite.material.color.setHex(0x888888);
-            
             // 眩晕时也要处理物理冲力 (击退)
             if (this.knockbackVelocity.lengthSq() > 0.0001) {
                 this.position.add(this.knockbackVelocity);
@@ -205,14 +232,7 @@ export class BaseUnit extends THREE.Group {
             // 处理碰撞挤压
             this.applySeparation(allies, enemies, deltaTime);
             return;
-        } else {
-            // 恢复颜色 (如果之前是灰的且没有其他 buff 颜色)
-            // 注意：这里可能跟 applyBuffToUnits 的颜色冲突，
-            // 生产环境下建议用一个状态机管理颜色，这里先简单处理
-            if (this.unitSprite && this.unitSprite.material.color.getHex() === 0x888888) {
-                this.unitSprite.material.color.setHex(0xffffff);
-            }
-        }
+        } 
 
         // 1. 处理物理冲力 (击退位移)
         if (this.knockbackVelocity.lengthSq() > 0.0001) {
@@ -457,17 +477,8 @@ export class BaseUnit extends THREE.Group {
             this.health -= finalAmount;
         }
         
-        // 通用受击反馈：强烈的红色闪烁
-        const originalColor = 0xffffff;
-        const hitColor = 0xff3333; // 鲜艳的红色
-        
-        this.unitSprite.material.color.setHex(hitColor);
-        
-        setTimeout(() => {
-            if (this.unitSprite && !this.isDead) {
-                this.unitSprite.material.color.setHex(originalColor);
-            }
-        }, 150);
+        // 通用受击反馈：记录时间，由 updateVisualState 统一处理
+        this.hitFlashUntil = Date.now() + 150;
 
         if (this.health <= 0) this.die();
     }
@@ -531,7 +542,6 @@ export class HeroUnit extends BaseUnit {
         // --- 藏剑双形态逻辑 ---
         if (heroData.id === 'yeying') {
             this._cangjianStance = 'heavy'; // 默认重剑
-            this.unitSprite.material.color.setHex(0xffcc00); // 重剑初始金色
             this.scale.set(1.5, 1.5, 1.5);
         }
         
@@ -638,11 +648,11 @@ export class HeroUnit extends BaseUnit {
         // 切换到重剑形态时，强制中断轻剑特有 Buff (如梦泉虎跑)
         if (v === 'heavy') {
             this.clearBuffs('mengquan');
-            this.unitSprite.material.color.setHex(0xffcc00); // 金色
+            this.baseColor = 0xffffff; // 重剑底色保持白色
             this.scale.set(1.5, 1.5, 1.5);
             this.attackRange = details.range; // 恢复心剑范围 (2.5)
         } else {
-            this.unitSprite.material.color.setHex(0xffffff); // 原色
+            this.baseColor = 0xffffff; // 轻剑底色恢复白色
             this.scale.set(1.5, 1.5, 1.5);
             this.attackRange = 1.0; // 轻剑单体攻击范围缩短
         }
@@ -744,7 +754,7 @@ export class HeroUnit extends BaseUnit {
     performTianceAttack(enemies) {
         if (!this.target || this.target.isDead) return;
         const sweepRadius = 2.0;
-        window.battle.playVFX('tiance_sweep', { unit: this, radius: sweepRadius, color: 0xff4400, duration: 300 });
+        window.battle.playVFX('advanced_sweep', { unit: this, radius: sweepRadius, color: 0xff0000, duration: 300 });
         this.executeAOE(enemies, {
             radius: sweepRadius,
             angle: Math.PI, 
@@ -1157,7 +1167,7 @@ export class Tiance extends BaseUnit {
             this.onAttackAnimation();
 
             // 真正的精简：VFX 和 AOE 判定现在都能自动识别面向
-            window.battle.playVFX('tiance_sweep', { unit: this, radius: this.sweepRadius, color: 0xff4400, duration: 250 });
+            window.battle.playVFX('tiance_sweep', { unit: this, radius: this.sweepRadius, color: 0xff0000, duration: 250 });
 
             this.executeAOE(enemies, {
                 radius: this.sweepRadius,

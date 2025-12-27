@@ -675,6 +675,9 @@ export class BattleScene {
             case 'tiance_sweep': 
                 this.vfxLibrary.createSweepVFX(vfxPos, finalDir, radius, color, duration, angle, parent); 
                 break;
+            case 'advanced_sweep':
+                this.vfxLibrary.createAdvancedSweepVFX(vfxPos, finalDir, radius, color, duration, angle, parent);
+                break;
             case 'cangjian_whirlwind': 
                 this.vfxLibrary.createWhirlwindVFX(vfxPos, radius, color, duration, parent); 
                 break;
@@ -747,7 +750,8 @@ export class BattleScene {
         const { 
             count = 1, interval = 100, startPos, target, damage, speed, 
             type, color, spread = 0.5, autoTarget = false,
-            targetMode = 'random' // 新增模式：random, nearest, spread
+            targetMode = 'random', // 新增模式：random, nearest, spread
+            scale = 1.0 // 新增：支持缩放
         } = options;
 
         for (let i = 0; i < count; i++) {
@@ -784,7 +788,8 @@ export class BattleScene {
                     speed, 
                     damage, 
                     type, 
-                    color 
+                    color,
+                    scale
                 });
             }, i * interval);
         }
@@ -837,6 +842,12 @@ export class BattleScene {
             }
 
             if (vfxName) this.playVFX(vfxName, { unit, duration, color: color || 0xffffff, radius: unit.isHero ? 1.5 : 0.8 });
+            
+            // 记录 Buff 颜色 (解决多 Buff 颜色冲突)
+            if (color && tag && unit.activeColors) {
+                unit.activeColors.set(tag, color);
+            }
+
             const stats = Array.isArray(stat) ? stat : [stat];
             const multipliers = Array.isArray(multiplier) ? multiplier : [multiplier];
             const offsets = Array.isArray(offset) ? offset : [offset];
@@ -860,8 +871,6 @@ export class BattleScene {
                 }
             });
 
-            if (color) unit.unitSprite.material.color.setHex(color);
-
             // 定时恢复函数
             const cleanup = () => {
                 if (!unit.isDead) {
@@ -883,7 +892,11 @@ export class BattleScene {
                             unit.isTigerHeart = false;
                         }
                     });
-                    if (color) unit.unitSprite.material.color.setHex(0xffffff);
+                    
+                    // 移除 Buff 颜色
+                    if (color && tag && unit.activeColors) {
+                        unit.activeColors.delete(tag);
+                    }
                 }
                 // 从单位的 activeBuffs 中移除自己
                 if (tag && unit.activeBuffs) {

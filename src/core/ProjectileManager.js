@@ -12,7 +12,8 @@ class Projectile extends THREE.Group {
             speed = 0.2,
             damage = 10,
             color = 0xffffff,
-            type = 'arrow'
+            type = 'arrow',
+            scale = 1.0
         } = config;
 
         this.target = target;
@@ -21,6 +22,9 @@ class Projectile extends THREE.Group {
         this.isDone = false;
 
         this.initVisual(type, color);
+        if (scale !== 1.0) {
+            this.scale.setScalar(scale);
+        }
         this.position.copy(startPos);
     }
 

@@ -362,6 +362,111 @@ export class VFXLibrary {
         anim();
     }
 
+    /**
+     * 高级横扫特效：带有羽化边缘和流光感，适用于英雄
+     */
+    createAdvancedSweepVFX(pos, dir, radius, color, duration, angle, parent = null) {
+        const actualParent = parent || this.scene;
+        const group = new THREE.Group();
+
+        // 抵消父级缩放
+        if (parent && parent.scale) {
+            group.scale.set(1/parent.scale.x, 1/parent.scale.y, 1/parent.scale.z);
+        }
+
+        // 1. 创建羽化扇形贴图
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        
+        // 绘制渐变扇形
+        const cx = 128, cy = 128;
+        const c = new THREE.Color(color);
+        const rgb = `${Math.floor(c.r * 255)},${Math.floor(c.g * 255)},${Math.floor(c.b * 255)}`;
+        
+        // 核心修正：使用固定的画布坐标 (0-128) 而非受世界半径影响的错误坐标
+        const grad = ctx.createRadialGradient(cx, cy, 60, cx, cy, 120); 
+        
+        grad.addColorStop(0, `rgba(${rgb}, 0)`);
+        grad.addColorStop(0.5, `rgba(${rgb}, 0.95)`); // 显著提升中心带透明度，让红色更“实”
+        grad.addColorStop(1, `rgba(${rgb}, 0)`);
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        // 核心修正：将中心点从 -PI/2 (Canvas的UP) 改为 +PI/2 (Canvas的DOWN)
+        // 这样在贴图映射到 PlaneGeometry 后，能与基础 sweep 一样指向本地 -Z 轴
+        ctx.arc(cx, cy, 120, -angle/2 + Math.PI/2, angle/2 + Math.PI/2);
+        ctx.closePath();
+        ctx.fill();
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const geo = new THREE.PlaneGeometry(radius * 2.1, radius * 2.1); // 尺寸更贴合半径
+        const mat = new THREE.MeshBasicMaterial({ 
+            map: texture, 
+            transparent: true, 
+            opacity: 0.8, 
+            side: THREE.DoubleSide, 
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.y = 0.15; // 与基础版高度一致，确保可见
+        group.add(mesh);
+
+        // 设置方向
+        if (dir) group.rotation.y = Math.atan2(dir.x, dir.z);
+        group.position.copy(pos);
+        actualParent.add(group);
+
+        const start = Date.now();
+        const anim = () => {
+            const prg = (Date.now() - start) / duration;
+            if (prg < 1) {
+                // 核心动效：扇形从小变大，同时迅速淡出
+                const s = 0.8 + prg * 0.4;
+                group.scale.set(s, s, 1);
+                mat.opacity = 0.8 * Math.pow(1 - prg, 2); // 平方衰减更显凌厉
+                requestAnimationFrame(anim);
+            } else {
+                actualParent.remove(group);
+                texture.dispose(); geo.dispose(); mat.dispose();
+            }
+        };
+        anim();
+
+        // 2. 伴随碎裂粒子 (增加打击感)
+        this.createParticleSystem({
+            pos: pos.clone(),
+            parent: actualParent,
+            color,
+            duration: duration * 0.8,
+            density: 1.5,
+            spawnRate: 40,
+            geometry: new THREE.BoxGeometry(0.05, 0.05, 0.05),
+            initFn: (p) => {
+                const a = (Math.random() - 0.5) * angle;
+                const r = radius * (0.6 + Math.random() * 0.4);
+                // 核心修正：粒子位置也需要与贴图弧度同步 (+Math.PI/2)
+                const localPos = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)).multiplyScalar(r);
+                if (dir) {
+                    const rotY = Math.atan2(dir.x, dir.z);
+                    localPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY);
+                }
+                p.position.copy(localPos);
+                p.userData.vel = localPos.clone().normalize().multiplyScalar(0.05);
+            },
+            updateFn: (p, prg) => {
+                p.position.add(p.userData.vel);
+                p.material.opacity = 0.6 * (1 - prg);
+                p.scale.setScalar(1 - prg);
+            }
+        });
+    }
+
     createWhirlwindVFX(pos, radius, color, duration, parent = null) {
         const actualParent = parent || this.scene;
         const group = new THREE.Group();

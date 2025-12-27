@@ -309,7 +309,8 @@ export const SkillRegistry = {
                 damage: 35, 
                 projType: 'air_sword',
                 autoTarget: true,
-                targetMode: 'nearest' // 四象轮回：盯着最近的打，适合集火
+                targetMode: 'nearest', // 四象轮回：盯着最近的打，适合集火
+                scale: 1.5 // 技能射出的剑比普攻大 50%
             }
         ]
     }),
@@ -330,7 +331,8 @@ export const SkillRegistry = {
                 damage: 45, 
                 projType: 'air_sword',
                 autoTarget: true,
-                targetMode: 'spread' // 两仪化形：智能散布，每人分几剑，华丽清场
+                targetMode: 'spread', // 两仪化形：智能散布，每人分几剑，华丽清场
+                scale: 1.8 // 进阶技能的剑气更粗壮
             }
         ]
     }),
@@ -351,7 +353,8 @@ export const SkillRegistry = {
                 damage: 38.5, 
                 projType: 'air_sword',
                 autoTarget: true,
-                targetMode: 'random'
+                targetMode: 'random',
+                scale: 2.5 // 绝技的剑气具有毁灭性的压迫感，最大！
             }
         ]
     }),
@@ -415,7 +418,7 @@ export const SkillRegistry = {
         targeting: { type: 'instant', shape: 'sector', radius: 4.0, angle: Math.PI / 2 }, 
         description: '【轻剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害并大幅击退',
         actions: [
-            { type: 'vfx', name: 'tiance_sweep', params: { color: 0xffcc00, duration: 400, radius: 4.0, angle: Math.PI / 2 } },
+            { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 400, radius: 4.0, angle: Math.PI / 2 } },
             { type: 'damage_aoe', value: 35, knockback: 1.6 }
         ]
     }),
@@ -461,8 +464,7 @@ export const SkillRegistry = {
                     multiplier: [1.5], 
                     duration: 5000,
                     tag: 'mengquan',
-                    vfxName: 'butterfly_particles', // 使用新设计的蝴蝶追随粒子
-                    color: 0xffcc00 // 藏剑金黄色
+                    vfxName: 'butterfly_particles' // 使用新设计的蝴蝶追随粒子
                 }
             },
             { 
@@ -488,7 +490,7 @@ export const SkillRegistry = {
         targeting: { type: 'instant', shape: 'sector', radius: 2.5, angle: Math.PI / 2 },
         description: '【轻剑招式】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
         actions: [
-            { type: 'vfx', name: 'tiance_sweep', params: { color: 0xffffff, duration: 200, radius: 2.5, angle: Math.PI / 2 } },
+            { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 200, radius: 2.5, angle: Math.PI / 2 } },
             { type: 'damage_aoe', value: 60, knockback: 0 }
         ]
     })
