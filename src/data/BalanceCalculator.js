@@ -1,63 +1,103 @@
 /**
- * 士兵属性均衡计算器 (Soldier Balance Calculator) - 调优版 v3
+ * 士兵属性均衡计算器 (Soldier Balance Calculator) - 自动化版 v4
  * 
- * 1. 纯阳 Cost 下调至 5。
- * 2. 藏剑 Atk 下调 20% (9 -> 7.2)。
- * 3. 黑熊/铁浮屠 Cost 提升至 7。
- * 4. 傀儡 Atk 下调 20% (15 -> 12)。
+ * 核心重构：直接从 UnitStatsData.js 引入真实数据，确保分析结果与游戏实际逻辑完全同步。
  */
 
-const UNIT_STATS = {
-    // 玩家兵种
-    'melee': { name: '天策弟子', hp: 85, atk: 6, attackSpeed: 1000, speed: 5.0, range: 0.8, burst: 1, targets: 1.0, cost: 2 },
-    'ranged': { name: '长歌弟子', hp: 70, atk: 14, attackSpeed: 1800, speed: 4.2, range: 6.0, burst: 1, targets: 1.0, cost: 2 },
-    'archer': { name: '唐门射手', hp: 65, atk: 22, attackSpeed: 2500, speed: 5.0, range: 20.0, burst: 1, targets: 1.0, cost: 3 },
-    'chunyang_air': { name: '纯阳(气)', hp: 140, atk: 12, attackSpeed: 1500, speed: 5.9, range: 12.0, burst: 3, targets: 1.0, cost: 5 },
-    'chunyang_sword': { name: '纯阳(剑)', hp: 140, atk: 18, attackSpeed: 1500, speed: 5.9, range: 1.2, burst: 1, targets: 1.5, cost: 5 },
-    'tiance': { name: '天策骑兵', hp: 160, atk: 18, attackSpeed: 800, speed: 8.4, range: 1.8, burst: 1, targets: 2.5, cost: 8 },
-    'cangjian': { name: '藏剑弟子', hp: 200, atk: 7.2, attackSpeed: 2000, speed: 5.9, range: 1.5, burst: 3, targets: 5.0, cost: 6 },
-    'cangyun': { name: '苍云将士', hp: 300, atk: 14, attackSpeed: 1200, speed: 3.4, range: 0.8, burst: 1, targets: 1.2, cost: 5 },
-    'healer': { name: '万花补给', hp: 120, atk: 30, attackSpeed: 2500, speed: 3.4, range: 5.0, burst: 1, targets: 1.0, cost: 4 },
+import { UNIT_STATS_DATA, UNIT_COSTS } from './UnitStatsData.js';
 
-    // 野外势力 (同步调优)
-    'wild_boar': { name: '野猪', hp: 100, atk: 8, attackSpeed: 1000, speed: 5.0, range: 0.8, burst: 1, targets: 1.0, cost: 2 },
-    'wolf': { name: '野狼', hp: 60, atk: 10, attackSpeed: 1000, speed: 6.7, range: 0.8, burst: 1, targets: 1.0, cost: 2 },
-    'tiger': { name: '猛虎', hp: 180, atk: 15, attackSpeed: 1000, speed: 7.6, range: 1.2, burst: 1, targets: 1.2, cost: 5 },
-    'bear': { name: '黑熊', hp: 250, atk: 18, attackSpeed: 1000, speed: 4.2, range: 1.0, burst: 1, targets: 1.5, cost: 7 },
-    'heavy_knight': { name: '铁浮屠', hp: 300, atk: 25, attackSpeed: 1500, speed: 3.4, range: 1.5, burst: 1, targets: 1.5, cost: 7 },
-    'shadow_ninja': { name: '隐之影', hp: 120, atk: 18, attackSpeed: 600, speed: 10.1, range: 0.8, burst: 1, targets: 1.0, cost: 5 },
-    'zombie': { name: '毒尸傀儡', hp: 250, atk: 12, attackSpeed: 1000, speed: 2.5, range: 0.7, burst: 1, targets: 1.0, cost: 4 },
-    'rebel_soldier': { name: '叛军甲兵', hp: 100, atk: 14, attackSpeed: 1000, speed: 4.2, range: 0.8, burst: 1, targets: 1.0, cost: 3 },
-};
+const UNIT_STATS = {};
+for (const id in UNIT_STATS_DATA) {
+    const baseUnit = UNIT_STATS_DATA[id];
+    const pricing = UNIT_COSTS[id] || { gold: 0, cost: 1 };
+    
+    if (baseUnit.modes) {
+        for (const modeId in baseUnit.modes) {
+            const mode = baseUnit.modes[modeId];
+            UNIT_STATS[modeId] = {
+                ...baseUnit,
+                ...mode,
+                name: mode.name || baseUnit.name,
+                cost: pricing.cost,
+                gold: pricing.gold
+            };
+        }
+    } else {
+        UNIT_STATS[id] = {
+            ...baseUnit,
+            cost: pricing.cost,
+            gold: pricing.gold
+        };
+    }
+}
+
 
 const MAX_RANGE = 20.0;
 
 function calculateMetrics(unit) {
-    const dps = (unit.atk * (unit.burst || 1) * (unit.targets || 1.0)) / (unit.attackSpeed / 1000);
+    const burst = unit.burstCount || unit.burst || 1;
+    const targets = unit.targets || 1.0;
+    const dps = (unit.atk * burst * targets) / (unit.attackSpeed / 1000);
     const baseScore = Math.sqrt(unit.hp * dps);
     const rangeBonus = 1 + (unit.range / MAX_RANGE) * 0.2;
     return { dps, score: baseScore * rangeBonus };
+}
+
+// 辅助函数：计算包含中文字符串的显示宽度
+function getDisplayWidth(str) {
+    let width = 0;
+    for (let i = 0; i < str.length; i++) {
+        width += str.charCodeAt(i) > 255 ? 2 : 1;
+    }
+    return width;
+}
+
+// 辅助函数：对齐包含中文的字符串
+function padRight(str, targetWidth) {
+    const currentWidth = getDisplayWidth(str);
+    return str + ' '.repeat(Math.max(0, targetWidth - currentWidth));
 }
 
 function runBalanceCheck() {
     const baseline = calculateMetrics(UNIT_STATS['melee']);
     const k = 2.0 / baseline.score; 
 
-    console.log(`\n=== 士兵单位属性平衡分析报告 (调优版 v3) ===`);
-    console.log(`-----------------------------------------------------------------------------------------------------------------`);
-    console.log(`${"单位名称".padEnd(12)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Range".padEnd(5)} | ${"Speed".padEnd(5)} | ${"设定Cost".padEnd(6)} | ${"理论战力".padEnd(6)} | ${"平衡度"}`);
-    console.log(`-----------------------------------------------------------------------------------------------------------------`);
+    console.log(`\n=== 士兵单位属性平衡分析报告 (经济效率增强版 v5) ===`);
+    const header = `${padRight("单位名称", 14)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Range".padEnd(5)} | ${"Cost".padEnd(4)} | ${"Gold".padEnd(5)} | ${"理论战力".padEnd(6)} | ${"统御平衡".padEnd(8)} | ${"经济效率"}`;
+    console.log(`-`.repeat(header.length + 10));
+    console.log(header);
+    console.log(`-`.repeat(header.length + 10));
 
     for (const [id, unit] of Object.entries(UNIT_STATS)) {
+        if (unit.hp === undefined || unit.atk === undefined) continue;
+
         const { dps, score } = calculateMetrics(unit);
         const theoreticalPower = score * k;
+        
+        // 1. 统御平衡度
         const balance = (theoreticalPower / unit.cost) * 100;
+        let balanceValue = balance.toFixed(1) + "%";
+        let balanceStr = balance > 115 ? `\x1b[31m${balanceValue}\x1b[0m` : 
+                         balance < 85 ? `\x1b[34m${balanceValue}\x1b[0m` : 
+                         balanceValue;
 
-        const balanceStr = balance > 115 ? `\x1b[31m${balance.toFixed(1)}%\x1b[0m` : 
-                           balance < 85 ? `\x1b[34m${balance.toFixed(1)}%\x1b[0m` : 
-                           `${balance.toFixed(1)}%`;
+        // 2. 经济效率
+        const goldEfficiency = unit.gold > 0 ? (theoreticalPower / (unit.gold / 25)) : 1.0;
+        let geValue = goldEfficiency.toFixed(2);
+        let geStr = goldEfficiency > 1.1 ? `\x1b[32m${geValue}\x1b[0m` : 
+                      goldEfficiency < 0.8 ? `\x1b[33m${geValue}\x1b[0m` : 
+                      geValue;
 
-        console.log(`${unit.name.padEnd(10)} | ${unit.hp.toString().padEnd(4)} | ${dps.toFixed(1).toString().padEnd(7)} | ${unit.range.toString().padEnd(5)} | ${unit.speed.toString().padEnd(5)} | ${unit.cost.toString().padEnd(8)} | ${theoreticalPower.toFixed(2).padEnd(6)} | ${balanceStr}`);
+        const nameStr = padRight(unit.name, 14);
+        const hpStr = (unit.hp || 0).toString().padEnd(4);
+        const dpsStr = dps.toFixed(1).toString().padEnd(7);
+        const rangeStr = (unit.range || 0).toString().padEnd(5);
+        const costStr = (unit.cost || 0).toString().padEnd(4);
+        const goldStr = (unit.gold || 0).toString().padEnd(5);
+        const powerStr = theoreticalPower.toFixed(2).padEnd(6);
+
+        // 颜色代码不计入宽度，所以手动对齐
+        console.log(`${nameStr} | ${hpStr} | ${dpsStr} | ${rangeStr} | ${costStr} | ${goldStr} | ${powerStr} | ${balanceStr.padEnd(balance > 115 || balance < 85 ? 17 : 8)} | ${geStr}`);
     }
 }
 

@@ -1,6 +1,7 @@
 import { modifierManager } from './ModifierManager.js';
 import { SkillRegistry } from './SkillRegistry.js';
 import { audioManager } from './AudioManager.js';
+import { UNIT_STATS_DATA, UNIT_COSTS } from '../data/UnitStatsData.js';
 
 /**
  * 英雄初始状态与固有特性 (数据驱动)
@@ -92,21 +93,7 @@ const BLUEPRINTS = {
 /**
  * 3. 兵种属性与说明注册表：全游戏唯一的兵种属性配置中心
  */
-const UNIT_STATS_DATA = {
-    'melee': { name: '天策弟子', hp: 85, atk: 6, range: 0.8, rangeType: '近战', speed: 5.0, attackSpeed: 1000, description: '天策府的基础步兵，性价比极高，适合作为前排炮灰。' },
-    'ranged': { name: '长歌弟子', hp: 70, atk: 14, range: 6.0, rangeType: '远程', speed: 4.2, attackSpeed: 1800, description: '以音律伤敌，射程适中，生存能力一般。' },
-    'archer': { name: '唐门射手', hp: 65, atk: 22, range: 20.0, rangeType: '极远', speed: 5.0, attackSpeed: 2000, description: '穿心弩箭，百步穿杨，脆皮但高输出。' },
-    'tiance': { name: '天策骑兵', hp: 160, atk: 18, range: 1.8, rangeType: '冲锋', speed: 8.4, attackSpeed: 800, description: '大唐精锐，强大的切入能力与控制力。' },
-    'chunyang': { name: '纯阳弟子', hp: 140, atk: 12, range: 12.0, rangeType: '远近结合', speed: 5.9, attackSpeed: 1500, burstCount: 3, description: '御剑而行，能在大后方提供精准的剑气支援。' },
-    'cangjian': { name: '藏剑弟子', hp: 200, atk: 7.2, range: 1.5, rangeType: 'AOE', speed: 5.9, attackSpeed: 2000, burstCount: 3, description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
-    'cangyun': { name: '苍云将士', hp: 300, atk: 14, range: 0.8, rangeType: '盾墙', speed: 3.4, attackSpeed: 1200, description: '玄甲军魂，战场上最难以逾越的铁壁。' },
-    'healer': { name: '万花补给', hp: 120, atk: 30, range: 5.0, rangeType: '治疗', speed: 3.4, attackSpeed: 2500, description: '妙手回春，能够有效保障精锐部队的存活。' },
-    
-    // --- 英雄单位注册 (仅保留物理常数，数值动态同步) ---
-    'qijin':      { name: '祁进', range: 6.0, rangeType: '五剑连发', attackSpeed: 1000, burstCount: 5, description: '紫虚子，剑气凌人，擅长远程密集压制。' },
-    'lichengen': { name: '李承恩', range: 2.0, rangeType: '横扫千军', attackSpeed: 1000, description: '天策统领，不动如山，一人可挡万军。' },
-    'yeying':    { name: '叶英', range: 2.5, rangeType: '心剑旋风', attackSpeed: 1000, burstCount: 3, description: '藏剑庄主，心剑合一，周身剑气无坚不摧。' }
-};
+const UNIT_STATS_DATA_INTERNAL = UNIT_STATS_DATA;
 
 /**
  * 城镇类：现在它通过 blueprintId 彻底解决了“出身”问题
@@ -402,33 +389,7 @@ class WorldManager {
         this.capturedBuildings = []; 
 
         // 6. 兵种价格定义
-        this.unitCosts = {
-            'melee': { gold: 50, cost: 2 },
-            'ranged': { gold: 80, cost: 2 },
-            'tiance': { gold: 200, cost: 5 },
-            'chunyang': { gold: 150, cost: 5 },
-            'cangjian': { gold: 180, cost: 6 },
-            'cangyun': { gold: 160, cost: 6 },
-            'archer': { gold: 100, cost: 3 },
-            'healer': { gold: 120, cost: 4 },
-            // 野外单位价格定义 (用于战力平衡计算)
-            'wild_boar': { gold: 40, cost: 2 },
-            'wolf': { gold: 40, cost: 2 },
-            'tiger': { gold: 120, cost: 5 },
-            'bear': { gold: 150, cost: 7 },
-            'bandit': { gold: 45, cost: 2 },
-            'bandit_archer': { gold: 60, cost: 3 },
-            'rebel_soldier': { gold: 70, cost: 3 },
-            'rebel_axeman': { gold: 75, cost: 3 },
-            'snake': { gold: 20, cost: 1 },
-            'bats': { gold: 15, cost: 1 },
-            'deer': { gold: 10, cost: 1 },
-            'pheasant': { gold: 5, cost: 1 },
-            'assassin_monk': { gold: 130, cost: 5 },
-            'zombie': { gold: 100, cost: 4 },
-            'heavy_knight': { gold: 250, cost: 7 },
-            'shadow_ninja': { gold: 180, cost: 5 }
-        };
+        this.unitCosts = UNIT_COSTS;
 
         // 5. 敌人组模板定义 (数据驱动模式)
         this.enemyTemplates = {
@@ -1490,11 +1451,16 @@ class WorldManager {
      * 获取兵种详情 (全游戏唯一合法的数据出口，彻底解决显示不一致问题)
      */
     getUnitDetails(type) {
-        const baseBlueprint = UNIT_STATS_DATA[type];
-        if (!baseBlueprint) return { name: type, hp: 0, atk: 0, dps: 0, rangeType: '', description: '' };
+        // 关键修复：先检查是否是英雄，即使数据表中没有基础属性，英雄同步逻辑也应执行
+        const baseBlueprint = UNIT_STATS_DATA_INTERNAL[type];
+        
+        // 1. 获取统御消耗 (Cost)
+        const cost = this.unitCosts[type]?.cost || 0;
 
-        // 浅拷贝蓝图，作为计算基准
-        let liveStats = { ...baseBlueprint };
+        // 浅拷贝蓝图，作为计算基准 (如果没有蓝图，先给个空壳，确保基础字段存在)
+        let liveStats = baseBlueprint ? { ...baseBlueprint, cost } : { 
+            name: type, hp: 0, atk: 0, speed: 0, attackSpeed: 1000, cost 
+        };
 
         // --- 核心重构：如果查询的是当前主角，强制同步面板实时属性 ---
         if (this.heroData && this.heroData.id === type) {
@@ -1536,7 +1502,8 @@ class WorldManager {
             hp: finalHP,
             atk: Math.ceil(finalAtk),
             speed: finalSpeed,
-            dps: dps
+            dps: dps,
+            cost: cost // 确保返回 cost
         };
     }
 

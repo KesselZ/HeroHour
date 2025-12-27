@@ -67,9 +67,9 @@ export class BaseUnit extends THREE.Group {
         this.knockbackVelocity = new THREE.Vector3();
         this.knockbackFriction = 0.85; // 摩擦力，值越小停得越快
         
-        // 走路音效控制
-        this.distanceWalked = 0;
-        this.stepThreshold = 3.0; // 每走 3 米触发一次脚步声
+        // 走路音效控制 (改为固定时间频率)
+        this.footstepTimer = 0;
+        this.footstepInterval = 650; // 每 650ms 响一次
 
         this.initVisual();
     }
@@ -120,7 +120,7 @@ export class BaseUnit extends THREE.Group {
      * @param {number} force 击退强度（冲量）
      */
     applyKnockback(fromPosition, force = 0.5) {
-        if (this.isDead || this.isControlImmune) return;
+        if (this.isDead || this.isControlImmune || this.isInvincible) return;
         
         // 计算从发起点到受击点的方向
         const dir = new THREE.Vector3()
@@ -137,7 +137,7 @@ export class BaseUnit extends THREE.Group {
     }
 
     applyStun(duration) {
-        if (this.isControlImmune) return;
+        if (this.isControlImmune || this.isInvincible) return;
         this.stunnedUntil = Math.max(this.stunnedUntil, Date.now() + duration);
         
         // 自动触发眩晕视觉特效
@@ -273,6 +273,7 @@ export class BaseUnit extends THREE.Group {
             if (distance > this.attackRange) {
                 this.moveTowardsTarget(deltaTime);
             } else {
+                this.footstepTimer = 0; // 停止移动时归零
                 this.performAttack(enemies, allies);
             }
             
@@ -334,8 +335,8 @@ export class BaseUnit extends THREE.Group {
      * 优化后的碰撞挤压：考虑质量 (Mass) 和 敌我关系
      */
     applySeparation(allies, enemies, deltaTime) {
-        const separationRadius = 0.6; // 基础排斥半径
-        const force = 1.2; // 基础挤开力量 (单位/秒)
+        const separationRadius = 0.8; // 增大排斥半径 (0.6 -> 0.8)
+        const force = 2.0; // 增大排斥力度 (1.2 -> 2.0)
         const allUnits = [...allies, ...enemies];
 
         for (const other of allUnits) {
@@ -343,8 +344,8 @@ export class BaseUnit extends THREE.Group {
 
             const dist = this.position.distanceTo(other.position);
             
-            // 敌对单位之间的排斥半径更小，允许贴得更近（增加“包围”感而非“弹开”感）
-            const effectiveRadius = (other.side === this.side) ? separationRadius : 0.45;
+            // 队友和敌人统一使用较大的排斥半径，防止重叠
+            const effectiveRadius = separationRadius;
 
             if (dist < effectiveRadius) {
                 // 计算排斥方向
@@ -355,11 +356,6 @@ export class BaseUnit extends THREE.Group {
                 // 核心逻辑：推挤强度受自身质量影响
                 let strength = (1 - dist / effectiveRadius) * force * deltaTime;
                 strength /= this.mass; 
-
-                // 如果是敌对单位，进一步削弱“日常推挤”，只保留最基本的空间隔离
-                if (other.side !== this.side) {
-                    strength *= 0.5;
-                }
 
                 this.position.addScaledVector(pushDir, strength);
             }
@@ -428,16 +424,18 @@ export class BaseUnit extends THREE.Group {
         const moveDist = this.moveSpeed * deltaTime;
         this.position.addScaledVector(dir, moveDist);
 
-        // 脚步声逻辑
-        this.distanceWalked += moveDist;
-        if (this.distanceWalked >= this.stepThreshold) {
-            // 只为屏幕内的单位播放脚步，或限制音量/概率
+        // 脚步声逻辑 (起步即响，固定频率)
+        if (this.footstepTimer === 0) {
             audioManager.play('footstep_grass', { 
-                volume: 0.4,   // 提高音量
-                pitchVar: 0.3, // 增加音调抖动，听起来更自然
-                chance: 0.5    // 战斗中人多，降低触发概率防止嘈杂
+                volume: 0.4,   
+                pitchVar: 0.3, 
+                chance: 0.5    
             });
-            this.distanceWalked = 0;
+        }
+
+        this.footstepTimer += deltaTime * 1000;
+        if (this.footstepTimer >= this.footstepInterval) {
+            this.footstepTimer = 0; // 重置，以便下帧或下次循环
         }
     }
 
@@ -827,7 +825,7 @@ export class MeleeSoldier extends BaseUnit {
             attackDamage: stats.atk,
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 2
+            cost: stats.cost
         });
     }
 }
@@ -846,7 +844,7 @@ export class RangedSoldier extends BaseUnit {
             attackDamage: stats.atk,
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 2
+            cost: stats.cost
         });
     }
 
@@ -931,7 +929,7 @@ export class Healer extends BaseUnit {
             attackDamage: -stats.atk, // 负伤害即治疗
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 4
+            cost: stats.cost
         });
     }
 
@@ -971,28 +969,32 @@ export class Healer extends BaseUnit {
 export class WildBoar extends BaseUnit {
     static displayName = '野猪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'wild_boar', hp: 100, speed: 5.0, attackRange: 0.8, attackDamage: 8, cost: 2, projectileManager });
+        const stats = worldManager.getUnitDetails('wild_boar');
+        super({ side, index, type: 'wild_boar', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
 export class Wolf extends BaseUnit {
     static displayName = '野狼';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'wolf', hp: 60, speed: 6.7, attackRange: 0.8, attackDamage: 10, cost: 2, projectileManager });
+        const stats = worldManager.getUnitDetails('wolf');
+        super({ side, index, type: 'wolf', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
 export class Tiger extends BaseUnit {
     static displayName = '猛虎';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'tiger', hp: 180, speed: 7.6, attackRange: 1.2, attackDamage: 15, cost: 5, mass: 2.0, projectileManager });
+        const stats = worldManager.getUnitDetails('tiger');
+        super({ side, index, type: 'tiger', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 2.0, projectileManager });
     }
 }
 
 export class Bear extends BaseUnit {
     static displayName = '黑熊';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bear', hp: 250, speed: 4.2, attackRange: 1.0, attackDamage: 18, cost: 7, mass: 3.0, projectileManager });
+        const stats = worldManager.getUnitDetails('bear');
+        super({ side, index, type: 'bear', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 3.0, projectileManager });
     }
 }
 
@@ -1000,14 +1002,16 @@ export class Bear extends BaseUnit {
 export class Bandit extends BaseUnit {
     static displayName = '山贼刀匪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bandit', hp: 95, speed: 5.0, attackRange: 0.8, attackDamage: 14, cost: 2, projectileManager });
+        const stats = worldManager.getUnitDetails('bandit');
+        super({ side, index, type: 'bandit', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
 export class BanditArcher extends BaseUnit {
     static displayName = '山贼弩匪';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bandit_archer', hp: 85, speed: 5.0, attackRange: 8.0, attackDamage: 16, attackSpeed: 2000, cost: 3, projectileManager });
+        const stats = worldManager.getUnitDetails('bandit_archer');
+        super({ side, index, type: 'bandit_archer', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
     }
     performAttack(enemies) {
         const now = Date.now();
@@ -1031,14 +1035,16 @@ export class BanditArcher extends BaseUnit {
 export class RebelSoldier extends BaseUnit {
     static displayName = '叛军甲兵';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'rebel_soldier', hp: 120, speed: 4.2, attackRange: 0.8, attackDamage: 18, cost: 3, mass: 1.5, projectileManager });
+        const stats = worldManager.getUnitDetails('rebel_soldier');
+        super({ side, index, type: 'rebel_soldier', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 1.5, projectileManager });
     }
 }
 
 export class RebelAxeman extends BaseUnit {
     static displayName = '叛军斧兵';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'rebel_axeman', hp: 135, speed: 5.0, attackRange: 0.8, attackDamage: 24, cost: 3, projectileManager });
+        const stats = worldManager.getUnitDetails('rebel_axeman');
+        super({ side, index, type: 'rebel_axeman', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
@@ -1046,28 +1052,32 @@ export class RebelAxeman extends BaseUnit {
 export class Snake extends BaseUnit {
     static displayName = '毒蛇';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'snake', hp: 30, speed: 5.9, attackRange: 0.6, attackDamage: 6, cost: 1, projectileManager });
+        const stats = worldManager.getUnitDetails('snake');
+        super({ side, index, type: 'snake', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
 export class Bats extends BaseUnit {
     static displayName = '蝙蝠群';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bats', hp: 20, speed: 8.4, attackRange: 0.5, attackDamage: 4, cost: 1, projectileManager });
+        const stats = worldManager.getUnitDetails('bats');
+        super({ side, index, type: 'bats', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
 export class Deer extends BaseUnit {
     static displayName = '林间小鹿';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'deer', hp: 80, speed: 8.4, attackRange: 0.5, attackDamage: 2, cost: 1, projectileManager });
+        const stats = worldManager.getUnitDetails('deer');
+        super({ side, index, type: 'deer', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
 export class Pheasant extends BaseUnit {
     static displayName = '山鸡';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'pheasant', hp: 30, speed: 6.7, attackRange: 0.4, attackDamage: 3, cost: 1, projectileManager });
+        const stats = worldManager.getUnitDetails('pheasant');
+        super({ side, index, type: 'pheasant', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
@@ -1075,28 +1085,32 @@ export class Pheasant extends BaseUnit {
 export class AssassinMonk extends BaseUnit {
     static displayName = '苦修刺客';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'assassin_monk', hp: 200, speed: 7.6, attackRange: 0.8, attackDamage: 30, attackSpeed: 800, cost: 5, projectileManager });
+        const stats = worldManager.getUnitDetails('assassin_monk');
+        super({ side, index, type: 'assassin_monk', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
     }
 }
 
 export class Zombie extends BaseUnit {
     static displayName = '毒尸傀儡';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'zombie', hp: 250, speed: 2.5, attackRange: 0.7, attackDamage: 12, cost: 4, projectileManager });
+        const stats = worldManager.getUnitDetails('zombie');
+        super({ side, index, type: 'zombie', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
     }
 }
 
 export class HeavyKnight extends BaseUnit {
     static displayName = '铁浮屠重骑';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'heavy_knight', hp: 300, speed: 3.4, attackRange: 1.5, attackDamage: 25, cost: 7, mass: 4.0, projectileManager });
+        const stats = worldManager.getUnitDetails('heavy_knight');
+        super({ side, index, type: 'heavy_knight', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 4.0, projectileManager });
     }
 }
 
 export class ShadowNinja extends BaseUnit {
     static displayName = '隐之影';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'shadow_ninja', hp: 120, speed: 10.1, attackRange: 0.8, attackDamage: 20, attackSpeed: 600, cost: 5, projectileManager });
+        const stats = worldManager.getUnitDetails('shadow_ninja');
+        super({ side, index, type: 'shadow_ninja', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
     }
 }
 
@@ -1117,7 +1131,7 @@ export class Cangjian extends BaseUnit {
             attackDamage: stats.atk, // 单次伤害降低，因为是高频多段伤害
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 6
+            cost: stats.cost
         });
         this.isSpinning = false;
         this.spinTimer = 0;
@@ -1168,7 +1182,7 @@ export class Cangyun extends BaseUnit {
             attackDamage: stats.atk, // 伤害一般
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 5,
+            cost: stats.cost,
             mass: 2.5 // 苍云盾墙，质量较高
         });
     }
@@ -1191,7 +1205,7 @@ export class Tiance extends BaseUnit {
             attackDamage: stats.atk, 
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 8
+            cost: stats.cost
         });
         this.sweepRadius = 2.0; // 范围缩小 (3.5 -> 2.0)
     }
@@ -1209,7 +1223,7 @@ export class Tiance extends BaseUnit {
                 radius: this.sweepRadius,
                 angle: Math.PI, 
                 damage: this.attackDamage,
-                knockbackForce: 0.15
+                knockbackForce: 0.07
             });
         }
     }
@@ -1232,8 +1246,9 @@ export class Chunyang extends BaseUnit {
             attackDamage: stats.atk,
             attackSpeed: stats.attackSpeed,
             projectileManager,
-            cost: 6
+            cost: stats.cost
         });
+        this.statsData = stats; // 保存原始数据引用以获取多形态数值
         this.meleeSwitchThreshold = 4.5; // 决定切换到近战模式的阈值
         this.meleeAttackRange = 1.2;     // 近战实际出招距离
         this.remoteAttackRange = 10.0;   // 远程攻击距离
@@ -1263,48 +1278,17 @@ export class Chunyang extends BaseUnit {
             this.onAttackAnimation();
 
             if (this.isMeleeMode) {
-                this.onAttackAnimation();
-                // 真正的精简：全自动
-                window.battle.playVFX('tiance_sweep', { 
-                    unit: this, 
-                    radius: 1.5, 
-                    color: 0x00ccff, 
-                    angle: Math.PI * 2 / 3, 
-                    duration: 200 
-                });
-
-                this.executeAOE(enemies, {
-                    radius: 1.5,
-                    angle: Math.PI * 2 / 3,
-                    damage: this.attackDamage * 1.5,
-                    knockbackForce: 0.03
-                });
+                const m = this.statsData.modes.chunyang_melee;
+                window.battle.playVFX('tiance_sweep', { unit: this, radius: m.range, color: 0x00ccff, duration: 200 });
+                this.executeAOE(enemies, { radius: m.range, angle: Math.PI * 2/3, damage: this.attackDamage * (m.atk/this.statsData.modes.chunyang_remote.atk), knockbackForce: 0.03 });
             } else {
-                // 远程：依次射出 3 把气剑
-                const swordCount = 3;
-                const delayBetweenSwords = 200; 
-
-                for (let i = 0; i < swordCount; i++) {
+                const r = this.statsData.modes.chunyang_remote;
+                for (let i = 0; i < r.burstCount; i++) {
                     setTimeout(() => {
                         if (this.isDead || !this.target || this.target.isDead) return;
-
-                        const offset = new THREE.Vector3(
-                            (i - 1) * 0.4, 
-                            1.2 + Math.sin(i) * 0.2, 
-                            (rng.next() - 0.5) * 0.5
-                        );
-                        const spawnPos = this.position.clone().add(offset);
-
-                        if (this.projectileManager) {
-                            this.projectileManager.spawn({
-                                startPos: spawnPos,
-                                target: this.target,
-                                speed: 0.25,
-                                damage: this.attackDamage, 
-                                type: 'air_sword'
-                            });
-                        }
-                    }, i * delayBetweenSwords);
+                        const spawnPos = this.position.clone().add(new THREE.Vector3((i - 1) * 0.4, 1.2, (rng.next() - 0.5) * 0.5));
+                        this.projectileManager?.spawn({ startPos: spawnPos, target: this.target, speed: 0.25, damage: this.attackDamage, type: 'air_sword' });
+                    }, i * 200);
                 }
             }
         }

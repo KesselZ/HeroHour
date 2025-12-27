@@ -27,8 +27,8 @@ export class WorldScene {
         // 移动控制
         this.keys = {};
         this.moveSpeed = 0.04; 
-        this.distanceWalked = 0;
-        this.stepThreshold = 6.0;        
+        this.footstepTimer = 0;
+        this.footstepInterval = 650;        
         // 交互控制
         this.interactables = [];
         this.activeCityId = null;        
@@ -806,14 +806,17 @@ export class WorldScene {
                 }
             }
 
-            // 脚步声逻辑
-            this.distanceWalked += moveStep;
-            if (this.distanceWalked >= this.stepThreshold) {
+            // 脚步声逻辑 (起步即响，固定频率)
+            if (this.footstepTimer === 0) {
                 audioManager.play('footstep_grass', { 
-                    volume: 0.6, // 大世界只有一个侠客，音量可以高一点
-                    pitchVar: 0.2 // 增加音调抖动，更真实
+                    volume: 0.6, 
+                    pitchVar: 0.2 
                 });
-                this.distanceWalked = 0;
+            }
+
+            this.footstepTimer += deltaTime * 1000;
+            if (this.footstepTimer >= this.footstepInterval) {
+                this.footstepTimer = 0;
             }
             
             if (moveDir.x !== 0) {
@@ -831,6 +834,8 @@ export class WorldScene {
                 }
             }
             this.checkInteractions();
+        } else {
+            this.footstepTimer = 0; // 停止移动时归零
         }
 
         // --- 更新小地图 ---

@@ -17,7 +17,11 @@ class AudioManager {
         // 音频配置映射
         this.config = {
             // UI 音效
-            'ui_click': { files: ['/audio/click/清脆按钮.mp3'] },
+            'ui_click': { 
+                files: ['/audio/click/清脆按钮.mp3'],
+                throttle: 10,  // 降低间隔到 10ms，允许快速连续点击
+                pitchVar: 0.25 // 默认开启音调波动，让连续点击听起来更自然
+            },
             
             // 攻击音效池
             'attack_melee': { 
@@ -58,8 +62,8 @@ class AudioManager {
             },
             'battle_intro': { 
                 files: ['/audio/fight/进入战斗.mp3'],
-                duration: 1500, // 播放 1.5 秒后开始淡出
-                fadeOut: 500    // 0.5 秒淡出，解决截断突兀问题
+                duration: 100,  // 几乎开播就准备淡出
+                fadeOut: 1500   // 整个过程都在柔和淡出，遮盖任何可能的截断
             },
             'footstep_grass': { 
                 files: [
