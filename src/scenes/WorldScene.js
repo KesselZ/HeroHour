@@ -12,6 +12,7 @@ import { createWorldObject } from '../entities/WorldObjects.js';
  * 负责探索、移动、资源收集和城镇管理
  */
 import { uiManager } from '../core/UIManager.js';
+import { audioManager } from '../core/AudioManager.js';
 
 export class WorldScene {
     constructor(scene, camera, renderer) {
@@ -26,7 +27,8 @@ export class WorldScene {
         // 移动控制
         this.keys = {};
         this.moveSpeed = 0.04; 
-        
+        this.distanceWalked = 0;
+        this.stepThreshold = 6.0;        
         // 交互控制
         this.interactables = [];
         this.activeCityId = null;        
@@ -49,6 +51,9 @@ export class WorldScene {
     init(heroId) {
         this.heroId = heroId;
         this.isActive = true; 
+
+        // 播放大世界 BGM (如寄)
+        audioManager.playBGM('/audio/bgm/如寄.mp3');
 
         // 同步英雄 ID 到数据管家，确保后续势力生成能正确匹配
         worldManager.heroData.id = heroId;
@@ -799,6 +804,16 @@ export class WorldScene {
                 if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z)) {
                     this.playerHero.position.copy(nextPosZ);
                 }
+            }
+
+            // 脚步声逻辑
+            this.distanceWalked += moveStep;
+            if (this.distanceWalked >= this.stepThreshold) {
+                audioManager.play('footstep_grass', { 
+                    volume: 0.6, // 大世界只有一个侠客，音量可以高一点
+                    pitchVar: 0.2 // 增加音调抖动，更真实
+                });
+                this.distanceWalked = 0;
             }
             
             if (moveDir.x !== 0) {

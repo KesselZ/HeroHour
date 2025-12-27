@@ -40,6 +40,7 @@ export const SkillRegistry = {
         icon: 'skill_wanjiangui_zong',
         cost: 35,
         cooldown: 6000,
+        audio: 'skill_sword_rain',
         targeting: { type: 'location', shape: 'circle', range: 8, radius: 3 },
         description: '在指定区域降下剑雨，造成 {damage} 点范围伤害及击退效果',
         actions: [
@@ -54,6 +55,7 @@ export const SkillRegistry = {
         icon: 'skill_liuhe',
         cost: 55,
         cooldown: 10000,
+        audio: 'skill_sword_rain',
         targeting: { type: 'location', shape: 'square', range: 10, radius: 4.5 },
         description: '【进阶招式】在极广区域降下凛冽剑雨，持续 {duration} 秒，每 0.5 秒造成 {tickDamage} 点伤害',
         actions: [
@@ -68,6 +70,7 @@ export const SkillRegistry = {
         icon: 'skill_hanrulei',
         cost: 45,
         cooldown: 10000,
+        audio: 'skill_field',
         targeting: { type: 'instant', shape: 'circle', radius: 12 },
         description: '激发起全军斗志，所有友军攻击力提升 {bonus}%，持续 {duration} 秒',
         actions: [
@@ -82,6 +85,7 @@ export const SkillRegistry = {
         icon: 'skill_jijieling',
         cost: 30,
         cooldown: 15000,
+        audio: 'skill_field',
         targeting: { type: 'instant', shape: 'circle', radius: 5 },
         description: '在英雄身边紧急征召 {count} 名天策弟子参战',
         actions: [
@@ -96,6 +100,7 @@ export const SkillRegistry = {
         icon: 'skill_zhenshanhe',
         cost: 75,
         cooldown: 25000,
+        audio: 'skill_field',
         targeting: { type: 'location', shape: 'circle', range: 12, radius: 4.5 },
         description: '【气场】产生无敌气场，保护范围内友军免受伤害，持续 {duration} 秒',
         actions: [
@@ -122,6 +127,7 @@ export const SkillRegistry = {
         icon: 'skill_fenglaiwushan',
         cost: 50,
         cooldown: 12000,
+        audio: 'skill_zhanbafang',
         targeting: { type: 'instant' },
         description: '【大风车】自身快速旋转，对周围敌人造成 10 段每段 {tickDamage} 点范围伤害',
         actions: [
@@ -136,6 +142,7 @@ export const SkillRegistry = {
         icon: 'skill_renchicheng',
         cost: 40,
         cooldown: 15000,
+        audio: 'skill_field',
         targeting: { type: 'instant' },
         description: '天策骑术：大幅提升移速与 {bonus}% 攻击频率，持续 {duration} 秒',
         actions: [
@@ -156,6 +163,7 @@ export const SkillRegistry = {
         icon: 'skill_shourushan',
         cost: 60,
         cooldown: 30000,
+        audio: 'skill_field',
         targeting: { type: 'instant' },
         description: '钢铁意志：获得 80% 减伤效果，持续 {duration} 秒',
         actions: [
@@ -184,6 +192,7 @@ export const SkillRegistry = {
         icon: 'skill_zhanbafang',
         cost: 30,
         cooldown: 8000,
+        audio: 'skill_zhanbafang',
         targeting: { type: 'instant', shape: 'circle', radius: 4 },
         description: '长枪横扫：快速旋转两圈，造成每段 {tickDamage} 点范围伤害',
         actions: [
@@ -198,6 +207,7 @@ export const SkillRegistry = {
         icon: 'skill_xiaoruhu',
         cost: 50,
         cooldown: 25000,
+        audio: 'skill_field',
         targeting: { type: 'instant', shape: 'circle', radius: 30 },
         description: '全军困兽犹斗：友军血量最低降至 1 点，持续 {duration} 秒',
         actions: [
@@ -218,6 +228,7 @@ export const SkillRegistry = {
         icon: 'skill_pochongwei',
         cost: 45,
         cooldown: 18000,
+        audio: 'skill_jiantan',
         targeting: { type: 'instant', shape: 'circle', radius: 3 },
         description: '重踏地面：对周围敌人造成 {damage} 点伤害并眩晕 {stunDuration} 秒',
         actions: [
@@ -233,6 +244,7 @@ export const SkillRegistry = {
         icon: 'skill_tu',
         cost: 35,
         cooldown: 12000,
+        audio: 'skill_jiantan',
         targeting: { type: 'location', range: 8, radius: 1 },
         description: '长枪冲锋：突进并击退路径敌人，造成 {damage} 点伤害',
         actions: [
@@ -247,6 +259,7 @@ export const SkillRegistry = {
         icon: 'skill_shengtaiji',
         cost: 40,
         cooldown: 12000,
+        audio: 'skill_field',
         targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
         description: '【气场】产生生太极气场，使范围内友军移速提升 {bonus}%，伤害提升 {bonus2}%，并免疫控制，持续 {duration} 秒',
         actions: [
@@ -273,6 +286,7 @@ export const SkillRegistry = {
         icon: 'skill_tunriyue',
         cost: 45,
         cooldown: 15000,
+        audio: 'skill_field',
         targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
         description: '【气场】产生吞日月气场，使范围内敌人移速降低 {bonus}%，伤害降低 {bonus2}%，持续 {duration} 秒',
         actions: [
@@ -299,6 +313,7 @@ export const SkillRegistry = {
         icon: 'skill_sixiang', // 假设图标已存在或后续添加
         cost: 25,
         cooldown: 3000,
+        audio: 'attack_air_sword',
         targeting: { type: 'instant', radius: 10 },
         description: '集聚浩然之气，连续发射 {count} 枚气剑，每枚造成 {damage} 点伤害',
         actions: [
@@ -321,6 +336,7 @@ export const SkillRegistry = {
         icon: 'skill_liangyi',
         cost: 40,
         cooldown: 8000,
+        audio: 'attack_air_sword',
         targeting: { type: 'instant', radius: 12 },
         description: '【进阶招式】瞬间爆发万千气劲，发射 {count} 枚追踪气剑，每枚造成 {damage} 点伤害',
         actions: [
@@ -343,6 +359,7 @@ export const SkillRegistry = {
         icon: 'skill_wanshi',
         cost: 80,
         cooldown: 20000,
+        audio: 'attack_air_sword',
         targeting: { type: 'instant', radius: 15 },
         description: '【纯阳绝技】生生不息，气劲无穷。持续发射 {count} 枚强力气剑随机轰击周围敌人',
         actions: [
@@ -365,6 +382,7 @@ export const SkillRegistry = {
         icon: 'skill_huasanqing',
         cost: 60,
         cooldown: 18000,
+        audio: 'skill_field',
         targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
         description: '【气场】产生化三清气场，使范围内友军功法提升 {bonus} 点，调息提升 {bonus2}%，持续 {duration} 秒',
         actions: [
@@ -391,6 +409,7 @@ export const SkillRegistry = {
         icon: 'skill_hegui',
         cost: 40,
         cooldown: 10000,
+        audio: 'skill_jiantan',
         targeting: { type: 'location', range: 8, impactRadius: 2.5 },
         description: '【重剑招式】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害、强力击退并眩晕敌人 2 秒',
         actions: [
@@ -415,6 +434,7 @@ export const SkillRegistry = {
         icon: 'skill_fengcha',
         cost: 30,
         cooldown: 4000,
+        audio: 'skill_zhanbafang',
         targeting: { type: 'instant', shape: 'sector', radius: 4.0, angle: Math.PI / 2 }, 
         description: '【轻剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害并大幅击退',
         actions: [
@@ -429,6 +449,7 @@ export const SkillRegistry = {
         icon: 'skill_songshe',
         cost: 65,
         cooldown: 7500,
+        audio: 'skill_jiantan',
         targeting: { type: 'location', range: 10, impactRadius: 1.0 },
         description: '【重剑绝学】以极速俯冲目标，造成 {damage} 点高额爆发伤害并击退周围敌人',
         actions: [
@@ -452,6 +473,7 @@ export const SkillRegistry = {
         icon: 'skill_mengquan',
         cost: 45,
         cooldown: 12000,
+        audio: 'skill_field',
         targeting: { type: 'instant' },
         description: '【轻剑招式】身如游龙，游走于敌人之间。移动速度提高 50%，攻击频率提高 {bonus}%，击退提高 50%，减伤提高 65%，持续 5 秒。切换重剑形态将中断此效果。',
         actions: [
@@ -487,6 +509,7 @@ export const SkillRegistry = {
         icon: 'skill_pinghu',
         cost: 15,
         cooldown: 2000,
+        audio: 'skill_zhanbafang',
         targeting: { type: 'instant', shape: 'sector', radius: 2.5, angle: Math.PI / 2 },
         description: '【轻剑招式】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
         actions: [

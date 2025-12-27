@@ -2,10 +2,10 @@ import { spriteFactory } from './SpriteFactory.js';
 import { SkillRegistry, SectSkills } from './SkillRegistry.js';
 import { worldManager } from './WorldManager.js';
 import { SECT_INTRO } from '../data/HowToPlayContent.js';
+import { audioManager } from './AudioManager.js';
 
 /**
  * UIManager: 统一管理全局 UI 逻辑（如 Tooltip、面板切换等）
- * 确保大世界和战斗界面的 UI 表现一致
  */
 class UIManager {
     constructor() {
@@ -44,6 +44,7 @@ class UIManager {
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (closeSkillLearnBtn && skillLearnPanel) {
             closeSkillLearnBtn.onclick = () => {
+                audioManager.play('ui_click');
                 skillLearnPanel.classList.add('hidden');
             };
         }
@@ -52,6 +53,7 @@ class UIManager {
         const tabs = document.querySelectorAll('.skill-learn-tabs .tab-btn');
         tabs.forEach(tab => {
             tab.onclick = () => {
+                audioManager.play('ui_click');
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 

@@ -3,6 +3,7 @@ import { spriteFactory } from '../core/SpriteFactory.js';
 import { rng } from '../core/Random.js';
 import { modifierManager } from '../core/ModifierManager.js';
 import { worldManager } from '../core/WorldManager.js';
+import { audioManager } from '../core/AudioManager.js';
 
 /**
  * 基础战斗单位类
@@ -66,6 +67,10 @@ export class BaseUnit extends THREE.Group {
         this.knockbackVelocity = new THREE.Vector3();
         this.knockbackFriction = 0.85; // 摩擦力，值越小停得越快
         
+        // 走路音效控制
+        this.distanceWalked = 0;
+        this.stepThreshold = 3.0; // 每走 3 米触发一次脚步声
+
         this.initVisual();
     }
 
@@ -420,10 +425,20 @@ export class BaseUnit extends THREE.Group {
             .subVectors(this.target.position, this.position)
             .normalize();
         
-        // 核心修改：位移 = 速度 * deltaTime，脱离帧率限制
-        this.position.addScaledVector(dir, this.moveSpeed * deltaTime);
-        
-        // 像素风不需要旋转 Group，Sprite 始终面向相机
+        const moveDist = this.moveSpeed * deltaTime;
+        this.position.addScaledVector(dir, moveDist);
+
+        // 脚步声逻辑
+        this.distanceWalked += moveDist;
+        if (this.distanceWalked >= this.stepThreshold) {
+            // 只为屏幕内的单位播放脚步，或限制音量/概率
+            audioManager.play('footstep_grass', { 
+                volume: 0.4,   // 提高音量
+                pitchVar: 0.3, // 增加音调抖动，听起来更自然
+                chance: 0.5    // 战斗中人多，降低触发概率防止嘈杂
+            });
+            this.distanceWalked = 0;
+        }
     }
 
     performAttack(enemies, allies) {
@@ -431,6 +446,15 @@ export class BaseUnit extends THREE.Group {
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
             this.onAttackAnimation();
+
+            // 播放攻击音效 (根据类型)
+            const animalTypes = ['wild_boar', 'wolf', 'tiger', 'bear'];
+            if (animalTypes.includes(this.type)) {
+                audioManager.play('attack_unarmed', { volume: 0.5 });
+            } else {
+                audioManager.play('attack_melee', { volume: 0.3, chance: 0.8 });
+            }
+
             // 默认单体攻击
             this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5);
         }
@@ -467,6 +491,9 @@ export class BaseUnit extends THREE.Group {
     takeDamage(amount) {
         if (this.isDead || this.isInvincible) return;
         
+        // 概率播放受击音效
+        audioManager.play('onhit', { volume: 0.3, chance: 0.4 });
+
         // 1. 应用百分比减伤 (核心重构：采用乘法叠加逻辑)
         let finalAmount = amount * this.damageMultiplier;
         
@@ -828,6 +855,9 @@ export class RangedSoldier extends BaseUnit {
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
             this.onAttackAnimation();
+
+            audioManager.play('attack_air_sword', { volume: 0.4 });
+
             if (this.projectileManager && this.target) {
                 this.projectileManager.spawn({
                     startPos: this.position.clone().add(new THREE.Vector3(0, 0.4, 0)),
@@ -868,6 +898,9 @@ export class Archer extends BaseUnit {
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;
             this.onAttackAnimation();
+
+            audioManager.play('attack_arrow', { volume: 0.4 });
+
             if (this.projectileManager && this.target) {
                 this.projectileManager.spawn({
                     startPos: this.position.clone().add(new THREE.Vector3(0, 0.4, 0)),
@@ -981,6 +1014,9 @@ export class BanditArcher extends BaseUnit {
         if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
             this.lastAttackTime = now;
             this.onAttackAnimation();
+
+            audioManager.play('attack_arrow', { volume: 0.3 });
+
             this.projectileManager?.spawn({ 
                 startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 
                 target: this.target, 

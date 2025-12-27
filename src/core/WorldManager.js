@@ -1,5 +1,6 @@
 import { modifierManager } from './ModifierManager.js';
 import { SkillRegistry } from './SkillRegistry.js';
+import { audioManager } from './AudioManager.js';
 
 /**
  * 英雄初始状态与固有特性 (数据驱动)
@@ -1351,6 +1352,8 @@ class WorldManager {
         this.updateHUD();
         this.triggerResourceAnimation('gold');
         
+        audioManager.play('source_gold');
+        
         // 派发事件供大世界显示飘字
         window.dispatchEvent(new CustomEvent('resource-gained', { 
             detail: { type: 'gold', amount: amount } 
@@ -1365,6 +1368,8 @@ class WorldManager {
         this.resources.wood += amount;
         this.updateHUD();
         this.triggerResourceAnimation('wood');
+
+        audioManager.play('source_wood');
 
         window.dispatchEvent(new CustomEvent('resource-gained', { 
             detail: { type: 'wood', amount: amount } 

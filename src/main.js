@@ -7,6 +7,7 @@ import { modifierManager } from './core/ModifierManager.js';
 import { worldManager } from './core/WorldManager.js';
 import { SkillRegistry } from './core/SkillRegistry.js';
 import { uiManager } from './core/UIManager.js';
+import { audioManager } from './core/AudioManager.js';
 
 import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
@@ -86,6 +87,7 @@ initUIIcons();
 // 点击“招式图谱”
 if (skillGalleryBtn) {
     skillGalleryBtn.addEventListener('click', () => {
+        audioManager.play('ui_click');
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (skillLearnPanel) {
             skillLearnPanel.classList.remove('hidden');
@@ -98,6 +100,7 @@ if (skillGalleryBtn) {
 // 点击“江湖指南”
 if (howToPlayBtn) {
     howToPlayBtn.addEventListener('click', () => {
+        audioManager.play('ui_click');
         const panel = document.getElementById('how-to-play-panel');
         const textContainer = document.getElementById('how-to-play-text');
         const closeBtn = document.getElementById('close-how-to-play');
@@ -114,7 +117,10 @@ if (howToPlayBtn) {
             panel.classList.remove('hidden');
 
             if (closeBtn) {
-                closeBtn.onclick = () => panel.classList.add('hidden');
+                closeBtn.onclick = () => {
+                    audioManager.play('ui_click');
+                    panel.classList.add('hidden');
+                };
             }
         }
     });
@@ -122,6 +128,7 @@ if (howToPlayBtn) {
 
 // 点击“闯荡江湖”进入角色选择
 startBtn.addEventListener('click', () => {
+    audioManager.play('ui_click');
     mainMenu.classList.add('hidden');
     charSelectMenu.classList.remove('hidden');
     currentState = GameState.CHAR_SELECT;
@@ -129,6 +136,7 @@ startBtn.addEventListener('click', () => {
 
 // 返回主菜单
 backToMenuBtn.addEventListener('click', () => {
+    audioManager.play('ui_click');
     charSelectMenu.classList.add('hidden');
     mainMenu.classList.remove('hidden');
     currentState = GameState.MENU;
@@ -143,6 +151,7 @@ backToMenuBtn.addEventListener('click', () => {
 // 选择角色卡片
 charCards.forEach(card => {
     card.addEventListener('click', () => {
+        audioManager.play('ui_click');
         charCards.forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
         selectedHero = card.dataset.hero;
@@ -156,6 +165,7 @@ charCards.forEach(card => {
 // 确认选择，开始加载
 confirmCharBtn.addEventListener('click', async () => {
     if (!selectedHero) return;
+    audioManager.play('ui_click');
     
     charSelectMenu.classList.add('hidden');
     if (menuBg) menuBg.classList.add('hidden');
@@ -174,6 +184,9 @@ confirmCharBtn.addEventListener('click', async () => {
     // 核心改动：选择完角色后先进入大世界
     enterGameState(GameState.WORLD);
 });
+
+// 初始进入菜单时播放菜单 BGM
+audioManager.playBGM('/audio/bgm_menu.mp3');
 
 // 监听大世界发出的开战请求
 window.addEventListener('start-battle', (e) => {

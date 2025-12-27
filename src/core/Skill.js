@@ -1,8 +1,8 @@
 import * as THREE from 'three';
+import { audioManager } from './AudioManager.js';
 
 /**
  * Skill: 技能逻辑的核心基类
- * 只包含技能的元数据定义和描述解析逻辑，不包含复杂的业务逻辑，以避免循环引用
  */
 export class Skill {
     constructor(id, config) {
@@ -16,6 +16,7 @@ export class Skill {
         this.targeting = config.targeting || { type: 'instant' };
         this.description = config.description || '';
         this.actions = config.actions || [];
+        this.audio = config.audio || null; // 新增：音效配置
         
         // 运行时状态
         this.lastUsed = 0;
@@ -147,6 +148,11 @@ export class Skill {
         
         battleScene.worldManager.heroData.mpCurrent -= actualCost;
         this.lastUsed = Date.now();
+
+        // 播放技能音效
+        if (this.audio) {
+            audioManager.play(this.audio);
+        }
 
         // 核心逻辑：根据技能类别自动切换藏剑形态
         if (caster.isHero && caster.type === 'yeying') {

@@ -49,6 +49,7 @@ import { VFXLibrary } from '../core/VFXLibrary.js';
 import { rng, setSeed } from '../core/Random.js';
 
 import { uiManager } from '../core/UIManager.js';
+import { audioManager } from '../core/AudioManager.js';
 
 export class BattleScene {
     constructor(scene, camera, enemyConfig = null) {
@@ -98,6 +99,11 @@ export class BattleScene {
         console.log("稻香村发展计划：进入部署阶段");
         this.isActive = false; 
         this.isDeployment = true;
+
+        // 停止大世界 BGM (带 500ms 淡出)
+        audioManager.stopBGM(500);
+        // 播放进入战斗的提示音
+        audioManager.play('battle_intro', { volume: 0.8 });
         
         // 初始化局内蓝条
         this.updateMPUI();
@@ -363,6 +369,10 @@ export class BattleScene {
             this.scene.add(unit);
             this.unitCounts[type]--;
             this.deployedCounts[type]++;
+            
+            // 部署士兵时播放点击音效
+            audioManager.play('ui_click', { volume: 0.3, pitchVar: 0.2 });
+
             this.updateUI();
             if (this.unitCounts[type] <= 0) {
                 this.selectedType = null;
@@ -408,6 +418,10 @@ export class BattleScene {
         setSeed(888);
         this.isDeployment = false;
         this.isActive = true;
+
+        // 播放士兵呐喊：配置已在 AudioManager 中定义 (维持 3s，淡出 5s)
+        this._shoutAudio = audioManager.play('soldier_shout', { volume: 0.6 });
+
         this.enemyUnits.forEach(u => u.visible = true); 
         document.getElementById('deployment-ui').classList.add('hidden');
         this.initSkillUI();
@@ -1069,7 +1083,24 @@ export class BattleScene {
             });
         }
         panel.classList.remove('hidden');
-        if (document.getElementById('return-to-world-btn')) document.getElementById('return-to-world-btn').onclick = () => { panel.classList.add('hidden'); window.dispatchEvent(new CustomEvent('battle-finished', { detail: { winner: isVictory ? 'player' : 'enemy' } })); };
+        if (document.getElementById('return-to-world-btn')) {
+            document.getElementById('return-to-world-btn').onclick = () => {
+                // 停止士兵呐喊
+                if (this._shoutAudio) {
+                    this._shoutAudio.pause();
+                    this._shoutAudio.remove();
+                    this._shoutAudio = null;
+                }
+                
+                // 恢复大世界 BGM (断点续播)
+                audioManager.playBGM('/audio/bgm/如寄.mp3');
+
+                panel.classList.add('hidden');
+                window.dispatchEvent(new CustomEvent('battle-finished', { 
+                    detail: { winner: isVictory ? 'player' : 'enemy' } 
+                }));
+            };
+        }
     }
 
     getUnitName(type) {
