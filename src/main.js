@@ -88,6 +88,13 @@ initUIIcons();
 if (skillGalleryBtn) {
     skillGalleryBtn.addEventListener('click', () => {
         audioManager.play('ui_click');
+        
+        // --- 互斥逻辑：打开招式图谱时，关闭其他面板 ---
+        const townPanel = document.getElementById('town-management-panel');
+        const heroPanel = document.getElementById('hero-stats-panel');
+        if (townPanel) townPanel.classList.add('hidden');
+        if (heroPanel) heroPanel.classList.add('hidden');
+
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (skillLearnPanel) {
             skillLearnPanel.classList.remove('hidden');
@@ -101,6 +108,15 @@ if (skillGalleryBtn) {
 if (howToPlayBtn) {
     howToPlayBtn.addEventListener('click', () => {
         audioManager.play('ui_click');
+
+        // --- 互斥逻辑：打开指南时，关闭其他面板 ---
+        const townPanel = document.getElementById('town-management-panel');
+        const heroPanel = document.getElementById('hero-stats-panel');
+        const skillPanel = document.getElementById('skill-learn-panel');
+        if (townPanel) townPanel.classList.add('hidden');
+        if (heroPanel) heroPanel.classList.add('hidden');
+        if (skillPanel) skillPanel.classList.add('hidden');
+
         const panel = document.getElementById('how-to-play-panel');
         const textContainer = document.getElementById('how-to-play-text');
         const closeBtn = document.getElementById('close-how-to-play');

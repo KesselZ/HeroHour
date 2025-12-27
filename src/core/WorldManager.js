@@ -10,7 +10,7 @@ import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsDat
 const BUILDING_REGISTRY = {
     'town_hall': { name: '议政厅', category: 'economy', maxLevel: 3, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。' },
     'market': { name: '市场', category: 'economy', maxLevel: 3, icon: 'merchant_guild', cost: { gold: 300, wood: 50 }, description: '互通有无：提高城镇的金钱与木材产出效率。' },
-    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '解锁阅历获取，随后每级增加全军 10% 的阅历获取速度。' },
+    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '每级增加全军 10% 的阅历获取速度。' },
     'bank': { name: '大通钱庄', category: 'economy', maxLevel: 3, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '提升该城镇 20% 的金钱产出。' },
     'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '增加城镇木材产出，并降低全军招募成本 5%。' },
     
@@ -182,12 +182,12 @@ class City {
                 multiplier: 1.0 - (level * 0.05) 
             });
         } else if (id === 'inn') {
-            // 1级解锁，2级开始每级增加全军阅历获取 10%
+            // 每级增加全军阅历获取 10%
             modifierManager.addGlobalModifier({ 
                 id: `city_${this.id}_xp_bonus`, 
                 side: 'player', 
                 stat: 'xp_gain', 
-                multiplier: 1.0 + Math.max(0, (level - 1) * 0.10) 
+                multiplier: 1.0 + (level * 0.10) 
             });
         }
         // --- 特殊建筑效果 ---
@@ -258,25 +258,13 @@ class City {
     }
 
     /**
-     * 获取总产出（包含城镇基础产出 + 挂载的外围矿产）
+     * 获取城镇基础产出
      */
     getTotalProduction() {
-        let gold = this.production.gold;
-        let wood = this.production.wood;
-        
-        // 核心逻辑：如果该城市是主城 (main_city_1)，则额外统计全图所有已占领矿产的收益
-        // 这使得“外围矿产”在 UI 显示上更具整体感
-        if (this.id === 'main_city_1' && this.owner === 'player') {
-            worldManager.capturedBuildings.forEach(b => {
-                if (b.owner === 'player') {
-                    // 矿产收益微调：金矿 +150，木矿 +80
-                    if (b.type === 'gold_mine') gold += 150;
-                    if (b.type === 'sawmill') wood += 80;
-                }
-            });
-        }
-        
-        return { gold, wood };
+        return { 
+            gold: this.production.gold, 
+            wood: this.production.wood 
+        };
     }
 }
 
@@ -554,26 +542,62 @@ class WorldManager {
     }
 
     /**
-     * 资源产出 Tick：根据所有城镇的产出增加全局资源
+     * 获取全局总产出及其明细
      */
-    processResourceProduction() {
-        let totalGoldGain = 0;
-        let totalWoodGain = 0;
-        
-        // 核心改动：现在所有外围矿产的产出都已集成到 City.getTotalProduction() 中（尤其是主城）
+    getGlobalProduction() {
+        let totalGold = 0;
+        let totalWood = 0;
+        const breakdown = {
+            cities: [],
+            mines: { gold: 0, wood: 0, count: { gold_mine: 0, sawmill: 0 } }
+        };
+
+        // 1. 统计所有玩家城镇的产出
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
             if (city.owner === 'player') {
-                const prod = city.getTotalProduction();
-                totalGoldGain += prod.gold;
-                totalWoodGain += prod.wood;
+                totalGold += city.production.gold;
+                totalWood += city.production.wood;
+                breakdown.cities.push({
+                    name: city.name,
+                    gold: city.production.gold,
+                    wood: city.production.wood
+                });
             }
         }
 
-        if (totalGoldGain > 0) this.addGold(totalGoldGain);
-        if (totalWoodGain > 0) this.addWood(totalWoodGain);
+        // 2. 统计所有已占领矿产的收益
+        this.capturedBuildings.forEach(b => {
+            if (b.owner === 'player') {
+                if (b.type === 'gold_mine') {
+                    totalGold += 150;
+                    breakdown.mines.gold += 150;
+                    breakdown.mines.count.gold_mine++;
+                } else if (b.type === 'sawmill') {
+                    totalWood += 80;
+                    breakdown.mines.wood += 80;
+                    breakdown.mines.count.sawmill++;
+                }
+            }
+        });
+
+        return {
+            gold: totalGold,
+            wood: totalWood,
+            breakdown
+        };
+    }
+
+    /**
+     * 资源产出 Tick：根据所有城镇的产出增加全局资源
+     */
+    processResourceProduction() {
+        const prodData = this.getGlobalProduction();
         
-        console.log(`%c[季度结算] %c总收入金钱 +${totalGoldGain}, 木材 +${totalWoodGain}`, 'color: #557755; font-weight: bold', 'color: #fff');
+        if (prodData.gold > 0) this.addGold(prodData.gold);
+        if (prodData.wood > 0) this.addWood(prodData.wood);
+        
+        console.log(`%c[季度结算] %c总收入金钱 +${prodData.gold}, 木材 +${prodData.wood}`, 'color: #557755; font-weight: bold', 'color: #fff');
     }
 
     /**
@@ -869,8 +893,8 @@ class WorldManager {
                     const tId = this.getDynamicEnemyType(worldX, worldZ);
                     const template = this.enemyTemplates[tId];
                     
-                    // 统一计算逻辑：基础战力 + 正负 15% 的随机波动
-                    const variance = 0.15;
+                    // 统一计算逻辑：基础战力 + 正负 5% 的随机波动
+                    const variance = 0.05;
                     const randomFactor = 1 + (Math.random() * variance * 2 - variance);
                     const points = Math.max(1, Math.floor(template.basePoints * randomFactor));
                     

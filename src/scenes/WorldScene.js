@@ -140,6 +140,7 @@ export class WorldScene {
         const closeBtn = document.getElementById('close-town-panel');
         if (closeBtn) {
             closeBtn.onclick = () => {
+                audioManager.play('ui_click', { volume: 0.4 });
                 console.log("[UI] 手动关闭城镇面板");
                 if (this.activeCityId) {
                     worldManager.mapState.interactionLocks.add(this.activeCityId);
@@ -174,6 +175,7 @@ export class WorldScene {
         const closeHeroBtn = document.getElementById('close-hero-panel');
         if (closeHeroBtn) {
             closeHeroBtn.onclick = () => {
+                audioManager.play('ui_click', { volume: 0.4 });
                 document.getElementById('hero-stats-panel').classList.add('hidden');
             };
         }
@@ -219,6 +221,11 @@ export class WorldScene {
     }
 
     openHeroStats() {
+        // --- 互斥逻辑：打开属性面板时，关闭其他可能冲突的面板 ---
+        this.closeTownManagement();
+        const skillLearnPanel = document.getElementById('skill-learn-panel');
+        if (skillLearnPanel) skillLearnPanel.classList.add('hidden');
+        
         const panel = document.getElementById('hero-stats-panel');
         const data = worldManager.heroData;
         const heroInfo = worldManager.availableHeroes[data.id];
@@ -379,6 +386,11 @@ export class WorldScene {
     }
 
     openTownManagement(cityId, isPhysical = false) {
+        // --- 互斥逻辑：打开城镇面板时，关闭其他可能冲突的面板 ---
+        document.getElementById('hero-stats-panel').classList.add('hidden');
+        const skillLearnPanel = document.getElementById('skill-learn-panel');
+        if (skillLearnPanel) skillLearnPanel.classList.add('hidden');
+
         const panel = document.getElementById('town-management-panel');
         const cityData = worldManager.cities[cityId];
         
@@ -404,11 +416,51 @@ export class WorldScene {
         const cityData = worldManager.cities[cityId];
         const allBuildings = cityData.getAvailableBuildings();
         
-        // 更新季度收入显示
+        // --- 核心改动：展示全局总收益，而非单一城市收益 ---
+        const prodData = worldManager.getGlobalProduction();
         const goldIncome = document.getElementById('town-income-gold');
         const woodIncome = document.getElementById('town-income-wood');
-        if (goldIncome) goldIncome.innerText = cityData.production.gold;
-        if (woodIncome) woodIncome.innerText = cityData.production.wood;
+        if (goldIncome) goldIncome.innerText = prodData.gold;
+        if (woodIncome) woodIncome.innerText = prodData.wood;
+
+        // 为收益容器绑定明细 Tooltip
+        const incomeContainer = document.querySelector('.town-income-v3');
+        if (incomeContainer) {
+            incomeContainer.style.cursor = 'help';
+            incomeContainer.onmouseenter = () => {
+                const breakdown = prodData.breakdown;
+                let desc = `<div style="color: var(--jx3-celadon); margin-bottom: 4px;">各城池贡献:</div>`;
+                breakdown.cities.forEach(c => {
+                    desc += `<div style="display: flex; justify-content: space-between; gap: 10px;">
+                        <span>${c.name}</span>
+                        <span>💰${c.gold} 🪵${c.wood}</span>
+                    </div>`;
+                });
+                
+                if (breakdown.mines.count.gold_mine > 0 || breakdown.mines.count.sawmill > 0) {
+                    desc += `<div style="color: var(--jx3-gold); margin-top: 8px; margin-bottom: 4px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px;">野外产出:</div>`;
+                    if (breakdown.mines.count.gold_mine > 0) {
+                        desc += `<div style="display: flex; justify-content: space-between;">
+                            <span>金矿 x${breakdown.mines.count.gold_mine}</span>
+                            <span>💰${breakdown.mines.gold}</span>
+                        </div>`;
+                    }
+                    if (breakdown.mines.count.sawmill > 0) {
+                        desc += `<div style="display: flex; justify-content: space-between;">
+                            <span>伐木场 x${breakdown.mines.count.sawmill}</span>
+                            <span>🪵${breakdown.mines.wood}</span>
+                        </div>`;
+                    }
+                }
+                
+                uiManager.showTooltip({
+                    name: "本季度总收益明细",
+                    level: "所有城池与矿产合计",
+                    description: desc
+                });
+            };
+            incomeContainer.onmouseleave = () => uiManager.hideTooltip();
+        }
 
         // 更新统御力显示
         const heroLeadershipLabel = document.querySelector('.hero-army .army-label');
@@ -482,6 +534,7 @@ export class WorldScene {
                         worldManager.showNotification("必须亲临城市才能领兵！");
                         return;
                     }
+                    audioManager.play('ui_click', { volume: 0.5 });
                     worldManager.transferToHero(type, 1, cityId);
                     this.refreshTownUI(cityId);
                 });
@@ -545,6 +598,7 @@ export class WorldScene {
                         worldManager.showNotification("必须亲临城市才能调动部队！");
                         return;
                     }
+                    audioManager.play('ui_click', { volume: 0.5 });
                     worldManager.transferToCity(type, 1, cityId);
                     this.refreshTownUI(cityId);
                 });
@@ -971,6 +1025,7 @@ export class WorldScene {
             `;
 
             cityCard.onclick = () => {
+                audioManager.play('ui_click', { volume: 0.6 });
                 this.openTownManagement(city.id);
             };
 
@@ -996,6 +1051,7 @@ export class WorldScene {
         `;
 
         heroCard.onclick = () => {
+            audioManager.play('ui_click', { volume: 0.6 });
             this.openHeroStats();
         };
 
