@@ -929,14 +929,14 @@ export class Wolf extends BaseUnit {
 export class Tiger extends BaseUnit {
     static displayName = '猛虎';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'tiger', hp: 250, speed: 7.6, attackRange: 1.2, attackDamage: 25, cost: 5, mass: 2.0, projectileManager });
+        super({ side, index, type: 'tiger', hp: 180, speed: 7.6, attackRange: 1.2, attackDamage: 15, cost: 5, mass: 2.0, projectileManager });
     }
 }
 
 export class Bear extends BaseUnit {
     static displayName = '黑熊';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'bear', hp: 400, speed: 4.2, attackRange: 1.0, attackDamage: 30, cost: 6, mass: 3.0, projectileManager });
+        super({ side, index, type: 'bear', hp: 250, speed: 4.2, attackRange: 1.0, attackDamage: 18, cost: 7, mass: 3.0, projectileManager });
     }
 }
 
@@ -972,7 +972,7 @@ export class BanditArcher extends BaseUnit {
 export class RebelSoldier extends BaseUnit {
     static displayName = '叛军甲兵';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'rebel_soldier', hp: 145, speed: 4.2, attackRange: 0.8, attackDamage: 22, cost: 3, mass: 1.5, projectileManager });
+        super({ side, index, type: 'rebel_soldier', hp: 120, speed: 4.2, attackRange: 0.8, attackDamage: 18, cost: 3, mass: 1.5, projectileManager });
     }
 }
 
@@ -1008,7 +1008,7 @@ export class Deer extends BaseUnit {
 export class Pheasant extends BaseUnit {
     static displayName = '山鸡';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'pheasant', hp: 30, speed: 6.7, attackRange: 0.4, attackDamage: 1, cost: 1, projectileManager });
+        super({ side, index, type: 'pheasant', hp: 30, speed: 6.7, attackRange: 0.4, attackDamage: 3, cost: 1, projectileManager });
     }
 }
 
@@ -1023,21 +1023,21 @@ export class AssassinMonk extends BaseUnit {
 export class Zombie extends BaseUnit {
     static displayName = '毒尸傀儡';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'zombie', hp: 450, speed: 2.5, attackRange: 0.7, attackDamage: 18, cost: 4, projectileManager });
+        super({ side, index, type: 'zombie', hp: 250, speed: 2.5, attackRange: 0.7, attackDamage: 12, cost: 4, projectileManager });
     }
 }
 
 export class HeavyKnight extends BaseUnit {
     static displayName = '铁浮屠重骑';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'heavy_knight', hp: 450, speed: 3.4, attackRange: 1.5, attackDamage: 40, cost: 6, mass: 4.0, projectileManager });
+        super({ side, index, type: 'heavy_knight', hp: 300, speed: 3.4, attackRange: 1.5, attackDamage: 25, cost: 7, mass: 4.0, projectileManager });
     }
 }
 
 export class ShadowNinja extends BaseUnit {
     static displayName = '隐之影';
     constructor(side, index, projectileManager) {
-        super({ side, index, type: 'shadow_ninja', hp: 160, speed: 10.1, attackRange: 0.8, attackDamage: 32, attackSpeed: 600, cost: 5, projectileManager });
+        super({ side, index, type: 'shadow_ninja', hp: 120, speed: 10.1, attackRange: 0.8, attackDamage: 20, attackSpeed: 600, cost: 5, projectileManager });
     }
 }
 

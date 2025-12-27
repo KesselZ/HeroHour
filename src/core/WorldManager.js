@@ -93,13 +93,13 @@ const BLUEPRINTS = {
  */
 const UNIT_STATS_DATA = {
     'melee': { name: '天策弟子', hp: 85, atk: 6, range: 0.8, rangeType: '近战', speed: 5.0, attackSpeed: 1000, description: '天策府的基础步兵，性价比极高，适合作为前排炮灰。' },
-    'ranged': { name: '长歌弟子', hp: 60, atk: 10, range: 6.0, rangeType: '远程', speed: 4.2, attackSpeed: 1800, description: '以音律伤敌，射程适中，生存能力一般。' },
-    'archer': { name: '唐门射手', hp: 55, atk: 15, range: 10.0, rangeType: '极远', speed: 5.0, attackSpeed: 2000, description: '穿心弩箭，百步穿杨，脆皮但高输出。' },
+    'ranged': { name: '长歌弟子', hp: 70, atk: 14, range: 6.0, rangeType: '远程', speed: 4.2, attackSpeed: 1800, description: '以音律伤敌，射程适中，生存能力一般。' },
+    'archer': { name: '唐门射手', hp: 65, atk: 22, range: 20.0, rangeType: '极远', speed: 5.0, attackSpeed: 2000, description: '穿心弩箭，百步穿杨，脆皮但高输出。' },
     'tiance': { name: '天策骑兵', hp: 160, atk: 18, range: 1.8, rangeType: '冲锋', speed: 8.4, attackSpeed: 800, description: '大唐精锐，强大的切入能力与控制力。' },
-    'chunyang': { name: '纯阳弟子', hp: 95, atk: 5, range: 10.0, rangeType: '远近结合', speed: 5.9, attackSpeed: 1500, burstCount: 3, description: '御剑而行，能在大后方提供精准的剑气支援。' },
-    'cangjian': { name: '藏剑弟子', hp: 200, atk: 16, range: 1.5, rangeType: 'AOE', speed: 5.9, attackSpeed: 2000, burstCount: 3, description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
-    'cangyun': { name: '苍云将士', hp: 250, atk: 14, range: 0.8, rangeType: '盾墙', speed: 3.4, attackSpeed: 1200, description: '玄甲军魂，战场上最难以逾越的铁壁。' },
-    'healer': { name: '万花补给', hp: 80, atk: 25, range: 5.0, rangeType: '治疗', speed: 3.4, attackSpeed: 2500, description: '妙手回春，能够有效保障精锐部队的存活。' },
+    'chunyang': { name: '纯阳弟子', hp: 140, atk: 12, range: 12.0, rangeType: '远近结合', speed: 5.9, attackSpeed: 1500, burstCount: 3, description: '御剑而行，能在大后方提供精准的剑气支援。' },
+    'cangjian': { name: '藏剑弟子', hp: 200, atk: 7.2, range: 1.5, rangeType: 'AOE', speed: 5.9, attackSpeed: 2000, burstCount: 3, description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
+    'cangyun': { name: '苍云将士', hp: 300, atk: 14, range: 0.8, rangeType: '盾墙', speed: 3.4, attackSpeed: 1200, description: '玄甲军魂，战场上最难以逾越的铁壁。' },
+    'healer': { name: '万花补给', hp: 120, atk: 30, range: 5.0, rangeType: '治疗', speed: 3.4, attackSpeed: 2500, description: '妙手回春，能够有效保障精锐部队的存活。' },
     
     // --- 英雄单位注册 (仅保留物理常数，数值动态同步) ---
     'qijin':      { name: '祁进', range: 6.0, rangeType: '五剑连发', attackSpeed: 1000, burstCount: 5, description: '紫虚子，剑气凌人，擅长远程密集压制。' },
@@ -414,7 +414,7 @@ class WorldManager {
             'wild_boar': { gold: 40, cost: 2 },
             'wolf': { gold: 40, cost: 2 },
             'tiger': { gold: 120, cost: 5 },
-            'bear': { gold: 150, cost: 6 },
+            'bear': { gold: 150, cost: 7 },
             'bandit': { gold: 45, cost: 2 },
             'bandit_archer': { gold: 60, cost: 3 },
             'rebel_soldier': { gold: 70, cost: 3 },
@@ -425,7 +425,7 @@ class WorldManager {
             'pheasant': { gold: 5, cost: 1 },
             'assassin_monk': { gold: 130, cost: 5 },
             'zombie': { gold: 100, cost: 4 },
-            'heavy_knight': { gold: 250, cost: 6 },
+            'heavy_knight': { gold: 250, cost: 7 },
             'shadow_ninja': { gold: 180, cost: 5 }
         };
 
