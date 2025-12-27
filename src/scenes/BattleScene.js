@@ -717,6 +717,12 @@ export class BattleScene {
             case 'butterfly_particles':
                 this.vfxLibrary.createButterflyVFX(parent, color, duration);
                 break;
+            case 'stun':
+                this.vfxLibrary.createStunVFX(parent, duration);
+                break;
+            case 'slow':
+                this.vfxLibrary.createSlowVFX(parent);
+                break;
         }
     }
 
@@ -820,6 +826,16 @@ export class BattleScene {
         const { stat, multiplier, offset, duration, color, vfxName, tag } = options;
 
         units.forEach(unit => {
+            // 核心修复：如果指定了 tag 且该 Buff 已存在，则仅刷新持续时间，不重复叠加属性
+            if (tag && unit.activeBuffs) {
+                const existing = unit.activeBuffs.find(b => b.tag === tag);
+                if (existing) {
+                    clearTimeout(existing.timer);
+                    existing.timer = setTimeout(existing.cleanup, duration);
+                    return; // 跳过属性叠加逻辑
+                }
+            }
+
             if (vfxName) this.playVFX(vfxName, { unit, duration, color: color || 0xffffff, radius: unit.isHero ? 1.5 : 0.8 });
             const stats = Array.isArray(stat) ? stat : [stat];
             const multipliers = Array.isArray(multiplier) ? multiplier : [multiplier];
@@ -890,7 +906,11 @@ export class BattleScene {
     }
 
     applyStatusToUnits(units, status, duration) {
-        units.forEach(unit => { if (status === 'stun') unit.applyStun(duration); });
+        units.forEach(unit => { 
+            if (status === 'stun') {
+                unit.applyStun(duration);
+            } 
+        });
     }
 
     executeMovement(unit, type, targetPos, options = {}) {

@@ -70,61 +70,97 @@ export class VFXLibrary {
     createFieldVFX(pos, radius, color, duration) {
         const group = new THREE.Group();
         group.position.copy(pos);
-        group.position.y = 0.05;
+        group.position.y = 0.02; // 贴近地面
         this.scene.add(group);
 
-        const ringGeo = new THREE.TorusGeometry(radius, 0.04, 8, 64);
-        const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = Math.PI / 2;
-        group.add(ring);
-
-        const fillGeo = new THREE.CircleGeometry(radius, 32);
-        const fillMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.1 });
+        // 1. 创建渐变圆形贴图
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        
+        const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        const c = new THREE.Color(color);
+        const rgb = `${Math.floor(c.r * 255)},${Math.floor(c.g * 255)},${Math.floor(c.b * 255)}`;
+        gradient.addColorStop(0, `rgba(${rgb}, 0)`);     // 中心消失，形成中空感
+        gradient.addColorStop(0.5, `rgba(${rgb}, 0.3)`); // 中间渐变
+        gradient.addColorStop(1, `rgba(${rgb}, 0.8)`);   // 边缘最实，强调边界
+        
+        ctx.clearRect(0, 0, 256, 256); // 显式清空，防止残留
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(128, 128, 128, 0, Math.PI * 2);
+        ctx.fill();
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const fillGeo = new THREE.CircleGeometry(radius, 64); // 改用圆形几何体，物理切除方角
+        const fillMat = new THREE.MeshBasicMaterial({ 
+            map: texture, 
+            transparent: true, 
+            opacity: 0.4,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending 
+        });
         const fill = new THREE.Mesh(fillGeo, fillMat);
         fill.rotation.x = -Math.PI / 2;
         group.add(fill);
 
-        const runeGeo = new THREE.RingGeometry(radius * 0.4, radius * 0.9, 4, 1, 0, Math.PI * 2);
-        const runeMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3, wireframe: true });
-        const rune = new THREE.Mesh(runeGeo, runeMat);
-        rune.rotation.x = -Math.PI / 2;
-        rune.position.y = 0.01;
-        group.add(rune);
+        // 2. 细腻的边缘亮环
+        const ringGeo = new THREE.RingGeometry(radius * 0.98, radius, 64);
+        const ringMat = new THREE.MeshBasicMaterial({ 
+            color: color, 
+            transparent: true, 
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        group.add(ring);
 
         const startTime = Date.now();
+        const fadeDuration = 600; // 0.6 秒消失时间
         const anim = () => {
             const elapsed = Date.now() - startTime;
-            const progress = elapsed / duration;
-            if (progress < 1) {
-                rune.rotation.z += 0.01;
-                fillMat.opacity = 0.1 * (1 + Math.sin(elapsed * 0.005) * 0.5);
+            
+            if (elapsed < duration + fadeDuration) {
+                // 计算淡出进度（只有当经过时间超过 duration 时才开始 > 0）
+                const fadeProgress = Math.max(0, (elapsed - duration) / fadeDuration);
+                
+                // 呼吸动效
+                const pulse = 1 + Math.sin(elapsed * 0.003) * 0.05;
+                fill.scale.set(pulse, pulse, 1);
+                
+                // 在 duration 期间保持饱满（呼吸），在最后的 fadeDuration 内线性淡出
+                fillMat.opacity = 0.4 * (1 - fadeProgress) * (0.8 + Math.sin(elapsed * 0.005) * 0.2);
+                ringMat.opacity = 0.6 * (1 - fadeProgress);
+                
                 requestAnimationFrame(anim);
             } else {
                 this.scene.remove(group);
-                ringGeo.dispose(); ringMat.dispose();
+                texture.dispose();
                 fillGeo.dispose(); fillMat.dispose();
-                runeGeo.dispose(); runeMat.dispose();
+                ringGeo.dispose(); ringMat.dispose();
             }
         };
         anim();
 
+        // 3. 极细微的上升星光
         this.createParticleSystem({
             pos: pos.clone(),
-            color: color,
+            color: 0xffffff,
             duration: duration,
-            density: 1.5,
-            spawnRate: 200,
-            geometry: new THREE.BoxGeometry(0.02, 0.5, 0.02),
+            density: 0.8,
+            spawnRate: 300,
+            geometry: new THREE.BoxGeometry(0.02, 0.02, 0.02),
             initFn: (p) => {
                 const r = Math.sqrt(Math.random()) * radius;
                 const theta = Math.random() * Math.PI * 2;
                 p.position.set(Math.cos(theta) * r, 0, Math.sin(theta) * r);
             },
             updateFn: (p, prg) => {
-                p.position.y += 0.02;
-                p.material.opacity = 0.4 * (1 - prg);
-                p.scale.y = 1 - prg;
+                p.position.y += 0.01;
+                p.material.opacity = 0.5 * (1 - prg);
             }
         });
     }
@@ -161,15 +197,21 @@ export class VFXLibrary {
     createRainVFX(pos, radius, color, duration, density, speed) {
         this.createParticleSystem({
             pos, color, duration, density: density * 2,
-            spawnRate: 80,
-            geometry: new THREE.BoxGeometry(0.04, 1.5, 0.04),
+            spawnRate: 60, // 稍微提高发射频率，补偿变慢后的视觉密度
+            geometry: new THREE.BoxGeometry(0.12, 2.0, 0.02), // 剑宽 0.12，长 2.0，更像一把大剑
             initFn: p => {
-                p.position.set((Math.random()-0.5)*radius*2, 15 + Math.random()*5, (Math.random()-0.5)*radius*2);
-                p.rotation.z = (Math.random()-0.5) * 0.2;
+                // 初始高度稍微降低一点点，配合变慢的速度
+                p.position.set((Math.random()-0.5)*radius*2, 12 + Math.random()*5, (Math.random()-0.5)*radius*2);
+                p.rotation.z = (Math.random()-0.5) * 0.1; // 减少倾斜度，让剑落得更直
             },
             updateFn: (p, prg) => {
-                p.position.y -= (0.6 + Math.random()*0.4) * speed;
-                if (p.position.y < 0) p.position.y = -100;
+                // 显著降低下落速度：从之前的 0.6-1.0 降低到 0.25-0.4 左右
+                p.position.y -= (0.25 + Math.random()*0.15) * (speed || 1.0);
+                if (p.position.y < 0) {
+                    p.position.y = -100; // 落地隐藏
+                }
+                // 增加淡出效果，防止突兀消失
+                p.material.opacity = 0.7 * (1 - prg);
             }
         });
     }
@@ -616,6 +658,164 @@ export class VFXLibrary {
             };
             anim();
         }, 30);
+    }
+
+    /**
+     * 眩晕特效：在单位头顶显示旋转的小星星和“晕”字
+     */
+    createStunVFX(parent, duration) {
+        if (!parent || parent.isDead) return;
+
+        // 如果已经有眩晕特效在运行，不再重复创建，它会自动跟随 unit.stunnedUntil 结束
+        if (parent.userData.stunVFXActive) return;
+        parent.userData.stunVFXActive = true;
+
+        const group = new THREE.Group();
+        group.position.y = 1.5; // 头顶高度
+        parent.add(group);
+
+        // 1. 创建“晕”字文字贴图
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 80px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 8;
+        ctx.strokeText('晕', 64, 64);
+        ctx.fillText('晕', 64, 64);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(0.8, 0.8, 1);
+        group.add(sprite);
+
+        // 2. 创建环绕的小星星 (粒子)
+        const starCount = 3;
+        const stars = [];
+        const starGeo = new THREE.SphereGeometry(0.05, 8, 8);
+        const starMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+
+        for (let i = 0; i < starCount; i++) {
+            const star = new THREE.Mesh(starGeo, starMat);
+            const angle = (i / starCount) * Math.PI * 2;
+            star.position.set(Math.cos(angle) * 0.4, 0.2, Math.sin(angle) * 0.4);
+            group.add(star);
+            stars.push({ mesh: star, angle });
+        }
+
+        const startTime = Date.now();
+        const anim = () => {
+            // 核心逻辑：直接跟随单位的眩晕状态同步
+            const isStunned = parent.stunnedUntil && Date.now() < parent.stunnedUntil;
+            
+            if (isStunned && !parent.isDead) {
+                const elapsed = Date.now() - startTime;
+                // 文字上下漂浮
+                sprite.position.y = Math.sin(elapsed * 0.005) * 0.1;
+                
+                // 星星旋转
+                stars.forEach((s, i) => {
+                    const curAngle = s.angle + elapsed * 0.005;
+                    s.mesh.position.x = Math.cos(curAngle) * 0.4;
+                    s.mesh.position.z = Math.sin(curAngle) * 0.4;
+                    s.mesh.position.y = 0.2 + Math.sin(elapsed * 0.01 + i) * 0.05;
+                });
+
+                requestAnimationFrame(anim);
+            } else {
+                parent.remove(group);
+                parent.userData.stunVFXActive = false;
+                texture.dispose();
+                spriteMat.dispose();
+                starGeo.dispose();
+                starMat.dispose();
+            }
+        };
+        anim();
+    }
+
+    /**
+     * 减速特效：在单位脚下显示一个粘稠的暗影圆环或拖尾
+     */
+    createSlowVFX(parent) {
+        if (!parent || parent.isDead) return;
+        if (parent.userData.slowVFXActive) return;
+        parent.userData.slowVFXActive = true;
+
+        const group = new THREE.Group();
+        group.position.y = -0.35; // 贴近地面
+        parent.add(group);
+
+        // 1. 创建地面的粘稠阴影圈
+        const ringGeo = new THREE.RingGeometry(0.3, 0.5, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ 
+            color: 0x220033, 
+            transparent: true, 
+            opacity: 0.5,
+            side: THREE.DoubleSide,
+            depthWrite: false 
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        group.add(ring);
+
+        // 2. 创建向上冒出的虚弱气息 (粒子)
+        const particleInterval = setInterval(() => {
+            if (!parent.userData.slowVFXActive || parent.isDead) {
+                clearInterval(particleInterval);
+                return;
+            }
+
+            const pGeo = new THREE.BoxGeometry(0.05, 0.1, 0.05);
+            const pMat = new THREE.MeshBasicMaterial({ color: 0x440066, transparent: true, opacity: 0.6 });
+            const p = new THREE.Mesh(pGeo, pMat);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * 0.4;
+            p.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+            group.add(p);
+
+            const pStart = Date.now();
+            const pDur = 600 + Math.random() * 400;
+            const pAnim = () => {
+                const prg = (Date.now() - pStart) / pDur;
+                if (prg < 1 && parent.userData.slowVFXActive) {
+                    p.position.y += 0.01;
+                    p.material.opacity = 0.6 * (1 - prg);
+                    p.scale.setScalar(1 - prg * 0.5);
+                    requestAnimationFrame(pAnim);
+                } else {
+                    group.remove(p);
+                    pGeo.dispose();
+                    pMat.dispose();
+                }
+            };
+            pAnim();
+        }, 200);
+
+        const anim = () => {
+            // 核心逻辑：检测单位当前的移速是否仍然低于基础移速
+            const isSlowed = parent.moveSpeed < parent.baseMoveSpeed * 0.95; // 给一点容差
+            
+            if (isSlowed && !parent.isDead) {
+                // 呼吸效果
+                const scale = 1 + Math.sin(Date.now() * 0.005) * 0.1;
+                ring.scale.set(scale, scale, 1);
+                requestAnimationFrame(anim);
+            } else {
+                parent.userData.slowVFXActive = false;
+                clearInterval(particleInterval);
+                parent.remove(group);
+                ringGeo.dispose();
+                ringMat.dispose();
+            }
+        };
+        anim();
     }
 }
 

@@ -43,7 +43,7 @@ export const SkillRegistry = {
         targeting: { type: 'location', shape: 'circle', range: 8, radius: 3 },
         description: '在指定区域降下剑雨，造成 {damage} 点范围伤害及击退效果',
         actions: [
-            { type: 'vfx', name: 'rain', params: { color: 0x00ffff, duration: 1000, density: 1.0, radius: 3 } },
+            { type: 'vfx', name: 'rain', params: { color: 0x00ffff, duration: 600, density: 1.0, radius: 3 } },
             { type: 'damage_aoe', value: 80, knockback: 0.1, targeting: { shape: 'circle', radius: 3 } }
         ]
     }),
@@ -55,9 +55,9 @@ export const SkillRegistry = {
         cost: 55,
         cooldown: 10000,
         targeting: { type: 'location', shape: 'square', range: 10, radius: 4.5 },
-        description: '【进阶招式】在极广区域降下金色神剑，持续 {duration} 秒，每 0.5 秒造成 {tickDamage} 点伤害',
+        description: '【进阶招式】在极广区域降下凛冽剑雨，持续 {duration} 秒，每 0.5 秒造成 {tickDamage} 点伤害',
         actions: [
-            { type: 'vfx', name: 'rain', params: { color: 0xffff00, duration: 3000, density: 2.0, speed: 1.5, radius: 4.5, applySkillPowerToDuration: true } },
+            { type: 'vfx', name: 'rain', params: { color: 0x00ffff, duration: 3000, density: 2.0, speed: 0.5, radius: 4.5, applySkillPowerToDuration: true } },
             { type: 'tick_effect', duration: 3000, interval: 500, onTickDamage: 16, applySkillPowerToDuration: true, targeting: { shape: 'square', radius: 4.5 } }
         ]
     }),
@@ -100,7 +100,19 @@ export const SkillRegistry = {
         description: '【气场】产生无敌气场，保护范围内友军免受伤害，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'dome', params: { color: 0x88ccff, duration: 3000, radius: 4.5, applySkillPowerToDuration: true } },
-            { type: 'buff_aoe', params: { stat: 'invincible', duration: 3000, color: 0x88ccff, applySkillPowerToDuration: true, radius: 4.5 } }
+            { 
+                type: 'tick_effect', 
+                duration: 3000, 
+                interval: 500, 
+                side: 'player',
+                applySkillPowerToDuration: true,
+                onTickBuff: { 
+                    stat: 'invincible', 
+                    duration: 800, 
+                    color: 0x88ccff,
+                    tag: 'zhenshanhe'
+                } 
+            }
         ]
     }),
     'fenglaiwushan': new Skill('fenglaiwushan', {
@@ -239,13 +251,19 @@ export const SkillRegistry = {
         description: '【气场】产生生太极气场，使范围内友军移速提升 {bonus}%，伤害提升 {bonus2}%，并免疫控制，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'field', params: { color: 0x00ffcc, duration: 5000, radius: 6.0 } },
-            { type: 'buff_aoe', side: 'player', params: { 
-                stat: ['moveSpeed', 'attackDamage', 'controlImmune'], 
-                multiplier: [1.1, 1.2, 1.0], 
+            { 
+                type: 'tick_effect', 
                 duration: 5000, 
-                color: 0x00ffcc,
-                radius: 6.0
-            } }
+                interval: 500, 
+                side: 'player',
+                onTickBuff: { 
+                    stat: ['moveSpeed', 'attackDamage', 'controlImmune'], 
+                    multiplier: [1.1, 1.2, 1.0], 
+                    duration: 800, 
+                    color: 0x00ffcc,
+                    tag: 'shengtaiji'
+                }
+            }
         ]
     }),
     'tunriyue': new Skill('tunriyue', {
@@ -259,13 +277,19 @@ export const SkillRegistry = {
         description: '【气场】产生吞日月气场，使范围内敌人移速降低 {bonus}%，伤害降低 {bonus2}%，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'field', params: { color: 0xff3300, duration: 5000, radius: 6.0 } },
-            { type: 'buff_aoe', side: 'enemy', params: { 
-                stat: ['moveSpeed', 'attackDamage'], 
-                multiplier: [0.8, 0.8], 
+            { 
+                type: 'tick_effect', 
                 duration: 5000, 
-                color: 0xff3300,
-                radius: 6.0
-            } }
+                interval: 500, 
+                side: 'enemy',
+                onTickBuff: { 
+                    stat: ['moveSpeed', 'attackDamage'], 
+                    multiplier: [0.8, 0.8], 
+                    duration: 800, // 略大于 interval 确保覆盖
+                    color: 0xff3300,
+                    tag: 'tunriyue'
+                }
+            }
         ]
     }),
     'sixiang': new Skill('sixiang', {
@@ -342,13 +366,19 @@ export const SkillRegistry = {
         description: '【气场】产生化三清气场，使范围内友军功法提升 {bonus} 点，调息提升 {bonus2}%，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'field', params: { color: 0x4488ff, duration: 8000, radius: 6.0 } },
-            { type: 'buff_aoe', side: 'player', params: { 
-                stat: ['spells', 'haste'], 
-                offset: [20, 0.1], // spells 提升 20点，haste 提升 10%
+            { 
+                type: 'tick_effect', 
                 duration: 8000, 
-                color: 0x4488ff,
-                radius: 6.0
-            } }
+                interval: 500, 
+                side: 'player',
+                onTickBuff: { 
+                    stat: ['spells', 'haste'], 
+                    offset: [20, 0.1], // spells 提升 20点，haste 提升 10%
+                    duration: 800, 
+                    color: 0x4488ff,
+                    tag: 'huasanqing'
+                }
+            }
         ]
     }),
     'hegui': new Skill('hegui', {

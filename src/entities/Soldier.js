@@ -36,6 +36,7 @@ export class BaseUnit extends THREE.Group {
         // 基础移速叠加随机微差后，再应用全局修正
         const rawSpeed = (speed + (rng.next() - 0.5) * 0.01) * 0.7; // 全局移速降低 30%
         this.moveSpeed = modifierManager.getModifiedValue(this, 'speed', rawSpeed);
+        this.baseMoveSpeed = this.moveSpeed; // 记录基础移速，用于判定减速特效
         
         this.attackRange = modifierManager.getModifiedValue(this, 'range', attackRange);
         this.attackDamage = modifierManager.getModifiedValue(this, 'damage', attackDamage);
@@ -134,6 +135,11 @@ export class BaseUnit extends THREE.Group {
     applyStun(duration) {
         if (this.isControlImmune) return;
         this.stunnedUntil = Math.max(this.stunnedUntil, Date.now() + duration);
+        
+        // 自动触发眩晕视觉特效
+        if (window.battle && window.battle.playVFX) {
+            window.battle.playVFX('stun', { unit: this, duration });
+        }
     }
 
     /**
@@ -178,6 +184,13 @@ export class BaseUnit extends THREE.Group {
 
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
+
+        // 0. 状态特效判定：减速
+        if (this.moveSpeed < this.baseMoveSpeed * 0.95) {
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('slow', { unit: this });
+            }
+        }
 
         // 0. 眩晕状态判定
         if (Date.now() < this.stunnedUntil) {

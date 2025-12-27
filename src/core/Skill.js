@@ -78,10 +78,12 @@ export class Skill {
                     desc = desc.split('{stunDuration}').join(normal(dur));
                 }
 
-                // 4. Buff 加成
-                if (action.type === 'buff_aoe' && action.params) {
-                    const p = action.params;
-                    const isMultDynamic = action.applySkillPowerToMultiplier !== false;
+                // 4. Buff 加成 (支持普通 Buff 和 Tick Buff)
+                const buffAction = (action.type === 'buff_aoe') ? action : (action.onTickBuff ? { params: action.onTickBuff, ...action } : null);
+                
+                if (buffAction && buffAction.params) {
+                    const p = buffAction.params;
+                    const isMultDynamic = buffAction.applySkillPowerToMultiplier !== false;
                     
                     if (p.multiplier) {
                         const multipliers = Array.isArray(p.multiplier) ? p.multiplier : [p.multiplier];
@@ -215,13 +217,31 @@ export class Skill {
 
             case 'tick_effect':
                 const isDynamicTick = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
-                battleScene.applyTickEffect(center, this.targeting, {
+                battleScene.applyTickEffect(center, action.targeting || this.targeting, {
                     duration: isDynamicTick ? action.duration * skillPower : action.duration,
                     interval: action.interval,
-                    targetSide: 'enemy',
-                    onTick: (enemies) => {
+                    targetSide: action.side || 'enemy',
+                    onTick: (targets) => {
                         if (action.onTickDamage) {
-                            battleScene.applyDamageToUnits(enemies, action.onTickDamage * skillPower, center, action.knockback);
+                            battleScene.applyDamageToUnits(targets, action.onTickDamage * skillPower, center, action.knockback);
+                        }
+                        if (action.onTickBuff) {
+                            // 动态计算功法对 Buff 的影响
+                            const tickBuffParams = { ...action.onTickBuff };
+                            const isMultDynamic = action.applySkillPowerToMultiplier !== false;
+                            
+                            if (tickBuffParams.multiplier) {
+                                const currentPower = isMultDynamic ? skillPower : 1.0;
+                                tickBuffParams.multiplier = Array.isArray(tickBuffParams.multiplier) 
+                                    ? tickBuffParams.multiplier.map(m => 1.0 + (m - 1.0) * currentPower)
+                                    : (1.0 + (tickBuffParams.multiplier - 1.0) * currentPower);
+                            }
+                            if (tickBuffParams.offset) {
+                                tickBuffParams.offset = Array.isArray(tickBuffParams.offset)
+                                    ? tickBuffParams.offset.map(o => o * skillPower)
+                                    : (tickBuffParams.offset * skillPower);
+                            }
+                            battleScene.applyBuffToUnits(targets, tickBuffParams);
                         }
                     }
                 });
