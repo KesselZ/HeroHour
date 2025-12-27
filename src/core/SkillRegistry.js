@@ -58,7 +58,7 @@ export const SkillRegistry = {
         description: '【进阶招式】在极广区域降下金色神剑，持续 {duration} 秒，每 0.5 秒造成 {tickDamage} 点伤害',
         actions: [
             { type: 'vfx', name: 'rain', params: { color: 0xffff00, duration: 3000, density: 2.0, speed: 1.5, radius: 4.5, applySkillPowerToDuration: true } },
-            { type: 'tick_effect', duration: 3000, interval: 500, onTickDamage: 40, applySkillPowerToDuration: true, targeting: { shape: 'square', radius: 4.5 } }
+            { type: 'tick_effect', duration: 3000, interval: 500, onTickDamage: 16, applySkillPowerToDuration: true, targeting: { shape: 'square', radius: 4.5 } }
         ]
     }),
     'battle_shout': new Skill('battle_shout', {
@@ -324,7 +324,7 @@ export const SkillRegistry = {
                 type: 'projectile', 
                 count: 20, 
                 interval: 100, 
-                damage: 55, 
+                damage: 38.5, 
                 projType: 'air_sword',
                 autoTarget: true,
                 targetMode: 'random'
@@ -459,7 +459,7 @@ export const SkillRegistry = {
         description: '【轻剑招式】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
         actions: [
             { type: 'vfx', name: 'tiance_sweep', params: { color: 0xffffff, duration: 200, radius: 2.5, angle: Math.PI / 2 } },
-            { type: 'damage_aoe', value: 30, knockback: 0 }
+            { type: 'damage_aoe', value: 60, knockback: 0 }
         ]
     })
 };
