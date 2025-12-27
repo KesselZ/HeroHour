@@ -79,7 +79,8 @@ class City {
         };
 
         this.availableUnits = { 'melee': 8, 'ranged': 5 };
-        this.production = { gold: 1000, wood: 200 };
+        // 初始季度收入：500 金钱，200 木材
+        this.production = { gold: 500, wood: 200 };
     }
 
     /**
@@ -268,8 +269,9 @@ class City {
         if (this.id === 'main_city_1' && this.owner === 'player') {
             worldManager.capturedBuildings.forEach(b => {
                 if (b.owner === 'player') {
-                    if (b.type === 'gold_mine') gold += 200;
-                    if (b.type === 'sawmill') wood += 100;
+                    // 矿产收益微调：金矿 +150，木矿 +80
+                    if (b.type === 'gold_mine') gold += 150;
+                    if (b.type === 'sawmill') wood += 80;
                 }
             });
         }
