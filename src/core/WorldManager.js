@@ -1,44 +1,7 @@
 import { modifierManager } from './ModifierManager.js';
 import { SkillRegistry } from './SkillRegistry.js';
 import { audioManager } from './AudioManager.js';
-import { UNIT_STATS_DATA, UNIT_COSTS } from '../data/UnitStatsData.js';
-
-/**
- * 英雄初始状态与固有特性 (数据驱动)
- * 彻底消除 main.js 中的 Hardcode
- */
-const HERO_IDENTITY = {
-    'qijin': {
-        initialStats: { power: 7, spells: 12, morale: 6, speed: 11.8, leadership: 20 },
-        combatBase: { atk: 28, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
-        traits: [
-            { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
-            { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'damage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
-        ]
-    },
-    'lichengen': {
-        initialStats: { power: 5, spells: 8, morale: 10, speed: 11.8, leadership: 25 }, // 李承恩统帅更高
-        combatBase: { atk: 40, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
-        traits: [
-            { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
-            { id: 'tiance_sect_hp', unitType: 'tiance', stat: 'hp', multiplier: 1.1, description: '骁勇善战：天策兵种气血提高 10%' }
-        ]
-    },
-    'yeying': {
-        initialStats: { power: 10, spells: 18, morale: 2, speed: 11.8, leadership: 15 }, // 叶英更注重个人武力
-        combatBase: { atk: 8, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
-        traits: [
-            { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
-        ]
-    }
-};
-
-/**
- * 英雄特性配置表 (旧配置，建议合并入 HERO_IDENTITY)
- */
-const HERO_TRAITS = {
-    // 已废弃，合并入上方 HERO_IDENTITY
-};
+import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
 
 /**
  * 1. 建筑全量注册表：定义所有建筑的元数据

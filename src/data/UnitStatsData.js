@@ -46,9 +46,64 @@ export const UNIT_STATS_DATA = {
     'shadow_ninja': { name: '隐之影', hp: 120, atk: 18, range: 0.8, rangeType: '近战', speed: 10.1, attackSpeed: 600, targets: 1.0 },
 
     // --- 英雄单位 (物理常数，数值在大世界中动态同步) ---
-    'qijin':      { name: '祁进', range: 6.0, rangeType: '五剑连发', attackSpeed: 1000, burstCount: 5, description: '紫虚子，剑气凌人，擅长远程密集压制。' },
-    'lichengen': { name: '李承恩', range: 2.0, rangeType: '横扫千军', attackSpeed: 1000, description: '天策统领，不动如山，一人可挡万军。' },
-    'yeying':    { name: '叶英', range: 2.5, rangeType: '心剑旋风', attackSpeed: 1000, burstCount: 3, description: '藏剑庄主，心剑合一，周身剑气无坚不摧。' }
+    'qijin':      { 
+        name: '祁进', 
+        range: 15.0, 
+        rangeType: '五剑连发', 
+        attackSpeed: 1000, 
+        burstCount: 5, 
+        targets: 1.0,
+        description: '紫虚子，剑气凌人，擅长远程密集压制。' 
+    },
+    'lichengen': { 
+        name: '李承恩', 
+        range: 2.0, 
+        rangeType: '横扫千军', 
+        attackSpeed: 1000, 
+        targets: 2.5,
+        knockbackForce: 0.15,
+        description: '天策统领，不动如山，一人可挡万军。' 
+    },
+    'yeying':    { 
+        name: '叶英', 
+        range: 2.5, 
+        rangeType: '心剑旋风', 
+        attackSpeed: 1000, 
+        description: '藏剑庄主，心剑合一，周身剑气无坚不摧。',
+        modes: {
+            'yeying_heavy': { name: '叶英(重)', atk: 6,  range: 2.5, burstCount: 3, targets: 5.0, attackSpeed: 1500 },
+            'yeying_light': { name: '叶英(轻)', atk: 22, range: 1.5, burstCount: 1, targets: 1.0, attackSpeed: 600 }
+        }
+    }
+};
+
+/**
+ * 英雄身份与初始数据 (面板数据)
+ */
+export const HERO_IDENTITY = {
+    'qijin': {
+        initialStats: { power: 7, spells: 12, morale: 6, speed: 11.8, leadership: 20 },
+        combatBase: { atk: 17, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
+        traits: [
+            { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
+            { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'damage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
+        ]
+    },
+    'lichengen': {
+        initialStats: { power: 5, spells: 8, morale: 10, speed: 11.8, leadership: 25 },
+        combatBase: { atk: 40, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
+        traits: [
+            { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
+            { id: 'tiance_sect_hp', unitType: 'tiance', stat: 'hp', multiplier: 1.1, description: '骁勇善战：天策兵种气血提高 10%' }
+        ]
+    },
+    'yeying': {
+        initialStats: { power: 10, spells: 18, morale: 2, speed: 11.8, leadership: 15 },
+        combatBase: { atk: 6, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
+        traits: [
+            { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
+        ]
+    }
 };
 
 export const UNIT_COSTS = {

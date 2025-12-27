@@ -424,7 +424,8 @@ export class BaseUnit extends THREE.Group {
         const moveDist = this.moveSpeed * deltaTime;
         this.position.addScaledVector(dir, moveDist);
 
-        // 脚步声逻辑 (起步即响，固定频率)
+        // 战斗中暂时取消个体的草地脚步声，由环境音或集体音效代替（可选）
+        /*
         if (this.footstepTimer === 0) {
             audioManager.play('footstep_grass', { 
                 volume: 0.4,   
@@ -432,6 +433,7 @@ export class BaseUnit extends THREE.Group {
                 chance: 0.5    
             });
         }
+        */
 
         this.footstepTimer += deltaTime * 1000;
         if (this.footstepTimer >= this.footstepInterval) {
@@ -541,17 +543,15 @@ export class HeroUnit extends BaseUnit {
     static displayName = '主角';
     constructor(side, index, projectileManager) {
         const heroData = worldManager.heroData;
-        // 获取英雄的完整详情 (包含基础值和修正值)
         const details = worldManager.getUnitDetails(heroData.id);
-        const identity = worldManager.getHeroIdentity(heroData.id);
         
         super({
             side,
             index,
             type: heroData.id, 
-            hp: identity.combatBase.hpBase + (heroData.stats.power * identity.combatBase.hpScaling), // 使用公式计算的基础血量
-            speed: heroData.stats.speed,
-            attackDamage: identity.combatBase.atk, // 使用身份表里的基础攻击力
+            hp: details.hp, // 直接使用 getUnitDetails 返回的、包含成长和全局加成的最终血量
+            speed: details.speed,
+            attackDamage: details.atk, // 使用包含力道成长的最终攻击力
             attackRange: details.range,
             attackSpeed: details.attackSpeed,
             projectileManager,
@@ -731,73 +731,93 @@ export class HeroUnit extends BaseUnit {
     performAttack(enemies, allies) {
         const heroId = worldManager.heroData.id;
         const now = Date.now();
+        const details = worldManager.getUnitDetails(heroId);
         
-        // 藏剑根据形态决定攻速
+        // 核心优化：攻速逻辑完全数据驱动，消除硬编码，且支持 Buff 缩放
         let actualCD = this.attackCooldownTime;
-        if (heroId === 'yeying') {
-            actualCD = this.cangjianStance === 'heavy' ? this.attackCooldownTime * 1.5 : this.attackCooldownTime * 0.6;
+        if (heroId === 'yeying' && details.modes) {
+            const m = details.modes;
+            const modeKey = this.cangjianStance === 'heavy' ? 'yeying_heavy' : 'yeying_light';
+            const modeCfg = m[modeKey];
+            if (modeCfg && modeCfg.attackSpeed) {
+                // 计算该形态相对于英雄蓝图攻速的比例
+                const baseBlueprintAS = UNIT_STATS_DATA[heroId].attackSpeed || 1000;
+                const ratio = modeCfg.attackSpeed / baseBlueprintAS;
+                actualCD = this.attackCooldownTime * ratio;
+            }
         }
 
         if (now - this.lastAttackTime < actualCD) return;
         this.lastAttackTime = now;
 
-        const details = worldManager.getUnitDetails(heroId);
         const burstCount = details.burstCount || 1;
 
         if (heroId === 'yeying') {
+            const m = details.modes;
+            const ident = worldManager.getHeroIdentity('yeying');
+            const baseAtk = ident.combatBase.atk;
             if (this.cangjianStance === 'heavy') {
-                // 重剑模式：心剑旋风 (对齐爆发次数)
-                for (let i = 0; i < burstCount; i++) {
+                // 重剑模式：心剑旋风
+                const cfg = m.yeying_heavy;
+                const burst = cfg.burstCount || 1;
+                for (let i = 0; i < burst; i++) {
                     setTimeout(() => {
                         if (this.isDead) return;
                         this.onAttackAnimation();
-                        // 自动对齐方向与坐标
-                        window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: details.range, color: 0xffcc00, duration: 250 });
+                        window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: cfg.range, color: 0xffcc00, duration: 250 });
                         this.executeAOE(enemies, {
-                            radius: details.range,
-                            damage: this.attackDamage,
+                            radius: cfg.range,
+                            damage: this.attackDamage * (cfg.atk / baseAtk),
                             knockbackForce: 0.05
                         });
                     }, i * 250);
                 }
             } else {
-                // 轻剑模式：普通的单体快速攻击 (类似天策弟子)
-                this.onAttackAnimation();
-                if (this.target && !this.target.isDead) {
-                    this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5);
+                // 轻剑模式：单体快速攻击
+                const cfg = m.yeying_light;
+                const burst = cfg.burstCount || 1;
+                for (let i = 0; i < burst; i++) {
+                    setTimeout(() => {
+                        if (this.isDead || !this.target || this.target.isDead) return;
+                        if (i === 0) this.onAttackAnimation(); 
+                        
+                        const finalDmg = this.attackDamage * (cfg.atk / baseAtk);
+                        this.target.takeDamage(finalDmg + (rng.next() - 0.5) * 5);
+                    }, i * 150); 
                 }
             }
         } else if (heroId === 'qijin') {
             this.onAttackAnimation();
-            this.performChunyangAttack(enemies);
+            this.performChunyangAttack(enemies, details);
         } else if (heroId === 'lichengen') {
             this.onAttackAnimation();
-            this.performTianceAttack(enemies);
+            this.performTianceAttack(enemies, details);
         }
     }
 
-    performTianceAttack(enemies) {
+    performTianceAttack(enemies, details) {
         if (!this.target || this.target.isDead) return;
-        const sweepRadius = 2.0;
-        window.battle.playVFX('advanced_sweep', { unit: this, radius: sweepRadius, color: 0xff0000, duration: 300 });
+        const radius = details.range || 2.0;
+        const kb = details.knockbackForce || 0.15;
+        window.battle.playVFX('advanced_sweep', { unit: this, radius: radius, color: 0xff0000, duration: 300 });
         this.executeAOE(enemies, {
-            radius: sweepRadius,
+            radius: radius,
             angle: Math.PI, 
             damage: this.attackDamage,
-            knockbackForce: 0.15
+            knockbackForce: kb
         });
     }
 
     /**
      * 纯阳强化：五剑齐发视觉与逻辑
      */
-    performChunyangAttack(enemies) {
+    performChunyangAttack(enemies, details) {
         if (!this.target || this.target.isDead) return;
-        const swordCount = 5; 
+        const swordCount = details.burstCount || 5; 
         for (let i = 0; i < swordCount; i++) {
             setTimeout(() => {
                 if (this.isDead || !this.target || this.target.isDead) return;
-                const offset = new THREE.Vector3((i-2)*0.5, 1.2, (rng.next()-0.5)*0.5);
+                const offset = new THREE.Vector3((i - (swordCount-1)/2) * 0.5, 1.2, (rng.next() - 0.5) * 0.5);
                 const spawnPos = this.position.clone().add(offset);
                 this.projectileManager?.spawn({
                     startPos: spawnPos,
@@ -934,15 +954,25 @@ export class Healer extends BaseUnit {
     }
 
     updateAI(enemies, allies) {
-        // 优先寻找血量最低的盟友
-        this.target = this.findLowestHealthAlly(allies);
-        // 如果没有需要治疗的盟友，则跟着大部队走（寻找最近敌人但不攻击）
+        // 1. 寻找任意受伤的盟友 (简单 find，不强求最低血量，自然分散治疗压力)
+        this.target = allies.find(u => !u.isDead && u.health < u.maxHealth);
+        
+        // 2. 如果全员健康，则把主角作为跟随目标
         if (!this.target) {
-            this.target = this.findNearestEnemy(enemies);
+            this.target = allies.find(u => u.isHero && !u.isDead);
+        }
+
+        if (this.target) {
+            const dist = this.position.distanceTo(this.target.position);
+            // 保持距离：离目标太远才移动
+            this.isMoving = dist > this.attackRange * 0.8; 
         }
     }
 
     performAttack(enemies, allies) {
+        // --- 核心安全性检查：只奶受伤的自己人 ---
+        if (!this.target || this.target.side !== this.side || this.target.health >= this.target.maxHealth) return;
+
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime) {
             this.lastAttackTime = now;

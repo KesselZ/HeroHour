@@ -370,8 +370,8 @@ export class BattleScene {
             this.unitCounts[type]--;
             this.deployedCounts[type]++;
             
-            // 部署士兵时播放点击音效
-            audioManager.play('ui_click', { volume: 0.3, pitchVar: 0.2 });
+            // 部署士兵时播放点击音效 (使用配置中的默认 10ms throttle 和 pitchVar)
+            audioManager.play('ui_click', { volume: 0.3 });
 
             this.updateUI();
             if (this.unitCounts[type] <= 0) {
