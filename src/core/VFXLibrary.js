@@ -10,6 +10,17 @@ export class VFXLibrary {
     }
 
     /**
+     * 内部辅助方法：统一处理材质创建，确保透明材质默认关闭深度写入
+     */
+    _createMaterial(params, MaterialClass = THREE.MeshBasicMaterial) {
+        const mat = new MaterialClass(params);
+        if (params.transparent && params.depthWrite === undefined) {
+            mat.depthWrite = false;
+        }
+        return mat;
+    }
+
+    /**
      * 通用粒子系统发射器
      */
     createParticleSystem(options) {
@@ -45,7 +56,7 @@ export class VFXLibrary {
 
             const count = Math.ceil(2 * density);
             for (let i = 0; i < count; i++) {
-                const pMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+                const pMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
                 const p = new THREE.Mesh(pGeo, pMat);
                 initFn(p);
                 group.add(p);
@@ -94,7 +105,7 @@ export class VFXLibrary {
         
         const texture = new THREE.CanvasTexture(canvas);
         const fillGeo = new THREE.CircleGeometry(radius, 64); // 改用圆形几何体，物理切除方角
-        const fillMat = new THREE.MeshBasicMaterial({ 
+        const fillMat = this._createMaterial({ 
             map: texture, 
             transparent: true, 
             opacity: 0.4,
@@ -107,7 +118,7 @@ export class VFXLibrary {
 
         // 2. 细腻的边缘亮环
         const ringGeo = new THREE.RingGeometry(radius * 0.98, radius, 64);
-        const ringMat = new THREE.MeshBasicMaterial({ 
+        const ringMat = this._createMaterial({ 
             color: color, 
             transparent: true, 
             opacity: 0.6,
@@ -170,7 +181,7 @@ export class VFXLibrary {
         for (let i = 0; i < 3; i++) {
             setTimeout(() => {
                 const geo = new THREE.RingGeometry(0.1, 0.15, 64);
-                const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+                const mat = this._createMaterial({ color, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
                 const ring = new THREE.Mesh(geo, mat);
                 ring.rotation.x = -Math.PI / 2;
                 ring.position.copy(pos).y = 0.1 + i * 0.05;
@@ -228,7 +239,7 @@ export class VFXLibrary {
         ];
 
         const meshes = layers.map(l => {
-            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: l.opacity });
+            const mat = this._createMaterial({ color, transparent: true, opacity: l.opacity });
             const m = new THREE.Mesh(l.geometry, mat);
             group.add(m);
             return { m, mat, l };
@@ -257,7 +268,7 @@ export class VFXLibrary {
     createStompVFX(pos, radius, color, duration, parent = null) {
         const actualParent = parent || this.scene;
         const ringGeo = new THREE.RingGeometry(radius * 0.1, radius, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x554433, transparent: true, opacity: 0.6, depthWrite: false });
+        const ringMat = this._createMaterial({ color: 0x554433, transparent: true, opacity: 0.6, depthWrite: false });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
         ring.position.copy(pos).y = 0.05;
@@ -309,7 +320,7 @@ export class VFXLibrary {
 
     createDomeVFX(pos, radius, color, duration) {
         const geo = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 });
+        const mat = this._createMaterial({ color, transparent: true, opacity: 0.3 });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.copy(pos);
         this.scene.add(mesh);
@@ -339,7 +350,7 @@ export class VFXLibrary {
         }
 
         const geo = new THREE.RingGeometry(radius * 0.5, radius, 32, 1, -Math.PI / 2 - angle / 2, angle);
-        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
+        const mat = this._createMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = -Math.PI / 2;
         group.add(mesh);
@@ -403,7 +414,7 @@ export class VFXLibrary {
 
         const texture = new THREE.CanvasTexture(canvas);
         const geo = new THREE.PlaneGeometry(radius * 2.1, radius * 2.1); // 尺寸更贴合半径
-        const mat = new THREE.MeshBasicMaterial({ 
+        const mat = this._createMaterial({ 
             map: texture, 
             transparent: true, 
             opacity: 0.8, 
@@ -487,7 +498,7 @@ export class VFXLibrary {
             const outerR = radius * (0.8 + i * 0.1);
             // 使用 RingGeometry 模拟剑气轨迹
             const geo = new THREE.RingGeometry(innerR, outerR, 32, 1, Math.random() * Math.PI, Math.PI * 1.2);
-            const mat = new THREE.MeshBasicMaterial({ 
+            const mat = this._createMaterial({ 
                 color, 
                 transparent: true, 
                 opacity: 0.5 - i * 0.1,
@@ -503,7 +514,7 @@ export class VFXLibrary {
 
         // 2. 核心金光
         const coreGeo = new THREE.SphereGeometry(radius * 0.3, 16, 16);
-        const coreMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.3 });
+        const coreMat = this._createMaterial({ color, transparent: true, opacity: 0.3 });
         const core = new THREE.Mesh(coreGeo, coreMat);
         group.add(core);
 
@@ -577,7 +588,7 @@ export class VFXLibrary {
         const swords = [];
         const swordGeo = new THREE.BoxGeometry(radius * 1.8, 0.2, 0.4); // 很长很宽的剑
         for (let i = 0; i < swordCount; i++) {
-            const swordMat = new THREE.MeshBasicMaterial({ 
+            const swordMat = this._createMaterial({ 
                 color: color, 
                 transparent: true, 
                 opacity: 0.7,
@@ -596,7 +607,7 @@ export class VFXLibrary {
             const innerR = radius * (0.4 + i * 0.15);
             const outerR = radius * (0.7 + i * 0.15);
             const geo = new THREE.RingGeometry(innerR, outerR, 64, 1, Math.random() * Math.PI, Math.PI * 1.5);
-            const mat = new THREE.MeshBasicMaterial({ 
+            const mat = this._createMaterial({ 
                 color: i % 2 === 0 ? color : 0xffffff, // 交替白光和金光
                 transparent: true, 
                 opacity: 0.4,
@@ -612,7 +623,7 @@ export class VFXLibrary {
 
         // 3. 底部金色法阵
         const circleGeo = new THREE.CircleGeometry(radius, 32);
-        const circleMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.15 });
+        const circleMat = this._createMaterial({ color, transparent: true, opacity: 0.15 });
         const circle = new THREE.Mesh(circleGeo, circleMat);
         circle.rotation.x = -Math.PI / 2;
         circle.position.y = -0.7;
@@ -700,7 +711,7 @@ export class VFXLibrary {
             }
 
             // 每一跳生成 1 个精细粒子
-            const pMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+            const pMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
             const p = new THREE.Mesh(pGeo, pMat);
             
             // 初始位置：覆盖整个身体范围，并增加水平散布
@@ -794,7 +805,7 @@ export class VFXLibrary {
         ctx.fillText('晕', 64, 64);
         
         const texture = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const spriteMat = this._createMaterial({ map: texture, transparent: true }, THREE.SpriteMaterial);
         const sprite = new THREE.Sprite(spriteMat);
         sprite.scale.set(0.8, 0.8, 1);
         group.add(sprite);
@@ -803,7 +814,7 @@ export class VFXLibrary {
         const starCount = 3;
         const stars = [];
         const starGeo = new THREE.SphereGeometry(0.05, 8, 8);
-        const starMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+        const starMat = this._createMaterial({ color: 0xffcc00 });
 
         for (let i = 0; i < starCount; i++) {
             const star = new THREE.Mesh(starGeo, starMat);
@@ -858,7 +869,7 @@ export class VFXLibrary {
 
         // 1. 创建地面的粘稠阴影圈
         const ringGeo = new THREE.RingGeometry(0.3, 0.5, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ 
+        const ringMat = this._createMaterial({ 
             color: 0x220033, 
             transparent: true, 
             opacity: 0.5,
@@ -877,7 +888,7 @@ export class VFXLibrary {
             }
 
             const pGeo = new THREE.BoxGeometry(0.05, 0.1, 0.05);
-            const pMat = new THREE.MeshBasicMaterial({ color: 0x440066, transparent: true, opacity: 0.6 });
+            const pMat = this._createMaterial({ color: 0x440066, transparent: true, opacity: 0.6 });
             const p = new THREE.Mesh(pGeo, pMat);
             
             const angle = Math.random() * Math.PI * 2;

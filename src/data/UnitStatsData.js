@@ -72,7 +72,7 @@ export const UNIT_STATS_DATA = {
         description: '藏剑庄主，心剑合一，周身剑气无坚不摧。',
         modes: {
             'yeying_heavy': { name: '叶英(重)', atk: 6,  range: 2.5, burstCount: 3, targets: 5.0, attackSpeed: 1500 },
-            'yeying_light': { name: '叶英(轻)', atk: 22, range: 1.5, burstCount: 1, targets: 1.0, attackSpeed: 600 }
+            'yeying_light': { name: '叶英(轻)', atk: 44, range: 1.5, burstCount: 1, targets: 1.0, attackSpeed: 600 }
         }
     }
 };
