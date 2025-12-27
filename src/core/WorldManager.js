@@ -10,18 +10,18 @@ import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsDat
 const BUILDING_REGISTRY = {
     'town_hall': { name: '议政厅', category: 'economy', maxLevel: 3, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。' },
     'market': { name: '市场', category: 'economy', maxLevel: 3, icon: 'merchant_guild', cost: { gold: 300, wood: 50 }, description: '互通有无：提高城镇的金钱与木材产出效率。' },
-    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '江湖传闻：每级增加全军 15% 的阅历（经验）获取速度。' },
-    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 3, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '财源广进：每级提升该城镇 20% 的金钱产出。' },
-    'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '辎重运输：每级增加城镇木材产出，并降低全军招募成本 5%。' },
+    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '解锁阅历获取，随后每级增加全军 10% 的阅历获取速度。' },
+    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 3, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '提升该城镇 20% 的金钱产出。' },
+    'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '增加城镇木材产出，并降低全军招募成本 5%。' },
     
     // 军事建筑：现在每级都有数值成长
-    'barracks': { name: '兵营', category: 'military', maxLevel: 5, icon: 'melee', cost: { gold: 400, wood: 150 }, description: '训练基础步兵。每级增加全军近战兵种 15% 生命。' },
-    'archery_range': { name: '靶场', category: 'military', maxLevel: 5, icon: 'archer', cost: { gold: 400, wood: 200 }, description: '招募唐门射手。每级增加全军远程兵种 15% 伤害。' },
-    'stable': { name: '天策马厩', category: 'military', maxLevel: 5, icon: 'tiance', cost: { gold: 800, wood: 300 }, description: '招募天策骑兵。每级增加天策骑兵 15% 伤害与生命。' },
-    'sword_forge': { name: '藏剑剑庐', category: 'military', maxLevel: 5, icon: 'cangjian', cost: { gold: 900, wood: 400 }, description: '招募藏剑弟子。每级增加藏剑弟子 15% 伤害与生命。' },
-    'martial_shrine': { name: '苍云讲武堂', category: 'military', maxLevel: 5, icon: 'cangyun', cost: { gold: 850, wood: 450 }, description: '招募苍云将士。每级增加苍云将士 15% 生命与防御。' },
-    'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 1000, wood: 500 }, description: '招募纯阳弟子。每级增加纯阳弟子 15% 属性。' },
-    'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '招募万花弟子。每级增加万花弟子 15% 气血与疗效。' },
+    'barracks': { name: '兵营', category: 'military', maxLevel: 5, icon: 'melee', cost: { gold: 400, wood: 150 }, description: '解锁近战兵种，随后每级增加全军近战兵种 10% 生命。' },
+    'archery_range': { name: '靶场', category: 'military', maxLevel: 5, icon: 'archer', cost: { gold: 400, wood: 200 }, description: '解锁远程兵种，随后每级增加全军远程兵种 10% 伤害。' },
+    'stable': { name: '天策马厩', category: 'military', maxLevel: 5, icon: 'tiance', cost: { gold: 800, wood: 300 }, description: '解锁天策兵种，随后每级增加全军天策系 10% 伤害与生命。' },
+    'sword_forge': { name: '藏剑剑庐', category: 'military', maxLevel: 5, icon: 'cangjian', cost: { gold: 900, wood: 400 }, description: '解锁藏剑兵种，随后每级增加全军藏剑系 10% 伤害与生命。' },
+    'martial_shrine': { name: '苍云讲武堂', category: 'military', maxLevel: 5, icon: 'cangyun', cost: { gold: 850, wood: 450 }, description: '解锁苍云兵种，随后每级增加全军苍云系 10% 生命与防御。' },
+    'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 1000, wood: 500 }, description: '解锁纯阳兵种，随后每级增加全军纯阳系 10% 属性。' },
+    'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '解锁万花兵种，随后每级增加全军万花系 10% 气血与疗效。' },
     
     'spell_altar': { name: '功法祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1200, wood: 600 }, description: '博采众长：每级随机感悟全江湖招式。' },
     'treasure_pavilion': { name: '藏宝阁', category: 'economy', maxLevel: 1, icon: 'treasure_pavilion_v2', cost: { gold: 2000, wood: 800 }, description: '琳琅满目：极其罕见的珍宝汇聚之地。' },
@@ -181,12 +181,12 @@ class City {
                 multiplier: 1.0 - (level * 0.05) 
             });
         } else if (id === 'inn') {
-            // 每级增加全军阅历获取 15%
+            // 1级解锁，2级开始每级增加全军阅历获取 10%
             modifierManager.addGlobalModifier({ 
                 id: `city_${this.id}_xp_bonus`, 
                 side: 'player', 
                 stat: 'xp_gain', 
-                multiplier: 1.0 + (level * 0.15) 
+                multiplier: 1.0 + Math.max(0, (level - 1) * 0.10) 
             });
         }
         // --- 特殊建筑效果 ---
@@ -211,8 +211,8 @@ class City {
         }
 
         // --- 军事建筑数值增强系统 ---
-        // 逻辑：每升一级提供 15% 的全局属性增益
-        const multiplier = 1.0 + (level * 0.15); 
+        // 逻辑：1级仅作为解锁，2级开始每级提供 10% 的全局属性增益
+        const multiplier = 1.0 + Math.max(0, (level - 1) * 0.10); 
         
         switch (id) {
             case 'barracks':
@@ -231,8 +231,8 @@ class City {
                 break;
             case 'martial_shrine':
                 modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: multiplier });
-                // 核心重构：直接增加 15% 减伤百分点，不再做 2 - x 的复杂换算
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damage_reduction', offset: level * 0.15 });
+                // 核心重构：1级解锁，2级开始每级增加 10% 减伤百分点
+                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damage_reduction', offset: Math.max(0, (level - 1) * 0.10) });
                 break;
             case 'mage_guild':
                 modifierManager.addGlobalModifier({ id: `city_${this.id}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'damage', multiplier: multiplier });
@@ -575,16 +575,49 @@ class WorldManager {
     }
 
     /**
+     * 判断玩家是否物理处于某个城市的位置
+     * 职责：统一的地理位置校验，用于决定是否能进行“领兵”、“直接入队”等亲临操作
+     */
+    isPlayerAtCity(cityId) {
+        const city = this.cities[cityId];
+        if (!city) return false;
+        
+        const pPos = this.mapState.playerPos;
+        if (!pPos) return false;
+
+        const dist = Math.sqrt(Math.pow(pPos.x - city.x, 2) + Math.pow(pPos.z - city.z, 2));
+        
+        // 5.0 为标准交互半径
+        return dist <= 5.0; 
+    }
+
+    /**
      * 招募士兵到指定城市
+     * @param {string} type 兵种类型
+     * @param {string} cityId 城市 ID
      */
     recruitUnit(type, cityId = 'main_city_1') {
         const baseCost = this.unitCosts[type].gold;
-        // 应用全局招募折扣 (来自马帮驿站等)
+        const unitLeadershipCost = this.unitCosts[type].cost || 0;
+
+        // 应用全局招募折扣
         const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
         
         if (this.spendGold(finalCost)) {
-            const city = this.cities[cityId];
-            city.availableUnits[type] = (city.availableUnits[type] || 0) + 1;
+            // 优雅的自动判定：如果人在现场且统御足够，直接入队
+            const canTakeNow = this.isPlayerAtCity(cityId) && 
+                               (this.getHeroCurrentLeadership() + unitLeadershipCost <= this.heroData.stats.leadership);
+
+            if (canTakeNow) {
+                this.heroArmy[type] = (this.heroArmy[type] || 0) + 1;
+                console.log(`%c[招募] %c${type} 已直接加入英雄队伍`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+            } else {
+                const city = this.cities[cityId];
+                city.availableUnits[type] = (city.availableUnits[type] || 0) + 1;
+                console.log(`%c[招募] %c${type} 已进入城市 ${city.name} 预备役`, 'color: #5b8a8a', 'color: #fff');
+            }
+
+            this.updateHUD();
             return true;
         }
         return false;
@@ -595,6 +628,12 @@ class WorldManager {
      * 改进版：采用轮询机制，尽量让每一类兵种都能领到一点，而不是优先领满某一类
      */
     collectAllFromCity(cityId = 'main_city_1') {
+        // 核心安全性校验：必须人在现场
+        if (!this.isPlayerAtCity(cityId)) {
+            console.warn(`[调兵] 失败：玩家未处于城市 ${cityId} 的地理范围内`);
+            return;
+        }
+
         const city = this.cities[cityId];
         let count = 0;
         let leadershipGained = 0;
@@ -1477,9 +1516,12 @@ class WorldManager {
      * 从英雄队伍移动士兵到城市 (驻守)
      */
     transferToCity(type, amount, cityId = 'main_city_1') {
+        if (!this.isPlayerAtCity(cityId)) return false;
+
         if (this.heroArmy[type] >= amount) {
             this.heroArmy[type] -= amount;
             this.cities[cityId].availableUnits[type] = (this.cities[cityId].availableUnits[type] || 0) + amount;
+            this.updateHUD(); // 确保 HUD 同步
             return true;
         }
         return false;
@@ -1503,6 +1545,8 @@ class WorldManager {
      * 从城市移动士兵到英雄队伍
      */
     transferToHero(type, amount, cityId = 'main_city_1') {
+        if (!this.isPlayerAtCity(cityId)) return false;
+
         const city = this.cities[cityId];
         const unitCost = this.unitCosts[type]?.cost || 0;
         const totalCostToAdd = amount * unitCost;

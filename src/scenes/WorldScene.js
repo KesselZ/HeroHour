@@ -153,6 +153,7 @@ export class WorldScene {
         if (collectAllBtn) {
             collectAllBtn.onclick = () => {
                 if (this.activeCityId) {
+                    audioManager.play('ui_click', { volume: 0.5 });
                     worldManager.collectAllFromCity(this.activeCityId);
                     this.refreshTownUI(this.activeCityId);
                 }
@@ -163,6 +164,7 @@ export class WorldScene {
         if (depositAllBtn) {
             depositAllBtn.onclick = () => {
                 if (this.activeCityId) {
+                    audioManager.play('ui_click', { volume: 0.5 });
                     worldManager.depositAllToCity(this.activeCityId);
                     this.refreshTownUI(this.activeCityId);
                 }
@@ -382,8 +384,15 @@ export class WorldScene {
         
         if (!cityData) return;
 
-        this.activeCityId = cityId; // 必须设置当前激活的城市 ID
-        this.isPhysicalVisit = isPhysical; // 记录是否亲临现场
+        // --- 核心修复：位置“懒同步” ---
+        // 在打开面板前，将 3D 世界的实时位置同步给逻辑层，确保 isPlayerAtCity 判定准确
+        if (this.playerHero) {
+            worldManager.savePlayerPos(this.playerHero.position.x, this.playerHero.position.z);
+        }
+
+        this.activeCityId = cityId; 
+        // 智能判定：如果你手动标记了亲临 (isPhysical)，或者你当前坐标确实在城里
+        this.isPhysicalVisit = isPhysical || worldManager.isPlayerAtCity(cityId);
 
         document.getElementById('town-name').innerText = cityData.name;
         panel.classList.remove('hidden');
@@ -450,6 +459,8 @@ export class WorldScene {
                 card.onclick = () => {
                     if (isMax) return;
                     if (worldManager.spendGold(build.cost.gold) && worldManager.spendWood(build.cost.wood)) {
+                        // 建筑升级成功：播放厚重的“按下”音效
+                        audioManager.play('ui_press', { volume: 0.8 });
                         cityData.upgradeBuilding(build.id);
                         this.refreshTownUI(cityId);
                     } else {
@@ -510,10 +521,13 @@ export class WorldScene {
                 this.bindUnitTooltip(item, type);
                 item.querySelector('button').onclick = (e) => {
                     e.stopPropagation();
+                    // 核心修改：逻辑已收拢至 WorldManager，它会自动判断是否能直接入队
                     if (worldManager.recruitUnit(type, cityId)) {
+                        // 招募成功：播放清脆音效
+                        audioManager.play('ui_click', { volume: 0.5 });
                         this.refreshTownUI(cityId);
                     } else {
-                        worldManager.showNotification('金钱不足！');
+                        worldManager.showNotification('资源不足或统御上限已满！');
                     }
                 };
                 recruitList.appendChild(item);
@@ -729,6 +743,7 @@ export class WorldScene {
 
     start() {
         this.isActive = true;
+        timeManager.resume(); // 恢复时间流逝并重置计时起点
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('pointermove', this.onPointerMove); // 核心修复：注册指针监听
@@ -749,6 +764,7 @@ export class WorldScene {
 
     stop() {
         this.isActive = false;
+        timeManager.pause(); // 暂停时间流逝
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('pointermove', this.onPointerMove); // 核心修复：移除指针监听

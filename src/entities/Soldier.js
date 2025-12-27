@@ -498,7 +498,12 @@ export class BaseUnit extends THREE.Group {
         
         if (finalAmount > 0) {
             // 只有受到伤害时才播受击音效和闪红
-            audioManager.play('onhit', { volume: 0.3, chance: 0.4 });
+            // 主角受击音效强制 100% 播放
+            audioManager.play('onhit', { 
+                volume: 0.3, 
+                chance: this.isHero ? 1.0 : 0.4,
+                force: this.isHero 
+            });
             this.hitFlashUntil = Date.now() + 150;
         }
 
@@ -781,6 +786,7 @@ export class HeroUnit extends BaseUnit {
             const baseAtk = ident.combatBase.atk;
             if (this.cangjianStance === 'heavy') {
                 // 重剑模式：心剑旋风
+                audioManager.play('attack_melee', { volume: 0.5, force: true, pitchVar: 0.2 });
                 const cfg = m.yeying_heavy;
                 const burst = cfg.burstCount || 1;
                 for (let i = 0; i < burst; i++) {
@@ -797,6 +803,7 @@ export class HeroUnit extends BaseUnit {
                 }
             } else {
                 // 轻剑模式：单体快速攻击
+                audioManager.play('attack_melee', { volume: 0.3, force: true, pitchVar: 0.1 });
                 const cfg = m.yeying_light;
                 const burst = cfg.burstCount || 1;
                 for (let i = 0; i < burst; i++) {
@@ -810,9 +817,11 @@ export class HeroUnit extends BaseUnit {
                 }
             }
         } else if (heroId === 'qijin') {
+            audioManager.play('attack_air_sword', { volume: 0.4, force: true });
             this.onAttackAnimation();
             this.performChunyangAttack(enemies, details);
         } else if (heroId === 'lichengen') {
+            audioManager.play('attack_melee', { volume: 0.5, force: true });
             this.onAttackAnimation();
             this.performTianceAttack(enemies, details);
         }
@@ -1091,7 +1100,7 @@ export class BanditArcher extends BaseUnit {
 }
 
 export class RebelSoldier extends BaseUnit {
-    static displayName = '叛军甲兵';
+    static displayName = '狼牙甲兵';
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('rebel_soldier');
         super({ side, index, type: 'rebel_soldier', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 1.5, projectileManager });
@@ -1099,7 +1108,7 @@ export class RebelSoldier extends BaseUnit {
 }
 
 export class RebelAxeman extends BaseUnit {
-    static displayName = '叛军斧兵';
+    static displayName = '狼牙斧兵';
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('rebel_axeman');
         super({ side, index, type: 'rebel_axeman', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
@@ -1112,6 +1121,26 @@ export class Snake extends BaseUnit {
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('snake');
         super({ side, index, type: 'snake', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+
+            // 毒蛇吐口水音效 (暂用气剑音效，音量调低)
+            audioManager.play('attack_air_sword', { volume: 0.2, pitchVar: 0.4 });
+
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.2, 0)), 
+                target: this.target, 
+                speed: 0.15, 
+                damage: this.attackDamage, 
+                type: 'wave', // 使用 wave 粒子模拟口水
+                color: 0x8800ff // 紫色口水
+            });
+        }
     }
 }
 

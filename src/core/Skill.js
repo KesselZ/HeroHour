@@ -149,9 +149,9 @@ export class Skill {
         battleScene.worldManager.heroData.mpCurrent -= actualCost;
         this.lastUsed = Date.now();
 
-        // 播放技能音效
+        // 播放技能音效 (技能触发强制 100% 成功)
         if (this.audio) {
-            audioManager.play(this.audio);
+            audioManager.play(this.audio, { force: true });
         }
 
         // 核心逻辑：根据技能类别自动切换藏剑形态
@@ -286,6 +286,7 @@ export class Skill {
                 battleScene.spawnProjectiles({
                     count: action.count || 1,
                     interval: action.interval || 100,
+                    audio: action.audio || this.audio, // 传递音效到发射器
                     startPos: caster.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
                     target: initialTargets[0], 
                     damage: action.damage * skillPower,

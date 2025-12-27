@@ -27,7 +27,7 @@ export const ASSET_REGISTRY = {
         // --- 技能图标 (Skill Icons) ---
         // skill.png 第一行
         'skill_zhenshanhe':   { name: '镇山河图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 1 },
-        'skill_fenglaiwushan': { name: '风来吴山图标', sheet: 'SKILL1', rows: 4, cols: 4, r: 1, c: 2 },
+        'skill_fenglaiwushan': { name: '风来吴山图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 4, c: 1 },
         'skill_hanrulei':      { name: '撼如雷图标', sheet: 'SKILL3', rows: 4, cols: 4, r: 4, c: 4 },
         
         // skill2.png 第一行
@@ -41,7 +41,7 @@ export const ASSET_REGISTRY = {
         'skill_wanshi':          { name: '万世不竭图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 3, c: 3 },
         'skill_huasanqing':      { name: '化三清图标', sheet: 'SKILL8', rows: 4, cols: 4, r: 3, c: 1 },
         'skill_hegui':           { name: '鹤归孤山图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 2, c: 2 },
-        'skill_fengcha':         { name: '峰插云景图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 2, c: 2 },
+        'skill_fengcha':         { name: '峰插云景图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 1, c: 3 },
         'skill_songshe':         { name: '松舍问霞图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 2, c: 3 },
         'skill_mengquan':        { name: '梦泉虎跑图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 4, c: 4 },
         'skill_pinghu':          { name: '平湖断月图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 1, c: 1 },

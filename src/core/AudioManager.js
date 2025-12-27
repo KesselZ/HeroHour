@@ -22,6 +22,10 @@ class AudioManager {
                 throttle: 10,  // 降低间隔到 10ms，允许快速连续点击
                 pitchVar: 0.25 // 默认开启音调波动，让连续点击听起来更自然
             },
+            'ui_press': { 
+                files: ['/audio/click/按下音效.mp3'],
+                throttle: 50 
+            },
             
             // 攻击音效池
             'attack_melee': { 
@@ -93,14 +97,19 @@ class AudioManager {
         const conf = this.config[key];
         if (!conf) return;
 
+        // 0. 强制播放检查 (Bypass chance and throttle)
+        const isForce = options.force ?? false;
+
         // 1. 概率检查
-        const chance = options.chance ?? conf.chance ?? 1.0;
-        if (Math.random() > chance) return;
+        if (!isForce) {
+            const chance = options.chance ?? conf.chance ?? 1.0;
+            if (Math.random() > chance) return;
+        }
 
         // 2. 频率限制 (Throttle)
         const now = Date.now();
         const throttle = options.throttle ?? conf.throttle ?? this.throttleMs;
-        if (this.lastPlayed.has(key) && now - this.lastPlayed.get(key) < throttle) {
+        if (!isForce && this.lastPlayed.has(key) && now - this.lastPlayed.get(key) < throttle) {
             return;
         }
         this.lastPlayed.set(key, now);

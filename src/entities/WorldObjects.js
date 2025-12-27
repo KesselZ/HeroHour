@@ -243,8 +243,8 @@ export class CityObject extends WorldObject {
                 name: `${cityData.name} 守军`,
                 // 根据主城类型动态获取兵种池，如果没有则兜底
                 unitPool: faction?.heroId === 'qijin' ? ['chunyang', 'ranged'] : ['tiance', 'melee'],
-                // 暂时逻辑：如果目标是 qijin，难度设为极低 (5点)；否则保持高难度
-                totalPoints: faction?.heroId === 'qijin' ? 5 : Math.floor(200 * timeManager.getPowerMultiplier()), 
+                // 统一攻城战难度：全部使用 200 基础战力，并随时间系数缩放
+                totalPoints: Math.floor(200 * timeManager.getPowerMultiplier()), 
                 isCitySiege: true, // 标记为攻城战
                 cityId: this.id
             };

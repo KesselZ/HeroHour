@@ -430,13 +430,13 @@ export const SkillRegistry = {
     'fengcha': new Skill('fengcha', {
         name: '峰插云景',
         level: '初级',
-        category: '轻剑招式',
+        category: '重剑招式',
         icon: 'skill_fengcha',
         cost: 30,
         cooldown: 4000,
         audio: 'skill_zhanbafang',
         targeting: { type: 'instant', shape: 'sector', radius: 4.0, angle: Math.PI / 2 }, 
-        description: '【轻剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害并大幅击退',
+        description: '【重剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害并大幅击退',
         actions: [
             { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 400, radius: 4.0, angle: Math.PI / 2 } },
             { type: 'damage_aoe', value: 35, knockback: 1.6 }

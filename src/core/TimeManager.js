@@ -47,6 +47,21 @@ class TimeManager {
         return false;
     }
 
+    /**
+     * 暂停时间
+     */
+    pause() {
+        this.isPaused = true;
+    }
+
+    /**
+     * 恢复时间
+     */
+    resume() {
+        this.isPaused = false;
+        this.lastUpdateTime = Date.now(); // 核心：恢复时立即重置计时起点，防止对战期间的漫长时间被计入
+    }
+
     onSeasonChange() {
         const dateStr = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
         console.log(`%c[时节更替] %c${dateStr}`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');

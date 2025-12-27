@@ -85,6 +85,7 @@ export class BattleScene {
         this.lastPlacementPos = new THREE.Vector3();
         this.placementZoneIndicator = null;
         this.previewSprite = null;
+        this.hoveredEnemy = null; // 记录当前悬浮的敌人，用于 Tooltip 性能优化
 
         // 英雄引用
         this.heroUnit = null;
@@ -171,10 +172,24 @@ export class BattleScene {
     setupUIListeners() {
         const slots = document.querySelectorAll('.unit-slot');
         slots.forEach(slot => {
+            const type = slot.getAttribute('data-type');
+
+            // --- 核心新增：部署阶段查看己方兵种属性 ---
+            slot.onmouseenter = () => {
+                const stats = worldManager.getUnitDetails(type, 'player');
+                const cost = worldManager.unitCosts[type]?.cost || 0;
+                uiManager.showTooltip({
+                    name: stats.name,
+                    level: `气血:${stats.hp} | 伤害:${stats.dps} | 占用:${cost}`,
+                    description: stats.description || '精锐的大唐将士。',
+                    color: '#d4af37' // 友军金色
+                });
+            };
+            slot.onmouseleave = () => uiManager.hideTooltip();
+
             slot.onclick = (e) => {
                 // 移除其他选中状态
                 slots.forEach(s => s.classList.remove('selected'));
-                const type = slot.getAttribute('data-type');
                 if (this.unitCounts[type] > 0) {
                     this.selectedType = type;
                     slot.classList.add('selected');
@@ -296,7 +311,7 @@ export class BattleScene {
 
             const zPos = (Math.random() - 0.5) * 18;
             unit.position.set(zoneX, 0.6, zPos);
-            unit.visible = false; 
+            unit.visible = true; 
             this.enemyUnits.push(unit);
             this.scene.add(unit);
         });
@@ -319,6 +334,39 @@ export class BattleScene {
         if (!this.isDeployment) return;
 
         this.raycaster.setFromCamera(this.mouse, this.camera);
+
+        // --- 核心新增：备战阶段探测敌军属性 ---
+        let enemyHit = null;
+        const enemyMeshes = this.enemyUnits.map(u => u.unitSprite).filter(s => s);
+        const enemyIntersects = this.raycaster.intersectObjects(enemyMeshes, true);
+        
+        if (enemyIntersects.length > 0) {
+            const hitSprite = enemyIntersects[0].object;
+            enemyHit = this.enemyUnits.find(u => u.unitSprite === hitSprite);
+        }
+
+        if (enemyHit) {
+            if (this.hoveredEnemy !== enemyHit) {
+                this.hoveredEnemy = enemyHit;
+                const stats = worldManager.getUnitDetails(enemyHit.type, 'enemy');
+                const cost = worldManager.unitCosts[enemyHit.type]?.cost || 0;
+                
+                uiManager.showTooltip({
+                    name: stats.name,
+                    level: `气血:${stats.hp} | 伤害:${stats.dps} | 占用:${cost}`,
+                    description: stats.description || '敌方精锐部队。',
+                    color: '#ff4444' // 敌对红色
+                });
+            }
+            if (this.previewSprite) this.previewSprite.visible = false;
+            return; 
+        } else {
+            if (this.hoveredEnemy) {
+                this.hoveredEnemy = null;
+                uiManager.hideTooltip();
+            }
+        }
+
         const intersects = this.raycaster.intersectObject(this.ground);
 
         if (intersects.length > 0) {
@@ -418,11 +466,14 @@ export class BattleScene {
         setSeed(888);
         this.isDeployment = false;
         this.isActive = true;
+        
+        // 核心修复：开战时强制隐藏悬浮提示
+        uiManager.hideTooltip();
+        this.hoveredEnemy = null;
 
         // 播放士兵呐喊：配置已在 AudioManager 中定义 (维持 3s，淡出 5s)
         this._shoutAudio = audioManager.play('soldier_shout', { volume: 0.6 });
 
-        this.enemyUnits.forEach(u => u.visible = true); 
         document.getElementById('deployment-ui').classList.add('hidden');
         this.initSkillUI();
         window.removeEventListener('pointerdown', this.onPointerDown);
@@ -765,12 +816,18 @@ export class BattleScene {
             count = 1, interval = 100, startPos, target, damage, speed, 
             type, color, spread = 0.5, autoTarget = false,
             targetMode = 'random', // 新增模式：random, nearest, spread
-            scale = 1.0 // 新增：支持缩放
+            scale = 1.0, // 新增：支持缩放
+            audio = null // 新增：发射音效
         } = options;
 
         for (let i = 0; i < count; i++) {
             setTimeout(() => {
                 if (!this.isActive || !this.projectileManager) return;
+
+                // 每发子弹强制播放音效
+                if (audio) {
+                    audioManager.play(audio, { volume: 0.25, force: true, pitchVar: 0.3 });
+                }
                 
                 let currentTarget = target;
                 if (autoTarget || !currentTarget || currentTarget.isDead) {
