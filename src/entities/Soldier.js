@@ -64,6 +64,7 @@ export class BaseUnit extends THREE.Group {
         this.target = null;
         this.lastAttackTime = 0;
         this.isFleeing = false; // 新增：逃跑状态
+        this.isVictoryMarch = false; // 新增：胜利进军状态
         
         this.unitSprite = null;
         
@@ -425,6 +426,15 @@ export class BaseUnit extends THREE.Group {
                 window.battle.playVFX('slow', { unit: this });
                 window.battle.playVFX('flee', { unit: this });
             }
+            return;
+        }
+
+        // 0. 胜利进军逻辑：直接向前奔跑
+        if (this.isVictoryMarch) {
+            const moveDir = this.side === 'player' ? 1 : -1;
+            this.position.x += moveDir * this.moveSpeed * deltaTime;
+            this.setSpriteFacing(this.side === 'player' ? 'right' : 'left');
+            this.applySeparation(allies, enemies, deltaTime);
             return;
         }
 

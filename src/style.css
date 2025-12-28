@@ -408,6 +408,28 @@ img {
 .hud-card-hero .hud-portrait {
     width: 52px;
     height: 52px;
+    position: relative; /* 为等级角标提供定位基准 */
+}
+
+/* 英雄头像下的等级角标 */
+.hud-level-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: var(--jx3-ink);
+    color: var(--jx3-gold);
+    font-size: 0.6rem;
+    font-weight: bold;
+    padding: 1px 3px;
+    border-radius: 2px;
+    border: 1px solid var(--jx3-gold);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    pointer-events: none;
+    line-height: 1;
+    z-index: 5;
+    font-family: "Arial", sans-serif;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    letter-spacing: -0.5px;
 }
 .hud-card-hero {
     min-width: 70px;
@@ -1623,9 +1645,15 @@ img {
     background: rgba(0, 0, 0, 0.05);
     padding: 15px;
     border-radius: 4px;
+    min-height: 150px; /* 固定最小高度，确保布局稳定 */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* 垂直居中核心 */
 }
 
 .section-label {
+    width: 100%;
+    text-align: center;
     font-weight: bold;
     color: var(--jx3-celadon-dark);
     margin-bottom: 15px;
@@ -1638,6 +1666,20 @@ img {
     flex-wrap: wrap;
     gap: 15px;
     justify-content: center;
+    flex: 1; /* 让列表占据剩余空间 */
+    align-items: center; /* 垂直居中列表内容 */
+}
+
+/* 无损状态下的提示样式 */
+.loss-empty-hint {
+    width: 100%;
+    text-align: center;
+    color: var(--jx3-celadon-dark);
+    font-size: 1.2rem;
+    font-style: italic;
+    font-family: "楷体", "STKaiti", serif;
+    letter-spacing: 2px;
+    opacity: 0.9;
 }
 
 .loss-item {

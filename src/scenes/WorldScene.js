@@ -206,12 +206,17 @@ export class WorldScene {
         const heroPortrait = document.getElementById('world-hero-portrait');
         const hpBar = document.getElementById('hud-hero-hp-bar');
         const mpBar = document.getElementById('hud-hero-mp-bar');
+        const levelBadge = document.getElementById('hud-hero-level');
         
         const heroData = worldManager.heroData;
         
         if (heroPortrait) {
             const iconStyle = spriteFactory.getIconStyle(heroData.id);
             Object.assign(heroPortrait.style, iconStyle);
+        }
+
+        if (levelBadge) {
+            levelBadge.innerText = `Lv.${heroData.level}`;
         }
 
         if (hpBar) {
@@ -1080,7 +1085,9 @@ export class WorldScene {
         heroCard.id = 'hero-mini-card';
         
         heroCard.innerHTML = `
-            <div class="hud-portrait" id="world-hero-portrait" style="background-image: ${heroIconStyle.backgroundImage}; background-position: ${heroIconStyle.backgroundPosition}; background-size: ${heroIconStyle.backgroundSize};"></div>
+            <div class="hud-portrait" id="world-hero-portrait" style="background-image: ${heroIconStyle.backgroundImage}; background-position: ${heroIconStyle.backgroundPosition}; background-size: ${heroIconStyle.backgroundSize};">
+                <div class="hud-level-badge" id="hud-hero-level">${heroData.level}</div>
+            </div>
             <div class="hud-info">
                 <div class="hud-mini-bars">
                     <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp" style="width: ${(heroData.hpCurrent/heroData.hpMax)*100}%"></div></div>

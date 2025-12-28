@@ -1191,7 +1191,7 @@ export class BattleScene {
      * 实时更新鼠标悬停单位的血条显示
      */
     updateHoverHealthBar() {
-        if (!this.isActive) return;
+        if (!this.isActive || this.isPostBattleSequence) return;
 
         this.raycaster.setFromCamera(this.mouse, this.camera);
         const allUnits = [...this.playerUnits, ...this.enemyUnits];
@@ -1223,7 +1223,7 @@ export class BattleScene {
      * 实时更新技能图标的可点击状态 (置灰逻辑)
      */
     updateSkillUIState() {
-        if (!this.isActive || this.isDeployment) return;
+        if (!this.isActive || this.isDeployment || this.isPostBattleSequence) return;
         
         const heroData = this.worldManager.heroData;
         const isHeroDead = this.heroUnit ? this.heroUnit.isDead : true;
@@ -1251,6 +1251,8 @@ export class BattleScene {
     }
 
     checkWinCondition() {
+        if (this.isPostBattleSequence) return;
+        
         const playerAlive = this.playerUnits.some(u => !u.isDead);
         const enemyAlive = this.enemyUnits.some(u => !u.isDead);
 
@@ -1306,7 +1308,12 @@ export class BattleScene {
     }
 
     async endBattle(message, isVictory) {
-        this.isActive = false;
+        if (this.isPostBattleSequence) return;
+        
+        // 关键重构：进入“战斗后序列”而非立即停止所有逻辑
+        this.isPostBattleSequence = true;
+        this.battleResult = isVictory;
+
         if (this.fleeTimer) {
             clearInterval(this.fleeTimer);
             this.fleeTimer = null;
@@ -1315,7 +1322,17 @@ export class BattleScene {
         if (this.skillIndicator) { this.scene.remove(this.skillIndicator); this.skillIndicator = null; }
         this.activeSkill = null;
         
-        // 清理事件监听，防止右键拦截延续到大世界
+        // 停止所有单位的攻击，清除目标
+        [...this.playerUnits, ...this.enemyUnits].forEach(u => {
+            u.target = null;
+            // 隐藏血条
+            if (u.hpSprite) u.hpSprite.visible = false;
+            // 确保胜者面向前进方向
+            if (isVictory && u.side === 'player') u.isVictoryMarch = true;
+            if (!isVictory && u.side === 'enemy') u.isVictoryMarch = true;
+        });
+
+        // 清理事件监听
         window.removeEventListener('contextmenu', this.onContextMenu);
         window.removeEventListener('pointerdown', this.onPointerDown);
         window.removeEventListener('pointerdown', this.handleSkillTargeting);
@@ -1340,7 +1357,19 @@ export class BattleScene {
             const { timeManager } = await import('../core/TimeManager.js');
             worldManager.gainXP(Math.floor(totalPoints * 4 * (1.0 + timeManager.getGlobalProgress() * 0.05)));
         }
-        this.showSettlementUI(isVictory, losses);
+
+        // 延迟 2 秒弹出结算界面，并播放对应音效
+        setTimeout(() => {
+            this.isActive = false; // 正式停止逻辑更新
+            this.isPostBattleSequence = false;
+            
+            if (isVictory) {
+                audioManager.play('battle_victory');
+            } else {
+                audioManager.play('battle_defeat');
+            }
+            this.showSettlementUI(isVictory, losses);
+        }, 2000);
     }
 
     showSettlementUI(isVictory, losses) {
@@ -1352,11 +1381,20 @@ export class BattleScene {
         document.getElementById('settlement-title').innerText = isVictory ? "战斗胜利" : "战斗失败";
         document.getElementById('settlement-title').style.color = isVictory ? "var(--jx3-celadon-dark)" : "#cc0000";
         const list = document.getElementById('settlement-losses-list');
+        const label = document.getElementById('settlement-losses-label');
         list.innerHTML = '';
         const lossTypes = Object.keys(losses);
-        if (lossTypes.length === 0) { if (document.querySelector('.loss-section')) document.querySelector('.loss-section').style.display = 'none'; }
-        else {
-            if (document.querySelector('.loss-section')) document.querySelector('.loss-section').style.display = 'block';
+        
+        if (lossTypes.length === 0) { 
+            // 无损情况：隐藏标题，显示居中的优雅提示
+            if (label) label.style.display = 'none';
+            const emptyHint = document.createElement('div');
+            emptyHint.className = 'loss-empty-hint';
+            emptyHint.innerText = '没有士兵损失。';
+            list.appendChild(emptyHint);
+        } else {
+            // 有变化情况：显示标题和列表
+            if (label) label.style.display = 'block';
             lossTypes.forEach(type => {
                 const iconStyle = spriteFactory.getIconStyle(type);
                 const item = document.createElement('div');

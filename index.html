@@ -47,7 +47,9 @@
 
                     <!-- 英雄卡片：小尺寸，靠右排列 -->
                     <div class="hud-card hud-card-hero" id="hero-mini-card">
-                        <div class="hud-portrait" id="world-hero-portrait"></div>
+                        <div class="hud-portrait" id="world-hero-portrait">
+                            <div class="hud-level-badge" id="hud-hero-level">Lv.1</div>
+                        </div>
                         <div class="hud-info">
                             <div class="hud-mini-bars">
                                 <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp"></div></div>
@@ -360,7 +362,7 @@
                 <h2 id="settlement-title" class="game-title">战斗胜利</h2>
                 <div class="settlement-content">
                     <div class="loss-section">
-                        <div class="section-label">我方损失兵力</div>
+                        <div class="section-label" id="settlement-losses-label">兵力变化</div>
                         <div id="settlement-losses-list" class="loss-list">
                             <!-- 动态填充 -->
                         </div>

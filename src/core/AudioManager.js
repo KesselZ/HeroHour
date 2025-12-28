@@ -95,7 +95,11 @@ class AudioManager {
             'source_gold': { files: ['/audio/sources/获得金钱.mp3'], throttle: 100 },
             'source_wood': { files: ['/audio/sources/获得木材.mp3'], throttle: 100 },
             'capture_gold_mine': { files: ['/audio/sources/获得金矿厂.mp3'], throttle: 500 },
-            'capture_sawmill': { files: ['/audio/sources/获得木材厂.mp3'], throttle: 500 }
+            'capture_sawmill': { files: ['/audio/sources/获得木材厂.mp3'], throttle: 500 },
+            
+            // 战场结算音效
+            'battle_victory': { files: ['/audio/click/胜利音效.mp3'], throttle: 1000 },
+            'battle_defeat': { files: ['/audio/click/战斗失败音效.mp3'], throttle: 1000 }
         };
     }
 
