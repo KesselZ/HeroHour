@@ -21,6 +21,98 @@ export class VFXLibrary {
     }
 
     /**
+     * 【通用头顶 UI Trick】
+     * 解决透视畸变：将 3D 坐标锚定在地面(0)，通过 center.y 实现视觉偏移。
+         * 支持 Sprite (零畸变) 和 Mesh (普通置顶)
+     */
+    _applyHeadUITrick(obj, visualHeight) {
+        if (!obj) return;
+        
+        // 使用 traverse 递归处理所有子对象，确保嵌套的 Group 也能正确生效
+        obj.traverse(child => {
+            if (child.material) {
+                child.material.depthTest = false;
+                child.material.depthWrite = false;
+                child.renderOrder = 9999;
+            }
+
+            if (child.isSprite) {
+                // 核心：Sprite 专有的 center 偏移，实现 3D 坐标与视觉位置的分离
+                const spriteHeight = child.scale.y;
+                child.center.y = 0.5 - (visualHeight / spriteHeight);
+                child.position.y = 0; // 强制 3D 坐标回归地面，消除视差
+            } else if (child !== obj && !child.isGroup) {
+                // 对于非 Sprite 的 Mesh，进行物理位置偏移
+                child.position.y = visualHeight;
+            }
+        });
+    }
+
+    /**
+     * 【内部通用】创建头顶符号特效 (晕/逃等)
+     * 实现了文字浮动 + 粒子旋转 + 零畸变 Trick
+     */
+    _createHeadSymbolVFX(parent, config) {
+        const { text, color, starColor, activeKey } = config;
+        if (!parent || parent.isDead || parent.userData[activeKey + 'Active']) return;
+        parent.userData[activeKey + 'Active'] = true;
+
+        const group = new THREE.Group();
+        parent.add(group);
+
+        // 1. 创建文字 Sprite
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = color;
+        ctx.font = 'bold 80px Arial';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 8;
+        ctx.strokeText(text, 64, 64); ctx.fillText(text, 64, 64);
+        
+        const sprite = new THREE.Sprite(this._createMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }, THREE.SpriteMaterial));
+        sprite.scale.set(0.8, 0.8, 1);
+        group.add(sprite);
+
+        // 2. 创建环绕的小点 (改用 Sprite 实现零畸变)
+        const stars = [];
+        for (let i = 0; i < 3; i++) {
+            const star = new THREE.Sprite(this._createMaterial({ color: starColor, transparent: true }, THREE.SpriteMaterial));
+            star.scale.set(0.1, 0.1, 1);
+            group.add(star);
+            stars.push({ obj: star, angle: (i / 3) * Math.PI * 2 });
+        }
+
+        const startTime = Date.now();
+        const anim = () => {
+            const isActive = activeKey === 'stun' ? (parent.stunnedUntil && Date.now() < parent.stunnedUntil) : parent.isFleeing;
+            
+            if (isActive && !parent.isDead) {
+                const elapsed = Date.now() - startTime;
+                const floatY = 1.5 + Math.sin(elapsed * 0.005) * 0.1;
+                
+                this._applyHeadUITrick(sprite, floatY);
+                
+                stars.forEach((s, i) => {
+                    const curAngle = s.angle + elapsed * (activeKey === 'flee' ? 0.008 : 0.005);
+                    s.obj.position.x = Math.cos(curAngle) * 0.4;
+                    s.obj.position.z = Math.sin(curAngle) * 0.4;
+                    this._applyHeadUITrick(s.obj, floatY + 0.2 + Math.sin(elapsed * 0.01 + i) * 0.05);
+                });
+
+                requestAnimationFrame(anim);
+            } else {
+                parent.remove(group);
+                parent.userData[activeKey + 'Active'] = false;
+                sprite.material.map.dispose();
+                sprite.material.dispose();
+                stars.forEach(s => s.obj.material.dispose());
+            }
+        };
+        anim();
+    }
+
+    /**
      * 通用粒子系统发射器
      */
     createParticleSystem(options) {
@@ -779,80 +871,8 @@ export class VFXLibrary {
     /**
      * 眩晕特效：在单位头顶显示旋转的小星星和“晕”字
      */
-    createStunVFX(parent, duration) {
-        if (!parent || parent.isDead) return;
-
-        // 如果已经有眩晕特效在运行，不再重复创建，它会自动跟随 unit.stunnedUntil 结束
-        if (parent.userData.stunVFXActive) return;
-        parent.userData.stunVFXActive = true;
-
-        const group = new THREE.Group();
-        group.position.y = 1.5; // 头顶高度
-        parent.add(group);
-
-        // 1. 创建“晕”字文字贴图
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffcc00';
-        ctx.font = 'bold 80px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 8;
-        ctx.strokeText('晕', 64, 64);
-        ctx.fillText('晕', 64, 64);
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMat = this._createMaterial({ map: texture, transparent: true }, THREE.SpriteMaterial);
-        const sprite = new THREE.Sprite(spriteMat);
-        sprite.scale.set(0.8, 0.8, 1);
-        group.add(sprite);
-
-        // 2. 创建环绕的小星星 (粒子)
-        const starCount = 3;
-        const stars = [];
-        const starGeo = new THREE.SphereGeometry(0.05, 8, 8);
-        const starMat = this._createMaterial({ color: 0xffcc00 });
-
-        for (let i = 0; i < starCount; i++) {
-            const star = new THREE.Mesh(starGeo, starMat);
-            const angle = (i / starCount) * Math.PI * 2;
-            star.position.set(Math.cos(angle) * 0.4, 0.2, Math.sin(angle) * 0.4);
-            group.add(star);
-            stars.push({ mesh: star, angle });
-        }
-
-        const startTime = Date.now();
-        const anim = () => {
-            // 核心逻辑：直接跟随单位的眩晕状态同步
-            const isStunned = parent.stunnedUntil && Date.now() < parent.stunnedUntil;
-            
-            if (isStunned && !parent.isDead) {
-                const elapsed = Date.now() - startTime;
-                // 文字上下漂浮
-                sprite.position.y = Math.sin(elapsed * 0.005) * 0.1;
-                
-                // 星星旋转
-                stars.forEach((s, i) => {
-                    const curAngle = s.angle + elapsed * 0.005;
-                    s.mesh.position.x = Math.cos(curAngle) * 0.4;
-                    s.mesh.position.z = Math.sin(curAngle) * 0.4;
-                    s.mesh.position.y = 0.2 + Math.sin(elapsed * 0.01 + i) * 0.05;
-                });
-
-                requestAnimationFrame(anim);
-            } else {
-                parent.remove(group);
-                parent.userData.stunVFXActive = false;
-                texture.dispose();
-                spriteMat.dispose();
-                starGeo.dispose();
-                starMat.dispose();
-            }
-        };
-        anim();
+    createStunVFX(parent) {
+        this._createHeadSymbolVFX(parent, { text: '晕', color: '#ffcc00', starColor: '#ffcc00', activeKey: 'stun' });
     }
 
     /**
@@ -932,6 +952,16 @@ export class VFXLibrary {
             }
         };
         anim();
+    }
+
+    /**
+     * 逃跑特效：参考眩晕特效风格，头顶显示浮动的“逃”字，并有红色的慌乱粒子环绕
+     */
+    /**
+     * 逃跑特效：参考眩晕特效风格，头顶显示浮动的“逃”字，并有红色的慌乱粒子环绕
+     */
+    createFleeVFX(parent) {
+        this._createHeadSymbolVFX(parent, { text: '逃', color: '#ff3333', starColor: '#ff3333', activeKey: 'flee' });
     }
 
     /**

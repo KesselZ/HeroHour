@@ -18,8 +18,40 @@ class UIManager {
         this.initTooltipEvents();
         this.initSkillGalleryEvents();
         this.initGameStartEvents();
+        this.initBattleEscapeEvents();
         
         this.gameStartWindowShown = false; // 记录开局窗口是否已显示
+    }
+
+    initBattleEscapeEvents() {
+        const escapeBtn = document.getElementById('battle-escape-btn');
+        const modal = document.getElementById('escape-confirm-modal');
+        const confirmBtn = document.getElementById('confirm-escape-btn');
+        const cancelBtn = document.getElementById('cancel-escape-btn');
+
+        if (escapeBtn && modal && confirmBtn && cancelBtn) {
+            escapeBtn.onclick = () => {
+                audioManager.play('ui_click');
+                modal.classList.remove('hidden');
+            };
+
+            cancelBtn.onclick = () => {
+                audioManager.play('ui_click');
+                modal.classList.add('hidden');
+            };
+
+            confirmBtn.onclick = () => {
+                audioManager.play('ui_click');
+                modal.classList.add('hidden');
+                escapeBtn.classList.add('hidden');
+                
+                // 执行逃跑逻辑
+                if (window.battle && window.battle.isActive) {
+                    // 调用战斗场景的逃跑序列
+                    window.battle.startFleeing();
+                }
+            };
+        }
     }
 
     initGameStartEvents() {

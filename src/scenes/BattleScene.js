@@ -93,6 +93,7 @@ export class BattleScene {
         this.heroUnit = null;
         this.activeSkill = null; // 当前正在准备释放的技能 (针对 location 类型)
         this.worldManager = worldManager; // 挂载管理器方便组件访问
+        this.isFleeing = false; // 新增：战斗是否处于撤退逃跑状态
 
         // 全局挂载，方便兵种 AI 逻辑访问场景状态
         window.battle = this;
@@ -524,11 +525,13 @@ export class BattleScene {
     }
 
     initSkillUI() {
-        const skillBar = document.getElementById('battle-skill-bar');
+        const bottomUI = document.getElementById('battle-bottom-ui');
         const filterContainer = document.getElementById('skill-category-filters');
-        if (!skillBar || !filterContainer) return;
+        
+        if (bottomUI) bottomUI.classList.remove('hidden');
+        
+        if (!bottomUI || !filterContainer) return;
 
-        skillBar.classList.remove('hidden');
         this.updateMPUI();
 
         const heroData = this.worldManager.heroData;
@@ -858,6 +861,9 @@ export class BattleScene {
                 break;
             case 'slow':
                 this.vfxLibrary.createSlowVFX(parent);
+                break;
+            case 'flee':
+                this.vfxLibrary.createFleeVFX(parent);
                 break;
             case 'damage_number':
                 this.vfxLibrary.createDamageNumberVFX(pos || (unit ? unit.position.clone() : new THREE.Vector3()), options.value, color, options.scale || 1.0);
@@ -1247,12 +1253,65 @@ export class BattleScene {
     checkWinCondition() {
         const playerAlive = this.playerUnits.some(u => !u.isDead);
         const enemyAlive = this.enemyUnits.some(u => !u.isDead);
-        if (!playerAlive) this.endBattle("胜败乃兵家常事，侠士请重新来过！", false);
-        else if (!enemyAlive) this.endBattle("这就是大唐侠士的风采！敌军已尽数伏诛。", true);
+
+        // 如果全灭了，无论是否在逃跑，都直接结束
+        if (!playerAlive) {
+            this.isFleeing = false; // 停止逃跑状态
+            this.endBattle("胜败乃兵家常事，侠士请重新来过！", false);
+            return;
+        }
+
+        if (this.isFleeing) return; // 逃跑期间不检查敌人是否全灭（因为我们要逃了）
+
+        if (!enemyAlive) this.endBattle("这就是大唐侠士的风采！敌军已尽数伏诛。", true);
+    }
+
+    /**
+     * 开始逃跑序列：所有友军减速并向后撤退 5 秒
+     */
+    startFleeing() {
+        if (!this.isActive || this.isFleeing) return;
+        
+        this.isFleeing = true;
+        
+        // 1. 隐藏底部 UI
+        if (document.getElementById('battle-bottom-ui')) {
+            document.getElementById('battle-bottom-ui').classList.add('hidden');
+        }
+        
+        // 2. 所有存活友军进入逃跑状态
+        this.playerUnits.forEach(u => {
+            if (!u.isDead) {
+                u.isFleeing = true;
+                u.target = null; // 清除目标，不再攻击
+            }
+        });
+
+        // 3. 5秒后正式结束战斗
+        uiManager.showActionHint("正在全力撤退... (剩余 5.0s)");
+        let timeLeft = 5.0;
+        this.fleeTimer = setInterval(() => {
+            timeLeft -= 0.1;
+            if (timeLeft <= 0 || !this.isActive) {
+                clearInterval(this.fleeTimer);
+                this.fleeTimer = null;
+                uiManager.hideActionHint();
+                if (this.isActive) {
+                    this.endBattle("留得青山在，不怕没柴烧。侠士决定先行撤退！", false);
+                }
+            } else {
+                uiManager.showActionHint(`正在全力撤退... (剩余 ${timeLeft.toFixed(1)}s)`);
+            }
+        }, 100);
     }
 
     async endBattle(message, isVictory) {
         this.isActive = false;
+        if (this.fleeTimer) {
+            clearInterval(this.fleeTimer);
+            this.fleeTimer = null;
+            uiManager.hideActionHint();
+        }
         if (this.skillIndicator) { this.scene.remove(this.skillIndicator); this.skillIndicator = null; }
         this.activeSkill = null;
         
@@ -1286,7 +1345,9 @@ export class BattleScene {
 
     showSettlementUI(isVictory, losses) {
         document.getElementById('deployment-ui').classList.add('hidden');
-        if (document.getElementById('battle-skill-bar')) document.getElementById('battle-skill-bar').classList.add('hidden');
+        if (document.getElementById('battle-bottom-ui')) {
+            document.getElementById('battle-bottom-ui').classList.add('hidden');
+        }
         const panel = document.getElementById('battle-settlement');
         document.getElementById('settlement-title').innerText = isVictory ? "战斗胜利" : "战斗失败";
         document.getElementById('settlement-title').style.color = isVictory ? "var(--jx3-celadon-dark)" : "#cc0000";

@@ -63,6 +63,7 @@ export class BaseUnit extends THREE.Group {
         
         this.target = null;
         this.lastAttackTime = 0;
+        this.isFleeing = false; // 新增：逃跑状态
         
         this.unitSprite = null;
         
@@ -118,12 +119,21 @@ export class BaseUnit extends THREE.Group {
         
         this.hpSprite = new THREE.Sprite(material);
         // 主角血条长一点 (0.9)，普通士兵现在也变大一点 (0.8)
-        // 垂直缩放增加到 0.12 让血条更宽、更有像素块的厚实感
         const isHeroType = ['qijin', 'lichengen', 'yeying'].includes(this.type);
         const s = isHeroType ? 0.9 : 0.8;
         this.hpSprite.scale.set(s, 0.12, 1); 
-        this.hpSprite.position.set(0, 0, 0);
-        this.add(this.hpSprite);
+        
+        // --- 应用统一的头顶 UI Trick ---
+        this.hpGroup = new THREE.Group();
+        this.hpGroup.add(this.hpSprite);
+        this.add(this.hpGroup);
+        
+        if (window.battle && window.battle.vfxLibrary) {
+            window.battle.vfxLibrary._applyHeadUITrick(this.hpSprite, 1.3);
+        } else {
+            // 回退方案
+            this.hpSprite.position.y = 1.3;
+        }
         
         this.updateHealthBar();
     }
@@ -351,17 +361,9 @@ export class BaseUnit extends THREE.Group {
             this.unitSprite.material.color.setHex(targetColor);
         }
 
-        // --- 核心修复：血条透视补偿与高度动态适配 ---
-        // 传统的 position.y 偏移会随相机距离中心越远而产生明显的“倾斜”
-        // 我们通过将偏移量设为“相机坐标系下的向上方向”来抵消这种透视畸变
-        if (this.hpSprite && window.battle && window.battle.camera) {
-            const cam = window.battle.camera;
-            // 计算相机视角中的“向上”向量在世界空间中的表达
-            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
-            // 补偿距离：根据单位的 visualScale (视觉缩放) 动态计算高度，防止大体型单位遮挡血条
-            const offsetDist = 0.4 + (this.visualScale * 0.18);
-            this.hpSprite.position.copy(cameraUp).multiplyScalar(offsetDist);
-        }
+        // --- 统一头顶 UI 逻辑：不再需要每帧计算偏移 ---
+        // 现在的血条位置由 hpGroup 的稳定锚点(0.7)和视觉偏移共同决定
+        // 且已开启 depthTest: false，保证位置稳定且不被遮挡
     }
 
     /**
@@ -409,6 +411,22 @@ export class BaseUnit extends THREE.Group {
         
         // 0. 攻击冲刺动画更新
         this.updateLunge(deltaTime);
+
+        // 0. 逃跑逻辑：强制往左走且减速
+        if (this.isFleeing) {
+            // 逃跑速度为基础战斗移速的 50%
+            const fleeSpeed = this.baseMoveSpeed * 0.5;
+            this.position.x -= fleeSpeed * deltaTime;
+            this.updateFacing(); // 确保面向左边
+            this.applySeparation(allies, enemies, deltaTime);
+            
+            // 逃跑时显示减速特效和专门的“逃”字特效
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('slow', { unit: this });
+                window.battle.playVFX('flee', { unit: this });
+            }
+            return;
+        }
 
         // 0. 状态特效判定：减速
         if (this.moveSpeed < this.baseMoveSpeed * 0.95) {
@@ -482,23 +500,30 @@ export class BaseUnit extends THREE.Group {
      * 更新单位面向：根据目标方向和初始面向决定是否翻转
      */
     updateFacing() {
-        if (!this.target || !this.unitSprite) return;
+        if (!this.unitSprite) return;
+        
+        // 逃跑时强制面向左
+        if (this.isFleeing) {
+            this.setSpriteFacing('left');
+            return;
+        }
 
+        if (!this.target) return;
+
+        const isTargetToLeft = this.target.position.x < this.position.x;
+        this.setSpriteFacing(isTargetToLeft ? 'left' : 'right');
+    }
+
+    /**
+     * 设置精灵面向
+     * @param {'left' | 'right'} direction 
+     */
+    setSpriteFacing(direction) {
         const config = spriteFactory.unitConfig[this.type];
         if (!config) return;
 
         const defaultFacing = config.defaultFacing || 'left';
-        const isTargetToLeft = this.target.position.x < this.position.x;
-        
-        // 核心逻辑：如果目标在左边，我们希望侠客“面朝左”
-        // 如果侠客初始就面朝左，则不需要翻转 (standard)
-        // 如果侠客初始面朝右，则需要翻转 (flipped)
-        let shouldFlip = false;
-        if (isTargetToLeft) {
-            shouldFlip = (defaultFacing === 'right'); 
-        } else {
-            shouldFlip = (defaultFacing === 'left');
-        }
+        let shouldFlip = (direction !== defaultFacing);
         
         const texture = this.unitSprite.material.map;
         const standardRepeatX = 1 / spriteFactory.cols;
@@ -510,16 +535,10 @@ export class BaseUnit extends THREE.Group {
         const targetOffsetX = shouldFlip ? flippedOffsetX : standardOffsetX;
 
         if (texture.repeat.x !== targetRepeatX) {
-            console.log(`%c[面向修正] %c单位 ${this.type} %c目标在${isTargetToLeft?'左':'右'}, 初始面朝${defaultFacing} -> ${shouldFlip?'翻转':'标准'}`, 
-                'color: #d4af37; font-weight: bold', 'color: #fff', 'color: #00ff00');
-            
             texture.repeat.x = targetRepeatX;
             texture.offset.x = targetOffsetX;
         }
     }
-
-
-
 
     /**
      * 重构后的硬性碰撞：基于几何约束的保底体积逻辑

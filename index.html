@@ -327,24 +327,31 @@
                 <button id="fight-btn" class="wuxia-btn small-btn">开战！</button>
             </div>
 
-            <!-- 战斗技能栏 (战斗开始后显示) -->
-            <div id="battle-skill-bar" class="skill-bar-container hidden">
-                <div class="battle-mp-status">
-                    <div class="mp-bar-bg">
-                        <div id="battle-mp-fill" class="mp-bar-fill"></div>
+            <!-- 战场底部 UI 容器 (包含技能栏与逃跑按钮) -->
+            <div id="battle-bottom-ui" class="battle-bottom-ui hidden">
+                <div id="battle-skill-bar" class="skill-bar-container">
+                    <div class="battle-mp-status">
+                        <div class="mp-bar-bg">
+                            <div id="battle-mp-fill" class="mp-bar-fill"></div>
+                        </div>
+                        <div id="battle-mp-text" class="mp-text">内力: 100/100</div>
                     </div>
-                    <div id="battle-mp-text" class="mp-text">内力: 100/100</div>
-                </div>
-                
-                <!-- 技能类别过滤 -->
-                <div id="skill-category-filters" class="skill-category-filters">
-                    <button class="filter-btn active" data-category="all">所有</button>
-                    <!-- 动态注入门派特定类别 -->
+                    
+                    <!-- 技能类别过滤 -->
+                    <div id="skill-category-filters" class="skill-category-filters">
+                        <button class="filter-btn active" data-category="all">所有</button>
+                        <!-- 动态注入门派特定类别 -->
+                    </div>
+
+                    <div class="skill-slots" id="skill-slots">
+                        <!-- 动态生成技能按钮 -->
+                    </div>
                 </div>
 
-                <div class="skill-slots" id="skill-slots">
-                    <!-- 动态生成技能按钮 -->
-                </div>
+                <!-- 撤退按钮 -->
+                <button id="battle-escape-btn" class="battle-escape-btn" title="撤退">
+                    <span>逃</span>
+                </button>
             </div>
 
             <!-- 战斗结算界面 -->
@@ -363,6 +370,20 @@
                     <button id="return-to-world-btn" class="wuxia-btn">返回大世界</button>
                 </div>
                 <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 战斗逃跑确认 -->
+            <div id="escape-confirm-modal" class="menu-overlay hidden">
+                <div class="menu-container confirm-container">
+                    <div class="menu-decoration-top">战场撤退</div>
+                    <h2 class="game-title">是否<span>撤离战场</span>？</h2>
+                    <p class="confirm-desc">撤退将导致本次战斗失败，且可能损失部分兵力。</p>
+                    <div class="menu-options horizontal">
+                        <button id="confirm-escape-btn" class="wuxia-btn">确认撤退</button>
+                        <button id="cancel-escape-btn" class="wuxia-btn secondary">继续战斗</button>
+                    </div>
+                    <div class="menu-decoration-bottom"></div>
+                </div>
             </div>
 
             <!-- 开局提示窗口 -->
