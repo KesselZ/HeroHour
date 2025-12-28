@@ -627,9 +627,8 @@ export class HeroUnit extends BaseUnit {
         const heroData = worldManager.heroData;
         const details = worldManager.getUnitBlueprint(heroData.id);
         
-        // 重构：英雄战场移动速度与大世界“轻功”彻底解耦
-        // 战场内只看 combatSpeed，不再受大世界 stats.speed (轻功) 的直接数值影响
-        const baseCombatSpeed = details.combatSpeed || 5.0;
+        // 彻底数据驱动：英雄战场移动速度完全由蓝图 combatSpeed 决定
+        const baseCombatSpeed = details.combatSpeed || 4.0; 
 
         super({
             side,
