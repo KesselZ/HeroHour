@@ -1637,7 +1637,40 @@ img {
     width: 100%;
     min-height: 150px;
     display: flex;
+    flex-direction: column; /* 改为纵向排列 */
+    align-items: center;
+    gap: 20px;
+}
+
+.xp-gain-section {
+    width: 100%;
+    background: rgba(166, 139, 68, 0.1);
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid rgba(166, 139, 68, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.xp-gain-display {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
     justify-content: center;
+}
+
+.xp-gain-val {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: var(--jx3-gold);
+    font-family: "Courier New", monospace;
+    text-shadow: 0 0 5px rgba(166, 139, 68, 0.3);
+}
+
+.xp-progress-mini {
+    flex: 0 1 250px; /* 进度条宽度 */
 }
 
 .loss-section {
@@ -1645,10 +1678,10 @@ img {
     background: rgba(0, 0, 0, 0.05);
     padding: 15px;
     border-radius: 4px;
-    min-height: 150px; /* 固定最小高度，确保布局稳定 */
+    min-height: 120px; /* 稍微压缩高度 */
     display: flex;
     flex-direction: column;
-    justify-content: center; /* 垂直居中核心 */
+    justify-content: center;
 }
 
 .section-label {

@@ -1355,7 +1355,23 @@ export class BattleScene {
         if (isVictory) {
             const totalPoints = this.enemyConfig ? this.enemyConfig.totalPoints : 0;
             const { timeManager } = await import('../core/TimeManager.js');
-            worldManager.gainXP(Math.floor(totalPoints * 4 * (1.0 + timeManager.getGlobalProgress() * 0.05)));
+            const xpGained = Math.floor(totalPoints * 4 * (1.0 + timeManager.getGlobalProgress() * 0.05));
+            
+            // 记录升级前的状态，用于结算界面展示
+            const data = worldManager.heroData;
+            this.xpBefore = data.xp;
+            this.xpMaxBefore = data.xpMax;
+            this.levelBefore = data.level;
+            
+            worldManager.gainXP(xpGained);
+            
+            // 记录升级后的状态
+            this.xpAfter = data.xp;
+            this.xpMaxAfter = data.xpMax;
+            this.levelAfter = data.level;
+            this.xpGained = xpGained;
+        } else {
+            this.xpGained = 0;
         }
 
         // 延迟 2 秒弹出结算界面，并播放对应音效
@@ -1380,6 +1396,71 @@ export class BattleScene {
         const panel = document.getElementById('battle-settlement');
         document.getElementById('settlement-title').innerText = isVictory ? "战斗胜利" : "战斗失败";
         document.getElementById('settlement-title').style.color = isVictory ? "var(--jx3-celadon-dark)" : "#cc0000";
+
+        // --- 阅历结算展示 ---
+        const xpSection = document.getElementById('settlement-xp-section');
+        if (isVictory && this.xpGained > 0) {
+            if (xpSection) xpSection.style.display = 'flex';
+            const xpVal = document.getElementById('settlement-xp-val');
+            const xpBar = document.getElementById('settlement-xp-bar');
+            const xpLevelVal = document.getElementById('settlement-level-val');
+            
+            if (xpVal) xpVal.innerText = `+${this.xpGained}`;
+            if (xpLevelVal) xpLevelVal.innerText = `Lv.${this.levelBefore}`;
+
+            if (xpBar) {
+                const isLevelUp = this.levelAfter > this.levelBefore;
+                const startPct = (this.xpBefore / this.xpMaxBefore) * 100;
+                const endPct = (this.xpAfter / this.xpMaxAfter) * 100;
+                
+                // 初始状态
+                xpBar.style.transition = 'none';
+                xpBar.style.width = `${startPct}%`;
+                
+                // 强制重绘
+                xpBar.offsetHeight;
+
+                if (!isLevelUp) {
+                    // 情况 A: 未升级，平滑增长到目标百分比
+                    requestAnimationFrame(() => {
+                        xpBar.style.transition = 'width 1.5s cubic-bezier(0.22, 1, 0.36, 1)';
+                        xpBar.style.width = `${endPct}%`;
+                    });
+                } else {
+                    // 情况 B: 升了级，分两段展示
+                    requestAnimationFrame(() => {
+                        // 第一段：从当前涨到 100%
+                        xpBar.style.transition = 'width 0.8s ease-in';
+                        xpBar.style.width = '100%';
+                        
+                        setTimeout(() => {
+                            // 瞬间重置到 0%
+                            xpBar.style.transition = 'none';
+                            xpBar.style.width = '0%';
+                            
+                            // 更新等级显示
+                            if (xpLevelVal) {
+                                xpLevelVal.innerText = `Lv.${this.levelAfter}`;
+                                xpLevelVal.style.transform = 'scale(1.2)';
+                                xpLevelVal.style.transition = 'transform 0.2s';
+                                setTimeout(() => xpLevelVal.style.transform = 'scale(1)', 200);
+                            }
+                            
+                            // 强制重绘后再涨到最终位置
+                            xpBar.offsetHeight;
+                            
+                            setTimeout(() => {
+                                xpBar.style.transition = 'width 1.0s cubic-bezier(0.22, 1, 0.36, 1)';
+                                xpBar.style.width = `${endPct}%`;
+                            }, 50);
+                        }, 850); // 略多于第一段 transition 时间
+                    });
+                }
+            }
+        } else {
+            if (xpSection) xpSection.style.display = 'none';
+        }
+
         const list = document.getElementById('settlement-losses-list');
         const label = document.getElementById('settlement-losses-label');
         list.innerHTML = '';

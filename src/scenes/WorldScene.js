@@ -6,6 +6,7 @@ import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
 import { timeManager } from '../core/TimeManager.js';
 import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
 import { createWorldObject } from '../entities/WorldObjects.js';
+import { VFXLibrary } from '../core/VFXLibrary.js'; // 核心引入
 
 /**
  * 大世界场景类
@@ -19,6 +20,8 @@ export class WorldScene {
         this.scene = scene;
         this.camera = camera;
         this.renderer = renderer;
+        
+        this.vfxLibrary = new VFXLibrary(this.scene); // 初始化特效库
         
         this.playerHero = null;
         this.heroId = null;
@@ -418,7 +421,13 @@ export class WorldScene {
 
         this.activeCityId = cityId; 
         // 智能判定：如果你手动标记了亲临 (isPhysical)，或者你当前坐标确实在城里
-        this.isPhysicalVisit = isPhysical || worldManager.isPlayerAtCity(cityId);
+        const isPhysicalVisit = isPhysical || worldManager.isPlayerAtCity(cityId);
+        this.isPhysicalVisit = isPhysicalVisit;
+
+        // 核心：仅在亲自访问时响起铃铛
+        if (isPhysicalVisit) {
+            audioManager.play('ui_bell', { volume: 0.8 });
+        }
 
         document.getElementById('town-name').innerText = cityData.name;
         panel.classList.remove('hidden');
@@ -876,6 +885,15 @@ export class WorldScene {
 
     update(deltaTime) {
         if (!this.isActive || !this.playerHero) return;
+
+        // --- 核心：检测待播放的升级反馈 ---
+        if (worldManager.heroData.pendingLevelUps > 0) {
+            this.vfxLibrary.createLevelUpVFX(this.playerHero.position);
+            // 播放专属的升级音效
+            audioManager.play('source_levelup', { volume: 0.8 });
+            worldManager.heroData.pendingLevelUps--;
+            console.log("%c[升级反馈] 已在大世界触发视觉特效", "color: #ffd700; font-weight: bold");
+        }
 
         if (this.waterTex) {
             this.waterTex.offset.x += 0.005 * deltaTime;

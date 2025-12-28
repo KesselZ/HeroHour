@@ -364,6 +364,7 @@ class WorldManager {
             hpCurrent: 500,
             mpMax: 160,
             mpCurrent: 160,
+            pendingLevelUps: 0, // 新增：记录待在大世界播放的升级特效次数
             skills: [],
             stats: {
                 morale: 40,           // 统帅：军队 (同时影响士兵攻击和血量)
@@ -1536,6 +1537,8 @@ class WorldManager {
             // 核心修改：所有人统一 160 基础，每级 +14
             data.mpMax = 160 + (data.level - 1) * 14;
             data.mpCurrent = data.mpMax; // 升级补满状态
+
+            data.pendingLevelUps++; // 核心：增加待播放反馈计数
 
             console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！`, 'color: #00ff00; font-weight: bold', 'color: #fff');
             

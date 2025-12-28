@@ -965,6 +965,62 @@ export class VFXLibrary {
     }
 
     /**
+     * 升级特效：参考武侠风格的金光冲天 + 地面震荡
+     */
+    createLevelUpVFX(pos, parent = null) {
+        const actualParent = parent || this.scene;
+        
+        // 1. 核心爆发脉冲 (金色)
+        this.createPulseVFX(pos, 2.5, 0xffcc00, 1000, actualParent);
+        
+        // 2. 环绕上升的粒子 (蝴蝶感/灵气)
+        this.createParticleSystem({
+            pos: pos.clone(),
+            parent: actualParent,
+            color: 0xffdd44,
+            duration: 2000,
+            density: 2.5,
+            spawnRate: 40,
+            initFn: (p) => {
+                const angle = Math.random() * Math.PI * 2;
+                const r = 0.5 + Math.random() * 0.5;
+                p.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+                p.userData.angle = angle;
+                p.userData.r = r;
+                p.userData.speedY = 0.02 + Math.random() * 0.03;
+            },
+            updateFn: (p, prg) => {
+                p.userData.angle += 0.05;
+                p.position.x = Math.cos(p.userData.angle) * p.userData.r;
+                p.position.z = Math.sin(p.userData.angle) * p.userData.r;
+                p.position.y += p.userData.speedY;
+                p.material.opacity = 0.8 * (1 - prg);
+                p.scale.setScalar(1 - prg * 0.5);
+            }
+        });
+
+        // 3. 冲天光柱 (由快速上升的长方体组成)
+        this.createParticleSystem({
+            pos: pos.clone(),
+            parent: actualParent,
+            color: 0xffffff,
+            duration: 1000,
+            density: 3.0,
+            spawnRate: 30,
+            geometry: new THREE.BoxGeometry(0.05, 2.5, 0.05),
+            initFn: (p) => {
+                p.position.set((Math.random()-0.5)*0.3, 0, (Math.random()-0.5)*0.3);
+                p.material.opacity = 0.3;
+            },
+            updateFn: (p, prg) => {
+                p.position.y += 0.2;
+                p.scale.set(1 - prg, 1, 1 - prg);
+                p.material.opacity = 0.4 * (1 - prg);
+            }
+        });
+    }
+
+    /**
      * 显示跳字特效 (像素风)
      */
     createDamageNumberVFX(pos, value, color = '#ff3333', scale = 1.0) {
