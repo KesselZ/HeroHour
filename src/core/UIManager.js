@@ -63,6 +63,12 @@ class UIManager {
     }
 
     initTooltipEvents() {
+        // 创建动作提示框 (Action Hint)
+        this.actionHint = document.createElement('div');
+        this.actionHint.id = 'action-hint';
+        this.actionHint.className = 'pixel-font hidden';
+        document.body.appendChild(this.actionHint);
+
         window.addEventListener('mousemove', (e) => {
             if (this.tooltip && !this.tooltip.classList.contains('hidden')) {
                 const x = e.clientX + 15;
@@ -76,7 +82,23 @@ class UIManager {
                 this.tooltip.style.left = `${finalX}px`;
                 this.tooltip.style.top = `${finalY}px`;
             }
+
+            // 更新 Action Hint 位置 (始终跟随鼠标，贴合右下方)
+            if (this.actionHint && !this.actionHint.classList.contains('hidden')) {
+                this.actionHint.style.left = `${e.clientX + 10}px`;
+                this.actionHint.style.top = `${e.clientY + 10}px`;
+            }
         });
+    }
+
+    showActionHint(text) {
+        if (!this.actionHint) return;
+        this.actionHint.innerText = text;
+        this.actionHint.classList.remove('hidden');
+    }
+
+    hideActionHint() {
+        if (this.actionHint) this.actionHint.classList.add('hidden');
     }
 
     /**

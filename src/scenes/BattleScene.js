@@ -80,6 +80,8 @@ export class BattleScene {
         this.onPointerDown = this.onPointerDown.bind(this);
         this.onPointerMove = this.onPointerMove.bind(this);
         this.onPointerUp = this.onPointerUp.bind(this);
+        this.onContextMenu = this.onContextMenu.bind(this); 
+        this.handleSkillTargeting = this.handleSkillTargeting.bind(this); // 新增：绑定技能目标处理
         
         this.isPointerDown = false;
         this.lastPlacementPos = new THREE.Vector3();
@@ -132,7 +134,32 @@ export class BattleScene {
         window.addEventListener('pointerdown', this.onPointerDown);
         window.addEventListener('pointermove', this.onPointerMove);
         window.addEventListener('pointerup', this.onPointerUp);
+        window.addEventListener('contextmenu', this.onContextMenu); // 核心：拦截右键
         this.updateUI();
+    }
+
+    /**
+     * 右键点击处理：取消施法
+     */
+    onContextMenu(event) {
+        event.preventDefault(); // 彻底禁用浏览器默认菜单
+        if (this.activeSkill) {
+            this.cancelActiveSkill();
+        }
+    }
+
+    /**
+     * 核心：执行取消当前正在准备的技能
+     */
+    cancelActiveSkill() {
+        if (!this.activeSkill) return;
+        console.log("%c[技能系统] %c已取消当前招式准备", "color: #aaa", "color: #fff");
+        this.activeSkill = null;
+        this.hideSkillIndicator();
+        uiManager.hideActionHint();
+        // 清除所有单位的目标高亮
+        [...this.playerUnits, ...this.enemyUnits].forEach(u => u.setTargeted(false));
+        audioManager.play('ui_click', { volume: 0.2 });
     }
 
     /**
@@ -322,6 +349,7 @@ export class BattleScene {
 
     onPointerDown(event) {
         if (!this.isDeployment || !this.selectedType) return;
+        if (event.button !== 0) return; // 仅限左键部署
         if (event.target.closest('#deployment-ui') || event.target.closest('.wuxia-btn')) return;
         this.isPointerDown = true;
         this.handlePlacement(event);
@@ -478,7 +506,7 @@ export class BattleScene {
         this.initSkillUI();
         window.removeEventListener('pointerdown', this.onPointerDown);
         window.removeEventListener('pointerup', this.onPointerUp);
-        window.addEventListener('pointerdown', (e) => this.handleSkillTargeting(e));
+        window.addEventListener('pointerdown', this.handleSkillTargeting);
 
         if (this.placementZoneIndicator) {
             this.scene.remove(this.placementZoneIndicator);
@@ -609,6 +637,16 @@ export class BattleScene {
 
     handleSkillTargeting(event) {
         if (!this.isActive || !this.activeSkill) return;
+
+        // 核心优化：按下右键 (button 2) 立即取消，不再等待松手
+        if (event.button === 2) {
+            this.cancelActiveSkill();
+            return;
+        }
+
+        // 核心修复：只允许左键释放技能 (button 0)
+        if (event.button !== 0) return;
+
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         this.raycaster.setFromCamera(this.mouse, this.camera);
@@ -1114,11 +1152,18 @@ export class BattleScene {
 
                 // --- 新增：实时目标预选高亮 ---
                 this.updateTargetHighlights(targetPos, skill);
+
+                // --- 新增：跟随鼠标的“右键取消”提示 ---
+                uiManager.showActionHint('右键取消', this.mouse);
             } else {
                 this.skillIndicator.visible = false;
                 // 没指到地面时，清除所有高亮
                 [...this.playerUnits, ...this.enemyUnits].forEach(u => u.setTargeted(false));
+                uiManager.hideActionHint();
             }
+        } else {
+            // 如果没有活动技能，确保提示隐藏
+            uiManager.hideActionHint();
         }
         
         if (this.isDeployment || !this.isActive) return;
@@ -1170,6 +1215,12 @@ export class BattleScene {
         this.isActive = false;
         if (this.skillIndicator) { this.scene.remove(this.skillIndicator); this.skillIndicator = null; }
         this.activeSkill = null;
+        
+        // 清理事件监听，防止右键拦截延续到大世界
+        window.removeEventListener('contextmenu', this.onContextMenu);
+        window.removeEventListener('pointerdown', this.onPointerDown);
+        window.removeEventListener('pointerdown', this.handleSkillTargeting);
+        
         console.log(message);
         const survivalCounts = {};
         Object.keys(this.initialCounts).forEach(type => survivalCounts[type] = 0);

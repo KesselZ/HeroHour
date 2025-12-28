@@ -153,9 +153,14 @@ export class BaseUnit extends THREE.Group {
         this.targetIndicator.material.opacity = isTargeted ? 0.8 : 0;
         if (isTargeted) {
             this.targetIndicator.material.color.set(color);
-            // 简单的缩放呼吸
-            const s = 1.0 + Math.sin(Date.now() * 0.01) * 0.05;
-            this.targetIndicator.scale.set(s, s, 1);
+            
+            // --- 核心优化：动态匹配单位体积 ---
+            // 基础半径是 0.6，我们根据 collisionRadius (单位碰撞半径) 动态缩放它
+            // 原本是 1.2 倍，现在缩小 30% 左右，改为 0.85 倍
+            const finalScale = (this.collisionRadius / 0.5) * 0.85;
+            
+            // 移除呼吸动画，使用固定缩放
+            this.targetIndicator.scale.set(finalScale, finalScale, 1);
         }
     }
 

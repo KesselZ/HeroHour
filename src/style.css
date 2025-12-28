@@ -2093,6 +2093,10 @@ canvas { image-rendering: pixelated; }
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
 
+.pixel-font {
+    image-rendering: pixelated;
+}
+
 .deploy-info {
     color: var(--jx3-celadon-dark);
     font-weight: bold;
@@ -2133,5 +2137,31 @@ canvas { image-rendering: pixelated; }
     font-size: 0.75rem;
     font-weight: bold;
     color: var(--jx3-celadon-dark);
+}
+
+/* 像素字体提示 (Action Hint) */
+#action-hint {
+    position: fixed;
+    pointer-events: none;
+    background: transparent; /* 移除背景 */
+    color: white; /* 白色文字 */
+    padding: 0;
+    font-size: 0.75rem; /* 缩小 30% (从 1.1rem 降至 0.75rem) */
+    font-weight: bold;
+    border: none; /* 移除边框 */
+    z-index: 10001;
+    font-family: "Courier New", monospace;
+    /* 核心：四方向黑色投影，模拟像素描边感 */
+    text-shadow: 
+        1px 1px 0px #000,
+        -1px -1px 0px #000,  
+        1px -1px 0px #000,
+        -1px 1px 0px #000;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+}
+
+.pixel-font {
+    image-rendering: pixelated;
 }
 
