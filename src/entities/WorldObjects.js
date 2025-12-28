@@ -25,6 +25,10 @@ export class WorldObject {
     spawn(scene) {
         this.mesh = this.createMesh();
         if (this.mesh) {
+            // 核心修复：仅在大世界物体生成时，将锚点设为底部偏上 (0.1)
+            if (this.mesh instanceof THREE.Sprite) {
+                this.mesh.center.set(0.5, 0.1);
+            }
             this.mesh.position.set(this.x, this.getElevation(), this.z);
             scene.add(this.mesh);
         }
@@ -36,7 +40,7 @@ export class WorldObject {
     }
 
     getElevation() {
-        return 0.8; // 默认悬浮高度
+        return 0; // 既然锚点已调至底部，位置高度应设为 0 以便贴地
     }
 
     /**
@@ -203,9 +207,7 @@ export class CityObject extends WorldObject {
     }
 
     createMesh() {
-        const city = spriteFactory.createUnitSprite('main_city');
-        city.center.set(0.5, 0); // 城市底部对齐
-        return city;
+        return spriteFactory.createUnitSprite('main_city');
     }
 
     getElevation() {
@@ -299,7 +301,7 @@ export class CapturedBuildingObject extends WorldObject {
     }
 
     getElevation() {
-        return 1.2;
+        return 0;
     }
 
     onInteract(worldScene) {

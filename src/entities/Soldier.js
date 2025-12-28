@@ -88,6 +88,76 @@ export class BaseUnit extends THREE.Group {
         // 保存视觉缩放比例，用于计算碰撞半径
         const unitCfg = spriteFactory.unitConfig[this.type];
         this.visualScale = unitCfg ? (unitCfg.scale || 1.4) : 1.4;
+
+        // 核心新增：所有单位初始化时都创建血条，但默认隐藏
+        this.createHealthBar();
+        if (this.hpSprite) this.hpSprite.visible = false;
+    }
+
+    /**
+     * 创建头顶 精灵图血条 (基类通用版)
+     */
+    createHealthBar() {
+        // 极低分辨率 (32x4)，让像素点非常巨大
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; 
+        canvas.height = 4; 
+        this.hpCanvas = canvas;
+        this.hpCtx = canvas.getContext('2d');
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        
+        const material = new THREE.SpriteMaterial({ 
+            map: texture, 
+            transparent: true,
+            depthTest: false,
+            depthWrite: false
+        });
+        
+        this.hpSprite = new THREE.Sprite(material);
+        // 主角血条长一点 (0.9)，普通士兵短一点 (0.6)
+        const s = this.isHero ? 0.9 : 0.6;
+        this.hpSprite.scale.set(s, 0.075, 1); 
+        this.hpSprite.position.set(0, 0, 0);
+        this.add(this.hpSprite);
+        
+        this.updateHealthBar();
+    }
+
+    updateHealthBar() {
+        if (!this.hpCtx || !this.hpCanvas) return;
+        const pct = Math.max(0, this.health / this.maxHealth);
+        
+        const ctx = this.hpCtx;
+        const w = this.hpCanvas.width;
+        const h = this.hpCanvas.height;
+        
+        const isPlayer = this.side === 'player';
+        
+        // 1. 完全清空
+        ctx.clearRect(0, 0, w, h);
+        
+        // 2. 绘制黑色像素边框 (铺满整个 Canvas 作为底)
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, w, h);
+        
+        // 3. 绘制内槽背景 (收缩 1px)
+        ctx.fillStyle = isPlayer ? 'rgba(0, 40, 0, 0.9)' : 'rgba(60, 0, 0, 0.9)';
+        ctx.fillRect(1, 1, w - 2, h - 2);
+        
+        // 4. 绘制填充内容 (收缩 1px，并按比例计算宽度)
+        ctx.fillStyle = isPlayer ? '#44ff44' : '#ff0000';
+        const maxFillW = w - 2;
+        const fillW = Math.floor(maxFillW * pct);
+        if (fillW > 0) {
+            ctx.fillRect(1, 1, fillW, h - 2);
+        }
+        
+        if (this.hpSprite) {
+            this.hpSprite.material.map.needsUpdate = true;
+        }
     }
 
     /**
@@ -277,6 +347,18 @@ export class BaseUnit extends THREE.Group {
 
         if (this.unitSprite.material.color.getHex() !== targetColor) {
             this.unitSprite.material.color.setHex(targetColor);
+        }
+
+        // --- 核心修复：血条透视补偿 ---
+        // 传统的 position.y 偏移会随相机距离中心越远而产生明显的“倾斜”
+        // 我们通过将偏移量设为“相机坐标系下的向上方向”来抵消这种透视畸变
+        if (this.hpSprite && window.battle && window.battle.camera) {
+            const cam = window.battle.camera;
+            // 计算相机视角中的“向上”向量在世界空间中的表达
+            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+            // 补偿距离：高度略微提升，保持呼吸感
+            const offsetDist = this.isHero ? 0.85 : 0.65;
+            this.hpSprite.position.copy(cameraUp).multiplyScalar(offsetDist);
         }
     }
 
@@ -648,6 +730,9 @@ export class BaseUnit extends THREE.Group {
         }
         
         if (this.health <= 0) this.die();
+
+        // 核心更新：任何受损都会更新血条
+        this.updateHealthBar();
     }
 
     die() {
@@ -735,7 +820,8 @@ export class HeroUnit extends BaseUnit {
 
         // 英雄更加醒目
         this.scale.set(1.5, 1.5, 1.5);
-        this.createHeroHealthBar();
+        this.updateHealthBar();
+        if (this.hpSprite) this.hpSprite.visible = true;
     }
 
     /**
@@ -789,31 +875,6 @@ export class HeroUnit extends BaseUnit {
                 knockbackForce: 0.05
             });
         }
-    }
-
-    /**
-     * 创建头顶 3D 血条
-     */
-    createHeroHealthBar() {
-        const bgGeo = new THREE.PlaneGeometry(0.8, 0.1);
-        const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
-        const bg = new THREE.Mesh(bgGeo, bgMat);
-        bg.position.y = 1.2;
-        this.add(bg);
-
-        const fillGeo = new THREE.PlaneGeometry(0.78, 0.08);
-        const fillMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-        this.hpFill = new THREE.Mesh(fillGeo, fillMat);
-        this.hpFill.position.set(0, 0, 0.01);
-        bg.add(this.hpFill);
-        this.hpBarFullWidth = 0.78;
-    }
-
-    updateHealthBar() {
-        if (!this.hpFill) return;
-        const pct = Math.max(0, this.health / this.maxHealth);
-        this.hpFill.scale.x = pct;
-        this.hpFill.position.x = -(1 - pct) * (this.hpBarFullWidth / 2);
     }
 
     /**

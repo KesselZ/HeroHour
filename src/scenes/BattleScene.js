@@ -1117,6 +1117,9 @@ export class BattleScene {
         this.camera.position.set(0, 15, 18); 
         this.camera.lookAt(0, 0, 0);
         
+        // --- 核心新增：悬停显示血条逻辑 ---
+        this.updateHoverHealthBar();
+
         // 实时更新技能栏状态 (内力不足或主角阵亡时禁用)
         this.updateSkillUIState();
         
@@ -1166,11 +1169,48 @@ export class BattleScene {
             uiManager.hideActionHint();
         }
         
+        // --- 核心修复：无论是否在部署阶段，都必须更新单位的视觉状态(血条对齐) ---
+        [...this.playerUnits, ...this.enemyUnits].forEach(u => {
+            if (u.updateVisualState) u.updateVisualState();
+        });
+
         if (this.isDeployment || !this.isActive) return;
         this.playerUnits.forEach(u => u.update(this.enemyUnits, this.playerUnits, deltaTime));
         this.enemyUnits.forEach(u => u.update(this.playerUnits, this.enemyUnits, deltaTime));
         this.projectileManager.update(deltaTime);
         this.checkWinCondition();
+    }
+
+    /**
+     * 实时更新鼠标悬停单位的血条显示
+     */
+    updateHoverHealthBar() {
+        if (!this.isActive) return;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const allUnits = [...this.playerUnits, ...this.enemyUnits];
+        // 获取所有存活单位的精灵图进行射线检测
+        const aliveSprites = allUnits
+            .filter(u => !u.isDead && u.unitSprite)
+            .map(u => u.unitSprite);
+        
+        const intersects = this.raycaster.intersectObjects(aliveSprites);
+        
+        // 1. 先隐藏所有非主角的血条 (主角血条始终显示)
+        allUnits.forEach(u => {
+            if (!u.isHero && u.hpSprite) {
+                u.hpSprite.visible = false;
+            }
+        });
+
+        // 2. 如果鼠标悬停在某个单位上，显示该单位的血条
+        if (intersects.length > 0) {
+            const hitSprite = intersects[0].object;
+            const unit = allUnits.find(u => u.unitSprite === hitSprite);
+            if (unit && unit.hpSprite) {
+                unit.hpSprite.visible = true;
+            }
+        }
     }
 
     /**

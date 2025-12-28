@@ -391,6 +391,33 @@
                 <div class="tooltip-effect"></div>
                 <div class="tooltip-desc"></div>
             </div>
+
+            <!-- 暂停菜单 -->
+            <div id="pause-menu" class="menu-overlay hidden">
+                <div class="menu-container pause-container" id="pause-main-content">
+                    <div class="menu-decoration-top">江湖休整</div>
+                    <h2 class="game-title">中途<span>休息</span></h2>
+                    <div class="menu-options" id="pause-default-options">
+                        <button id="resume-game-btn" class="wuxia-btn">继续江湖</button>
+                        <button id="open-settings-btn" class="wuxia-btn">江湖设置</button>
+                        <button id="back-to-menu-from-pause-btn" class="wuxia-btn small-btn">退出到主界面</button>
+                    </div>
+
+                    <!-- 设置面板 (在暂停菜单内切换) -->
+                    <div id="pause-settings-options" class="hidden">
+                        <div class="settings-group">
+                            <label>音乐音量</label>
+                            <input type="range" id="bgm-volume-slider" min="0" max="1" step="0.01" value="0.5">
+                        </div>
+                        <div class="settings-group">
+                            <label>音效音量</label>
+                            <input type="range" id="sfx-volume-slider" min="0" max="1" step="0.01" value="1.0">
+                        </div>
+                        <button id="close-settings-btn" class="wuxia-btn small-btn" style="margin-top: 20px;">返回暂停</button>
+                    </div>
+                    <div class="menu-decoration-bottom"></div>
+                </div>
+            </div>
         </div>
         
         <!-- Canvas 层：Three.js 渲染 -->

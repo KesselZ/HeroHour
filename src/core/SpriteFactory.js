@@ -188,12 +188,14 @@ class SpriteFactory {
         });
     }
 
-    createUnitSprite(key) {
+    createUnitSprite(key, anchorY = 0.5) {
         const config = ASSET_REGISTRY.UNITS[key];
         const material = this.getMaterial(key);
         const sprite = new THREE.Sprite(material);
         const s = config ? config.scale : 1.4;
         sprite.scale.set(s, s, 1);
+        // 恢复默认：除非指定，否则使用中心锚点 (0.5)
+        sprite.center.set(0.5, anchorY); 
         return sprite;
     }
 

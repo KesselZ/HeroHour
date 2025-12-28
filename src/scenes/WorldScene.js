@@ -811,9 +811,9 @@ export class WorldScene {
     }
 
     createPlayer() {
-        this.playerHero = spriteFactory.createUnitSprite(this.heroId);
+        this.playerHero = spriteFactory.createUnitSprite(this.heroId, 0.1);
         const pos = worldManager.mapState.playerPos;
-        this.playerHero.position.set(pos.x, 0.8, pos.z);
+        this.playerHero.position.set(pos.x, 0, pos.z);
         this.scene.add(this.playerHero);
     }
 

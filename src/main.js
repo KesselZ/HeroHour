@@ -8,6 +8,7 @@ import { worldManager } from './core/WorldManager.js';
 import { SkillRegistry } from './core/SkillRegistry.js';
 import { uiManager } from './core/UIManager.js';
 import { audioManager } from './core/AudioManager.js';
+import { timeManager } from './core/TimeManager.js';
 
 import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
@@ -24,6 +25,143 @@ let currentState = GameState.MENU;
 let worldInstance = null; // 大世界实例
 let battleInstance = null;
 let selectedHero = null;
+let isPaused = false;
+
+/**
+ * 切换暂停状态
+ */
+function togglePause() {
+    // 只有在世界或战斗中才能暂停
+    if (currentState !== GameState.WORLD && currentState !== GameState.BATTLE) return;
+
+    isPaused = !isPaused;
+    const pauseMenu = document.getElementById('pause-menu');
+    
+    if (isPaused) {
+        pauseMenu.classList.remove('hidden');
+        timeManager.pause();
+        audioManager.play('ui_click');
+    } else {
+        pauseMenu.classList.add('hidden');
+        // 确保关闭暂停菜单时，重置为默认选项视图
+        const defaultOps = document.getElementById('pause-default-options');
+        const settingOps = document.getElementById('pause-settings-options');
+        if (defaultOps) defaultOps.classList.remove('hidden');
+        if (settingOps) settingOps.classList.add('hidden');
+
+        timeManager.resume();
+        audioManager.play('ui_click');
+    }
+}
+
+// 监听 ESC 键
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        // 1. 检查是否有打开的面板需要关闭 (优先级高于暂停)
+        const panels = [
+            'hero-stats-panel',
+            'town-management-panel',
+            'skill-learn-panel',
+            'how-to-play-panel',
+            'game-start-window'
+        ];
+        
+        let panelClosed = false;
+        for (const id of panels) {
+            const panel = document.getElementById(id);
+            if (panel && !panel.classList.contains('hidden')) {
+                panel.classList.add('hidden');
+                audioManager.play('ui_click', { volume: 0.4 });
+                
+                // 特殊逻辑：如果是城镇面板，需要调用实例方法清理状态
+                if (id === 'town-management-panel' && worldInstance) {
+                    worldInstance.closeTownManagement();
+                }
+                panelClosed = true;
+                break; // 每次只关闭一个面板
+            }
+        }
+
+        if (panelClosed) return;
+
+        // 2. 检查战斗中是否有选中的兵种或正在释放的技能
+        if (currentState === GameState.BATTLE && battleInstance) {
+            if (battleInstance.selectedType) {
+                battleInstance.selectedType = null;
+                battleInstance.updatePreviewSprite(null);
+                const slots = document.querySelectorAll('.unit-slot');
+                slots.forEach(s => s.classList.remove('selected'));
+                return;
+            }
+            if (battleInstance.activeSkill) {
+                battleInstance.activeSkill = null;
+                if (battleInstance.skillIndicator) battleInstance.skillIndicator.visible = false;
+                if (battleInstance.rangeIndicator) battleInstance.rangeIndicator.visible = false;
+                // 清除高亮
+                [...battleInstance.playerUnits, ...battleInstance.enemyUnits].forEach(u => u.setTargeted(false));
+                uiManager.hideActionHint();
+                return;
+            }
+        }
+
+        // 3. 如果没有面板和特殊状态，则切换暂停
+        togglePause();
+    }
+});
+
+// 绑定暂停菜单按钮
+const resumeBtn = document.getElementById('resume-game-btn');
+if (resumeBtn) {
+    resumeBtn.addEventListener('click', () => {
+        togglePause();
+    });
+}
+
+// 设置按钮逻辑
+const openSettingsBtn = document.getElementById('open-settings-btn');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const pauseDefaultOptions = document.getElementById('pause-default-options');
+const pauseSettingsOptions = document.getElementById('pause-settings-options');
+
+if (openSettingsBtn && closeSettingsBtn) {
+    openSettingsBtn.addEventListener('click', () => {
+        audioManager.play('ui_click');
+        pauseDefaultOptions.classList.add('hidden');
+        pauseSettingsOptions.classList.remove('hidden');
+    });
+
+    closeSettingsBtn.addEventListener('click', () => {
+        audioManager.play('ui_click');
+        pauseSettingsOptions.classList.add('hidden');
+        pauseDefaultOptions.classList.remove('hidden');
+    });
+}
+
+// 音量滑块逻辑
+const bgmSlider = document.getElementById('bgm-volume-slider');
+const sfxSlider = document.getElementById('sfx-volume-slider');
+
+if (bgmSlider) {
+    bgmSlider.value = audioManager.bgmVolume;
+    bgmSlider.addEventListener('input', (e) => {
+        audioManager.setBGMVolume(parseFloat(e.target.value));
+    });
+}
+
+if (sfxSlider) {
+    sfxSlider.value = audioManager.sfxVolume;
+    sfxSlider.addEventListener('input', (e) => {
+        audioManager.setSFXVolume(parseFloat(e.target.value));
+    });
+}
+
+const backToMenuBtnFromPause = document.getElementById('back-to-menu-from-pause-btn');
+if (backToMenuBtnFromPause) {
+    backToMenuBtnFromPause.addEventListener('click', () => {
+        // 强制刷新页面回到主菜单，这是最彻底的重置方式
+        window.location.reload();
+    });
+}
 
 // 1. 初始化 Three.js 基础
 const scene = new THREE.Scene();
@@ -346,7 +484,14 @@ const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
+    
     const deltaTime = clock.getDelta();
+
+    // 如果处于暂停状态，跳过逻辑更新，只进行渲染
+    if (isPaused) {
+        renderer.render(scene, camera);
+        return;
+    }
 
     if (currentState === GameState.WORLD && worldInstance) {
         worldInstance.update(deltaTime);

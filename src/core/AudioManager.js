@@ -7,8 +7,10 @@ class AudioManager {
         this.sounds = new Map(); // 缓存 Audio 对象或池
         this.bgmCache = new Map(); // 缓存 BGM 对象实现断点续播
         this.bgm = null;
-        this.bgmVolume = 0.5;
-        this.sfxVolume = 1.0;
+        
+        // 从本地存储读取音量，如果没有则使用默认值
+        this.bgmVolume = parseFloat(localStorage.getItem('jx3_bgm_volume') ?? '0.5');
+        this.sfxVolume = parseFloat(localStorage.getItem('jx3_sfx_volume') ?? '1.0');
         
         // 频率限制：记录音效上次播放时间，防止同一音效瞬间重叠过多
         this.lastPlayed = new Map();
@@ -258,10 +260,12 @@ class AudioManager {
 
     setSFXVolume(v) {
         this.sfxVolume = Math.max(0, Math.min(1, v));
+        localStorage.setItem('jx3_sfx_volume', this.sfxVolume.toString());
     }
 
     setBGMVolume(v) {
         this.bgmVolume = Math.max(0, Math.min(1, v));
+        localStorage.setItem('jx3_bgm_volume', this.bgmVolume.toString());
         if (this.bgm) this.bgm.volume = this.bgmVolume;
     }
 }
