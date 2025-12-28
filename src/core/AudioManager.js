@@ -98,6 +98,7 @@ class AudioManager {
             'source_levelup': { files: ['/audio/sources/升级音效.mp3'], throttle: 1000 },
             'capture_gold_mine': { files: ['/audio/sources/获得金矿厂.mp3'], throttle: 500 },
             'capture_sawmill': { files: ['/audio/sources/获得木材厂.mp3'], throttle: 500 },
+            'talent_upgrade': { files: ['/audio/sources/点天赋.mp3'], throttle: 200, pitchVar: 0.1 },
             
             // 战场结算音效
             'battle_victory': { files: ['/audio/click/胜利音效.mp3'], throttle: 1000 },

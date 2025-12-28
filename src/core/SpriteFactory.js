@@ -20,6 +20,12 @@ export const ASSET_REGISTRY = {
         SKILL6: '/assets/skills/skill6.png',
         SKILL7: '/assets/skills/skill7.png',
         SKILL8: '/assets/skills/skill8.png',
+        TALENT1: '/assets/talents/talent.png',
+        TALENT2: '/assets/talents/talent2.png',
+        TALENT3: '/assets/talents/talent3.png',
+        TALENT4: '/assets/talents/talent4.png',
+        TALENT5: '/assets/talents/talent5.png',
+        TALENT6: '/assets/talents/talent6.png',
         BUILDING2: '/assets/buildings/building2.png',
         BUILDING3: '/assets/buildings/building3.png'
     },
@@ -98,6 +104,14 @@ export const ASSET_REGISTRY = {
         'bridge_v3': { name: '石桥', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 2, scale: 3.5 },
         'blacksmith_v3': { name: '铁匠铺', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 3, scale: 3.5 },
         'thatched_hut_v3': { name: '草屋', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 4, scale: 3.5 },
+
+        // --- 奇穴节点 (Talent Nodes) ---
+        'talent_point_1': { name: '极泉', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_point_2': { name: '天池', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_point_3': { name: '曲泽', sheet: 'TALENT3', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_point_4': { name: '内关', sheet: 'TALENT4', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_point_5': { name: '大陵', sheet: 'TALENT5', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_point_6': { name: '劳宫', sheet: 'TALENT6', rows: 4, cols: 4, r: 1, c: 1 },
 
         // --- building2.png 系列 (扩展建筑库) ---
         'sawmill_v2': { name: '伐木工坊', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 1, scale: 3.0 },

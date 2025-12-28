@@ -8,18 +8,54 @@ class ModifierManager {
     }
 
     /**
+     * 添加一个修正器 (兼容旧版 addGlobalModifier)
+     */
+    addModifier(mod) {
+        // 兼容处理：将 type 转为 unitType, value 转为 offset/multiplier
+        const normalizedMod = {
+            id: mod.id,
+            side: mod.side,
+            unitType: mod.unitType || mod.type,
+            stat: mod.stat,
+            source: mod.source,
+            multiplier: mod.multiplier,
+            offset: mod.offset
+        };
+
+        // 如果只有 value，根据属性名猜测是 offset 还是 multiplier
+        if (mod.value !== undefined) {
+            if (mod.stat.endsWith('_mult') || mod.stat.includes('multiplier') || Math.abs(mod.value) < 2) {
+                // 如果数值很小或者是比例类属性，设为系数加成
+                // 注意：这里需要根据实际业务逻辑微调
+                normalizedMod.multiplier = 1 + mod.value;
+            } else {
+                normalizedMod.offset = mod.value;
+            }
+        }
+
+        this.addGlobalModifier(normalizedMod);
+    }
+
+    /**
      * 添加一个全局修正器
-     * @param {Object} mod { id, side, unitType, stat, multiplier, offset }
+     * @param {Object} mod { id, side, unitType, stat, multiplier, offset, source }
      * multiplier: 1.2 表示增加 20%
      * offset: 10 表示增加 10 点固定值
      */
     addGlobalModifier(mod) {
         // 防止重复添加同一个 ID 的修正器
         if (this.globalModifiers.find(m => m.id === mod.id)) {
-            // 如果 ID 相同，通常是更新逻辑，先移除旧的
             this.removeModifier(mod.id);
         }
         this.globalModifiers.push(mod);
+    }
+
+    /**
+     * 按来源批量移除修正器
+     * @param {string} source 
+     */
+    removeModifiersBySource(source) {
+        this.globalModifiers = this.globalModifiers.filter(m => m.source !== source);
     }
 
     /**
@@ -57,7 +93,13 @@ class ModifierManager {
     _isMatch(mod, unit, statName) {
         if (mod.stat !== statName) return false;
         if (mod.side && unit.side !== mod.side) return false;
-        const isTypeMatch = !mod.unitType || unit.type === mod.unitType || (mod.unitType === 'hero' && unit.isHero);
+        
+        // 核心增强：支持 army (所有非英雄) 和 global (所有人) 关键字
+        const isTypeMatch = !mod.unitType || 
+                           mod.unitType === 'global' ||
+                           (mod.unitType === 'army' && !unit.isHero) ||
+                           unit.type === mod.unitType || 
+                           (mod.unitType === 'hero' && unit.isHero);
         return isTypeMatch;
     }
 

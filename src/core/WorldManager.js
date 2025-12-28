@@ -1,6 +1,7 @@
 import { modifierManager } from './ModifierManager.js';
 import { SkillRegistry } from './SkillRegistry.js';
 import { audioManager } from './AudioManager.js';
+import { talentManager } from './TalentManager.js';
 import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
 
 /**
@@ -135,26 +136,31 @@ class City {
         const targetLevel = currentLevel + 1;
         
         // 第一级永远使用基准价格
-        if (targetLevel <= 1) return { ...base };
-        
-        if (growth.type === 'linear') {
-            // 线性公式：Base + (TargetLevel - 1) * Increment
-            const inc = growth.increment || { gold: 100, wood: 50 };
-            return {
-                gold: base.gold + (targetLevel - 1) * (inc.gold || 0),
-                wood: base.wood + (targetLevel - 1) * (inc.wood || 0)
-            };
-        } else if (growth.type === 'exponential') {
-            // 指数公式：Base * (Factor ^ (TargetLevel - 1))，并取整到最接近的 50
-            const multiplier = Math.pow(growth.factor || 1.5, targetLevel - 1);
-            return {
-                gold: Math.ceil((base.gold * multiplier) / 50) * 50,
-                wood: Math.ceil((base.wood * multiplier) / 50) * 50
-            };
-        } else {
-            // constant 或其他：保持基准价格
-            return { ...base };
+        let costResult = { ...base };
+
+        if (targetLevel > 1) {
+            if (growth.type === 'linear') {
+                const inc = growth.increment || { gold: 100, wood: 50 };
+                costResult = {
+                    gold: base.gold + (targetLevel - 1) * (inc.gold || 0),
+                    wood: base.wood + (targetLevel - 1) * (inc.wood || 0)
+                };
+            } else if (growth.type === 'exponential') {
+                const multiplier = Math.pow(growth.factor || 1.5, targetLevel - 1);
+                costResult = {
+                    gold: Math.ceil((base.gold * multiplier) / 50) * 50,
+                    wood: Math.ceil((base.wood * multiplier) / 50) * 50
+                };
+            }
         }
+
+        // 核心改动：奇穴效果 - 以物易物 (降低木材消耗)
+        const woodCostMult = modifierManager.getModifiedValue({ side: 'player' }, 'building_wood_cost_mult', 0);
+        if (woodCostMult !== 0) {
+            costResult.wood = Math.ceil(costResult.wood * (1 + woodCostMult));
+        }
+
+        return costResult;
     }
 
     /**
@@ -364,6 +370,8 @@ class WorldManager {
             hpCurrent: 500,
             mpMax: 160,
             mpCurrent: 160,
+            talentPoints: 3, // 初始赠送3点奇穴点数
+            talents: {},     // 新增：已激活奇穴 { id: level }
             pendingLevelUps: 0, // 新增：记录待在大世界播放的升级特效次数
             skills: [],
             stats: {
@@ -622,15 +630,19 @@ class WorldManager {
             mines: { gold: 0, wood: 0, count: { gold_mine: 0, sawmill: 0 } }
         };
 
+        // 获取奇穴加成：生财有道 (每座城池额外金钱)
+        const cityGoldBonus = modifierManager.getModifiedValue({ side: 'player' }, 'city_gold_income', 0);
+
         // 1. 统计所有玩家城镇的产出
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
             if (city.owner === 'player') {
-                totalGold += city.production.gold;
+                const finalGold = city.production.gold + cityGoldBonus;
+                totalGold += finalGold;
                 totalWood += city.production.wood;
                 breakdown.cities.push({
                     name: city.name,
-                    gold: city.production.gold,
+                    gold: finalGold,
                     wood: city.production.wood
                 });
             }
@@ -667,6 +679,14 @@ class WorldManager {
         if (prodData.gold > 0) this.addGold(prodData.gold);
         if (prodData.wood > 0) this.addWood(prodData.wood);
         
+        // 核心改动：奇穴效果 - 气吞山河 (季节更替回蓝)
+        const mpRegenMult = modifierManager.getModifiedValue({ side: 'player' }, 'season_mp_regen', 0);
+        if (mpRegenMult > 0) {
+            const recoverAmount = Math.floor(this.heroData.mpMax * mpRegenMult);
+            this.heroData.mpCurrent = Math.min(this.heroData.mpMax, this.heroData.mpCurrent + recoverAmount);
+            this.showNotification(`气吞山河：由于时节更替，内力恢复了 ${recoverAmount} 点`);
+        }
+
         console.log(`%c[季度结算] %c总收入金钱 +${prodData.gold}, 木材 +${prodData.wood}`, 'color: #557755; font-weight: bold', 'color: #fff');
     }
 
@@ -688,13 +708,28 @@ class WorldManager {
     }
 
     /**
+     * 获取单位的统御占用 (考虑奇穴减费)
+     */
+    getUnitCost(type) {
+        const baseCost = this.unitCosts[type]?.cost || 0;
+        // 获取针对该单位或军队的减费修正
+        const minus = modifierManager.getModifiedValue({ side: 'player', type: type }, 'elite_cost_minus', 0);
+        
+        // 规则：只有基础占用 >= 3 的精锐单位享受减费
+        if (baseCost >= 3 && minus > 0) {
+            return Math.max(1, baseCost - Math.floor(minus));
+        }
+        return baseCost;
+    }
+
+    /**
      * 招募士兵到指定城市
      * @param {string} type 兵种类型
      * @param {string} cityId 城市 ID
      */
     recruitUnit(type, cityId = 'main_city_1') {
         const baseCost = this.unitCosts[type].gold;
-        const unitLeadershipCost = this.unitCosts[type].cost || 0;
+        const unitLeadershipCost = this.getUnitCost(type);
 
         // 应用全局招募折扣
         const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
@@ -741,7 +776,7 @@ class WorldManager {
         // 获取所有有余量且有成本的兵种
         const types = Object.keys(city.availableUnits).filter(type => {
             const amount = city.availableUnits[type];
-            const unitCost = this.unitCosts[type]?.cost || 0;
+            const unitCost = this.getUnitCost(type);
             return amount > 0 && unitCost > 0;
         });
 
@@ -755,7 +790,7 @@ class WorldManager {
                 const amount = city.availableUnits[type];
                 if (amount <= 0) continue;
 
-                const unitCost = this.unitCosts[type].cost;
+                const unitCost = this.getUnitCost(type);
                 if (remainingLeadership >= unitCost) {
                     this.heroArmy[type] = (this.heroArmy[type] || 0) + 1;
                     city.availableUnits[type] -= 1;
@@ -1206,15 +1241,20 @@ class WorldManager {
         let reward = { gold: 0, wood: 0, xp: 0 };
         let msg = "";
 
+        // 获取奇穴加成：赏金猎人 (拾取翻倍)
+        const lootMult = modifierManager.getModifiedValue({ side: 'player' }, 'world_loot_mult', 0);
+
         switch (itemType) {
             case 'gold_pile':
                 reward.gold = Math.floor(Math.random() * 100) + 50; // 50-150 金币
+                if (lootMult > 0) reward.gold = Math.floor(reward.gold * (1 + lootMult));
                 msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
                 break;
             case 'chest':
                 // 宝箱随机给金币或木材
                 if (Math.random() > 0.5) {
                     reward.gold = Math.floor(Math.random() * 300) + 100;
+                    if (lootMult > 0) reward.gold = Math.floor(reward.gold * (1 + lootMult));
                     msg = `开启了宝箱，获得 ${reward.gold} 💰`;
                 } else {
                     reward.wood = Math.floor(Math.random() * 100) + 50;
@@ -1538,9 +1578,10 @@ class WorldManager {
             data.mpMax = 160 + (data.level - 1) * 14;
             data.mpCurrent = data.mpMax; // 升级补满状态
 
+            data.talentPoints++; // 每升一级获得 1 点奇穴点数
             data.pendingLevelUps++; // 核心：增加待播放反馈计数
 
-            console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+            console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！获得 1 点奇穴点数。`, 'color: #00ff00; font-weight: bold', 'color: #fff');
             
             // 派发事件让 main.js 执行 syncHeroStatsToModifiers()
             window.dispatchEvent(new CustomEvent('hero-level-up'));
@@ -1678,7 +1719,7 @@ class WorldManager {
         for (const type in this.heroArmy) {
             const count = this.heroArmy[type];
             if (count > 0 && this.unitCosts[type]) {
-                current += count * (this.unitCosts[type].cost || 0);
+                current += count * this.getUnitCost(type);
             }
         }
         return current;
@@ -1691,7 +1732,7 @@ class WorldManager {
         if (!this.isPlayerAtCity(cityId)) return false;
 
         const city = this.cities[cityId];
-        const unitCost = this.unitCosts[type]?.cost || 0;
+        const unitCost = this.getUnitCost(type);
         const totalCostToAdd = amount * unitCost;
         
         const currentLeadership = this.getHeroCurrentLeadership();
@@ -1712,5 +1753,8 @@ class WorldManager {
 }
 
 export const worldManager = new WorldManager();
+
+// 初始化奇穴管理器
+talentManager.init(worldManager.heroData);
 
 

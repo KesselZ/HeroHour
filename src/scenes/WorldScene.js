@@ -190,8 +190,22 @@ export class WorldScene {
 
         // 移除旧的监听器防止重复
         window.removeEventListener('hero-stats-changed', this._onHeroStatsChanged);
-        this._onHeroStatsChanged = () => this.updateHeroHUD();
+        this._onHeroStatsChanged = () => {
+            this.updateHeroHUD();
+            // 核心修复：属性变化时同步更新大世界移动速度
+            const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
+            this.moveSpeed = heroDetails.qinggong * 0.6;
+        };
         window.addEventListener('hero-stats-changed', this._onHeroStatsChanged);
+
+        // 监听奇穴更新，同步更新移动速度
+        window.removeEventListener('talents-updated', this._onTalentsUpdated);
+        this._onTalentsUpdated = () => {
+            const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
+            this.moveSpeed = heroDetails.qinggong * 0.6;
+            console.log(`%c[属性同步] 奇穴已更新，当前大世界移速: ${this.moveSpeed.toFixed(3)}`, "color: #5b8a8a");
+        };
+        window.addEventListener('talents-updated', this._onTalentsUpdated);
 
         window.removeEventListener('resource-gained', this._onResourceGained);
         this._onResourceGained = (e) => {
@@ -905,11 +919,13 @@ export class WorldScene {
             worldManager.processResourceProduction();
         }
 
-        // --- 核心限制：仅开局告示显示时禁止移动，其他 UI 不受限 ---
+        // --- 核心限制：仅开局告示显示或奇穴面板打开时禁止移动 ---
         const startWindow = document.getElementById('game-start-window');
+        const talentPanel = document.getElementById('talent-panel');
         const isStartWindowOpen = startWindow && !startWindow.classList.contains('hidden');
+        const isTalentPanelOpen = talentPanel && !talentPanel.classList.contains('hidden');
 
-        if (isStartWindowOpen) {
+        if (isStartWindowOpen || isTalentPanelOpen) {
             this.footstepTimer = 0;
         } else {
             const moveDir = new THREE.Vector3(0, 0, 0);
@@ -1035,6 +1051,16 @@ export class WorldScene {
         worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
 
         if (result && result.winner === 'player') {
+            // 核心改动：奇穴效果 - 战利清缴 (战后额外金钱)
+            const killGoldMult = modifierManager.getModifiedValue({ side: 'player' }, 'kill_gold_mult', 0);
+            if (killGoldMult > 0) {
+                // 假设敌人强度为 result.enemyPower，如果没有则用默认值 100
+                const enemyPower = result.enemyPower || 100;
+                const bonusGold = Math.floor(enemyPower * killGoldMult);
+                worldManager.addGold(bonusGold);
+                worldManager.showNotification(`战利清缴：额外获得 💰${bonusGold}`);
+            }
+
             // 检查是否是城镇
             const cityData = worldManager.cities[enemyId];
             if (cityData) {
@@ -1212,7 +1238,10 @@ export class WorldScene {
         const px = Math.round(this.playerHero.position.x + halfSize);
         const pz = Math.round(this.playerHero.position.z + halfSize);
         
-        const revealRadius = 33; // 探索半径 (增大 30% 从 25 -> 33)
+        // 核心改动：奇穴效果 - 慧眼识珠 (迷雾半径增加)
+        let revealRadius = 33; // 探索半径 (基础 33)
+        const radiusMult = modifierManager.getModifiedValue({ side: 'player' }, 'reveal_radius_mult', 0);
+        if (radiusMult > 0) revealRadius = Math.round(revealRadius * (1 + radiusMult));
         
         // 标记已探索
         for (let dz = -revealRadius; dz <= revealRadius; dz++) {

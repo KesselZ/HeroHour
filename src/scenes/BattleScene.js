@@ -521,6 +521,20 @@ export class BattleScene {
                 if (child.material) child.material.dispose();
             });
         }
+
+        // --- 核心改动：奇穴效果 - 激励士气 (战斗开始全军振奋) ---
+        const startHasteVal = modifierManager.getModifiedValue({ side: 'player' }, 'battle_start_haste', 0);
+        if (startHasteVal > 0) {
+            this.applyBuffToUnits(this.playerUnits, {
+                tag: 'talent_haste',
+                stat: 'attackSpeed',
+                multiplier: 1.0 + startHasteVal,
+                duration: 10000,
+                color: 0xffffaa, // 浅金色振奋
+                vfxName: 'rising_particles'
+            });
+        }
+
         console.log("部署完成，江湖开战！");
     }
 

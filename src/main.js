@@ -6,6 +6,7 @@ import { setSeed } from './core/Random.js';
 import { modifierManager } from './core/ModifierManager.js';
 import { worldManager } from './core/WorldManager.js';
 import { SkillRegistry } from './core/SkillRegistry.js';
+import { talentManager } from './core/TalentManager.js';
 import { uiManager } from './core/UIManager.js';
 import { audioManager } from './core/AudioManager.js';
 import { timeManager } from './core/TimeManager.js';
@@ -366,6 +367,12 @@ window.addEventListener('hero-level-up', () => {
     syncHeroStatsToModifiers();
 });
 
+// 监听奇穴更新事件，同步属性
+window.addEventListener('talents-updated', () => {
+    syncHeroStatsToModifiers();
+    worldManager.updateHUD(); // 更新血条等显示
+});
+
 /**
  * 根据选择的角色应用全局属性加成
  */
@@ -386,6 +393,9 @@ function applyHeroTraits(heroId) {
 
     // 3. 执行同步与修正注册 (这里会根据 identity 动态计算 hpMax 和 mpMax)
     syncHeroStatsToModifiers();
+
+    // 3.5 重新初始化奇穴管理器，根据选中的英雄生成对应的奇穴树
+    talentManager.init(worldManager.heroData);
 
     // 4. 初始化资源状态 (补满血蓝)
     worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;

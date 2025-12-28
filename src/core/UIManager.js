@@ -1,6 +1,9 @@
 import { spriteFactory } from './SpriteFactory.js';
 import { SkillRegistry, SectSkills } from './SkillRegistry.js';
 import { worldManager } from './WorldManager.js';
+import { TALENT_UNITS, HERO_TREE_CONFIG, getHeroTalentTree } from './TalentRegistry.js';
+import { talentManager } from './TalentManager.js';
+import { timeManager } from './TimeManager.js';
 import { SECT_INTRO } from '../data/HowToPlayContent.js';
 import { audioManager } from './AudioManager.js';
 
@@ -17,6 +20,7 @@ class UIManager {
 
         this.initTooltipEvents();
         this.initSkillGalleryEvents();
+        this.initTalentEvents();
         this.initGameStartEvents();
         this.initBattleEscapeEvents();
         
@@ -159,6 +163,269 @@ class UIManager {
             };
         });
     }
+
+    /**
+     * 初始化奇穴系统交互事件
+     */
+    initTalentEvents() {
+        const openTalentBtn = document.getElementById('open-talent-btn');
+        const closeTalentBtn = document.getElementById('close-talent-panel');
+        const talentPanel = document.getElementById('talent-panel');
+        const uiLayer = document.getElementById('ui-layer');
+        const gameCanvas = document.getElementById('game-canvas');
+
+        // 拖拽状态变量
+        this.talentDrag = {
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            offsetX: 0,
+            offsetY: 0,
+            currentX: 0,
+            currentY: 0,
+            scale: 1.0 // 新增：缩放倍率
+        };
+
+        if (openTalentBtn && talentPanel && uiLayer && gameCanvas) {
+            openTalentBtn.onclick = () => {
+                audioManager.play('ui_click');
+                
+                // 1. 触发【全画面】扭曲缩小效果
+                uiLayer.classList.add('ui-layer-distort-out');
+                gameCanvas.classList.add('ui-layer-distort-out');
+
+                // 2. 暂停大世界时间流动
+                timeManager.pause();
+                
+                // 3. 稍微缩短延迟，确保新面板在旧画面彻底消失前就入场，形成重叠感
+                setTimeout(() => {
+                    talentPanel.classList.remove('hidden');
+                    talentPanel.classList.add('distort-enter');
+                    
+                    // 彻底隐藏底层防止干扰 (不移除动画类，而是用 visibility 配合强制隐藏)
+                    uiLayer.style.visibility = 'hidden';
+                    gameCanvas.style.visibility = 'hidden';
+                    
+                    // 重置拖拽偏移
+                    this.resetTalentView();
+                    
+                    // 更新点数
+                    const pointsVal = document.getElementById('talent-points-val');
+                    if (pointsVal) {
+                        pointsVal.innerText = worldManager.heroData.talentPoints || 0;
+                    }
+
+                    // 渲染奇穴图
+                    this.renderTalentGraph();
+                }, 550);
+            };
+        }
+
+        if (closeTalentBtn && talentPanel && uiLayer && gameCanvas) {
+            closeTalentBtn.onclick = () => {
+                audioManager.play('ui_click');
+                
+                // 1. 先准备好底层的状态
+                uiLayer.classList.remove('ui-layer-distort-out');
+                gameCanvas.classList.remove('ui-layer-distort-out');
+
+                // 2. 恢复时间流动
+                timeManager.resume();
+                
+                // 3. 隐藏奇穴面板
+                talentPanel.classList.add('hidden');
+                talentPanel.classList.remove('distort-enter');
+                
+                // 3. 恢复底层可见性，同时触发进入动画
+                uiLayer.style.visibility = 'visible';
+                gameCanvas.style.visibility = 'visible';
+                
+                uiLayer.classList.add('ui-layer-distort-in');
+                gameCanvas.classList.add('ui-layer-distort-in');
+                
+                // 4. 动画结束后清理类名
+                setTimeout(() => {
+                    uiLayer.classList.remove('ui-layer-distort-in');
+                    gameCanvas.classList.remove('ui-layer-distort-in');
+                }, 600);
+            };
+        }
+
+        // --- 拖拽交互监听 ---
+        talentPanel.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // 仅左键
+            this.talentDrag.isDragging = true;
+            this.talentDrag.startX = e.clientX - this.talentDrag.offsetX;
+            this.talentDrag.startY = e.clientY - this.talentDrag.offsetY;
+            talentPanel.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!this.talentDrag.isDragging) return;
+            
+            this.talentDrag.offsetX = e.clientX - this.talentDrag.startX;
+            this.talentDrag.offsetY = e.clientY - this.talentDrag.startY;
+            
+            this.updateTalentView();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (this.talentDrag.isDragging) {
+                this.talentDrag.isDragging = false;
+                talentPanel.style.cursor = 'default';
+            }
+        });
+
+        // --- 滚轮缩放监听 ---
+        talentPanel.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            const newScale = Math.max(0.5, Math.min(2.0, this.talentDrag.scale + delta));
+            
+            if (newScale !== this.talentDrag.scale) {
+                this.talentDrag.scale = newScale;
+                this.updateTalentView();
+            }
+        }, { passive: false });
+    }
+
+    /**
+     * 重置奇穴视图位置
+     */
+    resetTalentView() {
+        this.talentDrag.offsetX = 0;
+        this.talentDrag.offsetY = 0;
+        this.talentDrag.scale = 1.0;
+        this.updateTalentView();
+    }
+
+    /**
+     * 更新奇穴视图（包含星空视差与缩放）
+     */
+    updateTalentView() {
+        const container = document.getElementById('talent-container');
+        const starryBg = document.querySelector('.talent-starry-bg');
+        
+        if (container) {
+            // 奇穴位点跟随移动并缩放
+            container.style.transform = `translate(${this.talentDrag.offsetX}px, ${this.talentDrag.offsetY}px) scale(${this.talentDrag.scale})`;
+        }
+        
+        if (starryBg) {
+            // 背景星空视差移动并伴随微弱缩放
+            const bgX = this.talentDrag.offsetX * 0.2;
+            const bgY = this.talentDrag.offsetY * 0.2;
+            // 星空缩放幅度更小，产生深度距离感 (基础 1.1 + 缩放增量的 20%)
+            const bgScale = 1.1 + (this.talentDrag.scale - 1.0) * 0.2;
+            starryBg.style.transform = `translate(${bgX}px, ${bgY}px) scale(${bgScale})`;
+        }
+    }
+
+    /**
+     * 渲染基于注册表数据的奇穴图
+     */
+    renderTalentGraph() {
+        const container = document.getElementById('talent-container');
+        const svg = document.getElementById('talent-links-svg');
+        if (!container || !svg) return;
+
+        container.querySelectorAll('.talent-node').forEach(n => n.remove());
+        svg.innerHTML = '';
+
+        // 获取当前英雄生成的树
+        const tree = talentManager.currentTree;
+        if (!tree) return;
+
+        const { nodes, links } = tree;
+
+        // 1. 绘制经脉连线
+        links.forEach(link => {
+            const source = nodes[link.source];
+            const target = nodes[link.target];
+            if (!source || !target) return;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            const x1 = source.pos.x + 400;
+            const y1 = source.pos.y + 300;
+            const x2 = target.pos.x + 400;
+            const y2 = target.pos.y + 300;
+
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('class', 'talent-link');
+            
+            const isSourceActive = (talentManager.activeTalents[link.source] || 0) > 0;
+            const isTargetActive = (talentManager.activeTalents[link.target] || 0) > 0;
+            if (isSourceActive && isTargetActive) {
+                line.classList.add('active');
+            }
+
+            svg.appendChild(line);
+        });
+
+        // 2. 绘制奇穴节点
+        for (const id in nodes) {
+            const nodeData = nodes[id];
+            const node = document.createElement('div');
+            node.className = `talent-node node-type-${nodeData.type}`;
+            
+            const currentLevel = talentManager.activeTalents[id] || 0;
+            if (currentLevel > 0) node.classList.add('active');
+
+            node.style.left = `${nodeData.pos.x + 400 - 32}px`; 
+            node.style.top = `${nodeData.pos.y + 300 - 32}px`;
+
+            const iconStyle = spriteFactory.getIconStyle(nodeData.icon);
+            node.innerHTML = `
+                <div class="talent-node-inner" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                <div class="talent-node-level">${currentLevel}/${nodeData.maxLevel}</div>
+                <div class="talent-node-name">${nodeData.name}</div>
+            `;
+
+            node.onmouseenter = () => {
+                this.showTooltip({
+                    name: nodeData.name,
+                    level: `当前等级: ${currentLevel}/${nodeData.maxLevel}`,
+                    description: `<div style="margin-bottom: 8px;">${nodeData.description}</div>`,
+                    status: currentLevel < nodeData.maxLevel ? `升级需求: 1 奇穴点数` : '已修至最高重',
+                    color: currentLevel < nodeData.maxLevel ? 'var(--jx3-gold)' : '#ccc'
+                });
+            };
+            node.onmouseleave = () => this.hideTooltip();
+
+            node.onclick = () => {
+                if (talentManager.upgradeTalent(id)) {
+                    audioManager.play('talent_upgrade');
+                    this.renderTalentGraph();
+                    const pointsVal = document.getElementById('talent-points-val');
+                    if (pointsVal) pointsVal.innerText = worldManager.heroData.talentPoints;
+                } else {
+                    const check = talentManager.canUpgrade(id);
+                    this.showNotification(check.reason);
+                    audioManager.play('ui_invalid');
+                }
+            };
+
+            container.appendChild(node);
+        }
+    }
+
+    /**
+     * 显示全局通知
+     */
+    showNotification(text) {
+        const container = document.getElementById('notification-container');
+        if (!container) return;
+        const note = document.createElement('div');
+        note.className = 'notification-item';
+        note.innerText = text;
+        container.appendChild(note);
+        setTimeout(() => note.classList.add('fade-out'), 2000);
+        setTimeout(() => note.remove(), 2500);
+    }
+
 
     /**
      * 渲染可学习/图谱技能
