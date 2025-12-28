@@ -1913,6 +1913,13 @@ canvas { image-rendering: pixelated; }
     transform: translateY(-4px);
 }
 
+.skill-btn.disabled {
+    filter: grayscale(1);
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none; /* 防止悬浮动画和提示 */
+}
+
 .skill-icon {
     width: 32px;
     height: 32px;

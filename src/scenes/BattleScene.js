@@ -1044,6 +1044,9 @@ export class BattleScene {
         this.camera.position.set(0, 15, 18); 
         this.camera.lookAt(0, 0, 0);
         
+        // 实时更新技能栏状态 (内力不足或主角阵亡时禁用)
+        this.updateSkillUIState();
+        
         // 处理技能指示器逻辑
         if (this.activeSkill && this.skillIndicator) {
             const skill = SkillRegistry[this.activeSkill];
@@ -1083,6 +1086,37 @@ export class BattleScene {
         this.enemyUnits.forEach(u => u.update(this.playerUnits, this.enemyUnits, deltaTime));
         this.projectileManager.update(deltaTime);
         this.checkWinCondition();
+    }
+
+    /**
+     * 实时更新技能图标的可点击状态 (置灰逻辑)
+     */
+    updateSkillUIState() {
+        if (!this.isActive || this.isDeployment) return;
+        
+        const heroData = this.worldManager.heroData;
+        const isHeroDead = this.heroUnit ? this.heroUnit.isDead : true;
+        
+        heroData.skills.forEach(skillId => {
+            const btn = document.getElementById(`skill-${skillId}`);
+            if (!btn) return;
+            
+            const skill = SkillRegistry[skillId];
+            if (!skill) return;
+
+            // 检查：主角是否存活、内力是否足够
+            // 注意：冷却状态由 overlay 处理，此处主要控制“绝对不可放”的情况 (死亡/蓝耗)
+            const actualCost = Math.floor(skill.cost * (1 - (heroData.stats.haste || 0)));
+            const hasEnoughMP = heroData.mpCurrent >= actualCost;
+            
+            const isDisabled = isHeroDead || !hasEnoughMP;
+            
+            if (isDisabled) {
+                btn.classList.add('disabled');
+            } else {
+                btn.classList.remove('disabled');
+            }
+        });
     }
 
     checkWinCondition() {
