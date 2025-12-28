@@ -627,16 +627,17 @@ export class HeroUnit extends BaseUnit {
         const heroData = worldManager.heroData;
         const details = worldManager.getUnitBlueprint(heroData.id);
         
-        // 彻底数据驱动：英雄战场移动速度完全由蓝图 combatSpeed 决定
-        const baseCombatSpeed = details.combatSpeed || 4.0; 
+        // 优雅重构：英雄战场移动速度完全由蓝图 combatSpeed 决定，实现内外彻底解耦
+        // 如果蓝图未定义 combatSpeed，则安全降级到 5.0 (保证基础可玩性)
+        const baseCombatSpeed = details.combatSpeed || 5.0;
 
         super({
             side,
             index,
             type: heroData.id, 
-            hp: details.hp, // 使用蓝图基础血量 (BaseUnit 会应用全局修正)
+            hp: details.hp, 
             speed: baseCombatSpeed,
-            attackDamage: details.atk, // 使用包含力道成长的最终攻击力
+            attackDamage: details.atk, 
             attackRange: details.range,
             attackSpeed: details.attackSpeed,
             projectileManager,

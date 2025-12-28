@@ -49,7 +49,7 @@ export const UNIT_STATS_DATA = {
     'qijin':      { 
         name: '祁进', 
         range: 15.0, 
-        combatSpeed: 6.0, // 祁进战场基础速度 6.0
+        combatSpeed: 6.0, // 战场基础移动速度 (轻功属性仅影响大世界)
         rangeType: '五剑连发', 
         attackSpeed: 1000, 
         burstCount: 5, 
@@ -59,7 +59,7 @@ export const UNIT_STATS_DATA = {
     'lichengen': { 
         name: '李承恩', 
         range: 2.0, 
-        combatSpeed: 7.0, // 李承恩基础 7.0 (额外速度由天赋 talent_speed 提供)
+        combatSpeed: 7.0, // 战场基础移动速度 (额外速度由天赋 talent_speed 提供)
         rangeType: '横扫千军', 
         attackSpeed: 1000, 
         targets: 2.5,
@@ -69,7 +69,7 @@ export const UNIT_STATS_DATA = {
     'yeying':    { 
         name: '叶英', 
         range: 2.5, 
-        combatSpeed: 7.0, // 叶英战场基础速度 7.0
+        combatSpeed: 17.0, // 战场基础移动速度 (轻功属性仅影响大世界)
         rangeType: '心剑旋风', 
         attackSpeed: 1000, 
         description: '藏剑庄主，心剑合一，周身剑气无坚不摧。',
