@@ -26,6 +26,10 @@ class AudioManager {
                 files: ['/audio/click/按下音效.mp3'],
                 throttle: 50 
             },
+            'ui_invalid': { 
+                files: ['/audio/click/无效按钮音效.mp3'],
+                throttle: 50 
+            },
             
             // 攻击音效池
             'attack_melee': { 

@@ -8,7 +8,7 @@ export const UNIT_STATS_DATA = {
     'melee': { name: '天策弟子', hp: 85, atk: 6, range: 0.8, rangeType: '近战', speed: 5.0, attackSpeed: 1000, targets: 1.0, description: '天策府的基础步兵，性价比极高，适合作为前排炮灰。' },
     'ranged': { name: '长歌弟子', hp: 70, atk: 14, range: 6.0, rangeType: '远程', speed: 4.2, attackSpeed: 1800, targets: 1.0, description: '以音律伤敌，射程适中，生存能力一般。' },
     'archer': { name: '唐门射手', hp: 65, atk: 22, range: 20.0, rangeType: '极远', speed: 5.0, attackSpeed: 2500, targets: 1.0, description: '穿心弩箭，百步穿杨，脆皮但高输出。' },
-    'tiance': { name: '天策骑兵', hp: 160, atk: 18, range: 1.8, rangeType: '冲锋', speed: 8.4, attackSpeed: 800, targets: 2.5, description: '大唐精锐，强大的切入能力与控制力。' },
+    'tiance': { name: '天策骑兵', hp: 320, atk: 9, range: 1.8, rangeType: '冲锋', speed: 8.4, attackSpeed: 800, targets: 3.0, description: '大唐精锐，强大的切入能力与控制力。' },
     'chunyang': { 
         name: '纯阳弟子', 
         hp: 140, 
@@ -20,10 +20,10 @@ export const UNIT_STATS_DATA = {
         description: '御剑而行，能在大后方提供精准的剑气支援。',
         modes: {
             'chunyang_remote': { name: '纯阳(气)', atk: 12, range: 12.0, burstCount: 3, targets: 1.0 },
-            'chunyang_melee': { name: '纯阳(剑)', atk: 18, range: 1.5, burstCount: 1, targets: 1.5 }
+            'chunyang_melee': { name: '纯阳(剑)', atk: 22, range: 1.5, burstCount: 1, targets: 2.5 }
         }
     },
-    'cangjian': { name: '藏剑弟子', hp: 200, atk: 7.2, range: 1.5, rangeType: 'AOE', speed: 5.9, attackSpeed: 2000, burstCount: 3, targets: 5.0, description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
+    'cangjian': { name: '藏剑弟子', hp: 200, atk: 6.0, range: 1.5, rangeType: 'AOE', speed: 5.9, attackSpeed: 2000, burstCount: 3, targets: 4.0, description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
     'cangyun': { name: '苍云将士', hp: 390, atk: 10, range: 0.8, rangeType: '盾墙', speed: 3.4, attackSpeed: 1200, targets: 1.2, description: '玄甲军魂，战场上最难以逾越的铁壁。' },
     'healer': { name: '万花补给', hp: 120, atk: 30, range: 5.0, rangeType: '治疗', speed: 3.4, attackSpeed: 2500, targets: 1.0, description: '妙手回春，能够有效保障精锐部队的存活。' },
     

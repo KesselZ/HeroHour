@@ -50,6 +50,11 @@ window.addEventListener('resize', () => {
 });
 
 // 5. UI 逻辑
+// 禁止所有可能导致脱离游戏沉浸感的浏览器行为
+document.addEventListener('selectstart', (e) => e.preventDefault());
+document.addEventListener('copy', (e) => e.preventDefault());
+document.addEventListener('dragstart', (e) => e.preventDefault());
+
 const startBtn = document.querySelector('#start-btn');
 const skillGalleryBtn = document.querySelector('#open-skill-learn-btn'); // 招式图谱按钮
 const howToPlayBtn = document.querySelector('#how-to-play-btn'); // 江湖指南按钮

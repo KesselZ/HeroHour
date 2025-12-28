@@ -8,40 +8,42 @@ import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsDat
  * 这种方式将数据与逻辑彻底分离，以后增加建筑只需在此处添加
  */
 const BUILDING_REGISTRY = {
-    'town_hall': { name: '议政厅', category: 'economy', maxLevel: 3, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。' },
-    'market': { name: '市场', category: 'economy', maxLevel: 3, icon: 'merchant_guild', cost: { gold: 300, wood: 50 }, description: '互通有无：提高城镇的金钱与木材产出效率。' },
-    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '每级增加全军 10% 的阅历获取速度。' },
-    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 3, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '提升该城镇 20% 的金钱产出。' },
-    'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '增加城镇木材产出，并降低全军招募成本 5%。' },
+    'town_hall': { name: '议政厅', category: 'economy', maxLevel: 3, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。', costGrowth: { type: 'linear', increment: { gold: 500, wood: 100 } } },
+    'market': { name: '市场', category: 'economy', maxLevel: 3, icon: 'merchant_guild', cost: { gold: 300, wood: 50 }, description: '互通有无：提高城镇的金钱与木材产出效率。', costGrowth: { type: 'linear', increment: { gold: 200, wood: 50 } } },
+    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '每级增加全军 10% 的阅历获取速度。', costGrowth: { type: 'linear', increment: { gold: 400, wood: 200 } } },
+    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 3, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '提升该城镇 20% 的金钱产出。', costGrowth: { type: 'exponential', factor: 1.5 } },
+    'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '增加城镇木材产出，并降低全军招募成本 5%。', costGrowth: { type: 'linear', increment: { gold: 500, wood: 300 } } },
     
-    // 军事建筑：现在每级都有数值成长
-    'barracks': { name: '兵营', category: 'military', maxLevel: 5, icon: 'melee', cost: { gold: 400, wood: 150 }, description: '解锁近战兵种，随后每级增加全军近战兵种 10% 生命。' },
-    'archery_range': { name: '靶场', category: 'military', maxLevel: 5, icon: 'archer', cost: { gold: 400, wood: 200 }, description: '解锁远程兵种，随后每级增加全军远程兵种 10% 伤害。' },
-    'stable': { name: '天策马厩', category: 'military', maxLevel: 5, icon: 'tiance', cost: { gold: 800, wood: 300 }, description: '解锁天策兵种，随后每级增加全军天策系 10% 伤害与生命。' },
-    'sword_forge': { name: '藏剑剑庐', category: 'military', maxLevel: 5, icon: 'cangjian', cost: { gold: 900, wood: 400 }, description: '解锁藏剑兵种，随后每级增加全军藏剑系 10% 伤害与生命。' },
-    'martial_shrine': { name: '苍云讲武堂', category: 'military', maxLevel: 5, icon: 'cangyun', cost: { gold: 850, wood: 450 }, description: '解锁苍云兵种，随后每级增加全军苍云系 10% 生命与防御。' },
-    'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 1000, wood: 500 }, description: '解锁纯阳兵种，随后每级增加全军纯阳系 10% 属性。' },
-    'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '解锁万花兵种，随后每级增加全军万花系 10% 气血与疗效。' },
+    // 军事建筑：根据兵种强度（招募成本与统御占用）重新平衡
+    'barracks': { name: '兵营', category: 'military', maxLevel: 5, icon: 'melee', cost: { gold: 400, wood: 150 }, description: '解锁近战兵种，随后每级增加全军近战兵种 10% 生命。', costGrowth: { type: 'linear', increment: { gold: 150, wood: 50 } } },
+    'archery_range': { name: '靶场', category: 'military', maxLevel: 5, icon: 'archer', cost: { gold: 500, wood: 250 }, description: '解锁远程兵种，随后每级增加全军远程兵种 10% 伤害。', requirements: [{ id: 'barracks', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 200, wood: 100 } } },
     
-    'spell_altar': { name: '功法祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1200, wood: 600 }, description: '博采众长：每级随机感悟全江湖招式。' },
-    'treasure_pavilion': { name: '藏宝阁', category: 'economy', maxLevel: 1, icon: 'treasure_pavilion_v2', cost: { gold: 2000, wood: 800 }, description: '琳琅满目：极其罕见的珍宝汇聚之地。' },
+    // 高级兵种建筑：价格按强度阶梯式上升
+    'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '解锁万花兵种，随后每级增加全军万花系 10% 气血与疗效。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 300, wood: 150 } } },
+    'martial_shrine': { name: '苍云讲武堂', category: 'military', maxLevel: 5, icon: 'cangyun', cost: { gold: 700, wood: 350 }, description: '解锁苍云兵种，随后每级增加全军苍云系 10% 生命与防御。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 300, wood: 150 } } },
+    'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 600, wood: 300 }, description: '解锁纯阳兵种，随后每级增加全军纯阳系 10% 属性。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 250, wood: 125 } } },
+    'stable': { name: '天策马厩', category: 'military', maxLevel: 5, icon: 'tiance', cost: { gold: 1100, wood: 600 }, description: '解锁天策兵种，随后每级增加全军天策系 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 500, wood: 300 } } },
+    'sword_forge': { name: '藏剑剑庐', category: 'military', maxLevel: 5, icon: 'cangjian', cost: { gold: 800, wood: 400 }, description: '解锁藏剑兵种，随后每级增加全军藏剑系 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 400, wood: 200 } } },
     
-    // 纯阳：招式研习
-    'sect_chunyang_basic': { name: '两仪馆', category: 'magic', maxLevel: 2, icon: 'sect_chunyang_v3', cost: { gold: 400, wood: 200 }, description: '纯阳基础：感悟纯阳【初级】招式。' },
-    'sect_chunyang_advanced': { name: '太极殿', category: 'magic', maxLevel: 5, icon: 'sect_chunyang_v3', cost: { gold: 1000, wood: 500 }, description: '纯阳进阶：感悟纯阳【高级】招式。' },
-    'sect_chunyang_ultimate': { name: '纯阳宫', category: 'magic', maxLevel: 1, icon: 'sect_chunyang_v3', cost: { gold: 2500, wood: 1200 }, description: '纯阳绝学：感悟纯阳【绝技】招式。' },
+    // 特殊建筑：移除不必要的条件，平衡价格
+    'spell_altar': { name: '功法祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1500, wood: 800 }, description: '博采众长：每级随机感悟全江湖招式。', costGrowth: { type: 'exponential', factor: 1.8 } },
+    'treasure_pavilion': { name: '藏宝阁', category: 'economy', maxLevel: 1, icon: 'treasure_pavilion_v2', cost: { gold: 3000, wood: 1500 }, description: '琳琅满目：极其罕见的珍宝汇聚之地。', costGrowth: { type: 'constant' } },
+    'clinic': { name: '医馆', category: 'magic', maxLevel: 1, icon: 'clinic_v3', cost: { gold: 1000, wood: 500 }, description: '仁心仁术：战场上死去的士兵有 20% 概率伤愈归队，减少损耗。', costGrowth: { type: 'constant' } },
+
+    // 纯阳：招式研习 (层层递进解锁)
+    'sect_chunyang_basic': { name: '两仪馆', category: 'magic', maxLevel: 2, icon: 'sect_chunyang_v3', cost: { gold: 400, wood: 200 }, description: '纯阳基础：感悟纯阳【初级】招式。', costGrowth: { type: 'constant' } },
+    'sect_chunyang_advanced': { name: '太极殿', category: 'magic', maxLevel: 5, icon: 'sect_chunyang_v3', cost: { gold: 1000, wood: 500 }, description: '纯阳进阶：感悟纯阳【高级】招式。', requirements: [{ id: 'sect_chunyang_basic', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_chunyang_ultimate': { name: '纯阳宫', category: 'magic', maxLevel: 1, icon: 'sect_chunyang_v3', cost: { gold: 2500, wood: 1200 }, description: '纯阳绝学：感悟纯阳【绝技】招式。', requirements: [{ id: 'sect_chunyang_advanced', level: 1 }], costGrowth: { type: 'constant' } },
 
     // 天策：招式研习
-    'sect_tiance_basic': { name: '演武场', category: 'magic', maxLevel: 2, icon: 'dummy_training', cost: { gold: 400, wood: 200 }, description: '天策基础：感悟天策【初级】招式。' },
-    'sect_tiance_advanced': { name: '凌烟阁', category: 'magic', maxLevel: 5, icon: 'dummy_training', cost: { gold: 1000, wood: 500 }, description: '天策进阶：感悟天策【高级】招式。' },
-    'sect_tiance_ultimate': { name: '天策府', category: 'magic', maxLevel: 1, icon: 'dummy_training', cost: { gold: 2500, wood: 1200 }, description: '天策绝学：感悟天策【绝技】招式。' },
+    'sect_tiance_basic': { name: '演武场', category: 'magic', maxLevel: 2, icon: 'dummy_training', cost: { gold: 400, wood: 200 }, description: '天策基础：感悟天策【初级】招式。', costGrowth: { type: 'constant' } },
+    'sect_tiance_advanced': { name: '凌烟阁', category: 'magic', maxLevel: 5, icon: 'dummy_training', cost: { gold: 1000, wood: 500 }, description: '天策进阶：感悟天策【高级】招式。', requirements: [{ id: 'sect_tiance_basic', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_tiance_ultimate': { name: '天策府', category: 'magic', maxLevel: 1, icon: 'dummy_training', cost: { gold: 2500, wood: 1200 }, description: '天策绝学：感悟天策【绝技】招式。', requirements: [{ id: 'sect_tiance_advanced', level: 1 }], costGrowth: { type: 'constant' } },
 
     // 藏剑：招式研习
-    'sect_cangjian_basic': { name: '问水亭', category: 'magic', maxLevel: 2, icon: 'sect_cangjian_v3', cost: { gold: 400, wood: 200 }, description: '藏剑基础：感悟藏剑【初级】招式。' },
-    'sect_cangjian_advanced': { name: '山外山', category: 'magic', maxLevel: 5, icon: 'sect_cangjian_v3', cost: { gold: 1000, wood: 500 }, description: '藏剑进阶：感悟藏剑【高级】招式。' },
-    'sect_cangjian_ultimate': { name: '藏剑庐', category: 'magic', maxLevel: 1, icon: 'sect_cangjian_v3', cost: { gold: 2500, wood: 1200 }, description: '藏剑绝学：感悟藏剑【绝技】招式。' },
-
-    'clinic': { name: '医馆', category: 'magic', maxLevel: 1, icon: 'clinic_v3', cost: { gold: 600, wood: 300 }, description: '仁心仁术：战场上死去的士兵有 20% 概率伤愈归队，减少损耗。' }
+    'sect_cangjian_basic': { name: '问水亭', category: 'magic', maxLevel: 2, icon: 'sect_cangjian_v3', cost: { gold: 400, wood: 200 }, description: '藏剑基础：感悟藏剑【初级】招式。', costGrowth: { type: 'constant' } },
+    'sect_cangjian_advanced': { name: '山外山', category: 'magic', maxLevel: 5, icon: 'sect_cangjian_v3', cost: { gold: 1000, wood: 500 }, description: '藏剑进阶：感悟藏剑【高级】招式。', requirements: [{ id: 'sect_cangjian_basic', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_cangjian_ultimate': { name: '藏剑庐', category: 'magic', maxLevel: 1, icon: 'sect_cangjian_v3', cost: { gold: 2500, wood: 1200 }, description: '藏剑绝学：感悟藏剑【绝技】招式。', requirements: [{ id: 'sect_cangjian_advanced', level: 1 }], costGrowth: { type: 'constant' } }
 };
 
 /**
@@ -117,6 +119,65 @@ class City {
     }
 
     /**
+     * 核心算法：计算建筑升级至下一级所需的资源成本
+     * @param {string} buildingId 建筑ID
+     * @param {number} currentLevel 当前等级
+     * @returns {Object} { gold, wood }
+     */
+    calculateUpgradeCost(buildingId, currentLevel) {
+        const meta = BUILDING_REGISTRY[buildingId];
+        if (!meta) return { gold: 0, wood: 0 };
+        
+        const base = meta.cost; // 基础价格 (Lv.1 的价格)
+        const growth = meta.costGrowth || { type: 'linear', increment: { gold: 100, wood: 50 } }; 
+        
+        // 我们要升到的目标等级
+        const targetLevel = currentLevel + 1;
+        
+        // 第一级永远使用基准价格
+        if (targetLevel <= 1) return { ...base };
+        
+        if (growth.type === 'linear') {
+            // 线性公式：Base + (TargetLevel - 1) * Increment
+            const inc = growth.increment || { gold: 100, wood: 50 };
+            return {
+                gold: base.gold + (targetLevel - 1) * (inc.gold || 0),
+                wood: base.wood + (targetLevel - 1) * (inc.wood || 0)
+            };
+        } else if (growth.type === 'exponential') {
+            // 指数公式：Base * (Factor ^ (TargetLevel - 1))，并取整到最接近的 50
+            const multiplier = Math.pow(growth.factor || 1.5, targetLevel - 1);
+            return {
+                gold: Math.ceil((base.gold * multiplier) / 50) * 50,
+                wood: Math.ceil((base.wood * multiplier) / 50) * 50
+            };
+        } else {
+            // constant 或其他：保持基准价格
+            return { ...base };
+        }
+    }
+
+    /**
+     * 校验建筑是否满足解锁条件
+     */
+    checkBuildingRequirements(buildingId) {
+        const meta = BUILDING_REGISTRY[buildingId];
+        if (!meta || !meta.requirements) return { met: true };
+
+        for (const req of meta.requirements) {
+            const currentLevel = this.buildingLevels[req.id] || 0;
+            if (currentLevel < req.level) {
+                const reqMeta = BUILDING_REGISTRY[req.id];
+                return { 
+                    met: false, 
+                    reason: `需要 ${reqMeta ? reqMeta.name : req.id} 达到 Lv.${req.level}` 
+                };
+            }
+        }
+        return { met: true };
+    }
+
+    /**
      * 动态获取当前城市所有的建筑列表
      * 基于城市自身的 blueprintId，与当前 owner 无关，实现了“夺城而不改制”的战略感
      */
@@ -127,11 +188,15 @@ class City {
         blueprint.forEach(id => {
             const meta = BUILDING_REGISTRY[id];
             if (meta) {
+                const currentLevel = this.buildingLevels[id] || 0;
+                const reqStatus = this.checkBuildingRequirements(id);
                 list[meta.category].push({ 
                     id, 
                     ...meta, 
                     maxLevel: this.getBuildingMaxLevel(id), // 使用动态最大等级
-                    level: this.buildingLevels[id] || 0 
+                    level: currentLevel,
+                    cost: this.calculateUpgradeCost(id, currentLevel), // 动态计算升级成本
+                    unlockStatus: reqStatus // 包含解锁状态和原因
                 });
             }
         });
@@ -1383,6 +1448,28 @@ class WorldManager {
     spendWood(amount) {
         if (this.resources.wood >= amount) {
             this.resources.wood -= amount;
+            this.updateHUD();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 检查资源是否足够
+     */
+    hasResources(costs) {
+        const goldNeeded = costs.gold || 0;
+        const woodNeeded = costs.wood || 0;
+        return this.resources.gold >= goldNeeded && this.resources.wood >= woodNeeded;
+    }
+
+    /**
+     * 同时消耗多种资源 (原子操作，要么全扣，要么不扣)
+     */
+    spendResources(costs) {
+        if (this.hasResources(costs)) {
+            if (costs.gold) this.resources.gold -= costs.gold;
+            if (costs.wood) this.resources.wood -= costs.wood;
             this.updateHUD();
             return true;
         }

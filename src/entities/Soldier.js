@@ -1366,7 +1366,7 @@ export class Chunyang extends BaseUnit {
 
             if (this.isMeleeMode) {
                 const m = this.statsData.modes.chunyang_melee;
-                window.battle.playVFX('tiance_sweep', { unit: this, radius: m.range, color: 0x00ccff, duration: 200 });
+                window.battle.playVFX('tiance_sweep', { unit: this, radius: m.range, color: 0x00ffff, duration: 200 });
                 this.executeAOE(enemies, { radius: m.range, angle: Math.PI * 2/3, damage: this.attackDamage * (m.atk/this.statsData.modes.chunyang_remote.atk), knockbackForce: 0.03 });
             } else {
                 const r = this.statsData.modes.chunyang_remote;

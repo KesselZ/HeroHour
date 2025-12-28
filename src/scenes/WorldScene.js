@@ -497,26 +497,47 @@ export class WorldScene {
             allBuildings[cat].forEach(build => {
                 const card = document.createElement('div');
                 const isMax = build.level >= build.maxLevel;
-                card.className = `building-card lv-${build.level} ${isMax ? 'is-max' : ''}`;
+                const isLocked = !build.unlockStatus.met;
                 
+                card.className = `building-card lv-${build.level} ${isMax ? 'is-max' : ''} ${isLocked ? 'is-locked' : ''}`;
+                
+                let costText = isMax ? '已满级' : `💰${build.cost.gold} 🪵${build.cost.wood}`;
+                if (isLocked) {
+                    costText = `🔒 ${build.unlockStatus.reason}`;
+                }
+
                 card.innerHTML = `
                     <div class="building-icon" style="${this.getIconStyleString(build.icon)}"></div>
                     <span class="building-name">${build.name}</span>
-                    <span class="building-cost">${isMax ? '已满级' : `💰${build.cost.gold} 🪵${build.cost.wood}`}</span>
+                    <span class="building-cost">${costText}</span>
                 `;
                 
-                card.onmouseenter = () => uiManager.showTooltip(build);
+                card.onmouseenter = () => {
+                    const tooltipData = { ...build };
+                    if (isLocked) {
+                        tooltipData.description = `<div style="color: #ff4444; margin-bottom: 8px; font-weight: bold;">[锁定] ${build.unlockStatus.reason}</div>` + (build.description || '');
+                    }
+                    uiManager.showTooltip(tooltipData);
+                };
                 card.onmouseleave = () => uiManager.hideTooltip();
 
                 card.onclick = () => {
+                    if (isLocked) {
+                        worldManager.showNotification(`无法建设：${build.unlockStatus.reason}`);
+                        audioManager.play('ui_invalid', { volume: 0.8 });
+                        return;
+                    }
                     if (isMax) return;
-                    if (worldManager.spendGold(build.cost.gold) && worldManager.spendWood(build.cost.wood)) {
+
+                    // 使用原子化的资源消耗接口，修复资源扣除顺序导致的 Bug
+                    if (worldManager.spendResources(build.cost)) {
                         // 建筑升级成功：播放厚重的“按下”音效
                         audioManager.play('ui_press', { volume: 0.8 });
                         cityData.upgradeBuilding(build.id);
                         this.refreshTownUI(cityId);
                     } else {
                         worldManager.showNotification('资源不足，无法建设！');
+                        audioManager.play('ui_invalid', { volume: 0.8 });
                     }
                 };
                 container.appendChild(card);
@@ -581,6 +602,7 @@ export class WorldScene {
                         this.refreshTownUI(cityId);
                     } else {
                         worldManager.showNotification('资源不足或统御上限已满！');
+                        audioManager.play('ui_invalid', { volume: 0.8 });
                     }
                 };
                 recruitList.appendChild(item);
