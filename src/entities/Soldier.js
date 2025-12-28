@@ -98,10 +98,10 @@ export class BaseUnit extends THREE.Group {
      * 创建头顶 精灵图血条 (基类通用版)
      */
     createHealthBar() {
-        // 极低分辨率 (32x4)，让像素点非常巨大
+        // 极低分辨率，高度略微增加以变宽
         const canvas = document.createElement('canvas');
         canvas.width = 32; 
-        canvas.height = 4; 
+        canvas.height = 6; 
         this.hpCanvas = canvas;
         this.hpCtx = canvas.getContext('2d');
         
@@ -117,9 +117,11 @@ export class BaseUnit extends THREE.Group {
         });
         
         this.hpSprite = new THREE.Sprite(material);
-        // 主角血条长一点 (0.9)，普通士兵短一点 (0.6)
-        const s = this.isHero ? 0.9 : 0.6;
-        this.hpSprite.scale.set(s, 0.075, 1); 
+        // 主角血条长一点 (0.9)，普通士兵现在也变大一点 (0.8)
+        // 垂直缩放增加到 0.12 让血条更宽、更有像素块的厚实感
+        const isHeroType = ['qijin', 'lichengen', 'yeying'].includes(this.type);
+        const s = isHeroType ? 0.9 : 0.8;
+        this.hpSprite.scale.set(s, 0.12, 1); 
         this.hpSprite.position.set(0, 0, 0);
         this.add(this.hpSprite);
         
@@ -143,12 +145,12 @@ export class BaseUnit extends THREE.Group {
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, w, h);
         
-        // 3. 绘制内槽背景 (收缩 1px)
-        ctx.fillStyle = isPlayer ? 'rgba(0, 40, 0, 0.9)' : 'rgba(60, 0, 0, 0.9)';
+        // 3. 绘制内槽背景 (收缩 1px，显著提升敌方底色亮度)
+        ctx.fillStyle = isPlayer ? 'rgba(0, 40, 0, 0.9)' : 'rgba(100, 20, 20, 0.9)';
         ctx.fillRect(1, 1, w - 2, h - 2);
         
-        // 4. 绘制填充内容 (收缩 1px，并按比例计算宽度)
-        ctx.fillStyle = isPlayer ? '#44ff44' : '#ff0000';
+        // 4. 绘制填充内容 (使用更鲜艳、亮眼的红/绿)
+        ctx.fillStyle = isPlayer ? '#44ff44' : '#ff4444';
         const maxFillW = w - 2;
         const fillW = Math.floor(maxFillW * pct);
         if (fillW > 0) {
@@ -349,15 +351,15 @@ export class BaseUnit extends THREE.Group {
             this.unitSprite.material.color.setHex(targetColor);
         }
 
-        // --- 核心修复：血条透视补偿 ---
+        // --- 核心修复：血条透视补偿与高度动态适配 ---
         // 传统的 position.y 偏移会随相机距离中心越远而产生明显的“倾斜”
         // 我们通过将偏移量设为“相机坐标系下的向上方向”来抵消这种透视畸变
         if (this.hpSprite && window.battle && window.battle.camera) {
             const cam = window.battle.camera;
             // 计算相机视角中的“向上”向量在世界空间中的表达
             const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
-            // 补偿距离：高度略微提升，保持呼吸感
-            const offsetDist = this.isHero ? 0.85 : 0.65;
+            // 补偿距离：根据单位的 visualScale (视觉缩放) 动态计算高度，防止大体型单位遮挡血条
+            const offsetDist = 0.4 + (this.visualScale * 0.18);
             this.hpSprite.position.copy(cameraUp).multiplyScalar(offsetDist);
         }
     }
