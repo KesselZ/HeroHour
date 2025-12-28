@@ -4,6 +4,7 @@ import { rng } from '../core/Random.js';
 import { modifierManager } from '../core/ModifierManager.js';
 import { worldManager } from '../core/WorldManager.js';
 import { audioManager } from '../core/AudioManager.js';
+import { UNIT_STATS_DATA } from '../data/UnitStatsData.js';
 
 /**
  * 基础战斗单位类
@@ -73,7 +74,29 @@ export class BaseUnit extends THREE.Group {
         this.footstepTimer = 0;
         this.footstepInterval = 650; // 每 650ms 响一次
 
+        // 攻击动画状态机 (平滑冲刺)
+        this.lungeState = {
+            active: false,
+            progress: 0,     // 0.0 -> 1.0
+            direction: new THREE.Vector3(),
+            duration: 0.25,  // 总持续时间 (秒)
+            maxDist: 0.4
+        };
+
         this.initVisual();
+        
+        // 保存视觉缩放比例，用于计算碰撞半径
+        const unitCfg = spriteFactory.unitConfig[this.type];
+        this.visualScale = unitCfg ? (unitCfg.scale || 1.4) : 1.4;
+    }
+
+    /**
+     * 获取单位当前的硬体碰撞半径
+     */
+    get collisionRadius() {
+        // 基础半径 0.5 (对应标准缩放 1.4)
+        // 如果 scale 变大，半径等比例变大
+        return 0.5 * (this.visualScale / 1.4);
     }
 
     initVisual() {
@@ -216,11 +239,51 @@ export class BaseUnit extends THREE.Group {
         }
     }
 
+    /**
+     * 处理平滑的攻击冲刺动画
+     */
+    updateLunge(deltaTime) {
+        if (!this.lungeState.active || !this.unitSprite) return;
+
+        this.lungeState.progress += deltaTime / this.lungeState.duration;
+        
+        if (this.lungeState.progress >= 1.0) {
+            // 动画结束，重置位置和缩放
+            this.lungeState.active = false;
+            this.lungeState.progress = 0;
+            this.unitSprite.position.set(0, 0, 0);
+            this.unitSprite.scale.set(this.visualScale, this.visualScale, 1);
+            return;
+        }
+
+        // 使用 sin 曲线模拟冲刺并弹回的效果 (0 -> 1 -> 0)
+        // Math.sin(progress * Math.PI) 在 progress 为 0.5 时达到最大值 1
+        const t = Math.sin(this.lungeState.progress * Math.PI);
+        
+        // 更新位移 (如果没被禁用)
+        if (!this.lungeState.noLunge) {
+            const dist = t * this.lungeState.maxDist;
+            this.unitSprite.position.set(
+                this.lungeState.direction.x * dist,
+                this.lungeState.direction.y * dist,
+                this.lungeState.direction.z * dist
+            );
+        }
+
+        // 更新缩放 (在基础缩放上叠加 30% 的变化)
+        const scaleBoost = 1.0 + t * 0.3;
+        const currentScale = this.visualScale * scaleBoost;
+        this.unitSprite.scale.set(currentScale, currentScale, 1);
+    }
+
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
 
         // 0. 统一视觉状态更新
         this.updateVisualState();
+        
+        // 0. 攻击冲刺动画更新
+        this.updateLunge(deltaTime);
 
         // 0. 状态特效判定：减速
         if (this.moveSpeed < this.baseMoveSpeed * 0.95) {
@@ -334,32 +397,38 @@ export class BaseUnit extends THREE.Group {
 
 
     /**
-     * 优化后的碰撞挤压：考虑质量 (Mass) 和 敌我关系
+     * 重构后的硬性碰撞：基于几何约束的保底体积逻辑
+     * 不再使用质量分配，而是强制推开重叠部分，保证单位间有最小间距
      */
     applySeparation(allies, enemies, deltaTime) {
-        const separationRadius = 0.8; // 增大排斥半径 (0.6 -> 0.8)
-        const force = 2.0; // 增大排斥力度 (1.2 -> 2.0)
         const allUnits = [...allies, ...enemies];
+        const myRadius = this.collisionRadius;
 
         for (const other of allUnits) {
             if (other === this || other.isDead) continue;
 
             const dist = this.position.distanceTo(other.position);
-            
-            // 队友和敌人统一使用较大的排斥半径，防止重叠
-            const effectiveRadius = separationRadius;
+            const minAllowedDist = myRadius + other.collisionRadius;
 
-            if (dist < effectiveRadius) {
+            if (dist < minAllowedDist) {
                 // 计算排斥方向
-                const pushDir = new THREE.Vector3()
-                    .subVectors(this.position, other.position)
-                    .normalize();
+                const pushDir = new THREE.Vector3();
                 
-                // 核心逻辑：推挤强度受自身质量影响
-                let strength = (1 - dist / effectiveRadius) * force * deltaTime;
-                strength /= this.mass; 
+                // 解决重合死穴：如果距离极小，随机分配一个排斥方向
+                if (dist < 0.001) {
+                    pushDir.set(
+                        Math.random() - 0.5,
+                        Math.random() - 0.5,
+                        0
+                    ).normalize();
+                } else {
+                    pushDir.subVectors(this.position, other.position).normalize();
+                }
 
-                this.position.addScaledVector(pushDir, strength);
+                // 核心逻辑：立即校正重叠位移 (Constraint Correction)
+                // 两个单位平分重叠距离，不考虑质量
+                const overlap = minAllowedDist - dist;
+                this.position.addScaledVector(pushDir, overlap * 0.5);
             }
         }
     }
@@ -462,16 +531,17 @@ export class BaseUnit extends THREE.Group {
         }
     }
 
-    onAttackAnimation() {
-        const baseSize = 1.4;
-        const attackSize = 1.8; // 更夸张的攻击缩放
+    onAttackAnimation(noLunge = false) {
+        if (this.lungeState.active) return; // 如果正在播放，不重复触发
 
-        this.unitSprite.scale.set(attackSize, attackSize, attackSize);
-        setTimeout(() => {
-            if (!this.isDead) {
-                this.unitSprite.scale.set(baseSize, baseSize, baseSize);
-            }
-        }, 150); // 增加停留时长
+        const baseSize = this.visualScale || 1.4;
+        
+        // 激活状态机
+        this.lungeState.active = true;
+        this.lungeState.progress = 0;
+        this.lungeState.noLunge = noLunge; // 记录是否禁止位移
+        this.lungeState.direction.copy(this.getForwardVector());
+        this.lungeState.maxDist = 0.4 * (baseSize / 1.4); 
     }
 
 
@@ -557,12 +627,16 @@ export class HeroUnit extends BaseUnit {
         const heroData = worldManager.heroData;
         const details = worldManager.getUnitBlueprint(heroData.id);
         
+        // 重构：英雄战场移动速度与大世界“轻功”彻底解耦
+        // 战场内只看 combatSpeed，不再受大世界 stats.speed (轻功) 的直接数值影响
+        const baseCombatSpeed = details.combatSpeed || 5.0;
+
         super({
             side,
             index,
             type: heroData.id, 
             hp: details.hp, // 使用蓝图基础血量 (BaseUnit 会应用全局修正)
-            speed: details.speed,
+            speed: baseCombatSpeed,
             attackDamage: details.atk, // 使用包含力道成长的最终攻击力
             attackRange: details.range,
             attackSpeed: details.attackSpeed,
@@ -785,14 +859,14 @@ export class HeroUnit extends BaseUnit {
             const ident = worldManager.getHeroIdentity('yeying');
             const baseAtk = ident.combatBase.atk;
             if (this.cangjianStance === 'heavy') {
-                // 重剑模式：心剑旋风
+                // 重剑模式：心剑旋风 (禁用冲刺位移)
                 audioManager.play('attack_melee', { volume: 0.5, force: true, pitchVar: 0.2 });
                 const cfg = m.yeying_heavy;
                 const burst = cfg.burstCount || 1;
                 for (let i = 0; i < burst; i++) {
                     setTimeout(() => {
                         if (this.isDead) return;
-                        this.onAttackAnimation();
+                        this.onAttackAnimation(true); // 传入 true 禁用位移
                         window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: cfg.range, color: 0xffcc00, duration: 250 });
                         this.executeAOE(enemies, {
                             radius: cfg.range,
@@ -1238,7 +1312,7 @@ export class Cangjian extends BaseUnit {
             for (let i = 0; i < burstCount; i++) {
                 setTimeout(() => {
                     if (this.isDead) return;
-                    this.onAttackAnimation();
+                    this.onAttackAnimation(true); // 旋风斩禁用位移
                     window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: details.range, color: 0xffcc00, duration: 500 });
                     this.executeAOE(enemies, {
                         radius: details.range,

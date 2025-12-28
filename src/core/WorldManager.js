@@ -1584,7 +1584,10 @@ class WorldManager {
             stats.hp = cb.hpBase + (s.power * cb.hpScaling); 
             stats.mp = 160 + (this.heroData.level - 1) * 14; 
             stats.atk = cb.atk * (1 + s.power * (cb.atkScaling || 0.05));                
-            stats.speed = s.speed;          
+            stats.speed = s.speed; // 大世界移动速度 (轻功)
+            
+            // 战场基础移动速度：优先使用蓝图中的 combatSpeed，若无则使用默认值
+            stats.combatSpeed = baseBlueprint.combatSpeed || 5.0;         
         }
 
         return stats;
