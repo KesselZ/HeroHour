@@ -17,6 +17,49 @@ class UIManager {
 
         this.initTooltipEvents();
         this.initSkillGalleryEvents();
+        this.initGameStartEvents();
+        
+        this.gameStartWindowShown = false; // 记录开局窗口是否已显示
+    }
+
+    initGameStartEvents() {
+        const closeBtn = document.getElementById('close-game-start-btn');
+        const window = document.getElementById('game-start-window');
+        if (closeBtn && window) {
+            closeBtn.onclick = () => {
+                audioManager.play('ui_click');
+                window.classList.add('hidden');
+                this.gameStartWindowShown = true; // 标记为已显示
+            };
+        }
+    }
+
+    /**
+     * 显示开局提示窗口
+     * @param {Array} enemies 对手信息列表
+     */
+    showGameStartWindow(enemies) {
+        if (this.gameStartWindowShown) return; // 如果已经显示过，则不再重复显示
+
+        const window = document.getElementById('game-start-window');
+        const container = document.getElementById('game-start-enemies');
+        if (!window || !container) return;
+
+        container.innerHTML = '';
+        enemies.forEach(enemy => {
+            const card = document.createElement('div');
+            card.className = 'enemy-item-card';
+            
+            const iconStyle = spriteFactory.getIconStyle(enemy.id);
+            card.innerHTML = `
+                <div class="enemy-portrait-start" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                <div class="enemy-name-start">${enemy.name}</div>
+                <div class="enemy-title-start">${enemy.title}</div>
+            `;
+            container.appendChild(card);
+        });
+
+        window.classList.remove('hidden');
     }
 
     initTooltipEvents() {

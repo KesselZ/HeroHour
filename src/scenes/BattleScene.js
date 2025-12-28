@@ -712,6 +712,36 @@ export class BattleScene {
             this.rangeIndicator.material.dispose();
             this.rangeIndicator = null;
         }
+        // 清除所有单位的目标高亮
+        [...this.playerUnits, ...this.enemyUnits].forEach(u => u.setTargeted(false));
+    }
+
+    /**
+     * 实时更新被技能覆盖单位的高亮状态
+     */
+    updateTargetHighlights(center, skill) {
+        // 1. 确定技能侧重（是给队友上Buff还是给敌人降伤害）
+        let targetSide = 'enemy';
+        // 简单逻辑：如果技能包含 buff_aoe 且 side 是 player，或者是特定的气场
+        if (skill.actions && skill.actions.some(a => 
+            (a.type === 'buff_aoe' && (a.side === 'player' || !a.side)) || 
+            (a.type === 'tick_effect' && a.side === 'player')
+        )) {
+            targetSide = 'player';
+        }
+
+        // 2. 找到范围内单位
+        const targets = this.getUnitsInArea(center, skill.targeting, targetSide);
+        
+        // 3. 更新所有相关单位的状态
+        const allUnits = (targetSide === 'player') ? this.playerUnits : this.enemyUnits;
+        const color = (targetSide === 'player') ? 0x00ffcc : 0xff3333;
+
+        allUnits.forEach(u => {
+            if (u.isDead) return;
+            const isHighlighted = targets.includes(u);
+            u.setTargeted(isHighlighted, color);
+        });
     }
 
     // ========================================================
@@ -790,6 +820,9 @@ export class BattleScene {
                 break;
             case 'slow':
                 this.vfxLibrary.createSlowVFX(parent);
+                break;
+            case 'damage_number':
+                this.vfxLibrary.createDamageNumberVFX(pos || (unit ? unit.position.clone() : new THREE.Vector3()), options.value, color, options.scale || 1.0);
                 break;
         }
     }
@@ -1078,8 +1111,13 @@ export class BattleScene {
                 this.skillIndicator.position.copy(targetPos);
                 this.skillIndicator.position.y = 0.05;
                 this.skillIndicator.visible = true;
+
+                // --- 新增：实时目标预选高亮 ---
+                this.updateTargetHighlights(targetPos, skill);
             } else {
                 this.skillIndicator.visible = false;
+                // 没指到地面时，清除所有高亮
+                [...this.playerUnits, ...this.enemyUnits].forEach(u => u.setTargeted(false));
             }
         }
         

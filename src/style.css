@@ -1623,6 +1623,101 @@ img {
     color: #666;
 }
 
+/* -------------------------------------------------------
+   开局提示窗口样式
+------------------------------------------------------- */
+#game-start-window {
+    width: 580px;
+    padding: 60px 50px;
+    z-index: 1000;
+}
+
+.game-start-content {
+    margin-bottom: 30px;
+}
+
+.game-start-intro {
+    font-size: 1.2rem;
+    color: var(--jx3-ink);
+    line-height: 1.6;
+    margin-bottom: 25px;
+    font-family: "楷体", "STKaiti", serif;
+    font-weight: bold;
+    border-left: 4px solid var(--jx3-gold);
+    padding-left: 15px;
+    text-align: left;
+}
+
+.enemy-info-box {
+    background: rgba(91, 138, 138, 0.1);
+    border: 1px solid var(--jx3-celadon);
+    padding: 20px;
+    border-radius: 4px;
+    text-align: left;
+}
+
+.enemy-info-label {
+    font-size: 0.9rem;
+    color: var(--jx3-celadon-dark);
+    font-weight: bold;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.enemy-info-label::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: var(--jx3-gold);
+    transform: rotate(45deg);
+}
+
+.enemy-list-horizontal {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.enemy-item-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: var(--jx3-paper);
+    padding: 12px;
+    border: 1px solid var(--jx3-gold);
+    border-radius: 4px;
+    width: 120px;
+    transition: transform 0.2s;
+}
+
+.enemy-item-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.enemy-portrait-start {
+    width: 64px;
+    height: 64px;
+    border: 2px solid var(--jx3-celadon);
+    background-color: white;
+    background-size: 400% 400%;
+    image-rendering: pixelated;
+}
+
+.enemy-name-start {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--jx3-ink);
+}
+
+.enemy-title-start {
+    font-size: 0.75rem;
+    color: #666;
+}
 
 /* 招募画卷特定样式 */
 .recruit-scroll {

@@ -406,6 +406,9 @@ class WorldManager {
 
         // 5. 占领建筑状态 (已整合进 entities，保留此数组用于快速结算收益)
         this.capturedBuildings = []; 
+        
+        // 5.5 当前对手信息 (用于开局展示)
+        this.currentAIFactions = [];
 
         // 6. 兵种价格定义
         this.unitCosts = UNIT_COSTS;
@@ -824,6 +827,13 @@ class WorldManager {
         // 随机选择两个对手
         const shuffledPool = [...opponentPool].sort(() => Math.random() - 0.5);
         const aiHeroes = shuffledPool.slice(0, 2);
+        
+        // 记录对手信息以便 UI 展示
+        this.currentAIFactions = aiHeroes.map(id => ({
+            id: id,
+            name: this.availableHeroes[id].name,
+            title: this.availableHeroes[id].title
+        }));
 
         aiHeroes.forEach((aiHeroId, index) => {
             const aiHeroInfo = this.availableHeroes[aiHeroId];
@@ -1307,6 +1317,13 @@ class WorldManager {
         
         if (newOwner === 'player') {
             this.showNotification(`成功占领了${name}！每季度将产出额外资源。`);
+            
+            // 播放占领音效
+            if (config.type === 'gold_mine') {
+                audioManager.play('capture_gold_mine');
+            } else if (config.type === 'sawmill') {
+                audioManager.play('capture_sawmill');
+            }
         }
         
         console.log(`%c[占领] %c${name} (${id}) 现在归属于 ${ownerName}`, 'color: #00ff00; font-weight: bold', 'color: #fff');

@@ -91,7 +91,9 @@ class AudioManager {
             
             // 资源获得音效
             'source_gold': { files: ['/audio/sources/获得金钱.mp3'], throttle: 100 },
-            'source_wood': { files: ['/audio/sources/获得木材.mp3'], throttle: 100 }
+            'source_wood': { files: ['/audio/sources/获得木材.mp3'], throttle: 100 },
+            'capture_gold_mine': { files: ['/audio/sources/获得金矿厂.mp3'], throttle: 500 },
+            'capture_sawmill': { files: ['/audio/sources/获得木材厂.mp3'], throttle: 500 }
         };
     }
 

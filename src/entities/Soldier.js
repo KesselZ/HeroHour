@@ -121,6 +121,42 @@ export class BaseUnit extends THREE.Group {
         this.add(this.influenceRing);
 
         this.position.y = 0.6;
+
+        // --- 新增：目标预选指示器 ---
+        this.initTargetIndicator();
+        
+        // 保存视觉缩放比例，用于计算碰撞半径
+        const unitCfg = spriteFactory.unitConfig[this.type];
+        this.visualScale = unitCfg ? (unitCfg.scale || 1.4) : 1.4;
+    }
+
+    initTargetIndicator() {
+        const geo = new THREE.RingGeometry(0.6, 0.7, 32);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0, // 初始隐藏
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        this.targetIndicator = new THREE.Mesh(geo, mat);
+        this.targetIndicator.rotation.x = -Math.PI / 2;
+        this.targetIndicator.position.y = -0.37; // 略高于阵营环 (-0.38)
+        this.add(this.targetIndicator);
+    }
+
+    /**
+     * 设置是否被技能锁定
+     */
+    setTargeted(isTargeted, color = 0xffffff) {
+        if (!this.targetIndicator || this.isDead) return;
+        this.targetIndicator.material.opacity = isTargeted ? 0.8 : 0;
+        if (isTargeted) {
+            this.targetIndicator.material.color.set(color);
+            // 简单的缩放呼吸
+            const s = 1.0 + Math.sin(Date.now() * 0.01) * 0.05;
+            this.targetIndicator.scale.set(s, s, 1);
+        }
     }
 
     createRingTexture() {
@@ -581,6 +617,17 @@ export class BaseUnit extends THREE.Group {
                 force: isCriticalSource 
             });
             this.hitFlashUntil = Date.now() + 150;
+
+            // --- 新增：跳字特效 ---
+            // 暂时只对主角或技能造成的伤害生效，增加战斗透明度
+            if (isHeroSource && window.battle && window.battle.playVFX) {
+                window.battle.playVFX('damage_number', { 
+                    pos: this.position.clone(), 
+                    value: finalAmount, 
+                    color: '#ff3333',
+                    scale: 1.0
+                });
+            }
         }
 
         // 2. 啸如虎：锁血 1 点逻辑

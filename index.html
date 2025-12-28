@@ -365,6 +365,25 @@
                 <div class="menu-decoration-bottom"></div>
             </div>
 
+            <!-- 开局提示窗口 -->
+            <div id="game-start-window" class="menu-container hidden">
+                <div class="menu-decoration-top">江湖告示</div>
+                <h2 class="game-title">初入<span>江湖</span></h2>
+                <div class="game-start-content">
+                    <p class="game-start-intro">请你发展稻香村，扩大势力，成就一番霸业。</p>
+                    <div class="enemy-info-box">
+                        <div class="enemy-info-label">本场对手</div>
+                        <div id="game-start-enemies" class="enemy-list-horizontal">
+                            <!-- 动态填充对手信息 -->
+                        </div>
+                    </div>
+                </div>
+                <div class="menu-options">
+                    <button id="close-game-start-btn" class="wuxia-btn">踏上征途</button>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
             <!-- 全局提示框 (Tooltip) -->
             <div id="game-tooltip" class="tooltip-container hidden">
                 <div class="tooltip-title"></div>

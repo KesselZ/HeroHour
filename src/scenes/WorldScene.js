@@ -112,6 +112,11 @@ export class WorldScene {
 
         // --- 初始化小地图 ---
         this.initMinimap();
+
+        // --- 开局提示 ---
+        if (worldManager.currentAIFactions.length > 0) {
+            uiManager.showGameStartWindow(worldManager.currentAIFactions);
+        }
     }
 
     /**
@@ -332,10 +337,14 @@ export class WorldScene {
         const heroPanel = document.getElementById('hero-stats-panel');
         const townPanel = document.getElementById('town-management-panel');
         const skillLearnPanel = document.getElementById('skill-learn-panel');
+        const startWindow = document.getElementById('game-start-window');
+        const htpPanel = document.getElementById('how-to-play-panel');
         
         const isUIOpen = (heroPanel && !heroPanel.classList.contains('hidden')) || 
                          (townPanel && !townPanel.classList.contains('hidden')) ||
-                         (skillLearnPanel && !skillLearnPanel.classList.contains('hidden'));
+                         (skillLearnPanel && !skillLearnPanel.classList.contains('hidden')) ||
+                         (startWindow && !startWindow.classList.contains('hidden')) ||
+                         (htpPanel && !htpPanel.classList.contains('hidden'));
 
         if (isUIOpen) {
             if (this.hoveredObject) {
@@ -873,61 +882,69 @@ export class WorldScene {
             worldManager.processResourceProduction();
         }
 
-        const moveDir = new THREE.Vector3(0, 0, 0);
-        if (this.keys['w'] || this.keys['arrowup']) moveDir.z -= 1;
-        if (this.keys['s'] || this.keys['arrowdown']) moveDir.z += 1;
-        if (this.keys['a'] || this.keys['arrowleft']) moveDir.x -= 1;
-        if (this.keys['d'] || this.keys['arrowright']) moveDir.x += 1;
+        // --- 核心限制：仅开局告示显示时禁止移动，其他 UI 不受限 ---
+        const startWindow = document.getElementById('game-start-window');
+        const isStartWindowOpen = startWindow && !startWindow.classList.contains('hidden');
 
-        if (moveDir.lengthSq() > 0) {
-            moveDir.normalize();
-            // 核心修改：位移 = 速度 * deltaTime，脱离帧率限制
-            const moveStep = this.moveSpeed * deltaTime;
-            const nextPos = this.playerHero.position.clone().addScaledVector(moveDir, moveStep);
-            
-            if (mapGenerator.isPassable(nextPos.x, nextPos.z)) {
-                this.playerHero.position.copy(nextPos);
-            } else {
-                const nextPosX = this.playerHero.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
-                if (mapGenerator.isPassable(nextPosX.x, nextPosX.z)) {
-                    this.playerHero.position.copy(nextPosX);
-                }
-                const nextPosZ = this.playerHero.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
-                if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z)) {
-                    this.playerHero.position.copy(nextPosZ);
-                }
-            }
-
-            // 脚步声逻辑 (起步即响，固定频率)
-            if (this.footstepTimer === 0) {
-                audioManager.play('footstep_grass', { 
-                    volume: 0.6, 
-                    pitchVar: 0.2 
-                });
-            }
-
-            this.footstepTimer += deltaTime * 1000;
-            if (this.footstepTimer >= this.footstepInterval) {
-                this.footstepTimer = 0;
-            }
-            
-            if (moveDir.x !== 0) {
-                const config = spriteFactory.unitConfig[this.heroId];
-                const defaultFacing = config.defaultFacing || 'right';
-                const isMovingLeft = moveDir.x < 0;
-                let shouldFlip = isMovingLeft ? (defaultFacing === 'right') : (defaultFacing === 'left');
-                const texture = this.playerHero.material.map;
-                const standardRepeatX = 1 / 4; 
-                const flippedRepeatX = -1 / 4;
-                const targetRepeatX = shouldFlip ? flippedRepeatX : standardRepeatX;
-                if (texture.repeat.x !== targetRepeatX) {
-                    texture.repeat.x = targetRepeatX;
-                    texture.offset.x = shouldFlip ? (config.col / 4) : ((config.col - 1) / 4);
-                }
-            }
-            this.checkInteractions();
+        if (isStartWindowOpen) {
+            this.footstepTimer = 0;
         } else {
-            this.footstepTimer = 0; // 停止移动时归零
+            const moveDir = new THREE.Vector3(0, 0, 0);
+            if (this.keys['w'] || this.keys['arrowup']) moveDir.z -= 1;
+            if (this.keys['s'] || this.keys['arrowdown']) moveDir.z += 1;
+            if (this.keys['a'] || this.keys['arrowleft']) moveDir.x -= 1;
+            if (this.keys['d'] || this.keys['arrowright']) moveDir.x += 1;
+
+            if (moveDir.lengthSq() > 0) {
+                moveDir.normalize();
+                // 核心修改：位移 = 速度 * deltaTime，脱离帧率限制
+                const moveStep = this.moveSpeed * deltaTime;
+                const nextPos = this.playerHero.position.clone().addScaledVector(moveDir, moveStep);
+                
+                if (mapGenerator.isPassable(nextPos.x, nextPos.z)) {
+                    this.playerHero.position.copy(nextPos);
+                } else {
+                    const nextPosX = this.playerHero.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
+                    if (mapGenerator.isPassable(nextPosX.x, nextPosX.z)) {
+                        this.playerHero.position.copy(nextPosX);
+                    }
+                    const nextPosZ = this.playerHero.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
+                    if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z)) {
+                        this.playerHero.position.copy(nextPosZ);
+                    }
+                }
+
+                // 脚步声逻辑 (起步即响，固定频率)
+                if (this.footstepTimer === 0) {
+                    audioManager.play('footstep_grass', { 
+                        volume: 0.6, 
+                        pitchVar: 0.2 
+                    });
+                }
+
+                this.footstepTimer += deltaTime * 1000;
+                if (this.footstepTimer >= this.footstepInterval) {
+                    this.footstepTimer = 0;
+                }
+                
+                if (moveDir.x !== 0) {
+                    const config = spriteFactory.unitConfig[this.heroId];
+                    const defaultFacing = config.defaultFacing || 'right';
+                    const isMovingLeft = moveDir.x < 0;
+                    let shouldFlip = isMovingLeft ? (defaultFacing === 'right') : (defaultFacing === 'left');
+                    const texture = this.playerHero.material.map;
+                    const standardRepeatX = 1 / 4; 
+                    const flippedRepeatX = -1 / 4;
+                    const targetRepeatX = shouldFlip ? flippedRepeatX : standardRepeatX;
+                    if (texture.repeat.x !== targetRepeatX) {
+                        texture.repeat.x = targetRepeatX;
+                        texture.offset.x = shouldFlip ? (config.col / 4) : ((config.col - 1) / 4);
+                    }
+                }
+                this.checkInteractions();
+            } else {
+                this.footstepTimer = 0; // 停止移动时归零
+            }
         }
 
         // --- 更新小地图 ---
