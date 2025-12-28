@@ -173,6 +173,11 @@ export class Skill {
     }
 
     _executeAction(action, battleScene, caster, center, skillPower) {
+        // 新增：支持动作级音效播放 (用于实现双段式音效，如落地声)
+        if (action.audio) {
+            audioManager.play(action.audio, { force: true });
+        }
+
         switch (action.type) {
             case 'vfx':
                 const vfxParams = { ...action.params };
@@ -195,7 +200,7 @@ export class Skill {
                     }
                 }
                 const targets = battleScene.getUnitsInArea(center, dmgTargeting, 'enemy');
-                battleScene.applyDamageToUnits(targets, action.value * skillPower, center, action.knockback);
+                battleScene.applyDamageToUnits(targets, action.value * skillPower, center, action.knockback, caster.isHero);
                 break;
 
             case 'buff_aoe':
@@ -229,7 +234,7 @@ export class Skill {
                     targetSide: action.side || 'enemy',
                     onTick: (targets) => {
                         if (action.onTickDamage) {
-                            battleScene.applyDamageToUnits(targets, action.onTickDamage * skillPower, center, action.knockback);
+                            battleScene.applyDamageToUnits(targets, action.onTickDamage * skillPower, center, action.knockback, caster.isHero);
                         }
                         if (action.onTickBuff) {
                             // 动态计算功法对 Buff 的影响
@@ -296,7 +301,8 @@ export class Skill {
                     autoTarget: action.autoTarget !== false,
                     targetMode: action.targetMode || 'random',
                     spread: action.spread || 0.5,
-                    scale: action.scale || 1.0
+                    scale: action.scale || 1.0,
+                    isHeroSource: caster.isHero // 关键：标记为主角来源
                 });
                 break;
         }

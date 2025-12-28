@@ -205,7 +205,7 @@ export class BaseUnit extends THREE.Group {
     }
 
     applyDamageAndKnockback(target, damage, knockbackForce) {
-        target.takeDamage(damage + (rng.next() - 0.5) * 5);
+        target.takeDamage(damage + (rng.next() - 0.5) * 5, this.isHero);
         if (knockbackForce > 0) {
             target.applyKnockback(this.position, knockbackForce);
         }
@@ -523,11 +523,16 @@ export class BaseUnit extends THREE.Group {
             if (animalTypes.includes(this.type)) {
                 audioManager.play('attack_unarmed', { volume: 0.5 });
             } else {
-                audioManager.play('attack_melee', { volume: 0.3, chance: 0.8 });
+                // 主角普通攻击强制 100% 播放
+                audioManager.play('attack_melee', { 
+                    volume: 0.3, 
+                    chance: this.isHero ? 1.0 : 0.8,
+                    force: this.isHero 
+                });
             }
 
             // 默认单体攻击
-            this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5);
+            this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5, this.isHero);
         }
     }
 
@@ -560,7 +565,7 @@ export class BaseUnit extends THREE.Group {
         return new THREE.Vector3(isFlipped ? -1 : 1, 0, 0);
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, isHeroSource = false) {
         if (this.isDead || this.isInvincible) return;
         
         // 1. 应用百分比减伤 (核心重构：采用乘法叠加逻辑)
@@ -568,11 +573,12 @@ export class BaseUnit extends THREE.Group {
         
         if (finalAmount > 0) {
             // 只有受到伤害时才播受击音效和闪红
-            // 主角受击音效强制 100% 播放
+            // 主角受击 或 被主角攻击 时，受击音效强制 100% 播放
+            const isCriticalSource = this.isHero || isHeroSource;
             audioManager.play('onhit', { 
                 volume: 0.3, 
-                chance: this.isHero ? 1.0 : 0.4,
-                force: this.isHero 
+                chance: isCriticalSource ? 1.0 : 0.4,
+                force: isCriticalSource 
             });
             this.hitFlashUntil = Date.now() + 150;
         }
@@ -627,17 +633,13 @@ export class HeroUnit extends BaseUnit {
         const heroData = worldManager.heroData;
         const details = worldManager.getUnitBlueprint(heroData.id);
         
-        // 优雅重构：英雄战场移动速度完全由蓝图 combatSpeed 决定，实现内外彻底解耦
-        // 如果蓝图未定义 combatSpeed，则安全降级到 5.0 (保证基础可玩性)
-        const baseCombatSpeed = details.combatSpeed || 5.0;
-
         super({
             side,
             index,
             type: heroData.id, 
-            hp: details.hp, 
-            speed: baseCombatSpeed,
-            attackDamage: details.atk, 
+            hp: details.hp, // 使用蓝图基础血量 (BaseUnit 会应用全局修正)
+            speed: details.speed,
+            attackDamage: details.atk, // 使用包含力道成长的最终攻击力
             attackRange: details.range,
             attackSpeed: details.attackSpeed,
             projectileManager,
@@ -860,12 +862,13 @@ export class HeroUnit extends BaseUnit {
             const baseAtk = ident.combatBase.atk;
             if (this.cangjianStance === 'heavy') {
                 // 重剑模式：心剑旋风 (禁用冲刺位移)
-                audioManager.play('attack_melee', { volume: 0.5, force: true, pitchVar: 0.2 });
                 const cfg = m.yeying_heavy;
                 const burst = cfg.burstCount || 1;
                 for (let i = 0; i < burst; i++) {
                     setTimeout(() => {
                         if (this.isDead) return;
+                        // 每段爆发独立音效
+                        audioManager.play('attack_melee', { volume: 0.4, force: true, pitchVar: 0.2 });
                         this.onAttackAnimation(true); // 传入 true 禁用位移
                         window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: cfg.range, color: 0xffcc00, duration: 250 });
                         this.executeAOE(enemies, {
@@ -877,21 +880,22 @@ export class HeroUnit extends BaseUnit {
                 }
             } else {
                 // 轻剑模式：单体快速攻击
-                audioManager.play('attack_melee', { volume: 0.3, force: true, pitchVar: 0.1 });
                 const cfg = m.yeying_light;
                 const burst = cfg.burstCount || 1;
                 for (let i = 0; i < burst; i++) {
                     setTimeout(() => {
                         if (this.isDead || !this.target || this.target.isDead) return;
+                        // 每段爆发独立音效，音量稍小
+                        audioManager.play('attack_melee', { volume: 0.25, force: true, pitchVar: 0.1 });
                         if (i === 0) this.onAttackAnimation(); 
                         
                         const finalDmg = this.attackDamage * (cfg.atk / baseAtk);
-                        this.target.takeDamage(finalDmg + (rng.next() - 0.5) * 5);
+                        this.target.takeDamage(finalDmg + (rng.next() - 0.5) * 5, true);
                     }, i * 150); 
                 }
             }
         } else if (heroId === 'qijin') {
-            audioManager.play('attack_air_sword', { volume: 0.4, force: true });
+            // 祁进改为 performChunyangAttack 内部控制音效
             this.onAttackAnimation();
             this.performChunyangAttack(enemies, details);
         } else if (heroId === 'lichengen') {
@@ -923,6 +927,10 @@ export class HeroUnit extends BaseUnit {
         for (let i = 0; i < swordCount; i++) {
             setTimeout(() => {
                 if (this.isDead || !this.target || this.target.isDead) return;
+                
+                // 每柄气剑发射时播放音效
+                audioManager.play('attack_air_sword', { volume: 0.2, force: true, pitchVar: 0.3 });
+
                 const offset = new THREE.Vector3((i - (swordCount-1)/2) * 0.5, 1.2, (rng.next() - 0.5) * 0.5);
                 const spawnPos = this.position.clone().add(offset);
                 this.projectileManager?.spawn({
@@ -930,7 +938,8 @@ export class HeroUnit extends BaseUnit {
                     target: this.target,
                     speed: 0.25,
                     damage: this.attackDamage, 
-                    type: 'air_sword'
+                    type: 'air_sword',
+                    isHeroSource: true // 确保命中时的音效也是 100%
                 });
             }, i * 100);
         }
@@ -1312,6 +1321,9 @@ export class Cangjian extends BaseUnit {
             for (let i = 0; i < burstCount; i++) {
                 setTimeout(() => {
                     if (this.isDead) return;
+                    // 补全音效：每一段旋风斩都播放挥砍音效
+                    audioManager.play('attack_melee', { volume: 0.2, chance: 0.8, pitchVar: 0.2 });
+                    
                     this.onAttackAnimation(true); // 旋风斩禁用位移
                     window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: details.range, color: 0xffcc00, duration: 500 });
                     this.executeAOE(enemies, {

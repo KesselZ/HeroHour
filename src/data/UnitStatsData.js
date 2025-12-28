@@ -49,7 +49,6 @@ export const UNIT_STATS_DATA = {
     'qijin':      { 
         name: '祁进', 
         range: 15.0, 
-        combatSpeed: 6.0, // 战场基础移动速度 (轻功属性仅影响大世界)
         rangeType: '五剑连发', 
         attackSpeed: 1000, 
         burstCount: 5, 
@@ -59,7 +58,6 @@ export const UNIT_STATS_DATA = {
     'lichengen': { 
         name: '李承恩', 
         range: 2.0, 
-        combatSpeed: 7.0, // 战场基础移动速度 (额外速度由天赋 talent_speed 提供)
         rangeType: '横扫千军', 
         attackSpeed: 1000, 
         targets: 2.5,
@@ -69,7 +67,6 @@ export const UNIT_STATS_DATA = {
     'yeying':    { 
         name: '叶英', 
         range: 2.5, 
-        combatSpeed: 17.0, // 战场基础移动速度 (轻功属性仅影响大世界)
         rangeType: '心剑旋风', 
         attackSpeed: 1000, 
         description: '藏剑庄主，心剑合一，周身剑气无坚不摧。',
@@ -85,7 +82,7 @@ export const UNIT_STATS_DATA = {
  */
 export const HERO_IDENTITY = {
     'qijin': {
-        initialStats: { power: 7, spells: 12, morale: 6, speed: 11.8, leadership: 20 },
+        initialStats: { power: 7, spells: 12, morale: 6, qinggong: 11.8, battleSpeed: 11.8, leadership: 20 },
         combatBase: { atk: 17, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
             { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
@@ -93,15 +90,15 @@ export const HERO_IDENTITY = {
         ]
     },
     'lichengen': {
-        initialStats: { power: 5, spells: 8, morale: 10, speed: 11.8, leadership: 25 },
+        initialStats: { power: 5, spells: 8, morale: 10, qinggong: 11.8, battleSpeed: 11.8, leadership: 25 },
         combatBase: { atk: 40, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
-            { id: 'talent_speed', stat: 'speed', multiplier: 1.2, description: '骁勇善战：移动速度提高 20%' },
+            { id: 'talent_speed', stat: 'qinggong', multiplier: 1.2, description: '骁勇善战：轻功提高 20%' },
             { id: 'tiance_sect_hp', unitType: 'tiance', stat: 'hp', multiplier: 1.1, description: '骁勇善战：天策兵种气血提高 10%' }
         ]
     },
     'yeying': {
-        initialStats: { power: 10, spells: 18, morale: 2, speed: 11.8, leadership: 15 },
+        initialStats: { power: 10, spells: 18, morale: 2, qinggong: 11.8, battleSpeed: 100.0, leadership: 15 },
         combatBase: { atk: 6, hpBase: 300, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
             { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }

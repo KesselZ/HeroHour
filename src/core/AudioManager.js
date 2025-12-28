@@ -60,6 +60,13 @@ class AudioManager {
             'skill_field': { files: ['/audio/skill/放气场.mp3'] },
             'skill_sword_rain': { files: ['/audio/skill/气剑雨.mp3'] },
             'skill_arrows_all': { files: ['/audio/skill/万箭齐发.mp3'] },
+            'skill_armor': { files: ['/audio/skill/盔甲声音.mp3'] },
+            'skill_horse': { files: ['/audio/skill/马叫声.mp3'] },
+            'skill_shout_extra': { files: ['/audio/skill/士兵呐喊.mp3'] },
+            'skill_xiaoruhu': { files: ['/audio/skill/啸如虎.mp3'] },
+            'skill_pierce': { files: ['/audio/skill/突刺.mp3'] },
+            'skill_slash': { files: ['/audio/skill/切砍声音.mp3'] },
+            'skill_air_cut': { files: ['/audio/skill/破空声.mp3'] },
             
             // 场景音效
             'soldier_shout': { 

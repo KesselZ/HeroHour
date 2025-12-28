@@ -142,7 +142,7 @@ export const SkillRegistry = {
         icon: 'skill_renchicheng',
         cost: 40,
         cooldown: 15000,
-        audio: 'skill_field',
+        audio: 'skill_horse',
         targeting: { type: 'instant' },
         description: '天策骑术：大幅提升移速与 {bonus}% 攻击频率，持续 {duration} 秒',
         actions: [
@@ -163,7 +163,7 @@ export const SkillRegistry = {
         icon: 'skill_shourushan',
         cost: 60,
         cooldown: 30000,
-        audio: 'skill_field',
+        audio: 'skill_armor',
         targeting: { type: 'instant' },
         description: '钢铁意志：获得 80% 减伤效果，持续 {duration} 秒',
         actions: [
@@ -207,7 +207,7 @@ export const SkillRegistry = {
         icon: 'skill_xiaoruhu',
         cost: 50,
         cooldown: 25000,
-        audio: 'skill_field',
+        audio: 'skill_xiaoruhu',
         targeting: { type: 'instant', shape: 'circle', radius: 30 },
         description: '全军困兽犹斗：友军血量最低降至 1 点，持续 {duration} 秒',
         actions: [
@@ -244,7 +244,7 @@ export const SkillRegistry = {
         icon: 'skill_tu',
         cost: 35,
         cooldown: 12000,
-        audio: 'skill_jiantan',
+        audio: 'skill_pierce',
         targeting: { type: 'location', range: 8, radius: 1 },
         description: '长枪冲锋：突进并击退路径敌人，造成 {damage} 点伤害',
         actions: [
@@ -409,7 +409,7 @@ export const SkillRegistry = {
         icon: 'skill_hegui',
         cost: 40,
         cooldown: 10000,
-        audio: 'skill_jiantan',
+        audio: 'skill_air_cut', // 第一段：飞身破空声
         targeting: { type: 'location', range: 8, impactRadius: 2.5 },
         description: '【重剑招式】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害、强力击退并眩晕敌人 2 秒',
         actions: [
@@ -419,8 +419,8 @@ export const SkillRegistry = {
                 duration: 500, 
                 jumpHeight: 2.0, // 鹤归孤山有明显的跳跃感
                 landActions: [
-                    // 修复：增大落地半径至 2.5
-                    { type: 'vfx', name: 'stomp', params: { color: 0xffcc00, radius: 2.5, duration: 800 } },
+                    // 第二段：落地砸地声
+                    { type: 'vfx', audio: 'skill_jiantan', name: 'stomp', params: { color: 0xffcc00, radius: 2.5, duration: 800 } },
                     { type: 'damage_aoe', value: 80, knockback: 0.5, targeting: { shape: 'circle', radius: 2.5 } },
                     { type: 'status_aoe', status: 'stun', duration: 2000, targeting: { shape: 'circle', radius: 2.5 } }
                 ]
@@ -434,7 +434,7 @@ export const SkillRegistry = {
         icon: 'skill_fengcha',
         cost: 30,
         cooldown: 4000,
-        audio: 'skill_zhanbafang',
+        audio: 'skill_slash',
         targeting: { type: 'instant', shape: 'sector', radius: 4.0, angle: Math.PI / 2 }, 
         description: '【重剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害并大幅击退',
         actions: [
@@ -449,7 +449,7 @@ export const SkillRegistry = {
         icon: 'skill_songshe',
         cost: 65,
         cooldown: 7500,
-        audio: 'skill_jiantan',
+        audio: 'skill_pierce', // 第一段：极速冲锋声
         targeting: { type: 'location', range: 10, impactRadius: 1.0 },
         description: '【重剑绝学】以极速俯冲目标，造成 {damage} 点高额爆发伤害并击退周围敌人',
         actions: [
@@ -459,8 +459,8 @@ export const SkillRegistry = {
                 duration: 350, 
                 jumpHeight: 0, // 修复：松舍问霞改为突的冲锋感，高度为 0
                 landActions: [
-                    // 修复：范围扩大一倍至 1.0
-                    { type: 'vfx', name: 'stomp', params: { color: 0xff4400, radius: 1.0, duration: 1000 } },
+                    // 第二段：击中地板声
+                    { type: 'vfx', audio: 'skill_jiantan', name: 'stomp', params: { color: 0xff4400, radius: 1.0, duration: 1000 } },
                     { type: 'damage_aoe', value: 145, knockback: 0.3, targeting: { shape: 'circle', radius: 1.0 } }
                 ]
             }
@@ -509,7 +509,7 @@ export const SkillRegistry = {
         icon: 'skill_pinghu',
         cost: 15,
         cooldown: 2000,
-        audio: 'skill_zhanbafang',
+        audio: 'skill_slash',
         targeting: { type: 'instant', shape: 'sector', radius: 2.5, angle: Math.PI / 2 },
         description: '【轻剑招式】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
         actions: [

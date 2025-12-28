@@ -13,12 +13,14 @@ class Projectile extends THREE.Group {
             damage = 10,
             color = 0xffffff,
             type = 'arrow',
-            scale = 1.0
+            scale = 1.0,
+            isHeroSource = false
         } = config;
 
         this.target = target;
         this.speed = speed;
         this.damage = damage;
+        this.isHeroSource = isHeroSource;
         this.isDone = false;
 
         this.initVisual(type, color);
@@ -120,7 +122,7 @@ class Projectile extends THREE.Group {
     hit() {
         this.isDone = true;
         if (this.target && !this.target.isDead) {
-            this.target.takeDamage(this.damage);
+            this.target.takeDamage(this.damage, this.isHeroSource);
         }
     }
 }

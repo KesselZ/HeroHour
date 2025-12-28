@@ -817,7 +817,8 @@ export class BattleScene {
             type, color, spread = 0.5, autoTarget = false,
             targetMode = 'random', // 新增模式：random, nearest, spread
             scale = 1.0, // 新增：支持缩放
-            audio = null // 新增：发射音效
+            audio = null, // 新增：发射音效
+            isHeroSource = false // 是否为主角来源
         } = options;
 
         for (let i = 0; i < count; i++) {
@@ -826,7 +827,7 @@ export class BattleScene {
 
                 // 每发子弹强制播放音效
                 if (audio) {
-                    audioManager.play(audio, { volume: 0.25, force: true, pitchVar: 0.3 });
+                    audioManager.play(audio, { volume: 0.25, force: isHeroSource, pitchVar: 0.3 });
                 }
                 
                 let currentTarget = target;
@@ -860,7 +861,8 @@ export class BattleScene {
                     damage, 
                     type, 
                     color,
-                    scale
+                    scale,
+                    isHeroSource
                 });
             }, i * interval);
         }
@@ -891,9 +893,9 @@ export class BattleScene {
         });
     }
 
-    applyDamageToUnits(units, damage, sourcePos = null, knockback = 0) {
+    applyDamageToUnits(units, damage, sourcePos = null, knockback = 0, isHeroSource = false) {
         units.forEach(unit => {
-            unit.takeDamage(damage);
+            unit.takeDamage(damage, isHeroSource);
             if (knockback > 0 && sourcePos) unit.applyKnockback(sourcePos, knockback);
         });
     }

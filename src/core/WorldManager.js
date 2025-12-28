@@ -369,7 +369,8 @@ class WorldManager {
                 morale: 40,           // 统帅：军队 (同时影响士兵攻击和血量)
                 power: 50,            // 武力：英雄体魄与伤害
                 spells: 100,          // 功法：招式强度
-                speed: 0.08,
+                qinggong: 11.8,       // 轻功 (决定大世界移速，并影响局内速度)
+                battleSpeed: 11.8,    // 英雄局内基础移速
                 haste: 0,
                 leadership: 20,       // 带兵容量上限
             }
@@ -1584,10 +1585,7 @@ class WorldManager {
             stats.hp = cb.hpBase + (s.power * cb.hpScaling); 
             stats.mp = 160 + (this.heroData.level - 1) * 14; 
             stats.atk = cb.atk * (1 + s.power * (cb.atkScaling || 0.05));                
-            stats.speed = s.speed; // 大世界移动速度 (轻功)
-            
-            // 战场基础移动速度：优先使用蓝图中的 combatSpeed，若无则使用默认值
-            stats.combatSpeed = baseBlueprint.combatSpeed || 5.0;         
+            stats.speed = s.battleSpeed; // 蓝图移速使用局内速度
         }
 
         return stats;
@@ -1611,7 +1609,15 @@ class WorldManager {
             finalAtk = modifierManager.getModifiedValue(dummyUnit, 'damage', blueprint.atk);
         }
         
+        // 核心重构：区分局内局外速度修正
         const finalSpeed = modifierManager.getModifiedValue(dummyUnit, 'speed', blueprint.speed);
+        
+        // 如果是英雄，还需要额外计算轻功 (大世界速度)
+        let finalQinggong = 0;
+        if (this.heroData && this.heroData.id === type) {
+            finalQinggong = modifierManager.getModifiedValue(dummyUnit, 'qinggong', this.heroData.stats.qinggong);
+        }
+
         const finalInterval = modifierManager.getModifiedValue(dummyUnit, 'attack_speed', blueprint.attackSpeed);
         
         // 2. DPS 换算
@@ -1623,6 +1629,7 @@ class WorldManager {
             hp: finalHP,
             atk: Math.ceil(finalAtk),
             speed: finalSpeed,
+            qinggong: finalQinggong || finalSpeed, // 如果不是英雄，则 fallback 到普通速度
             dps: dps,
             cost: blueprint.cost
         };
@@ -1685,4 +1692,5 @@ class WorldManager {
 }
 
 export const worldManager = new WorldManager();
+
 

@@ -105,7 +105,7 @@ export class WorldScene {
         // --- 英雄大世界属性应用 ---
         // 核心修正：行军速度必须读取“最终修正后”的轻功属性，确保李承恩等人的天赋生效
         const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
-        this.moveSpeed = heroDetails.speed * 0.6; // 0.6 是世界地图缩放系数
+        this.moveSpeed = heroDetails.qinggong * 0.6; // 使用分离后的轻功数值，0.6 是世界地图缩放系数
 
         // 4. 根据逻辑数据“摆放”物体
         this.renderWorldEntities(mapState.entities);
@@ -257,7 +257,7 @@ export class WorldScene {
         const moraleVal = document.getElementById('attr-morale');
         if (moraleVal) moraleVal.innerText = data.stats.morale;
         const details = worldManager.getUnitDetails(data.id);
-        document.getElementById('attr-speed').innerText = details.speed.toFixed(1); 
+        document.getElementById('attr-speed').innerText = details.qinggong.toFixed(1); 
         
         // 动态修改力道/身法标签
         const powerLabel = document.getElementById('attr-power-label');
