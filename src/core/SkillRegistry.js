@@ -45,7 +45,7 @@ export const SkillRegistry = {
         description: '在指定区域降下剑雨，造成 {damage} 点范围伤害及击退效果',
         actions: [
             { type: 'vfx', name: 'rain', params: { color: 0x00ffff, duration: 600, density: 1.0, radius: 3 } },
-            { type: 'damage_aoe', value: 80, knockback: 0.1, targeting: { shape: 'circle', radius: 3 } }
+            { type: 'damage_aoe', value: 40, knockback: 0.1, targeting: { shape: 'circle', radius: 3 } }
         ]
     }),
     'divine_sword_rain': new Skill('divine_sword_rain', {
@@ -56,11 +56,11 @@ export const SkillRegistry = {
         cost: 55,
         cooldown: 10000,
         audio: 'skill_sword_rain',
-        targeting: { type: 'location', shape: 'square', range: 10, radius: 4.5 },
+        targeting: { type: 'location', shape: 'circle', range: 10, radius: 4.5 },
         description: '【进阶招式】在极广区域降下凛冽剑雨，持续 {duration} 秒，每 0.5 秒造成 {tickDamage} 点伤害',
         actions: [
             { type: 'vfx', name: 'rain', params: { color: 0x00ffff, duration: 3000, density: 2.0, speed: 0.5, radius: 4.5, applySkillPowerToDuration: true } },
-            { type: 'tick_effect', duration: 3000, interval: 500, onTickDamage: 16, applySkillPowerToDuration: true, targeting: { shape: 'square', radius: 4.5 } }
+            { type: 'tick_effect', duration: 3000, interval: 500, onTickDamage: 8, applySkillPowerToDuration: true, targeting: { shape: 'circle', radius: 4.5 } }
         ]
     }),
     'battle_shout': new Skill('battle_shout', {
@@ -70,12 +70,12 @@ export const SkillRegistry = {
         icon: 'skill_hanrulei',
         cost: 45,
         cooldown: 10000,
-        audio: 'skill_field',
+        audio: 'skill_shout_extra',
         targeting: { type: 'instant', shape: 'circle', radius: 12 },
         description: '激发起全军斗志，所有友军攻击力提升 {bonus}%，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'pulse', params: { color: 0xffaa00, duration: 800, radius: 10 } },
-            { type: 'buff_aoe', side: 'player', params: { stat: 'attackDamage', multiplier: 1.3, duration: 5000, color: 0xffaa00, radius: 12 } }
+            { type: 'buff_aoe', side: 'player', params: { stat: 'attackDamage', multiplier: 1.2, duration: 4000, color: 0xffaa00, radius: 12 } }
         ]
     }),
     'summon_militia': new Skill('summon_militia', {
@@ -87,10 +87,10 @@ export const SkillRegistry = {
         cooldown: 15000,
         audio: 'skill_field',
         targeting: { type: 'instant', shape: 'circle', radius: 5 },
-        description: '在英雄身边紧急征召 {count} 名天策弟子参战',
+        description: '在英雄身边紧急征召 {count} 名天策骑兵参战',
         actions: [
             { type: 'vfx', name: 'pulse', params: { color: 0xffffff, duration: 500, radius: 3 } },
-            { type: 'summon', unitType: 'melee', count: 3 }
+            { type: 'summon', unitType: 'tiance', count: 3, applySkillPowerToCount: true }
         ]
     }),
     'zhenshanhe': new Skill('zhenshanhe', {
@@ -101,7 +101,7 @@ export const SkillRegistry = {
         cost: 75,
         cooldown: 25000,
         audio: 'skill_field',
-        targeting: { type: 'location', shape: 'circle', range: 12, radius: 4.5 },
+        targeting: { type: 'location', shape: 'circle', range: 18, radius: 4.5 },
         description: '【气场】产生无敌气场，保护范围内友军免受伤害，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'dome', params: { color: 0x88ccff, duration: 3000, radius: 4.5, applySkillPowerToDuration: true } },
@@ -132,7 +132,7 @@ export const SkillRegistry = {
         description: '【大风车】自身快速旋转，对周围敌人造成 10 段每段 {tickDamage} 点范围伤害',
         actions: [
             { type: 'vfx', name: 'mega_whirlwind', params: { color: 0xffcc00, duration: 3000, radius: 5 } },
-            { type: 'tick_effect', duration: 3000, interval: 300, onTickDamage: 18, knockback: 0.12, targeting: { radius: 5 } }
+            { type: 'tick_effect', duration: 3000, interval: 300, onTickDamage: 7.2, knockback: 0.12, targeting: { radius: 5 } }
         ]
     }),
     'renchicheng': new Skill('renchicheng', {
@@ -193,11 +193,11 @@ export const SkillRegistry = {
         cost: 30,
         cooldown: 8000,
         audio: 'skill_zhanbafang',
-        targeting: { type: 'instant', shape: 'circle', radius: 4 },
+        targeting: { type: 'instant', shape: 'circle', radius: 2.8 },
         description: '长枪横扫：快速旋转两圈，造成每段 {tickDamage} 点范围伤害',
         actions: [
-            { type: 'vfx', name: 'cangjian_whirlwind', params: { color: 0xff0000, duration: 1000, radius: 4 } },
-            { type: 'tick_effect', duration: 1000, interval: 500, onTickDamage: 45, knockback: 0.1 }
+            { type: 'vfx', name: 'cangjian_whirlwind', params: { color: 0xff0000, duration: 1000, radius: 2.8 } },
+            { type: 'tick_effect', duration: 1000, interval: 500, onTickDamage: 22.5, knockback: 0.1 }
         ]
     }),
     'xiaoruhu': new Skill('xiaoruhu', {
@@ -233,7 +233,7 @@ export const SkillRegistry = {
         description: '重踏地面：对周围敌人造成 {damage} 点伤害并眩晕 {stunDuration} 秒',
         actions: [
             { type: 'vfx', name: 'stomp', params: { color: 0x887766, duration: 800, radius: 3 } },
-            { type: 'damage_aoe', value: 75, knockback: 0.2, targeting: { shape: 'circle', radius: 3 } },
+            { type: 'damage_aoe', value: 37.5, knockback: 0.2, targeting: { shape: 'circle', radius: 3 } },
             { type: 'status_aoe', status: 'stun', duration: 3000, targeting: { shape: 'circle', radius: 3 } }
         ]
     }),
@@ -245,10 +245,10 @@ export const SkillRegistry = {
         cost: 35,
         cooldown: 12000,
         audio: 'skill_pierce',
-        targeting: { type: 'location', range: 8, radius: 1 },
+        targeting: { type: 'location', range: 24, radius: 1 },
         description: '长枪冲锋：突进并击退路径敌人，造成 {damage} 点伤害',
         actions: [
-            { type: 'movement', moveType: 'dash', duration: 400, damage: 55, knockback: 0.8 },
+            { type: 'movement', moveType: 'dash', duration: 400, damage: 55, knockback: 0.4 },
             { type: 'vfx', name: 'pulse', params: { color: 0xffffff, duration: 400, radius: 2 } }
         ]
     }),
@@ -260,7 +260,7 @@ export const SkillRegistry = {
         cost: 40,
         cooldown: 12000,
         audio: 'skill_field',
-        targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
+        targeting: { type: 'location', shape: 'circle', range: 18, radius: 6.0 },
         description: '【气场】产生生太极气场，使范围内友军移速提升 {bonus}%，伤害提升 {bonus2}%，并免疫控制，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'field', params: { color: 0x00ffcc, duration: 5000, radius: 6.0 } },
@@ -287,7 +287,7 @@ export const SkillRegistry = {
         cost: 45,
         cooldown: 15000,
         audio: 'skill_field',
-        targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
+        targeting: { type: 'location', shape: 'circle', range: 18, radius: 6.0 },
         description: '【气场】产生吞日月气场，使范围内敌人移速降低 {bonus}%，伤害降低 {bonus2}%，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'field', params: { color: 0xff3300, duration: 5000, radius: 6.0 } },
@@ -301,6 +301,7 @@ export const SkillRegistry = {
                     multiplier: [0.8, 0.8], 
                     duration: 800, // 略大于 interval 确保覆盖
                     color: 0xff3300,
+                    vfxName: 'slow',
                     tag: 'tunriyue'
                 }
             }
@@ -367,7 +368,7 @@ export const SkillRegistry = {
                 type: 'projectile', 
                 count: 20, 
                 interval: 100, 
-                damage: 38.5, 
+                damage: 30.8, 
                 projType: 'air_sword',
                 autoTarget: true,
                 targetMode: 'random',
@@ -383,7 +384,7 @@ export const SkillRegistry = {
         cost: 60,
         cooldown: 18000,
         audio: 'skill_field',
-        targeting: { type: 'location', shape: 'circle', range: 12, radius: 6.0 },
+        targeting: { type: 'location', shape: 'circle', range: 18, radius: 6.0 },
         description: '【气场】产生化三清气场，使范围内友军功法提升 {bonus} 点，调息提升 {bonus2}%，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'field', params: { color: 0x4488ff, duration: 8000, radius: 6.0 } },
@@ -410,7 +411,7 @@ export const SkillRegistry = {
         cost: 40,
         cooldown: 10000,
         audio: 'skill_air_cut', // 第一段：飞身破空声
-        targeting: { type: 'location', range: 8, impactRadius: 2.5 },
+        targeting: { type: 'location', range: 13, impactRadius: 2.5 },
         description: '【重剑招式】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害、强力击退并眩晕敌人 2 秒',
         actions: [
             { 
@@ -436,10 +437,11 @@ export const SkillRegistry = {
         cooldown: 4000,
         audio: 'skill_slash',
         targeting: { type: 'instant', shape: 'sector', radius: 4.0, angle: Math.PI / 2 }, 
-        description: '【重剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害并大幅击退',
+        description: '【重剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害、大幅击退并使其减速 30%，持续 3 秒',
         actions: [
             { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 400, radius: 4.0, angle: Math.PI / 2 } },
-            { type: 'damage_aoe', value: 35, knockback: 1.6 }
+            { type: 'damage_aoe', value: 35, knockback: 1.6 },
+            { type: 'buff_aoe', side: 'enemy', params: { stat: 'moveSpeed', multiplier: 0.7, duration: 3000, color: 0x00ffff, vfxName: 'slow' } }
         ]
     }),
     'songshe': new Skill('songshe', {
@@ -450,7 +452,7 @@ export const SkillRegistry = {
         cost: 65,
         cooldown: 7500,
         audio: 'skill_pierce', // 第一段：极速冲锋声
-        targeting: { type: 'location', range: 10, impactRadius: 1.0 },
+        targeting: { type: 'location', range: 15, impactRadius: 1.3 },
         description: '【重剑绝学】以极速俯冲目标，造成 {damage} 点高额爆发伤害并击退周围敌人',
         actions: [
             { 
@@ -460,8 +462,8 @@ export const SkillRegistry = {
                 jumpHeight: 0, // 修复：松舍问霞改为突的冲锋感，高度为 0
                 landActions: [
                     // 第二段：击中地板声
-                    { type: 'vfx', audio: 'skill_jiantan', name: 'stomp', params: { color: 0xff4400, radius: 1.0, duration: 1000 } },
-                    { type: 'damage_aoe', value: 145, knockback: 0.3, targeting: { shape: 'circle', radius: 1.0 } }
+                    { type: 'vfx', audio: 'skill_jiantan', name: 'stomp', params: { color: 0xff4400, radius: 1.3, duration: 1000 } },
+                    { type: 'damage_aoe', value: 145, knockback: 0.3, targeting: { shape: 'circle', radius: 1.3 } }
                 ]
             }
         ]
@@ -514,7 +516,7 @@ export const SkillRegistry = {
         description: '【轻剑招式】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
         actions: [
             { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 200, radius: 2.5, angle: Math.PI / 2 } },
-            { type: 'damage_aoe', value: 60, knockback: 0 }
+            { type: 'damage_aoe', value: 45, knockback: 0 }
         ]
     })
 };

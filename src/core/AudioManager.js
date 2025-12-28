@@ -9,8 +9,9 @@ class AudioManager {
         this.bgm = null;
         
         // 从本地存储读取音量，如果没有则使用默认值
-        this.bgmVolume = parseFloat(localStorage.getItem('jx3_bgm_volume') ?? '0.5');
-        this.sfxVolume = parseFloat(localStorage.getItem('jx3_sfx_volume') ?? '0.5');
+        const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+        this.bgmVolume = isBrowser ? parseFloat(localStorage.getItem('jx3_bgm_volume') ?? '0.5') : 0.5;
+        this.sfxVolume = isBrowser ? parseFloat(localStorage.getItem('jx3_sfx_volume') ?? '0.5') : 0.5;
         
         // 频率限制：记录音效上次播放时间，防止同一音效瞬间重叠过多
         this.lastPlayed = new Map();

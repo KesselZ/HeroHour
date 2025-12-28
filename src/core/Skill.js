@@ -115,7 +115,11 @@ export class Skill {
                     }
                 }
 
-                if (action.count) desc = desc.split('{count}').join(normal(action.count));
+                if (action.count) {
+                    const isCountDynamic = action.applySkillPowerToCount === true;
+                    const finalCount = isCountDynamic ? Math.floor(action.count * skillPower) : action.count;
+                    desc = desc.split('{count}').join(isCountDynamic ? hl(finalCount) : normal(finalCount));
+                }
 
                 // 递归处理子动作（如 movement 的 landActions）
                 if (action.landActions) {
@@ -259,7 +263,8 @@ export class Skill {
                 break;
 
             case 'summon':
-                battleScene.spawnSupportUnits(action.unitType, action.count, center);
+                const finalCount = action.applySkillPowerToCount ? Math.floor(action.count * skillPower) : action.count;
+                battleScene.spawnSupportUnits(action.unitType, finalCount, center);
                 break;
 
             case 'movement':

@@ -6,22 +6,22 @@ import * as THREE from 'three';
  */
 export const ASSET_REGISTRY = {
     SHEETS: {
-        CHARS1: '/assets/character.png',
-        CHARS2: '/assets/character2.png',
-        CHARS3: '/assets/character3.png',
-        ITEMS: '/assets/items.png',
-        ITEMS2: '/assets/items2.png',
-        ENEMY: '/assets/enemy.png',
-        SKILL1: '/assets/skill.png',
-        SKILL2: '/assets/skill2.png',
-        SKILL3: '/assets/skill3.png',
-        SKILL4: '/assets/skill4.png',
-        SKILL5: '/assets/skill5.png',
-        SKILL6: '/assets/skill6.png',
-        SKILL7: '/assets/skill7.png',
-        SKILL8: '/assets/skill8.png',
-        BUILDING2: '/assets/building2.png',
-        BUILDING3: '/assets/building3.png'
+        CHARS1: '/assets/characters/character.png',
+        CHARS2: '/assets/characters/character2.png',
+        CHARS3: '/assets/characters/character3.png',
+        ITEMS: '/assets/items/items.png',
+        ITEMS2: '/assets/items/items2.png',
+        ENEMY: '/assets/enemies/enemy.png',
+        SKILL1: '/assets/skills/skill.png',
+        SKILL2: '/assets/skills/skill2.png',
+        SKILL3: '/assets/skills/skill3.png',
+        SKILL4: '/assets/skills/skill4.png',
+        SKILL5: '/assets/skills/skill5.png',
+        SKILL6: '/assets/skills/skill6.png',
+        SKILL7: '/assets/skills/skill7.png',
+        SKILL8: '/assets/skills/skill8.png',
+        BUILDING2: '/assets/buildings/building2.png',
+        BUILDING3: '/assets/buildings/building3.png'
     },
     UNITS: {
         // --- 技能图标 (Skill Icons) ---
@@ -34,7 +34,7 @@ export const ASSET_REGISTRY = {
         'skill_wanjiangui_zong': { name: '五方行尽图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 1 },
         'skill_liuhe':           { name: '六合独尊图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 1, c: 2 },
         'skill_shengtaiji':      { name: '生太极图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 3 },
-        'skill_jijieling':       { name: '集结令图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 2, c: 2 }, 
+        'skill_jijieling':       { name: '集结令图标', sheet: 'SKILL3', rows: 4, cols: 4, r: 2, c: 1 }, 
         'skill_tunriyue':        { name: '吞日月图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 3, c: 4 },
         'skill_sixiang':         { name: '四象轮回图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 2, c: 3 },
         'skill_liangyi':         { name: '两仪化形图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 4, c: 3 },
