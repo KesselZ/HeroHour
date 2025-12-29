@@ -91,7 +91,7 @@ class TimeManager {
         modifierManager.addModifier({
             id: 'difficulty_damage',
             side: 'enemy',
-            stat: 'damage',
+            stat: 'attackDamage',
             multiplier: statMult
         });
         

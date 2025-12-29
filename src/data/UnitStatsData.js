@@ -86,7 +86,7 @@ export const HERO_IDENTITY = {
         combatBase: { atk: 12, hpBase: 270, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
             { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
-            { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'damage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
+            { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'attackDamage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
         ]
     },
     'lichengen': {

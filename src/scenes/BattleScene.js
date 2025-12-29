@@ -126,6 +126,7 @@ export class BattleScene {
 
         // 核心改动：根据来自大世界的配置生成敌人
         const totalPoints = this.enemyConfig ? this.enemyConfig.totalPoints : 60;
+        this.enemyPower = totalPoints; // 记录敌人强度，用于战后奖励计算
         this.spawnEnemiesDynamic(totalPoints); 
         
         // 显示部署 UI
@@ -1504,7 +1505,10 @@ export class BattleScene {
 
                 panel.classList.add('hidden');
                 window.dispatchEvent(new CustomEvent('battle-finished', { 
-                    detail: { winner: isVictory ? 'player' : 'enemy' } 
+                    detail: { 
+                        winner: isVictory ? 'player' : 'enemy',
+                        enemyPower: this.enemyPower 
+                    } 
                 }));
             };
         }

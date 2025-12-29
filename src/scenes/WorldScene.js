@@ -1060,7 +1060,7 @@ export class WorldScene {
             // 核心改动：奇穴效果 - 战利清缴 (战后额外金钱)
             // 优雅实现：传入敌人强度作为基础值，中转站会自动根据 50% 加成返还 1.5 倍结果
             const enemyPower = result.enemyPower || 100;
-            const totalGold = modifierManager.getModifiedValue({ side: 'player' }, 'kill_gold', enemyPower);
+            const totalGold = modifierManager.getModifiedValue(worldManager.getPlayerHeroDummy(), 'kill_gold', enemyPower);
             const bonusGold = Math.floor(totalGold - enemyPower); // 差值即为额外奖励
             
             if (bonusGold > 0) {

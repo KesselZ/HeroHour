@@ -678,7 +678,7 @@ class WorldManager {
         if (prodData.wood > 0) this.addWood(prodData.wood);
         
         // 核心改动：奇穴效果 - 气吞山河 (季节更替回蓝)
-        const mpRegenMult = modifierManager.getModifiedValue({ side: 'player' }, 'season_mp_regen', 0);
+        const mpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_mp_regen', 0);
         if (mpRegenMult > 0) {
             const recoverAmount = Math.floor(this.heroData.mpMax * mpRegenMult);
             this.heroData.mpCurrent = Math.min(this.heroData.mpMax, this.heroData.mpCurrent + recoverAmount);
@@ -1245,7 +1245,7 @@ class WorldManager {
                     id: `build_${cityId}_range_dmg`,
                     side: 'player',
                     unitType: 'ranged',
-                    stat: 'damage',
+                    stat: 'attackDamage',
                     value: 0.1 * rangeLv,
                     type: 'percent',
                     source: 'building'
@@ -1301,17 +1301,18 @@ class WorldManager {
 
         // 获取奇穴加成：赏金猎人 (拾取翻倍)
         // 优雅实现：传入原始奖励，中转站自动叠算所有百分比加成
+        const dummyHero = this.getPlayerHeroDummy();
         switch (itemType) {
             case 'gold_pile':
                 const rawGold = Math.floor(Math.random() * 100) + 50; // 50-150 金币
-                reward.gold = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'world_loot', rawGold));
+                reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawGold));
                 msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
                 break;
             case 'chest':
                 // 宝箱随机给金币或木材
                 if (Math.random() > 0.5) {
                     const rawChestGold = Math.floor(Math.random() * 300) + 100;
-                    reward.gold = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'world_loot', rawChestGold));
+                    reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestGold));
                     msg = `开启了宝箱，获得 ${reward.gold} 💰`;
                 } else {
                     reward.wood = Math.floor(Math.random() * 100) + 50;
@@ -1726,9 +1727,9 @@ class WorldManager {
         
         let finalAtk;
         if (type === 'healer') {
-            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'damage', -blueprint.atk));
+            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'attackDamage', -blueprint.atk));
         } else {
-            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'damage', blueprint.atk);
+            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'attackDamage', blueprint.atk);
         }
         
         // 核心重构：区分局内局外速度修正
@@ -1786,6 +1787,17 @@ class WorldManager {
             }
         }
         return current;
+    }
+
+    /**
+     * 获取玩家主角的“影子对象”(用于 ModifierManager 匹配)
+     */
+    getPlayerHeroDummy() {
+        return {
+            side: 'player',
+            isHero: true,
+            type: this.heroData.id
+        };
     }
 
     /**
