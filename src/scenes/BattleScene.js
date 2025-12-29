@@ -524,15 +524,16 @@ export class BattleScene {
         }
 
         // --- 核心改动：奇穴效果 - 激励士气 (战斗开始全军振奋) ---
-        const startHasteMultiplier = modifierManager.getModifiedValue({ side: 'player' }, 'battle_start_haste', 1.0);
+        const startHaste = modifierManager.getModifiedValue({ side: 'player' }, 'battle_start_haste', 1.0);
+        const startSpeed = modifierManager.getModifiedValue({ side: 'player' }, 'battle_start_speed', 1.0);
         
-        if (startHasteMultiplier > 1.0) {
-            console.log(`[战斗开始] 激励士气生效：攻速倍率=${startHasteMultiplier.toFixed(2)}`);
+        if (startHaste > 1.0 || startSpeed > 1.0) {
+            console.log(`[战斗开始] 激励士气生效：攻速+${((startHaste-1)*100).toFixed(0)}%, 移速+${((startSpeed-1)*100).toFixed(0)}%`);
             this.applyBuffToUnits(this.playerUnits, {
                 tag: 'talent_haste',
-                stat: 'attackSpeed',
-                multiplier: startHasteMultiplier,
-                duration: 10000,
+                stat: ['attackSpeed', 'speed'],
+                multiplier: [startHaste, startSpeed],
+                duration: 8000,
                 color: 0xffffaa, // 浅金色振奋
                 vfxName: 'rising_particles'
             });
@@ -547,45 +548,15 @@ export class BattleScene {
         
         if (bottomUI) bottomUI.classList.remove('hidden');
         
-        if (!bottomUI || !filterContainer) return;
+        // 核心重构：隐藏过滤器，改为全显示并分组
+        if (filterContainer) filterContainer.style.display = 'none';
+        if (!bottomUI) return;
 
         this.updateMPUI();
-
-        const heroData = this.worldManager.heroData;
-        const heroSkills = heroData.skills;
-        
-        // 1. 提取所有已拥有的技能类别
-        const categories = new Set();
-        heroSkills.forEach(id => {
-            const skill = SkillRegistry[id];
-            if (skill && skill.category) categories.add(skill.category);
-        });
-
-        // 2. 初始化过滤器按钮
-        filterContainer.innerHTML = '<button class="filter-btn active" data-category="all">所有</button>';
-        categories.forEach(cat => {
-            const btn = document.createElement('button');
-            btn.className = 'filter-btn';
-            btn.dataset.category = cat;
-            btn.innerText = cat;
-            filterContainer.appendChild(btn);
-        });
-
-        // 3. 绑定过滤器点击事件
-        const filterBtns = filterContainer.querySelectorAll('.filter-btn');
-        filterBtns.forEach(btn => {
-            btn.onclick = () => {
-                filterBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.renderSkills(btn.dataset.category);
-            };
-        });
-
-        // 4. 初始渲染所有技能
-        this.renderSkills('all');
+        this.renderSkills();
     }
 
-    renderSkills(categoryFilter = 'all') {
+    renderSkills() {
         const skillSlots = document.getElementById('skill-slots');
         if (!skillSlots) return;
 
@@ -593,41 +564,71 @@ export class BattleScene {
         const heroData = this.worldManager.heroData;
         const heroSkills = heroData.skills;
 
+        // 1. 按类别对技能进行分组
+        const groupedSkills = {};
         heroSkills.forEach(skillId => {
             const skill = SkillRegistry[skillId];
             if (!skill) return;
+            const cat = skill.category || '基础';
+            if (!groupedSkills[cat]) groupedSkills[cat] = [];
+            groupedSkills[cat].push({ id: skillId, data: skill });
+        });
 
-            // 类别过滤
-            if (categoryFilter !== 'all' && skill.category !== categoryFilter) return;
-
-            const btn = document.createElement('div');
-            btn.className = 'skill-btn';
-            btn.id = `skill-${skillId}`;
-            const iconStyle = spriteFactory.getIconStyle(skill.icon);
-            const actualCost = Math.floor(skill.cost * (1 - (heroData.stats.haste || 0)));
+        // 2. 遍历类别进行渲染
+        Object.entries(groupedSkills).forEach(([category, skills]) => {
+            // 创建分组容器
+            const groupWrap = document.createElement('div');
+            groupWrap.className = 'skill-group-wrap';
             
-            btn.innerHTML = `
-                <div class="skill-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
-                <div class="skill-cost">内:${actualCost}</div>
-                <div class="cooldown-overlay" id="cd-${skillId}"></div>
-                <div class="skill-name-tag">${skill.name}</div>
-            `;
+            // 添加类别标签
+            const header = document.createElement('div');
+            header.className = 'skill-group-header';
+            header.innerText = category;
+            groupWrap.appendChild(header);
 
-            btn.onmouseenter = () => {
-                uiManager.showSkillTooltip(skillId, heroData);
-            };
+            // 添加技能列表容器
+            const list = document.createElement('div');
+            list.className = 'skill-group-list';
+            
+            skills.forEach(item => {
+                const skillId = item.id;
+                const skill = item.data;
+                const btn = document.createElement('div');
+                btn.className = 'skill-btn';
+                btn.id = `skill-${skillId}`;
+                const iconStyle = spriteFactory.getIconStyle(skill.icon);
+                
+                const casterDummy = { side: 'player', isHero: true, type: heroData.id };
+                const mpMult = modifierManager.getModifiedValue(casterDummy, 'mana_cost_multiplier', 1.0);
+                
+                const actualCost = Math.floor(skill.cost * mpMult);
+                const actualCD = skill.getActualCooldown(heroData);
+                
+                btn.innerHTML = `
+                    <div class="skill-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
+                    <div class="skill-cost">内:${actualCost}</div>
+                    <div class="cooldown-overlay" id="cd-${skillId}"></div>
+                    <div class="skill-name-tag">${skill.name}</div>
+                `;
 
-            btn.onmouseleave = () => uiManager.hideTooltip();
-            btn.onclick = (e) => { e.stopPropagation(); this.onSkillBtnClick(skillId); };
-            skillSlots.appendChild(btn);
+                btn.onmouseenter = () => {
+                    uiManager.showSkillTooltip(skillId, heroData);
+                };
 
-            // 如果技能正在冷却中，需要重新启动动画（如果是中途切换分类）
-            const now = Date.now();
-            const actualCD = skill.cooldown * (1 - (heroData.stats.haste || 0));
-            const elapsed = now - skill.lastUsed;
-            if (elapsed < actualCD) {
-                this.startSkillCDAnimation(skillId, actualCD, elapsed);
-            }
+                btn.onmouseleave = () => uiManager.hideTooltip();
+                btn.onclick = (e) => { e.stopPropagation(); this.onSkillBtnClick(skillId); };
+                list.appendChild(btn);
+
+                // 如果技能正在冷却中，需要重新启动动画
+                const now = Date.now();
+                const elapsed = now - (skill.lastUsed || 0);
+                if (elapsed < actualCD) {
+                    this.startSkillCDAnimation(skillId, actualCD, elapsed);
+                }
+            });
+
+            groupWrap.appendChild(list);
+            skillSlots.appendChild(groupWrap);
         });
     }
 
@@ -697,7 +698,11 @@ export class BattleScene {
         if (success) {
             window.dispatchEvent(new CustomEvent('hero-stats-changed'));
             this.updateMPUI();
-            const actualCD = skill.cooldown * (1 - (this.worldManager.heroData.stats.haste || 0));
+            
+            // 核心修复：统一使用 ModifierManager 获取已截断的冷却倍率
+            const cdMult = modifierManager.getModifiedValue(this.heroUnit, 'cooldown_multiplier', 1.0);
+            const actualCD = skill.cooldown * cdMult;
+            
             this.startSkillCDAnimation(skillId, actualCD);
         }
         this.activeSkill = null;
@@ -707,14 +712,20 @@ export class BattleScene {
         const overlay = document.getElementById(`cd-${skillId}`);
         if (!overlay) return;
         
-        const startTime = Date.now() - initialElapsed;
         const update = () => {
-            // 检查元素是否还在 DOM 中（分类切换时按钮会被销毁重建）
+            // 检查元素是否还在 DOM 中
             const currentOverlay = document.getElementById(`cd-${skillId}`);
             if (!currentOverlay) return;
 
-            const elapsed = Date.now() - startTime;
-            const progress = Math.max(0, 1 - elapsed / cooldown);
+            const skill = SkillRegistry[skillId];
+            if (!skill) return;
+
+            // --- 核心：动态同步进度条 ---
+            // 每一帧都获取最新的“实际冷却时长”，这样即使在冷却中途开启虎跑，进度条也会瞬间对齐
+            const actualCD = skill.getActualCooldown(worldManager.heroData);
+            const elapsed = Date.now() - (skill.lastUsed || 0);
+            
+            const progress = Math.max(0, 1 - elapsed / actualCD);
             currentOverlay.style.height = `${progress * 100}%`;
             
             if (progress > 0 && this.isActive) {
@@ -836,9 +847,39 @@ export class BattleScene {
                 break;
             case 'rising_particles': 
                 this.vfxLibrary.createParticleSystem({
+                    pos: vfxPos, parent, color, duration, density: 1.5,
+                    spawnRate: 100,
+                    initFn: p => {
+                        // 初始分布在单位身体周围
+                        const r = 0.4;
+                        const ang = Math.random() * Math.PI * 2;
+                        p.position.set(Math.cos(ang) * r, Math.random() * 0.5, Math.sin(ang) * r);
+                        p.userData.speedY = 0.02 + Math.random() * 0.02;
+                    },
+                    updateFn: (p, prg) => { 
+                        p.position.y += p.userData.speedY; 
+                        p.rotation.y += 0.1; // 粒子自身旋转
+                        p.scale.setScalar((1 - prg) * 0.5); 
+                        p.material.opacity = 0.8 * (1 - prg); 
+                    }
+                });
+                break;
+            case 'vfx_sparkle':
+                this.vfxLibrary.createParticleSystem({
                     pos: vfxPos, parent, color, duration, density,
-                    initFn: p => p.position.set((Math.random()-0.5)*0.6, 0, (Math.random()-0.5)*0.6),
-                    updateFn: (p, prg) => { p.position.y += 0.02; p.scale.setScalar(1 - prg); p.material.opacity = 0.8 * (1 - prg); }
+                    spawnRate: 100,
+                    initFn: p => {
+                        const r = radius * 0.8;
+                        // 初始高度稍微拉高一点，方便颗粒向下掉落
+                        p.position.set((Math.random()-0.5)*r, 1.2 + Math.random()*0.3, (Math.random()-0.5)*r);
+                    },
+                    updateFn: (p, prg) => { 
+                        // 颗粒向下移动，且重力感逐渐增加
+                        p.position.y -= 0.02; 
+                        // 颗粒大一点 (0.5 -> 1.0)
+                        p.scale.setScalar((1 - prg) * 1.0); 
+                        p.material.opacity = 0.8 * (1 - prg); 
+                    }
                 });
                 break;
             case 'shield': 
@@ -902,6 +943,32 @@ export class BattleScene {
             onTick(targets);
             setTimeout(executeTick, interval);
         };
+        executeTick();
+    }
+
+    /**
+     * 持续伤害 API (DOT - Damage Over Time)
+     * 适用于流血、中毒等直接挂在单位身上的效果
+     */
+    applyDOT(unit, options) {
+        const { damage, interval, count, color = 0xff3333, isHeroSource = false } = options;
+        let ticksLeft = count;
+
+        const executeTick = () => {
+            if (unit.isDead || ticksLeft <= 0 || !this.isActive) return;
+
+            // 1. 造成伤害
+            unit.takeDamage(damage, isHeroSource);
+            
+            // 2. 视觉反馈：在单位身上冒出对应颜色的火花
+            this.playVFX('vfx_sparkle', { unit, color, duration: 300, radius: 0.5 });
+
+            ticksLeft--;
+            if (ticksLeft > 0) {
+                setTimeout(executeTick, interval);
+            }
+        };
+
         executeTick();
     }
 
@@ -991,6 +1058,25 @@ export class BattleScene {
         units.forEach(unit => {
             unit.takeDamage(damage, isHeroSource);
             if (knockback > 0 && sourcePos) unit.applyKnockback(sourcePos, knockback);
+
+            // --- 核心：天策【龙牙破军】(招式流血) 逻辑 ---
+            if (isHeroSource) {
+                const heroId = worldManager.heroData?.id;
+                if (heroId === 'lichengen') {
+                    // 使用 dummy 查询天赋
+                    const dummy = { side: 'player', isHero: true, type: 'lichengen' };
+                    const bleedRatio = modifierManager.getModifiedValue(dummy, 'tiance_bleeding_enabled', 0);
+                    if (bleedRatio > 0) {
+                        this.applyDOT(unit, {
+                            damage: damage * bleedRatio,
+                            interval: 1000,
+                            count: 3,
+                            color: 0x880000,
+                            isHeroSource: true
+                        });
+                    }
+                }
+            }
         });
     }
 
@@ -998,20 +1084,10 @@ export class BattleScene {
         const { stat, multiplier, offset, duration, color, vfxName, tag } = options;
 
         units.forEach(unit => {
-            // 1. 如果指定了 tag 且该 Buff 已存在，则仅刷新持续时间，不重复添加 Modifier
-            if (tag && unit.activeBuffs) {
-                const existing = unit.activeBuffs.find(b => b.tag === tag);
-                if (existing) {
-                    clearTimeout(existing.timer);
-                    existing.timer = setTimeout(existing.cleanup, duration);
-                    return; 
-                }
-            }
-
-            // 2. 播放特效
+            // 1. 播放特效
             if (vfxName) this.playVFX(vfxName, { unit, duration, color: color || 0xffffff, radius: unit.isHero ? 1.5 : 0.8 });
             
-            // 3. 记录颜色
+            // 2. 记录颜色反馈
             if (color && tag && unit.activeColors) {
                 unit.activeColors.set(tag, color);
             }
@@ -1020,17 +1096,14 @@ export class BattleScene {
             const multipliers = Array.isArray(multiplier) ? multiplier : [multiplier];
             const offsets = Array.isArray(offset) ? offset : [offset];
 
-            // 4. 为每个属性添加 Modifier
-            const modifierIds = [];
+            // 3. 为每个属性添加 Modifier (由 ModifierManager 自动管理生命周期)
             stats.forEach((s, i) => {
                 let m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
                 let o = offsets[i] !== undefined ? offsets[i] : (offsets[0] !== undefined ? offsets[0] : 0);
 
-                // --- 核心增强：自动识别并激活“开关型”Buff (Flag Stats) ---
-                // 像无敌、锁血、免控这类属性，基础值通常是 0，只要有任意正向修正就视为开启
                 const isFlagStat = ['invincible', 'controlImmune', 'tigerHeart'].includes(s);
                 if (isFlagStat && m === 1.0 && o === 0) {
-                    o = 1; // 默认赋予 1 点偏移量以激活该状态
+                    o = 1; 
                 }
 
                 const modId = `buff_${unit.side}_${unit.type}_${unit.index}_${tag || 'anon'}_${s}`;
@@ -1041,32 +1114,17 @@ export class BattleScene {
                     multiplier: m,
                     offset: o,
                     targetUnit: unit,
-                    source: 'skill'
-                });
-                modifierIds.push(modId);
-            });
-
-            // 5. 定时清理函数 (经销商负责撤场)
-            const cleanup = () => {
-                if (!unit.isDead) {
-                    modifierIds.forEach(id => modifierManager.removeModifier(id));
-                    
-                    if (color && tag && unit.activeColors) {
-                        unit.activeColors.delete(tag);
+                    source: 'skill',
+                    startTime: Date.now(),
+                    duration: duration,
+                    onCleanup: () => {
+                        // 核心：利用 ModifierManager 的回调清理视觉反馈
+                        if (color && tag && unit.activeColors) {
+                            unit.activeColors.delete(tag);
+                        }
                     }
-                }
-                if (tag && unit.activeBuffs) {
-                    unit.activeBuffs = unit.activeBuffs.filter(b => b.timer !== timer);
-                }
-            };
-
-            const timer = setTimeout(cleanup, duration);
-
-            // 6. 登记在册，方便中途维护
-            if (tag) {
-                if (!unit.activeBuffs) unit.activeBuffs = [];
-                unit.activeBuffs.push({ tag, timer, cleanup });
-            }
+                });
+            });
         });
     }
 
@@ -1114,6 +1172,12 @@ export class BattleScene {
                 if (progress < 1) requestAnimationFrame(animate); 
                 else {
                     unit.position.y = 0.6; // 落地校准
+                    // 核心修复：不再区分英雄，位移结束后全员强制触发重新索敌
+                    unit.target = null; 
+                    if (unit.updateAI) {
+                        // 立即执行一次索敌，确保存储新坐标点下的最近敌人
+                        unit.updateAI(this.enemyUnits, this.playerUnits);
+                    }
                     if (onComplete) onComplete();
                 }
             };
@@ -1121,11 +1185,19 @@ export class BattleScene {
         } else if (type === 'blink') {
             unit.position.copy(targetPos);
             unit.position.y = 0.6;
+            // 核心修复：瞬移结束后同样强制触发重新索敌
+            unit.target = null;
+            if (unit.updateAI) {
+                unit.updateAI(this.enemyUnits, this.playerUnits);
+            }
             if (onComplete) onComplete();
         }
     }
 
     update(deltaTime) {
+        // 驱动 ModifierManager 的自动计时系统 (Point 4)
+        modifierManager.update(deltaTime);
+
         this.camera.position.set(0, 15, 18); 
         this.camera.lookAt(0, 0, 0);
         
@@ -1243,7 +1315,8 @@ export class BattleScene {
 
             // 检查：主角是否存活、内力是否足够
             // 注意：冷却状态由 overlay 处理，此处主要控制“绝对不可放”的情况 (死亡/蓝耗)
-            const actualCost = Math.floor(skill.cost * (1 - (heroData.stats.haste || 0)));
+            const mpMult = modifierManager.getModifiedValue({ side: 'player', isHero: true, type: heroData.id }, 'mana_cost_multiplier', 1.0);
+            const actualCost = Math.floor(skill.cost * mpMult);
             const hasEnoughMP = heroData.mpCurrent >= actualCost;
             
             const isDisabled = isHeroDead || !hasEnoughMP;
@@ -1347,16 +1420,39 @@ export class BattleScene {
         const survivalCounts = {};
         Object.keys(this.initialCounts).forEach(type => survivalCounts[type] = 0);
         this.playerUnits.forEach(u => { if (!u.isDead) survivalCounts[u.type]++; });
+
         const armyChanges = {};
-        const losses = {};
+        const settlementChanges = []; // 用于 UI 显示：[{type, loss, gain}]
+        
         const survivalRate = modifierManager.getModifiedValue({ side: 'player' }, 'survival_rate', 0);
+        
         Object.keys(this.deployedCounts).forEach(type => {
             const rawLoss = this.deployedCounts[type] - survivalCounts[type];
             if (rawLoss > 0) {
-                const finalLoss = Math.floor(rawLoss * (1 - survivalRate));
-                if (finalLoss > 0) { armyChanges[type] = -finalLoss; losses[type] = finalLoss; }
+                // --- 核心优化：概率救回模型 ---
+                let saved = 0;
+                for (let i = 0; i < rawLoss; i++) {
+                    if (Math.random() < survivalRate) {
+                        saved++;
+                    }
+                }
+
+                const finalLoss = rawLoss - saved;
+
+                // 记录变动：现在将 loss 和 gain 合并在同一个对象里
+                settlementChanges.push({ 
+                    type, 
+                    loss: -rawLoss, 
+                    gain: saved 
+                });
+
+                // 实际更新兵力池的数据 (净损失)
+                if (finalLoss > 0) {
+                    armyChanges[type] = -finalLoss;
+                }
             }
         });
+
         worldManager.updateHeroArmy(armyChanges);
         if (isVictory) {
             const totalPoints = this.enemyConfig ? this.enemyConfig.totalPoints : 0;
@@ -1390,11 +1486,11 @@ export class BattleScene {
             } else {
                 audioManager.play('battle_defeat');
             }
-            this.showSettlementUI(isVictory, losses);
+            this.showSettlementUI(isVictory, settlementChanges);
         }, 2000);
     }
 
-    showSettlementUI(isVictory, losses) {
+    showSettlementUI(isVictory, settlementChanges) {
         document.getElementById('deployment-ui').classList.add('hidden');
         if (document.getElementById('battle-bottom-ui')) {
             document.getElementById('battle-bottom-ui').classList.add('hidden');
@@ -1470,9 +1566,8 @@ export class BattleScene {
         const list = document.getElementById('settlement-losses-list');
         const label = document.getElementById('settlement-losses-label');
         list.innerHTML = '';
-        const lossTypes = Object.keys(losses);
         
-        if (lossTypes.length === 0) { 
+        if (settlementChanges.length === 0) { 
             // 无损情况：隐藏标题，显示居中的优雅提示
             if (label) label.style.display = 'none';
             const emptyHint = document.createElement('div');
@@ -1481,12 +1576,29 @@ export class BattleScene {
             list.appendChild(emptyHint);
         } else {
             // 有变化情况：显示标题和列表
-            if (label) label.style.display = 'block';
-            lossTypes.forEach(type => {
+            if (label) {
+                label.style.display = 'block';
+                label.innerText = "兵力变动"; // 还原用户喜欢的标题
+            }
+            settlementChanges.forEach(change => {
+                const { type, loss, gain } = change;
                 const iconStyle = spriteFactory.getIconStyle(type);
                 const item = document.createElement('div');
                 item.className = 'loss-item';
-                item.innerHTML = `<div class="slot-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div><div class="loss-count">-${losses[type]}</div><div class="loss-name">${this.getUnitName(type)}</div>`;
+                
+                // 构建数值显示部分
+                let countsHtml = `<div class="loss-count">${loss}</div>`;
+                if (gain > 0) {
+                    countsHtml += `<div class="gain-count">+${gain}</div>`;
+                }
+                
+                item.innerHTML = `
+                    <div class="slot-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
+                    <div style="display: flex; align-items: center; gap: 10px; margin: 2px 0;">
+                        ${countsHtml}
+                    </div>
+                    <div class="loss-name">${this.getUnitName(type)}</div>
+                `;
                 list.appendChild(item);
             });
         }
@@ -1502,6 +1614,10 @@ export class BattleScene {
                 
                 // 恢复大世界 BGM (断点续播)
                 audioManager.playBGM('/audio/bgm/如寄.mp3');
+
+                // 核心修复：返回大世界前，彻底清理所有战斗瞬时 Modifier
+                // 解决单位死亡或战斗结束后的 Modifier 残留导致的性能与逻辑问题
+                modifierManager.clearBattleModifiers();
 
                 panel.classList.add('hidden');
                 window.dispatchEvent(new CustomEvent('battle-finished', { 

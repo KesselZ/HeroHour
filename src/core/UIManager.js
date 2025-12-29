@@ -1,6 +1,7 @@
 import { spriteFactory } from './SpriteFactory.js';
 import { SkillRegistry, SectSkills } from './SkillRegistry.js';
 import { worldManager } from './WorldManager.js';
+import { modifierManager } from './ModifierManager.js';
 import { TALENT_UNITS, HERO_TREE_CONFIG, getHeroTalentTree } from './TalentRegistry.js';
 import { talentManager } from './TalentManager.js';
 import { timeManager } from './TimeManager.js';
@@ -374,19 +375,26 @@ class UIManager {
             const currentLevel = talentManager.activeTalents[id] || 0;
             if (currentLevel > 0) node.classList.add('active');
 
-            node.style.left = `${nodeData.pos.x + 400 - 32}px`; 
-            node.style.top = `${nodeData.pos.y + 300 - 32}px`;
+            // 核心逻辑：动态处理主属性名称 (力道/身法)
+            let displayName = nodeData.name;
+            if (id.includes('minor') && nodeData.name === '主属性') {
+                const heroId = worldManager.heroData?.id;
+                displayName = (heroId === 'qijin' || heroId === 'yeying') ? '身法' : '力道';
+            }
+
+            node.style.left = `${nodeData.pos.x + 400}px`; 
+            node.style.top = `${nodeData.pos.y + 300}px`;
 
             const iconStyle = spriteFactory.getIconStyle(nodeData.icon);
             node.innerHTML = `
                 <div class="talent-node-inner" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
                 <div class="talent-node-level">${currentLevel}/${nodeData.maxLevel}</div>
-                <div class="talent-node-name">${nodeData.name}</div>
+                <div class="talent-node-name">${displayName}</div>
             `;
 
             node.onmouseenter = () => {
                 this.showTooltip({
-                    name: nodeData.name,
+                    name: displayName,
                     level: `当前等级: ${currentLevel}/${nodeData.maxLevel}`,
                     description: `<div style="margin-bottom: 8px;">${nodeData.description}</div>`,
                     status: currentLevel < nodeData.maxLevel ? `升级需求: 1 奇穴点数` : '已修至最高重',
@@ -559,9 +567,12 @@ class UIManager {
         const skill = SkillRegistry[skillId];
         if (!skill) return;
 
-        const haste = heroData.stats.haste || 0;
-        const actualCD = (skill.cooldown * (1 - haste) / 1000).toFixed(1);
-        const actualCost = Math.floor(skill.cost * (1 - haste));
+        // 核心修复：统一使用 ModifierManager 获取已截断的倍率，解决 UI 与逻辑不一致问题
+        const casterDummy = { side: 'player', isHero: true, type: heroData.id };
+        const mpMult = modifierManager.getModifiedValue(casterDummy, 'mana_cost_multiplier', 1.0);
+
+        const actualCD = (skill.getActualCooldown(heroData) / 1000).toFixed(1);
+        const actualCost = Math.floor(skill.cost * mpMult);
 
         this.showTooltip({
             name: skill.name,

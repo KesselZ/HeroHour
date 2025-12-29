@@ -12,7 +12,7 @@ import { UNIT_STATS_DATA, HERO_IDENTITY } from './UnitStatsData.js';
  */
 
 // 用于战力对齐的常量 (基准：天策弟子 = 2.0 战力)
-const BASELINE_MELEE = { hp: 85, dps: 6.0, score: Math.sqrt(85 * 6.0) * (1 + 0.8 / 10 * 0.2) };
+const BASELINE_MELEE = { hp: 85, dps: 6.0, score: Math.sqrt(85 * 6.0) };
 const K = 2.0 / BASELINE_MELEE.score;
 
 /**
@@ -59,16 +59,25 @@ function calculateHeroCombat(heroId, mode = 'default') {
     } else if (heroId === 'qijin') {
         actualTargets = 1.0; // 纯阳剑气是单体
     } else if (heroId === 'lichengen') {
-        actualTargets = 2.5; // 天策横扫
+        const modes = stats.modes;
+        if (mode === 'tiance_sweep') {
+            // 点了天赋：横扫千军 (从数据表读取)
+            const cfg = modes.sweep;
+            actualAtk = baseAtk * cfg.atkMult;
+            actualTargets = cfg.targets; 
+        } else {
+            // 默认状态：单体突刺 (从数据表读取)
+            const cfg = modes.pierce;
+            actualAtk = baseAtk * cfg.atkMult;
+            actualTargets = cfg.targets;
+        }
     }
 
     // 3. 计算 DPS
     const dps = (actualAtk * actualBurst * actualTargets) / (actualAS / 1000);
 
-    // 4. 战力评分 (含射程补偿)
-    const baseScore = Math.sqrt(hp * dps);
-    const rangeBonus = 1 + (range / 10.0) * 0.2;
-    const theoreticalPower = baseScore * rangeBonus * K;
+    // 4. 战力评分 (移除射程补偿，仅根据 HP 和 DPS 计算)
+    const theoreticalPower = Math.sqrt(hp * dps) * K;
 
     return { 
         name: mode === 'default' ? stats.name : (mode === 'yeying_heavy' ? '叶英(重)' : '叶英(轻)'),
@@ -118,6 +127,7 @@ function runHeroCheck() {
     const heroesToCheck = [
         { id: 'qijin', mode: 'default' },
         { id: 'lichengen', mode: 'default' },
+        { id: 'lichengen', mode: 'tiance_sweep' },
         { id: 'yeying', mode: 'yeying_heavy' },
         { id: 'yeying', mode: 'yeying_light' }
     ];
@@ -126,6 +136,10 @@ function runHeroCheck() {
         const result = calculateHeroCombat(item.id, item.mode);
         if (!result) continue;
 
+        const nameDisplay = item.id === 'lichengen' 
+            ? (item.mode === 'tiance_sweep' ? '李承恩(扫)' : '李承恩(刺)')
+            : result.name;
+
         const cost = 20; // 英雄设定价值 (调整为 20)
         const balance = (result.theoreticalPower / cost) * 100;
         
@@ -133,7 +147,7 @@ function runHeroCheck() {
         const resetCode = '\x1b[0m';
         const balanceStr = `${colorCode}${balance.toFixed(1)}%${resetCode}`;
         
-        console.log(`${padRight(result.name, 12)} | ${padRight(result.hp, 8)} | ${padRight(result.dps.toFixed(1), 10)} | ${padRight(result.range.toFixed(1), 8)} | ${padRight(cost, 10)} | ${padRight(result.theoreticalPower.toFixed(2), 10)} | ${balanceStr}`);
+        console.log(`${padRight(nameDisplay, 12)} | ${padRight(result.hp, 8)} | ${padRight(result.dps.toFixed(1), 10)} | ${padRight(result.range.toFixed(1), 8)} | ${padRight(cost, 10)} | ${padRight(result.theoreticalPower.toFixed(2), 10)} | ${balanceStr}`);
     }
     console.log(`---------------------------------------------------------------------------------------------------------`);
     console.log(`提示：英雄战力目标为 15.0 左右。目前已同步最新数值调整。`);

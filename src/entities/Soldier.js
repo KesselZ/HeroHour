@@ -49,7 +49,6 @@ export class BaseUnit extends THREE.Group {
         
         this.isDead = false;
         
-        this.stunnedUntil = 0; // 眩晕截止时间戳
         this.hitFlashUntil = 0; // 受击闪红截止时间戳
         this.activeColors = new Map(); // 记录当前生效的 Buff 颜色 (Tag -> Color)
         this.baseColor = 0xffffff; // 单位的基础颜色
@@ -68,6 +67,8 @@ export class BaseUnit extends THREE.Group {
         // 走路音效控制 (改为固定时间频率)
         this.footstepTimer = 0;
         this.footstepInterval = 650; // 每 650ms 响一次
+
+        this._martyrdomTriggered = false; // 哀兵必胜触发标记
 
         // 攻击动画状态机 (平滑冲刺)
         this.lungeState = {
@@ -195,7 +196,8 @@ export class BaseUnit extends THREE.Group {
     }
 
     get damageMultiplier() {
-        return modifierManager.getModifiedValue(this, 'damageResist', this._baseDamageMultiplier);
+        // 核心修正：基础倍率为 1.0 (100% 承受)，通过 ModifierManager 堆叠减伤
+        return modifierManager.getModifiedValue(this, 'damage_multiplier', 1.0);
     }
 
     get isInvincible() {
@@ -208,6 +210,10 @@ export class BaseUnit extends THREE.Group {
 
     get isTigerHeart() {
         return modifierManager.getModifiedValue(this, 'tigerHeart', 0) > 0;
+    }
+
+    get isStunned() {
+        return modifierManager.getModifiedValue(this, 'stun', 0) > 0;
     }
 
     /**
@@ -324,7 +330,20 @@ export class BaseUnit extends THREE.Group {
 
     applyStun(duration) {
         if (this.isControlImmune || this.isInvincible) return;
-        this.stunnedUntil = Math.max(this.stunnedUntil, Date.now() + duration);
+        
+        // 核心重构：利用 ModifierManager 的自动生命周期管理 (针对专家 Point 2)
+        const modId = `stun_${this.side}_${this.type}_${this.index}`;
+        
+        modifierManager.addModifier({
+            id: modId,
+            stat: 'stun',
+            value: 1,
+            type: 'add',
+            targetUnit: this,
+            source: 'status',
+            startTime: Date.now(),
+            duration: duration
+        });
         
         // 自动触发眩晕视觉特效
         if (window.battle && window.battle.playVFX) {
@@ -386,7 +405,7 @@ export class BaseUnit extends THREE.Group {
         }
 
         // 2. 眩晕状态 (优先级高于 Buff)
-        if (Date.now() < this.stunnedUntil) {
+        if (this.isStunned) {
             targetColor = 0x888888;
         }
 
@@ -483,7 +502,7 @@ export class BaseUnit extends THREE.Group {
         }
 
         // 0. 眩晕状态判定
-        if (Date.now() < this.stunnedUntil) {
+        if (this.isStunned) {
             // 眩晕时也要处理物理冲力 (击退)
             if (this.knockbackVelocity.lengthSq() > 0.0001) {
                 this.position.add(this.knockbackVelocity);
@@ -536,7 +555,7 @@ export class BaseUnit extends THREE.Group {
             this.applySeparation(allies, enemies, deltaTime);
             
             // 3. 动态光环逻辑
-            const nearestEnemy = this.findNearestEnemy(enemies);
+            const nearestEnemy = this.findNearestEnemy(enemies, true); // 视觉光环需要绝对最近，防止闪烁
             if (nearestEnemy) {
                 this.updateInfluenceRing(this.position.distanceTo(nearestEnemy.position));
             }
@@ -663,19 +682,40 @@ export class BaseUnit extends THREE.Group {
     }
 
 
-    findNearestEnemy(enemies) {
-        let minDist = Infinity;
-        let nearest = null;
-        for (const enemy of enemies) {
-            if (!enemy.isDead) {
-                const d = this.position.distanceTo(enemy.position);
-                if (d < minDist) {
-                    minDist = d;
-                    nearest = enemy;
-                }
-            }
-        }
-        return nearest;
+    /**
+     * 寻找最近的敌人 (带随机扰动的灵活寻敌)
+     * @param {Array} enemies 
+     * @param {boolean} strict 是否强制返回绝对最近的 (用于视觉/光环)
+     */
+    findNearestEnemy(enemies, strict = false) {
+        const aliveEnemies = enemies.filter(e => !e.isDead);
+        if (aliveEnemies.length === 0) return null;
+
+        // 1. 计算所有距离并排序
+        const candidates = aliveEnemies.map(enemy => ({
+            enemy,
+            dist: this.position.distanceTo(enemy.position)
+        })).sort((a, b) => a.dist - b.dist);
+
+        // 如果只需要最精确的最近目标（如视觉效果），或只有一个候选人，直接返回
+        if (strict || candidates.length === 1) return candidates[0].enemy;
+
+        // 2. 取最近的最多三个候选者
+        const top3 = candidates.slice(0, 3);
+        const minDist = top3[0].dist;
+
+        // 3. 剔除 Outlier (定义：距离超过最近者 30% 且 绝对距离差超过 2.0)
+        // 这样如果几个敌人扎堆，士兵会随机分流；如果一个近两个远，则只选近的
+        const validCandidates = top3.filter(c => {
+            const isTooFarRatio = c.dist > minDist * 1.3;
+            const isTooFarAbs = (c.dist - minDist) > 2.0;
+            // 只有同时满足“比最近的远很多”和“绝对距离有明显差距”才判定为 outlier
+            return !(isTooFarRatio && isTooFarAbs);
+        });
+
+        // 4. 从非离群的候选人中随机选一个
+        const randomIndex = Math.floor(rng.next() * validCandidates.length);
+        return validCandidates[randomIndex].enemy;
     }
 
     moveTowardsTarget(deltaTime) {
@@ -759,8 +799,11 @@ export class BaseUnit extends THREE.Group {
     takeDamage(amount, isHeroSource = false) {
         if (this.isDead || this.isInvincible) return;
         
-        // 1. 应用百分比减伤 (核心重构：采用乘法叠加逻辑)
-        let finalAmount = amount * this.damageMultiplier;
+        // 核心修正：如果是治疗 (amount < 0)，跳过减伤计算
+        let finalAmount = amount;
+        if (amount > 0) {
+            finalAmount = amount * this.damageMultiplier;
+        }
         
         if (finalAmount > 0) {
             // 只有受到伤害时才播受击音效和闪红
@@ -783,6 +826,16 @@ export class BaseUnit extends THREE.Group {
                     scale: 1.0
                 });
             }
+        } else if (finalAmount < 0) {
+            // 治疗表现：绿色跳字
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('damage_number', { 
+                    pos: this.position.clone(), 
+                    value: Math.abs(finalAmount), 
+                    color: '#44ff44',
+                    scale: 0.8
+                });
+            }
         }
 
         // 2. 啸如虎：锁血 1 点逻辑
@@ -797,7 +850,37 @@ export class BaseUnit extends THREE.Group {
             this.health = this.maxHealth;
         }
         
-        if (this.health <= 0) this.die();
+        if (this.health <= 0) {
+            // --- 核心：处理“哀兵必胜”天赋 ---
+            const hasMartyrdom = modifierManager.getModifiedValue(this, 'martyrdom_enabled', 0) > 0;
+            if (hasMartyrdom && !this._martyrdomTriggered && !this.isHero) {
+                this._martyrdomTriggered = true;
+                this.health = 1; // 强行锁 1 血
+                
+                // 视觉反馈：变为半透明，增加紧迫感
+                if (this.unitSprite) this.unitSprite.material.opacity = 0.6;
+                
+                // 添加 2 秒无敌 Modifier
+                modifierManager.addModifier({
+                    id: `martyr_${this.side}_${this.type}_${this.index}`,
+                    stat: 'invincible',
+                    value: 1,
+                    type: 'add',
+                    duration: 2000,
+                    targetUnit: this,
+                    source: 'talent',
+                    onCleanup: () => {
+                        this.die(); // 2 秒后强行死亡
+                    }
+                });
+                
+                if (window.battle && window.battle.playVFX) {
+                    window.battle.playVFX('vfx_sparkle', { unit: this, color: 0xff4444, duration: 2000, radius: 1.0 });
+                }
+            } else {
+                this.die();
+            }
+        }
 
         // 核心更新：任何受损都会更新血条
         this.updateHealthBar();
@@ -808,6 +891,10 @@ export class BaseUnit extends THREE.Group {
         this.unitSprite.rotation.z = Math.PI / 2; // 倒下
         this.position.y = 0.3;
         
+        // 核心修复：死亡时立即从 ModifierManager 中移除该单位的所有修正器
+        // 彻底解决死亡单位 Modifier 堆积导致的内存泄漏与 $O(N)$ 计算性能崩溃问题
+        modifierManager.removeModifiersByTarget(this);
+
         // 死亡时立即隐藏阵营环
         if (this.influenceRing) {
             this.influenceRing.visible = false;
@@ -954,17 +1041,34 @@ export class HeroUnit extends BaseUnit {
         this._cangjianStance = v;
         
         const details = worldManager.getUnitBlueprint('yeying');
+        const m = details.modes;
+        const modeKey = v === 'heavy' ? 'yeying_heavy' : 'yeying_light';
+        const modeCfg = m[modeKey];
+
+        // --- 核心重构：将形态攻速缩放转化为 Modifier (Point 2) ---
+        // 逻辑：通过 attackSpeed 修正器来改变 attackCooldownTime，实现数据驱动
+        const baseBlueprintAS = UNIT_STATS_DATA['yeying'].attackSpeed || 1000;
+        const ratio = (modeCfg && modeCfg.attackSpeed) ? (modeCfg.attackSpeed / baseBlueprintAS) : 1.0;
+        
+        modifierManager.addModifier({
+            id: 'yeying_mode_speed',
+            side: this.side,
+            targetUnit: this,
+            stat: 'attackSpeed',
+            multiplier: 1 / ratio, // 间隔 = 基础 / 倍率，若间隔变为 2倍，则倍率设为 0.5
+            source: 'hero_mode'
+        });
 
         // 切换到重剑形态时，强制中断轻剑特有 Buff (如梦泉虎跑)
         if (v === 'heavy') {
             this.clearBuffs('mengquan');
-            this.baseColor = 0xffffff; // 重剑底色保持白色
+            this.baseColor = 0xffffff; 
             this.scale.set(1.5, 1.5, 1.5);
-            this._baseAttackRange = details.range; // 恢复心剑范围 (2.5)
+            this._baseAttackRange = details.range; 
         } else {
-            this.baseColor = 0xffffff; // 轻剑底色恢复白色
+            this.baseColor = 0xffffff; 
             this.scale.set(1.5, 1.5, 1.5);
-            this._baseAttackRange = 1.0; // 轻剑单体攻击范围缩短
+            this._baseAttackRange = modeCfg.range || 1.8; // 使用配置值，保底 1.8
         }
     }
 
@@ -985,13 +1089,33 @@ export class HeroUnit extends BaseUnit {
      * 英雄数据的代理接口：
      * 允许 BattleScene 中的 Buff 像操作普通属性一样操作功法和调息，并自动同步回 WorldManager
      */
-    get spells() { return worldManager.heroData.stats.spells; }
-    set spells(v) { worldManager.heroData.stats.spells = v; }
+    get spells() { 
+        // 核心加固：直接传入当前原始功法点数作为 baseValue (专家建议 Point 2)
+        // 这样即便外部没有提前注册 Modifier，英雄的基本功法加成也能保底生效
+        const rawPoints = worldManager.heroData.stats.spells;
+        return modifierManager.getModifiedValue(this, 'skill_power', rawPoints); 
+    }
+    set spells(v) { 
+        // 原始点数依然存回 heroData
+        worldManager.heroData.stats.spells = v; 
+        worldManager.refreshHeroStats(); 
+    }
+
+    /**
+     * 获取原始功法点数 (用于 UI 显示)
+     */
+    get rawSpells() {
+        return modifierManager.getModifiedValue(this, 'spells', 0);
+    }
     
-    get haste() { return worldManager.heroData.stats.haste; }
+    get haste() { 
+        // 核心加固：传入英雄原始急速作为 baseValue
+        return modifierManager.getModifiedValue(this, 'haste', worldManager.heroData.stats.haste); 
+    }
     set haste(v) { 
-        // 调息上限锁定在 0.5 (50%)
-        worldManager.heroData.stats.haste = Math.max(0, Math.min(0.5, v)); 
+        // 核心优化：原始数据不再截断，出口由 ModifierManager 统一管理
+        worldManager.heroData.stats.haste = Math.max(0, v); 
+        worldManager.refreshHeroStats();
     }
 
     takeDamage(amount) {
@@ -1014,29 +1138,52 @@ export class HeroUnit extends BaseUnit {
      * 核心重构：高度复用兵种逻辑，彻底解决残留与重叠
      */
     performAttack(enemies, allies) {
-        const heroId = worldManager.heroData.id;
         const now = Date.now();
-        const details = worldManager.getUnitBlueprint(heroId);
+        const details = worldManager.getUnitBlueprint(this.type);
         
-        // 核心优化：攻速逻辑完全数据驱动，消除硬编码，且支持 Buff 缩放
+        // 核心优化：攻速逻辑现在完全由 ModifierManager 驱动
         let actualCD = this.attackCooldownTime;
-        if (heroId === 'yeying' && details.modes) {
-            const m = details.modes;
-            const modeKey = this.cangjianStance === 'heavy' ? 'yeying_heavy' : 'yeying_light';
-            const modeCfg = m[modeKey];
-            if (modeCfg && modeCfg.attackSpeed) {
-                // 计算该形态相对于英雄蓝图攻速的比例
-                const baseBlueprintAS = UNIT_STATS_DATA[heroId].attackSpeed || 1000;
-                const ratio = modeCfg.attackSpeed / baseBlueprintAS;
-                actualCD = this.attackCooldownTime * ratio;
-            }
-        }
 
         if (now - this.lastAttackTime < actualCD) return;
+        
+        // --- 核心：天策【横扫千军】(原羽林枪法) 逻辑 ---
+        if (this.type === 'lichengen') {
+            const isSweepEnabled = modifierManager.getModifiedValue(this, 'tiance_yulin_enabled', 0) > 0;
+            const mode = isSweepEnabled ? details.modes.sweep : details.modes.pierce;
+
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+
+            if (isSweepEnabled) {
+                // 情况 1: 横扫 (1.5倍伤害)
+                audioManager.play('attack_melee', { volume: 0.5, force: true });
+                const radius = this.attackRange;
+                const kb = details.knockbackForce || 0.15;
+                if (window.battle && window.battle.playVFX) {
+                    window.battle.playVFX('advanced_sweep', { unit: this, radius: radius, color: 0xff0000, duration: 300 });
+                }
+                this.executeAOE(enemies, {
+                    radius: radius,
+                    angle: Math.PI, 
+                    damage: this.attackDamage * mode.atkMult,
+                    knockbackForce: kb
+                });
+            } else {
+                // 情况 2: 单体突刺 (2倍伤害)
+                audioManager.play('attack_melee', { volume: 0.6, force: true });
+                if (window.battle && window.battle.playVFX) {
+                    window.battle.playVFX('tiance_sweep', { unit: this, radius: 1.2, color: 0xffaa00, duration: 150, angle: Math.PI / 4 });
+                }
+                if (this.target && !this.target.isDead) {
+                    this.target.takeDamage(this.attackDamage * mode.atkMult, true);
+                }
+            }
+            return;
+        }
+
         this.lastAttackTime = now;
 
-        const burstCount = details.burstCount || 1;
-
+        const heroId = this.type;
         if (heroId === 'yeying') {
             const m = details.modes;
             const ident = worldManager.getHeroIdentity('yeying');
@@ -1051,9 +1198,9 @@ export class HeroUnit extends BaseUnit {
                         // 每段爆发独立音效
                         audioManager.play('attack_melee', { volume: 0.4, force: true, pitchVar: 0.2 });
                         this.onAttackAnimation(true); // 传入 true 禁用位移
-                        window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: cfg.range, color: 0xffcc00, duration: 250 });
+                        window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: this.attackRange, color: 0xffcc00, duration: 250 });
                         this.executeAOE(enemies, {
-                            radius: cfg.range,
+                            radius: this.attackRange,
                             damage: this.attackDamage * (cfg.atk / baseAtk),
                             knockbackForce: 0.05
                         });
@@ -1080,6 +1227,7 @@ export class HeroUnit extends BaseUnit {
             this.onAttackAnimation();
             this.performChunyangAttack(enemies, details);
         } else if (heroId === 'lichengen') {
+            // 此时已在 performAttack 顶层处理了羽林枪法覆盖，这里的逻辑仅作保底（通常不会走到）
             audioManager.play('attack_melee', { volume: 0.5, force: true });
             this.onAttackAnimation();
             this.performTianceAttack(enemies, details);
@@ -1088,7 +1236,8 @@ export class HeroUnit extends BaseUnit {
 
     performTianceAttack(enemies, details) {
         if (!this.target || this.target.isDead) return;
-        const radius = details.range || 2.0;
+        // 原有横扫逻辑
+        const radius = this.attackRange;
         const kb = details.knockbackForce || 0.15;
         window.battle.playVFX('advanced_sweep', { unit: this, radius: radius, color: 0xff0000, duration: 300 });
         this.executeAOE(enemies, {
@@ -1242,7 +1391,7 @@ export class Healer extends BaseUnit {
             hp: stats.hp,
             speed: stats.speed,
             attackRange: stats.range, // 治疗范围
-            attackDamage: -stats.atk, // 负伤害即治疗
+            attackDamage: stats.atk, // 核心修正：治疗职业也存正数，仅在输出时转为负值
             attackSpeed: stats.attackSpeed,
             projectileManager,
             cost: stats.cost
@@ -1250,15 +1399,38 @@ export class Healer extends BaseUnit {
     }
 
     updateAI(enemies, allies) {
-        // 1. 寻找任意受伤的盟友 (增加 1 点血量的容差，防止浮点数精度导致的误判)
-        this.target = allies.find(u => !u.isDead && u.health < (u.maxHealth - 1));
-        
-        if (this.target && this.target.health < (this.target.maxHealth - 1)) {
-            console.log(`%c[Healer AI] %c锁定受伤目标: ${this.target.type}, HP: ${this.target.health.toFixed(2)}/${this.target.maxHealth.toFixed(2)}`);
-        }
-        
-        // 2. 如果全员健康，则把主角作为跟随目标
-        if (!this.target) {
+        // 1. 寻找所有受伤的盟友 (血量低于 90%)
+        const injuredAllies = allies.filter(u => !u.isDead && u.health < (u.maxHealth * 0.9));
+
+        if (injuredAllies.length > 0) {
+            // 2. 计算距离并按距离排序
+            const withDist = injuredAllies.map(ally => ({
+                ally,
+                dist: this.position.distanceTo(ally.position),
+                hpRatio: ally.health / ally.maxHealth
+            })).sort((a, b) => a.dist - b.dist);
+
+            // 3. 取最近的 4 个候选者 (k=4)
+            const topK = withDist.slice(0, 4);
+            const minDist = topK[0].dist;
+
+            // 4. 剔除距离过远的 Outlier (奶妈容忍度稍高，设为 2 倍距离且差值大于 4)
+            const validByDist = topK.filter(c => {
+                const isTooFarRatio = c.dist > minDist * 2.0;
+                const isTooFarAbs = (c.dist - minDist) > 4.0;
+                return !(isTooFarRatio && isTooFarAbs);
+            });
+
+            // 5. 在有效的近处伤员中，按血量百分比排序 (伤最重的排前面)
+            validByDist.sort((a, b) => a.hpRatio - b.hpRatio);
+
+            // 6. 从最残血的前 2 名中随机选一个，兼顾“救急”和“分工”
+            const finalCandidates = validByDist.slice(0, 2);
+            const randomIndex = Math.floor(rng.next() * finalCandidates.length);
+            this.target = finalCandidates[randomIndex].ally;
+            
+        } else {
+            // 7. 如果全员健康，则把主角作为跟随目标
             this.target = allies.find(u => u.isHero && !u.isDead);
         }
 
@@ -1284,7 +1456,7 @@ export class Healer extends BaseUnit {
                     startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
                     target: this.target,
                     speed: 0.1,
-                    damage: this.attackDamage,
+                    damage: -this.attackDamage, // 发射负值进行治疗
                     type: 'heal'
                 });
             }
@@ -1506,9 +1678,10 @@ export class Cangjian extends BaseUnit {
                     audioManager.play('attack_melee', { volume: 0.2, chance: 0.8, pitchVar: 0.2 });
                     
                     this.onAttackAnimation(true); // 旋风斩禁用位移
-                    window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: details.range, color: 0xffcc00, duration: 500 });
+                    // 核心修复：使用修正后的 attackRange (Point 1)
+                    window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: this.attackRange, color: 0xffcc00, duration: 500 });
                     this.executeAOE(enemies, {
-                        radius: details.range,
+                        radius: this.attackRange,
                         angle: Math.PI * 2,
                         damage: this.attackDamage,
                         knockbackForce: 0.05
@@ -1633,8 +1806,9 @@ export class Chunyang extends BaseUnit {
 
             if (this.isMeleeMode) {
                 const m = this.statsData.modes.chunyang_melee;
-                window.battle.playVFX('tiance_sweep', { unit: this, radius: m.range, color: 0x00ffff, duration: 200 });
-                this.executeAOE(enemies, { radius: m.range, angle: Math.PI * 2/3, damage: this.attackDamage * (m.atk/this.statsData.modes.chunyang_remote.atk), knockbackForce: 0.03 });
+                // 核心修复：使用修正后的 attackRange (Point 1)
+                window.battle.playVFX('tiance_sweep', { unit: this, radius: this.attackRange, color: 0x00ffff, duration: 200 });
+                this.executeAOE(enemies, { radius: this.attackRange, angle: Math.PI * 2/3, damage: this.attackDamage * (m.atk/this.statsData.modes.chunyang_remote.atk), knockbackForce: 0.03 });
             } else {
                 const r = this.statsData.modes.chunyang_remote;
                 for (let i = 0; i < r.burstCount; i++) {

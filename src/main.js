@@ -364,12 +364,12 @@ window.addEventListener('battle-finished', (e) => {
 
 // 监听英雄升级事件，同步属性修正器
 window.addEventListener('hero-level-up', () => {
-    syncHeroStatsToModifiers();
+    worldManager.refreshHeroStats();
 });
 
 // 监听奇穴更新事件，同步属性
 window.addEventListener('talents-updated', () => {
-    syncHeroStatsToModifiers();
+    worldManager.refreshHeroStats();
     worldManager.updateHUD(); // 更新血条等显示
 });
 
@@ -392,7 +392,7 @@ function applyHeroTraits(heroId) {
     if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'fenglaiwushan'];
 
     // 3. 执行同步与修正注册 (这里会根据 identity 动态计算 hpMax 和 mpMax)
-    syncHeroStatsToModifiers();
+    worldManager.refreshHeroStats();
 
     // 3.5 重新初始化奇穴管理器，根据选中的英雄生成对应的奇穴树
     talentManager.init(worldManager.heroData);
@@ -400,59 +400,6 @@ function applyHeroTraits(heroId) {
     // 4. 初始化资源状态 (补满血蓝)
     worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
     worldManager.heroData.mpCurrent = worldManager.heroData.mpMax;
-}
-
-/**
- * 将主角的四维属性转化为全局 Modifier
- */
-function syncHeroStatsToModifiers() {
-    const s = worldManager.heroData.stats;
-    const heroId = worldManager.heroData.id;
-    
-    // 核心修复：不再直接 clear()，否则会冲掉奇穴天赋产生的 Modifier
-    // 改为按来源清除，只清理属于 'hero_stats' 的部分
-    modifierManager.removeModifiersBySource('hero_stats');
-
-    // 0. 获取英雄身份数据用于计算上限 (彻底消除 Hardcode)
-    const identity = worldManager.getHeroIdentity(heroId);
-    if (!identity) return;
-    const cb = identity.combatBase;
-
-    // 1. 统帅：军队影响士兵攻击和血量 (显式标记 source: 'hero_stats')
-    modifierManager.addModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'attackDamage', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
-    modifierManager.addModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
-
-    // 2. 武力与功法：根据身份表动态计算上限
-    worldManager.heroData.hpMax = cb.hpBase + (s.power * cb.hpScaling);
-    // 核心修改：所有人统一 160 基础，每级 +14
-    worldManager.heroData.mpMax = 160 + (worldManager.heroData.level - 1) * 14;
-    
-    modifierManager.addModifier({
-        id: 'hero_damage_bonus',
-        side: 'player',
-        unitType: heroId, 
-        stat: 'attackDamage',
-        multiplier: 1.0 + (s.power * (cb.atkScaling || 0.05)),
-        source: 'hero_stats'
-    });
-
-    // 3. 核心重构：自动加载英雄固有天赋 (数据驱动)
-    const traits = worldManager.getHeroTraits(heroId);
-    traits.forEach(trait => {
-        // 映射旧的 stat 名到新的 stat 名
-        if (trait.stat === 'damage') trait.stat = 'attackDamage';
-        if (trait.stat === 'range') trait.stat = 'attackRange';
-        if (trait.stat === 'speed') trait.stat = 'moveSpeed';
-        if (trait.stat === 'attack_speed') trait.stat = 'attackSpeed';
-
-        modifierManager.addModifier({
-            ...trait,
-            side: 'player',
-            // 如果 trait 没写 unitType，默认加给英雄本人
-            unitType: trait.unitType || heroId,
-            source: 'trait' // 明确来源为 trait，使其进入独立乘区
-        });
-    });
 }
 
 function enterGameState(state, config = null) {

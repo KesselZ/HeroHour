@@ -26,6 +26,7 @@ export const ASSET_REGISTRY = {
         TALENT4: '/assets/talents/talent4.png',
         TALENT5: '/assets/talents/talent5.png',
         TALENT6: '/assets/talents/talent6.png',
+        TALENT_TIANCE: '/assets/talents/talent_tiance.png',
         BUILDING2: '/assets/buildings/building2.png',
         BUILDING3: '/assets/buildings/building3.png'
     },
@@ -81,6 +82,7 @@ export const ASSET_REGISTRY = {
         'house_2': { name: '民居二', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 2, scale: 3.0 },
         'house_3': { name: '民居三', sheet: 'ITEMS2', rows: 4, cols: 4, r: 3, c: 3, scale: 3.0 },
         'gold_mine_world': { name: '金矿', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
+        'wood_pile': { name: '木材堆', sheet: 'ITEMS2', rows: 4, cols: 4, r: 1, c: 4, scale: 1.5 },
         'sawmill_world': { name: '伐木场', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
         'dummy_training': { name: '演武木人', sheet: 'ITEMS2', rows: 4, cols: 4, r: 2, c: 3, scale: 1.2 },
 
@@ -106,12 +108,52 @@ export const ASSET_REGISTRY = {
         'thatched_hut_v3': { name: '草屋', sheet: 'BUILDING3', rows: 4, cols: 4, r: 4, c: 4, scale: 3.5 },
 
         // --- 奇穴节点 (Talent Nodes) ---
-        'talent_point_1': { name: '极泉', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_point_2': { name: '天池', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_point_3': { name: '曲泽', sheet: 'TALENT3', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_point_4': { name: '内关', sheet: 'TALENT4', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_point_5': { name: '大陵', sheet: 'TALENT5', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_point_6': { name: '劳宫', sheet: 'TALENT6', rows: 4, cols: 4, r: 1, c: 1 },
+        // 商道系列 (TALENT1)
+        'talent_gold_base': { name: '金钱产出', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_loot':      { name: '战利奖励', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 2 },
+        'talent_wood':      { name: '木材节约', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_monopoly':  { name: '资源垄断', sheet: 'TALENT1', rows: 4, cols: 4, r: 2, c: 1 },
+
+        // 武道/演武系列 (TALENT2)
+        'talent_spell_power': { name: '功法提升', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_combo':       { name: '连招联动', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 2 },
+        'talent_mp':          { name: '内力根基', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_spell_epic':  { name: '功参造化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 1 },
+
+        // 将道/兵流系列 (TALENT3)
+        'talent_army_hp':   { name: '军队气血', sheet: 'TALENT3', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_army_def':  { name: '军队防御', sheet: 'TALENT3', rows: 4, cols: 4, r: 1, c: 2 },
+        'talent_elite_cost': { name: '精锐减费', sheet: 'TALENT3', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_martyrdom':  { name: '哀兵存续', sheet: 'TALENT3', rows: 4, cols: 4, r: 2, c: 1 },
+
+        // 侠道/游历系列 (TALENT4)
+        'talent_world_speed': { name: '地图神行', sheet: 'TALENT4', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_mp_regen':    { name: '内力恢复', sheet: 'TALENT4', rows: 4, cols: 4, r: 1, c: 2 },
+        'talent_reveal':      { name: '迷雾揭开', sheet: 'TALENT4', rows: 4, cols: 4, r: 1, c: 3 },
+
+        // 基础属性与爆发 (TALENT5 & TALENT6)
+        'talent_power':       { name: '力道提升', sheet: 'TALENT5', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_haste':       { name: '加速调息', sheet: 'TALENT6', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_leadership':  { name: '统御大旗', sheet: 'TALENT3', rows: 4, cols: 4, r: 3, c: 1 },
+        'talent_power_epic':  { name: '神力惊世', sheet: 'TALENT5', rows: 4, cols: 4, r: 2, c: 1 },
+        'talent_haste_epic':  { name: '迅疾如风', sheet: 'TALENT6', rows: 4, cols: 4, r: 2, c: 1 },
+
+        // 天策专属系列 (TALENT_TIANCE)
+        'talent_tiance_sweep':    { name: '横扫图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_tiance_cavalry':  { name: '骑兵图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 2 },
+        'talent_tiance_tu':       { name: '奔雷图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_tiance_bleeding': { name: '龙牙图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 4 },
+
+        // 藏剑专属
+        'talent_cangjian_fengming': { name: '凤鸣图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 3, c: 1 }, // 借用技能图标
+        
+        // --- 核心节点占位符 (如果需要) ---
+        'talent_core': { name: '核心', sheet: 'TALENT4', rows: 4, cols: 4, r: 4, c: 4 },
+
+        // --- 职业中心节点图标 (Hero Core Icons) ---
+        'core_qijin':   { name: '纯阳核心', sheet: 'TALENT5', rows: 4, cols: 4, r: 2, c: 1 },
+        'core_yeying':  { name: '藏剑核心', sheet: 'SKILL6',  rows: 4, cols: 4, r: 3, c: 2 },
+        'core_tiance':  { name: '天策核心', sheet: 'SKILL4',  rows: 4, cols: 4, r: 1, c: 4 },
 
         // --- building2.png 系列 (扩展建筑库) ---
         'sawmill_v2': { name: '伐木工坊', sheet: 'BUILDING3', rows: 4, cols: 4, r: 1, c: 1, scale: 3.0 },
@@ -137,7 +179,7 @@ export const ASSET_REGISTRY = {
         'bear':      { name: '黑熊', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 4, scale: 1.8 },
 
         // 第二行：山贼与叛军
-        'bandit':        { name: '山贼刀匪', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'bandit':        { name: '山贼刀匪', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4, defaultFacing: 'left' },
         'bandit_archer': { name: '山贼弩匪', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4, defaultFacing: 'right' },
         'rebel_soldier': { name: '叛军甲兵', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'left' },
         'rebel_axeman':  { name: '叛军斧兵', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'left' },

@@ -1294,6 +1294,7 @@ img {
     box-shadow: 0 0 20px rgba(91, 138, 138, 0.2),
                 inset 0 0 10px rgba(178, 211, 211, 0.1);
     z-index: 2;
+    transform: translate(-50%, -50%); /* 核心修复：确保节点中心对齐坐标点 */
 }
 
 /* 核心节点：更大更亮 */
@@ -1349,7 +1350,7 @@ img {
     border-color: var(--jx3-gold-light);
     box-shadow: 0 0 40px rgba(178, 211, 211, 0.5),
                 inset 0 0 15px rgba(255, 255, 255, 0.2);
-    transform: scale(1.15);
+    transform: translate(-50%, -50%) scale(1.15); /* 保持居中的同时放大 */
     /* 放大动画加快 (0.1s)，移开缩小保持原速 (0.4s) */
     transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -1385,14 +1386,17 @@ img {
 
 .talent-node-name {
     position: absolute;
-    top: -25px;
-    width: 100%;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
     text-align: center;
     color: #fff;
     font-size: 0.85rem;
     text-shadow: 0 0 5px #000;
     pointer-events: none;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
+    white-space: nowrap;
 }
 
 /* 顶部信息条 */
@@ -2176,6 +2180,12 @@ img {
     font-size: 1.1rem;
 }
 
+.gain-count {
+    color: #2e7d32; /* 绿色，表示获得 */
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
 .loss-name {
     font-size: 0.8rem;
     color: #666;
@@ -2501,7 +2511,18 @@ canvas { image-rendering: pixelated; }
     align-items: center;
     gap: 10px;
     min-width: 520px; /* 设定最小基准宽度，防止面板过窄 */
+    max-width: 90vw;
+    overflow-x: auto;
     transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1); /* 让面板宽度变化变得丝滑 */
+}
+
+/* 隐藏滚动条但保留功能 (可选，为了美观) */
+.skill-bar-container::-webkit-scrollbar {
+    height: 4px;
+}
+.skill-bar-container::-webkit-scrollbar-thumb {
+    background: var(--jx3-celadon);
+    border-radius: 2px;
 }
 
 /* 逃跑按钮样式 */
@@ -2639,7 +2660,51 @@ canvas { image-rendering: pixelated; }
 
 .skill-slots {
     display: flex;
-    gap: 15px;
+    gap: 25px; /* 增加组间距 */
+    align-items: flex-start;
+}
+
+.skill-group-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 0 15px; /* 增加组内间距 */
+}
+
+.skill-group-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--jx3-celadon-dark);
+    letter-spacing: 4px;
+    white-space: nowrap;
+}
+
+/* 分界横线：水墨渐变风格 */
+.skill-group-header::before,
+.skill-group-header::after {
+    content: "";
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--jx3-celadon-light), transparent);
+}
+
+.skill-group-header::before {
+    background: linear-gradient(to left, var(--jx3-celadon-light), transparent);
+}
+
+.skill-group-header::after {
+    background: linear-gradient(to right, var(--jx3-celadon-light), transparent);
+}
+
+.skill-group-list {
+    display: flex;
+    gap: 12px;
 }
 
 .skill-btn {

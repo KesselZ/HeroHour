@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { audioManager } from './AudioManager.js';
+import { modifierManager } from './ModifierManager.js';
 
 /**
  * Skill: 技能逻辑的核心基类
@@ -23,14 +24,40 @@ export class Skill {
     }
 
     /**
+     * 获取当前实际的冷却时间 (考虑全局修正和特殊天赋)
+     */
+    /**
+     * 获取实际冷却时间 (支持通用声明式劫持)
+     */
+    getActualCooldown(heroData) {
+        const dummy = { side: 'player', isHero: true, type: heroData.id };
+        
+        // 1. 全局冷却缩减 (haste/急速)
+        const globalCDMult = modifierManager.getModifiedValue(dummy, 'cooldown_multiplier', 1.0);
+        
+        // 2. 技能特定倍率劫持 (例如: pinghu_cooldown_multiplier)
+        const specificCDMult = modifierManager.getModifiedValue(dummy, `${this.id}_cooldown_multiplier`, 1.0);
+        
+        // 3. 技能特定数值覆盖 (例如: tu_cooldown_override)
+        // 如果该值 > 0，则直接跳过所有计算，强制返回该值
+        const override = modifierManager.getModifiedValue(dummy, `${this.id}_cooldown_override`, 0);
+        
+        if (override > 0) return override;
+
+        return this.cooldown * globalCDMult * specificCDMult;
+    }
+
+    /**
      * 检查技能是否可用
      */
     isReady(heroData) {
         const now = Date.now();
-        const haste = heroData.stats.haste || 0;
-        const actualCD = this.cooldown * (1 - haste);
+        // 核心优化：直接请求计算好的倍率 (已包含 40% 上限逻辑)
+        const dummy = { side: 'player', isHero: true, type: heroData.id };
+        const mpMult = modifierManager.getModifiedValue(dummy, 'mana_cost_multiplier', 1.0);
         
-        const canAffordMP = heroData.mpCurrent >= Math.floor(this.cost * (1 - haste));
+        const actualCD = this.getActualCooldown(heroData);
+        const canAffordMP = heroData.mpCurrent >= Math.floor(this.cost * mpMult);
         const cdReady = (now - this.lastUsed) >= actualCD;
         
         return canAffordMP && cdReady;
@@ -41,7 +68,9 @@ export class Skill {
      */
     getDescription(heroData) {
         let desc = this.description;
-        const skillPower = 1 + (heroData.stats.spells || 0) / 100;
+        // 核心优化：直接请求计算好的招式强度系数 (已包含 1 + spells/100 逻辑)
+        const dummy = { side: 'player', isHero: true, type: heroData.id };
+        const skillPower = modifierManager.getModifiedValue(dummy, 'skill_power', 0);
         
         const hl = (val) => `<span class="skill-num-highlight">${val}</span>`;
         const normal = (val) => val; 
@@ -95,8 +124,11 @@ export class Skill {
                             const currentPower = isMultDynamic ? skillPower : 1.0;
                             
                             let bonusPct;
-                            if (statName === 'damageResist') {
-                                bonusPct = Math.abs(Math.round((1.0 - m) * currentPower * 100));
+                            if (statName === 'damageReduction') {
+                                // 减伤逻辑：offset 0.65 代表 65%
+                                const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
+                                const off = offsets[idx] !== undefined ? offsets[idx] : (offsets[0] || 0);
+                                bonusPct = Math.round(off * currentPower * 100);
                             } else {
                                 bonusPct = Math.abs(Math.round((m - 1.0) * currentPower * 100));
                             }
@@ -144,13 +176,15 @@ export class Skill {
      * 核心：执行技能
      */
     execute(battleScene, caster, targetPos = null) {
-        if (!this.isReady(battleScene.worldManager.heroData)) return false;
+        const heroData = battleScene.worldManager.heroData;
+        if (!this.isReady(heroData)) return false;
 
-        const heroStats = battleScene.worldManager.heroData.stats;
-        const haste = heroStats.haste || 0;
-        const actualCost = Math.floor(this.cost * (1 - haste));
+        // 核心优化：通过 ModifierManager 分别获取 CD 和 蓝耗倍率
+        const cdMult = modifierManager.getModifiedValue(caster, 'cooldown_multiplier', 1.0);
+        const mpMult = modifierManager.getModifiedValue(caster, 'mana_cost_multiplier', 1.0);
+        const actualCost = Math.floor(this.cost * mpMult);
         
-        battleScene.worldManager.heroData.mpCurrent -= actualCost;
+        heroData.mpCurrent -= actualCost;
         this.lastUsed = Date.now();
 
         // 播放技能音效 (技能触发强制 100% 成功)
@@ -160,18 +194,37 @@ export class Skill {
 
         // 核心逻辑：根据技能类别自动切换藏剑形态
         if (caster.isHero && caster.type === 'yeying') {
-            if (this.category.includes('重剑')) {
-                caster.cangjianStance = 'heavy';
-            } else if (this.category.includes('轻剑')) {
-                caster.cangjianStance = 'light';
+            if (this.category === '山居剑意') {
+                caster.cangjianStance = 'heavy'; // 自动切换为重剑形态
+            } else if (this.category === '问水决') {
+                caster.cangjianStance = 'light'; // 自动切换为轻剑形态
             }
         }
 
+        const skillPower = modifierManager.getModifiedValue(caster, 'skill_power', 0);
+
         this.actions.forEach(action => {
-            const skillPower = 1 + (heroStats.spells || 0) / 100;
             const center = targetPos || caster.position;
             this._executeAction(action, battleScene, caster, center, skillPower);
         });
+
+        // --- 核心：处理“行云流水”天赋效果 ---
+        const isComboChainEnabled = modifierManager.getModifiedValue(caster, 'combo_chain_enabled', 0) > 0;
+        if (isComboChainEnabled && caster.isHero) {
+            modifierManager.addModifier({
+                id: 'combo_chain_buff',
+                stat: 'spells', // 功法加成，会自动影响 skill_power
+                multiplier: 1.2,
+                duration: 3000,
+                targetUnit: caster,
+                source: 'skill',
+                startTime: Date.now()
+            });
+            // 触发视觉反馈
+            if (battleScene.playVFX) {
+                battleScene.playVFX('vfx_sparkle', { unit: caster, color: 0x00ffff, duration: 500, radius: 1.2 });
+            }
+        }
 
         return true;
     }
@@ -224,9 +277,33 @@ export class Skill {
                         ? buffParams.offset.map(o => o * skillPower)
                         : (buffParams.offset * skillPower);
                 }
+
+                let finalDuration = isDynamicBuff ? action.params.duration * skillPower : action.params.duration;
+
+                // --- 核心：藏剑【凤鸣】时长延长 ---
+                if (action.params && action.params.tag === 'mengquan' && caster.isHero) {
+                    const extraDur = modifierManager.getModifiedValue(caster, 'cangjian_mengquan_duration_add', 0);
+                    finalDuration += extraDur;
+
+                    // --- 核心：藏剑【凤鸣】技能联动 ---
+                    const isFengmingEnabled = modifierManager.getModifiedValue(caster, 'cangjian_fengming_enabled', 0) > 0;
+                    if (isFengmingEnabled) {
+                        modifierManager.addModifier({
+                            id: 'pinghu_hupao_hijack',
+                            stat: 'pinghu_cooldown_multiplier',
+                            value: 0.7, // 降低 30% 即乘以 0.7
+                            type: 'mult', 
+                            unitType: 'hero',
+                            source: 'skill',
+                            duration: finalDuration,
+                            startTime: Date.now()
+                        });
+                    }
+                }
+
                 battleScene.applyBuffToUnits(buffTargets, {
                     ...buffParams,
-                    duration: isDynamicBuff ? action.params.duration * skillPower : action.params.duration
+                    duration: finalDuration
                 });
                 break;
 
@@ -263,8 +340,15 @@ export class Skill {
                 break;
 
             case 'summon':
+                let finalUnitType = action.unitType;
+                
+                // --- 核心：天策【铁骑召来】逻辑 ---
+                if (this.id === 'summon_militia' && modifierManager.getModifiedValue(caster, 'tiance_summon_upgrade', 0) > 0) {
+                    finalUnitType = 'tiance'; // 升级为骑兵
+                }
+
                 const finalCount = action.applySkillPowerToCount ? Math.floor(action.count * skillPower) : action.count;
-                battleScene.spawnSupportUnits(action.unitType, finalCount, center);
+                battleScene.spawnSupportUnits(finalUnitType, finalCount, center);
                 break;
 
             case 'movement':
@@ -289,6 +373,20 @@ export class Skill {
             case 'status_aoe':
                 const statusTargets = battleScene.getUnitsInArea(center, this.targeting, 'enemy');
                 battleScene.applyStatusToUnits(statusTargets, action.status, action.duration);
+                break;
+
+            case 'dot':
+                // DOT 通常作用于当前区域内的敌人
+                const dotTargets = battleScene.getUnitsInArea(center, action.targeting || this.targeting, 'enemy');
+                dotTargets.forEach(target => {
+                    battleScene.applyDOT(target, {
+                        damage: action.damage * skillPower,
+                        interval: action.interval || 1000,
+                        count: action.count || 3,
+                        color: action.color,
+                        isHeroSource: caster.isHero
+                    });
+                });
                 break;
 
             case 'projectile':

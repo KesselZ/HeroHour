@@ -62,6 +62,10 @@ export const UNIT_STATS_DATA = {
         attackSpeed: 1000, 
         targets: 2.5,
         knockbackForce: 0.15,
+        modes: {
+            'pierce': { name: '突刺', atkMult: 2.0, targets: 1.0 }, // 默认形态：2倍单体
+            'sweep':  { name: '横扫', atkMult: 1.5, targets: 2.5 }  // 奇穴形态：1.5倍群体
+        },
         description: '天策统领，不动如山，一人可挡万军。' 
     },
     'yeying':    { 
@@ -72,7 +76,7 @@ export const UNIT_STATS_DATA = {
         description: '藏剑庄主，心剑合一，周身剑气无坚不摧。',
         modes: {
             'yeying_heavy': { name: '叶英(重)', atk: 5,  range: 2.5, burstCount: 3, targets: 5.0, attackSpeed: 1500 },
-            'yeying_light': { name: '叶英(轻)', atk: 20, range: 1.5, burstCount: 1, targets: 1.0, attackSpeed: 600 }
+            'yeying_light': { name: '叶英(轻)', atk: 20, range: 1.8, burstCount: 1, targets: 1.0, attackSpeed: 600 }
         }
     }
 };
@@ -83,7 +87,7 @@ export const UNIT_STATS_DATA = {
 export const HERO_IDENTITY = {
     'qijin': {
         initialStats: { power: 7, spells: 12, morale: 6, qinggong: 11.8, battleSpeed: 6.0, leadership: 20 },
-        combatBase: { atk: 12, hpBase: 270, hpScaling: 5, atkScaling: 0.02 }, 
+        combatBase: { atk: 9, hpBase: 200, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
             { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
             { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'attackDamage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }

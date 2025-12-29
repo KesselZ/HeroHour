@@ -298,7 +298,10 @@ export class WorldScene {
         
         document.getElementById('attr-primary-val').innerText = data.stats.power;
         document.getElementById('attr-fali').innerText = data.stats.spells;
-        document.getElementById('attr-haste').innerText = Math.floor(data.stats.haste * 100);
+        
+        // 核心修复：显示经过 ModifierManager 截断后的真实调息百分比
+        const actualHaste = modifierManager.getModifiedValue({ side: 'player', isHero: true, type: data.id }, 'haste', 0);
+        document.getElementById('attr-haste').innerText = Math.floor(actualHaste * 100);
         
         const leaderMax = document.getElementById('attr-leadership-max');
         if (leaderMax) leaderMax.innerText = data.stats.leadership;
@@ -622,8 +625,7 @@ export class WorldScene {
                 item.className = 'recruit-item';
                 
                 // 计算最终招募价格
-                const baseCost = worldManager.unitCosts[type].gold;
-                const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
+                const finalCost = worldManager.getRecruitGoldCost(type);
 
                 item.innerHTML = `
                     <div class="slot-icon" style="${this.getIconStyleString(type)}"></div>

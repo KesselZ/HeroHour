@@ -87,10 +87,10 @@ export const SkillRegistry = {
         cooldown: 15000,
         audio: 'skill_field',
         targeting: { type: 'instant', shape: 'circle', radius: 5 },
-        description: '在英雄身边紧急征召 {count} 名天策骑兵参战',
+        description: '在英雄身边紧急征召 {count} 名天策步兵参战',
         actions: [
             { type: 'vfx', name: 'pulse', params: { color: 0xffffff, duration: 500, radius: 3 } },
-            { type: 'summon', unitType: 'tiance', count: 3, applySkillPowerToCount: true }
+            { type: 'summon', unitType: 'melee', count: 3, applySkillPowerToCount: true }
         ]
     }),
     'zhenshanhe': new Skill('zhenshanhe', {
@@ -123,7 +123,7 @@ export const SkillRegistry = {
     'fenglaiwushan': new Skill('fenglaiwushan', {
         name: '风来吴山',
         level: '绝技',
-        category: '重剑招式',
+        category: '山居剑意',
         icon: 'skill_fenglaiwushan',
         cost: 50,
         cooldown: 12000,
@@ -168,16 +168,16 @@ export const SkillRegistry = {
         description: '钢铁意志：获得 80% 减伤效果，持续 {duration} 秒',
         actions: [
             // 特效层：短持续时间
-            { type: 'vfx', name: 'pulse', params: { color: 0x666666, duration: 800, radius: 5 } },
-            // 逻辑层：减伤设为 0.2 (即受损 20%，减伤 80%)
+            { type: 'vfx', name: 'pulse', params: { color: 0x666666, duration: 800, radius: 1.5 } },
+            // 逻辑层：减伤设为 0.8 (即受损 20%)
             { 
                 type: 'buff_aoe', 
                 side: 'player', 
                 applySkillPowerToMultiplier: false, // 核心修复：减伤百分比固定为 80%
                 applySkillPowerToDuration: true,    // 核心修复：只有持续时间随功法提升
                 params: { 
-                    stat: 'damageResist', 
-                    multiplier: 0.2, // 减伤 80% = 受损 0.2 倍
+                    stat: 'damageReduction', 
+                    offset: 0.8, // 80% 减伤
                     duration: 4000, 
                     color: 0xaaaaaa,
                     vfxName: 'shield'
@@ -406,13 +406,13 @@ export const SkillRegistry = {
     'hegui': new Skill('hegui', {
         name: '鹤归孤山',
         level: '高级',
-        category: '重剑招式',
+        category: '山居剑意',
         icon: 'skill_hegui',
         cost: 40,
         cooldown: 10000,
         audio: 'skill_air_cut', // 第一段：飞身破空声
         targeting: { type: 'location', range: 13, impactRadius: 2.5 },
-        description: '【重剑招式】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害、强力击退并眩晕敌人 2 秒',
+        description: '【山居剑意】向目标区域飞身俯冲，落地时震碎地面造成 {damage} 点伤害、强力击退并眩晕敌人 2 秒',
         actions: [
             { 
                 type: 'movement', 
@@ -431,13 +431,13 @@ export const SkillRegistry = {
     'fengcha': new Skill('fengcha', {
         name: '峰插云景',
         level: '初级',
-        category: '重剑招式',
+        category: '山居剑意',
         icon: 'skill_fengcha',
         cost: 30,
         cooldown: 4000,
         audio: 'skill_slash',
         targeting: { type: 'instant', shape: 'sector', radius: 4.0, angle: Math.PI / 2 }, 
-        description: '【重剑招式】横扫前方，对扇形区域敌人造成 {damage} 点伤害、大幅击退并使其减速 30%，持续 3 秒',
+        description: '【山居剑意】横扫前方，对扇形区域敌人造成 {damage} 点伤害、大幅击退并使其减速 30%，持续 3 秒',
         actions: [
             { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 400, radius: 4.0, angle: Math.PI / 2 } },
             { type: 'damage_aoe', value: 35, knockback: 1.6 },
@@ -447,13 +447,13 @@ export const SkillRegistry = {
     'songshe': new Skill('songshe', {
         name: '松舍问霞',
         level: '高级',
-        category: '重剑招式',
+        category: '山居剑意',
         icon: 'skill_songshe',
         cost: 65,
         cooldown: 7500,
         audio: 'skill_pierce', // 第一段：极速冲锋声
         targeting: { type: 'location', range: 15, impactRadius: 1.3 },
-        description: '【重剑绝学】以极速俯冲目标，造成 {damage} 点高额爆发伤害并击退周围敌人',
+        description: '【山居剑意】以极速俯冲目标，造成 {damage} 点高额爆发伤害并击退周围敌人',
         actions: [
             { 
                 type: 'movement', 
@@ -471,13 +471,13 @@ export const SkillRegistry = {
     'mengquan': new Skill('mengquan', {
         name: '梦泉虎跑',
         level: '高级',
-        category: '轻剑招式',
+        category: '问水决',
         icon: 'skill_mengquan',
         cost: 45,
         cooldown: 12000,
         audio: 'skill_field',
         targeting: { type: 'instant' },
-        description: '【轻剑招式】身如游龙，游走于敌人之间。移动速度提高 50%，攻击频率提高 {bonus}%，击退提高 50%，减伤提高 65%，持续 5 秒。切换重剑形态将中断此效果。',
+        description: '【问水决】身如游龙，游走于敌人之间。移动速度提高 50%，攻击频率提高 {bonus}%，击退提高 50%，减伤提高 65%，持续 5 秒。切换重剑形态将中断此效果。',
         actions: [
             {
                 type: 'buff_aoe',
@@ -496,8 +496,9 @@ export const SkillRegistry = {
                 side: 'player', 
                 applySkillPowerToMultiplier: false, // 基础移动、击退、减伤不吃系数
                 params: { 
-                    stat: ['moveSpeed', 'knockback', 'damageResist'], 
-                    multiplier: [1.5, 1.5, 0.35], 
+                    stat: ['moveSpeed', 'knockback', 'damageReduction'], 
+                    multiplier: [1.5, 1.5, 1.0], 
+                    offset: [0, 0, 0.65], // 65% 减伤
                     duration: 5000,
                     tag: 'mengquan' 
                 } 
@@ -507,13 +508,13 @@ export const SkillRegistry = {
     'pinghu': new Skill('pinghu', {
         name: '平湖断月',
         level: '初级',
-        category: '轻剑招式',
+        category: '问水决',
         icon: 'skill_pinghu',
         cost: 15,
         cooldown: 2000,
         audio: 'skill_slash',
         targeting: { type: 'instant', shape: 'sector', radius: 2.5, angle: Math.PI / 2 },
-        description: '【轻剑招式】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
+        description: '【问水决】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
         actions: [
             { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 200, radius: 2.5, angle: Math.PI / 2 } },
             { type: 'damage_aoe', value: 45, knockback: 0 }

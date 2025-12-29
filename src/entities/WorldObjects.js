@@ -122,8 +122,7 @@ export class PickupObject extends WorldObject {
         const names = {
             'gold_pile': '金币堆',
             'chest': '宝箱',
-            'wood_small': '散落的木材',
-            'wood_large': '大堆木材'
+            'wood_pile': '木材堆'
         };
         return {
             name: names[this.pickupType] || '未知物品',

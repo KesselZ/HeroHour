@@ -2,6 +2,7 @@ import { modifierManager } from './ModifierManager.js';
 import { SkillRegistry } from './SkillRegistry.js';
 import { audioManager } from './AudioManager.js';
 import { talentManager } from './TalentManager.js';
+import { timeManager } from './TimeManager.js';
 import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
 
 /**
@@ -69,6 +70,7 @@ class City {
         this.id = id;
         this.name = name;
         this.owner = owner; 
+        this.side = owner; // 统一 side 命名，对接 ModifierManager
         this.type = type;
         this.blueprintId = blueprintId; // 核心：这座城市的“出身蓝图”
         this.x = 0;
@@ -82,8 +84,43 @@ class City {
         };
 
         this.availableUnits = { 'melee': 8, 'ranged': 5 };
+        
+        // --- 核心重构：初始产出注册为基础 Modifier ---
+        this._initBaseProduction();
+    }
+
+    /**
+     * 初始化城市的初始产出修正
+     */
+    _initBaseProduction() {
         // 初始季度收入：500 金钱，200 木材
-        this.production = { gold: 500, wood: 200 };
+        modifierManager.addModifier({
+            id: `city_${this.id}_base_gold`,
+            side: this.side,
+            targetUnit: this,
+            stat: 'gold_income',
+            offset: 500,
+            source: 'city_base'
+        });
+        modifierManager.addModifier({
+            id: `city_${this.id}_base_wood`,
+            side: this.side,
+            targetUnit: this,
+            stat: 'wood_income',
+            offset: 200,
+            source: 'city_base'
+        });
+    }
+
+    /**
+     * 获取城市当前产出 (通过 ModifierManager 计算)
+     */
+    getGoldIncome() {
+        return Math.floor(modifierManager.getModifiedValue(this, 'final_gold_income', 0));
+    }
+
+    getWoodIncome() {
+        return Math.floor(modifierManager.getModifiedValue(this, 'final_wood_income', 0));
     }
 
     /**
@@ -225,42 +262,14 @@ class City {
     }
 
     /**
-     * 效果分发器
+     * 效果分发器 (仅处理一次性即时效果)
+     * 持久性属性加成现在统一由 WorldManager.syncBuildingsToModifiers 处理
      */
     _applyEffect(id, level) {
         console.log(`%c[建设] %c${id} 升级至 Lv.${level}`, 'color: #a68b44; font-weight: bold', 'color: #fff');
         
-        // --- 商业建筑效果 ---
-        if (id === 'town_hall') {
-            // 每级增加 200 金钱产出
-            this.production.gold += 200;
-        } else if (id === 'market') {
-            // 每级增加 100 金钱和 50 木材
-            this.production.gold += 100;
-            this.production.wood += 50;
-        } else if (id === 'bank') {
-            // 每级增加该城市当前金钱产出的 20% (基于初始 1000 的基数，约 200)
-            this.production.gold += 200;
-        } else if (id === 'trade_post') {
-            // 每级增加 80 木材，并降低全局招募成本 5%
-            this.production.wood += 80;
-            modifierManager.addModifier({ 
-                id: `city_${this.id}_recruit_discount`, 
-                side: 'player', 
-                stat: 'recruit_cost', 
-                multiplier: 1.0 - (level * 0.05) 
-            });
-        } else if (id === 'inn') {
-            // 每级增加全军阅历获取 10%
-            modifierManager.addModifier({ 
-                id: `city_${this.id}_xp_bonus`, 
-                side: 'player', 
-                stat: 'xp_gain', 
-                multiplier: 1.0 + (level * 0.10) 
-            });
-        }
-        // --- 特殊建筑效果 ---
-        else if (id === 'spell_altar') {
+        // --- 仅处理即时效果 (如获得技能) ---
+        if (id === 'spell_altar') {
             worldManager.grantRandomSkill({ ignoreSect: true });
         } else if (id.startsWith('sect_')) {
             const parts = id.split('_');
@@ -280,42 +289,9 @@ class City {
             });
         }
 
-        // --- 军事建筑数值增强系统 ---
-        // 逻辑：1级仅作为解锁，2级开始每级提供 10% 的全局属性增益
-        const multiplier = 1.0 + Math.max(0, (level - 1) * 0.10); 
-        
-        switch (id) {
-            case 'barracks':
-                modifierManager.addModifier({ id: `city_${this.id}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: multiplier });
-                break;
-            case 'archery_range':
-                modifierManager.addModifier({ id: `city_${this.id}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'attackDamage', multiplier: multiplier });
-                break;
-            case 'stable':
-                modifierManager.addModifier({ id: `city_${this.id}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'attackDamage', multiplier: multiplier });
-                modifierManager.addModifier({ id: `city_${this.id}_tiance_hp`, side: 'player', unitType: 'tiance', stat: 'hp', multiplier: multiplier });
-                break;
-            case 'sword_forge':
-                modifierManager.addModifier({ id: `city_${this.id}_cangjian_bonus`, side: 'player', unitType: 'cangjian', stat: 'attackDamage', multiplier: multiplier });
-                modifierManager.addModifier({ id: `city_${this.id}_cangjian_hp`, side: 'player', unitType: 'cangjian', stat: 'hp', multiplier: multiplier });
-                break;
-            case 'martial_shrine':
-                modifierManager.addModifier({ id: `city_${this.id}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: multiplier });
-                // 核心重构：1级解锁，2级开始每级增加 10% 减伤百分点
-                modifierManager.addModifier({ id: `city_${this.id}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damageResist', offset: Math.max(0, (level - 1) * 0.10) });
-                break;
-            case 'mage_guild':
-                modifierManager.addModifier({ id: `city_${this.id}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'attackDamage', multiplier: multiplier });
-                break;
-            case 'medical_pavilion':
-                modifierManager.addModifier({ id: `city_${this.id}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: multiplier });
-                modifierManager.addModifier({ id: `city_${this.id}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'attackDamage', multiplier: multiplier });
-                break;
-            case 'clinic':
-                // 仁心仁术：每级增加 20% 战场存活率 (修正器 offset 模式)
-                modifierManager.addModifier({ id: `city_${this.id}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.20 });
-                break;
-        }
+        // --- 核心：主动触发一次全量同步，确保新等级效果立即生效 ---
+        worldManager.syncBuildingsToModifiers();
+        worldManager.updateHUD(); // 同时刷新显示
     }
 
     isBuildingBuilt(buildingId) {
@@ -343,6 +319,10 @@ class City {
  */
 class WorldManager {
     constructor() {
+        // 核心修复：显式指定 Side (针对专家建议 Point 1)
+        // 这样当 WorldManager 调用 getModifiedValue 时，能正确匹配 side: 'player' 的全局修正
+        this.side = 'player'; 
+
         // 0. 势力定义
         this.availableHeroes = {
             'qijin': { name: '祁进', title: '紫虚子', icon: 'qijin', sect: 'chunyang', color: '#44ccff', primaryStat: '力道' }, 
@@ -363,7 +343,7 @@ class WorldManager {
             id: 'qijin', // 默认，初始化时会被覆盖
             level: 1,
             xp: 0,
-            xpMax: 100, // 下一级所需经验
+            xpMax: 120, // 下一级所需经验 (使用新公式：L=0时为120)
             hpMax: 500,
             hpCurrent: 500,
             mpMax: 160,
@@ -628,34 +608,37 @@ class WorldManager {
             mines: { gold: 0, wood: 0, count: { gold_mine: 0, sawmill: 0 } }
         };
 
-        // 获取奇穴加成：生财有道 (每座城池额外金钱)
-        const cityGoldBonus = modifierManager.getModifiedValue({ side: 'player' }, 'city_gold_income', 0);
-
         // 1. 统计所有玩家城镇的产出
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
             if (city.owner === 'player') {
-                const finalGold = city.production.gold + cityGoldBonus;
+                const finalGold = city.getGoldIncome();
+                const finalWood = city.getWoodIncome();
                 totalGold += finalGold;
-                totalWood += city.production.wood;
+                totalWood += finalWood;
                 breakdown.cities.push({
                     name: city.name,
                     gold: finalGold,
-                    wood: city.production.wood
+                    wood: finalWood
                 });
             }
         }
 
-        // 2. 统计所有已占领矿产的收益
+        // 2. 统计所有已占领矿产的收益 (接入 ModifierManager 以支持全局加成)
         this.capturedBuildings.forEach(b => {
             if (b.owner === 'player') {
+                const dummy = { side: 'player', type: b.type };
                 if (b.type === 'gold_mine') {
-                    totalGold += 150;
-                    breakdown.mines.gold += 150;
+                    // 基础金矿产量 150，支持全局百分比加成
+                    const mineGold = Math.floor(modifierManager.getModifiedValue(dummy, 'final_gold_income', 150));
+                    totalGold += mineGold;
+                    breakdown.mines.gold += mineGold;
                     breakdown.mines.count.gold_mine++;
                 } else if (b.type === 'sawmill') {
-                    totalWood += 80;
-                    breakdown.mines.wood += 80;
+                    // 基础伐木场产量 80
+                    const mineWood = Math.floor(modifierManager.getModifiedValue(dummy, 'final_wood_income', 80));
+                    totalWood += mineWood;
+                    breakdown.mines.wood += mineWood;
                     breakdown.mines.count.sawmill++;
                 }
             }
@@ -714,11 +697,19 @@ class WorldManager {
         // 核心修复：明确传出 isHero: false，确保 army 目标的修正能准确匹配
         const minus = modifierManager.getModifiedValue({ side: 'player', type: type, isHero: false }, 'elite_cost_minus', 0);
         
-        // 规则：只有基础占用 >= 3 的精锐单位享受减费
-        if (baseCost >= 3 && minus > 0) {
+        // 规则：只有基础占用 >= 4 的精锐单位享受减费
+        if (baseCost >= 4 && minus > 0) {
             return Math.max(1, baseCost - Math.floor(minus));
         }
         return baseCost;
+    }
+
+    /**
+     * 获取招募金钱消耗 (包含全局修正)
+     */
+    getRecruitGoldCost(type) {
+        const baseCost = this.unitCosts[type]?.gold || 0;
+        return Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
     }
 
     /**
@@ -727,11 +718,8 @@ class WorldManager {
      * @param {string} cityId 城市 ID
      */
     recruitUnit(type, cityId = 'main_city_1') {
-        const baseCost = this.unitCosts[type].gold;
         const unitLeadershipCost = this.getUnitCost(type);
-
-        // 应用全局招募折扣
-        const finalCost = Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
+        const finalCost = this.getRecruitGoldCost(type);
         
         if (this.spendGold(finalCost)) {
             // 优雅的自动判定：如果人在现场且统御足够，直接入队
@@ -984,10 +972,10 @@ class WorldManager {
                 } else if (roll < 0.003) {
                     entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.004) {
-                    entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'wood_small', x: worldX, z: worldZ });
+                } else if (roll < 0.005) {
+                    entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.0045) {
+                } else if (roll < 0.0055) {
                     const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
                     const sKey = bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2';
                     entities.push({ 
@@ -1200,8 +1188,8 @@ class WorldManager {
     }
 
     /**
-     * 将建筑效果同步到 ModifierManager
-     * 职责：将静态建筑等级转化为动态属性修正
+     * 将所有城市的所有建筑效果全量同步到 ModifierManager
+     * 职责：Single Source of Truth，彻底解决建筑加成在资源更新时消失的问题
      */
     syncBuildingsToModifiers() {
         modifierManager.removeModifiersBySource('building');
@@ -1209,50 +1197,87 @@ class WorldManager {
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
             const side = city.owner;
-            if (side !== 'player') continue; // 目前仅处理玩家建筑
+            if (side !== 'player') continue; // 目前主要处理玩家建筑
 
-            // 1. 驿站：降低全军招募成本
-            const tradePostLv = city.buildingLevels['trade_post'] || 0;
-            if (tradePostLv > 0) {
-                modifierManager.addModifier({
-                    id: `build_${cityId}_trade_post`,
-                    side: 'player',
-                    unitType: 'global',
-                    stat: 'recruit_cost',
-                    value: -0.05 * tradePostLv,
-                    type: 'percent',
-                    source: 'building'
-                });
+            for (const [id, level] of Object.entries(city.buildingLevels)) {
+                if (level <= 0) continue;
+
+                // --- 1. 经济类建筑 ---
+                if (id === 'town_hall') {
+                    modifierManager.addModifier({
+                        id: `city_${cityId}_town_hall_gold`,
+                        side: side, targetUnit: city, stat: 'gold_income',
+                        offset: level * 200, source: 'building'
+                    });
+                } else if (id === 'market') {
+                    modifierManager.addModifier({
+                        id: `city_${cityId}_market_gold`,
+                        side: side, targetUnit: city, stat: 'gold_income',
+                        offset: level * 100, source: 'building'
+                    });
+                    modifierManager.addModifier({
+                        id: `city_${cityId}_market_wood`,
+                        side: side, targetUnit: city, stat: 'wood_income',
+                        offset: level * 50, source: 'building'
+                    });
+                } else if (id === 'bank') {
+                    modifierManager.addModifier({
+                        id: `city_${cityId}_bank_bonus`,
+                        side: side, targetUnit: city, stat: 'gold_income',
+                        multiplier: 1.0 + (level * 0.20), source: 'building'
+                    });
+                } else if (id === 'trade_post') {
+                    modifierManager.addModifier({
+                        id: `city_${cityId}_trade_post_wood`,
+                        side: side, targetUnit: city, stat: 'wood_income',
+                        offset: level * 80, source: 'building'
+                    });
+                    modifierManager.addModifier({ 
+                        id: `city_${cityId}_recruit_discount`, 
+                        side: 'player', stat: 'recruit_cost', 
+                        multiplier: 1.0 - (level * 0.05), source: 'building'
+                    });
+                } else if (id === 'inn') {
+                    modifierManager.addModifier({ 
+                        id: `city_${cityId}_xp_bonus`, 
+                        side: 'player', stat: 'xp_gain', 
+                        multiplier: 1.0 + (level * 0.10), source: 'building'
+                    });
+                }
+
+                // --- 2. 军事类建筑 ---
+                const milMultiplier = 1.0 + Math.max(0, (level - 1) * 0.10);
+                switch (id) {
+                    case 'barracks':
+                        modifierManager.addModifier({ id: `city_${cityId}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        break;
+                    case 'archery_range':
+                        modifierManager.addModifier({ id: `city_${cityId}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        break;
+                    case 'stable':
+                        modifierManager.addModifier({ id: `city_${cityId}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_tiance_hp`, side: 'player', unitType: 'tiance', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        break;
+                    case 'sword_forge':
+                        modifierManager.addModifier({ id: `city_${cityId}_cangjian_bonus`, side: 'player', unitType: 'cangjian', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_cangjian_hp`, side: 'player', unitType: 'cangjian', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        break;
+                    case 'martial_shrine':
+                        modifierManager.addModifier({ id: `city_${cityId}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damageReduction', offset: Math.max(0, (level - 1) * 0.10), source: 'building' });
+                        break;
+                    case 'mage_guild':
+                        modifierManager.addModifier({ id: `city_${cityId}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        break;
+                    case 'medical_pavilion':
+                        modifierManager.addModifier({ id: `city_${cityId}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        break;
+                    case 'clinic':
+                        modifierManager.addModifier({ id: `city_${cityId}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.20, source: 'building' });
+                        break;
+                }
             }
-
-            // 2. 兵营/靶场/马厩等：提升对应兵种属性
-            const barracksLv = city.buildingLevels['barracks'] || 0;
-            if (barracksLv > 0) {
-                modifierManager.addModifier({
-                    id: `build_${cityId}_barracks_hp`,
-                    side: 'player',
-                    unitType: 'melee',
-                    stat: 'hp',
-                    value: 0.1 * barracksLv,
-                    type: 'percent',
-                    source: 'building'
-                });
-            }
-
-            const rangeLv = city.buildingLevels['archery_range'] || 0;
-            if (rangeLv > 0) {
-                modifierManager.addModifier({
-                    id: `build_${cityId}_range_dmg`,
-                    side: 'player',
-                    unitType: 'ranged',
-                    stat: 'attackDamage',
-                    value: 0.1 * rangeLv,
-                    type: 'percent',
-                    source: 'building'
-                });
-            }
-
-            // ... 其他建筑逻辑可以在此继续扩展
         }
     }
 
@@ -1299,34 +1324,30 @@ class WorldManager {
         let reward = { gold: 0, wood: 0, xp: 0 };
         let msg = "";
 
+        // 获取当前战力/时间缩放系数 (每季度增加 4%)
+        const powerMult = timeManager.getPowerMultiplier();
+
         // 获取奇穴加成：赏金猎人 (拾取翻倍)
-        // 优雅实现：传入原始奖励，中转站自动叠算所有百分比加成
         const dummyHero = this.getPlayerHeroDummy();
         switch (itemType) {
             case 'gold_pile':
-                const rawGold = Math.floor(Math.random() * 100) + 50; // 50-150 金币
+                const rawGold = (Math.floor(Math.random() * 51) + 200) * powerMult; // 200-250 金币 * 缩放
                 reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawGold));
                 msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
                 break;
             case 'chest':
-                // 宝箱随机给金币或木材
-                if (Math.random() > 0.5) {
-                    const rawChestGold = Math.floor(Math.random() * 300) + 100;
-                    reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestGold));
-                    msg = `开启了宝箱，获得 ${reward.gold} 💰`;
-                } else {
-                    reward.wood = Math.floor(Math.random() * 100) + 50;
-                    msg = `开启了宝箱，获得 ${reward.wood} 🪵`;
-                }
-                reward.xp = 20; // 开启宝箱给点经验
+                // 宝箱给金币和木材
+                const rawChestGold = (Math.floor(Math.random() * 101) + 400) * powerMult; // 400-500 * 缩放
+                const rawChestWood = (Math.floor(Math.random() * 101) + 200) * powerMult; // 200-300 * 缩放
+                reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestGold));
+                reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestWood));
+                msg = `开启了宝箱，获得 ${reward.gold} 💰 和 ${reward.wood} 🪵`;
+                reward.xp = 30; // 奖励丰厚，多给点经验
                 break;
-            case 'wood_small':
-                reward.wood = Math.floor(Math.random() * 50) + 30;
-                msg = `捡到了木材，获得 ${reward.wood} 🪵`;
-                break;
-            case 'wood_large':
-                reward.wood = Math.floor(Math.random() * 150) + 100;
-                msg = `捡到了一大堆木材，获得 ${reward.wood} 🪵`;
+            case 'wood_pile':
+                const rawWood = (Math.floor(Math.random() * 61) + 90) * powerMult; // 90-150 * 缩放
+                reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawWood));
+                msg = `捡到了木材堆，获得 ${reward.wood} 🪵`;
                 break;
         }
 
@@ -1599,6 +1620,16 @@ class WorldManager {
     /**
      * 英雄获得经验并处理升级
      */
+    /**
+     * 计算指定等级升到下一级所需的总经验 (核心公式重构)
+     * 公式：xpMax = floor(120 + 80*(level-1) + 40*(level-1)^1.3)
+     */
+    getNextLevelXP(level) {
+        if (level < 1) return 120;
+        const L = level - 1;
+        return Math.floor(120 + 80 * L + 40 * Math.pow(L, 1.3));
+    }
+
     gainXP(amount) {
         if (amount <= 0) return;
         
@@ -1617,34 +1648,32 @@ class WorldManager {
         while (data.xp >= data.xpMax) {
             data.xp -= data.xpMax;
             data.level++;
-            data.xpMax = Math.floor(data.xpMax * 1.5);
+            
+            // 使用新公式计算下一级经验
+            data.xpMax = this.getNextLevelXP(data.level);
             
             // --- 属性固定成长系统 ---
             const s = data.stats;
-            s.power += 8;          // 侠客力道/身法 (+8)
-            s.spells += 4;         // 侠客功法
-            s.morale += 3;         // 统帅军队 (+3%)
+            s.power += 4;          // 每级力道/身法降低到 +4
+            s.spells += 2;         // 侠客功法 (技能强度)
+            s.morale += 2;         // 统帅军队 (+2%)
             s.leadership += 6;     // 带兵上限每级 +6
             // s.speed 保持不变
-            s.haste = Math.min(0.5, s.haste + 0.01); // 招式调息 (每级 1%, 上限 50%)
+            s.haste += 0.01;       // 招式调息 (每级 1%，不再在数据源层级截断，由 ModifierManager 统一出口截断)
             
-            // 同步计算英雄血量与内力上限 (从身份表动态获取，彻底消除 Hardcode)
-            const identity = this.getHeroIdentity(data.id);
-            const cb = identity.combatBase;
+            // 核心重构：刷新所有基于属性的修正器，并更新 hpMax/mpMax
+            this.refreshHeroStats();
 
-            data.hpMax = cb.hpBase + (s.power * cb.hpScaling);
-            data.hpCurrent = data.hpMax;
-            
-            // 核心修改：所有人统一 160 基础，每级 +14
-            data.mpMax = 160 + (data.level - 1) * 14;
-            data.mpCurrent = data.mpMax; // 升级补满状态
+            // 升级不再自动补满生命和内力
+            // data.hpCurrent = data.hpMax;
+            // data.mpCurrent = data.mpMax; 
 
             data.talentPoints++; // 每升一级获得 1 点奇穴点数
             data.pendingLevelUps++; // 核心：增加待播放反馈计数
 
             console.log(`%c[升级] %c英雄升到了第 ${data.level} 级！获得 1 点奇穴点数。`, 'color: #00ff00; font-weight: bold', 'color: #fff');
             
-            // 派发事件让 main.js 执行 syncHeroStatsToModifiers()
+            // 派发升级事件 (供 UI 表现使用)
             window.dispatchEvent(new CustomEvent('hero-level-up'));
         }
         
@@ -1699,16 +1728,16 @@ class WorldManager {
             name: type, hp: 0, atk: 0, speed: 0, attackSpeed: 1000, cost 
         };
 
-        // --- 英雄成长逻辑 (属于基础属性的一部分) ---
+        // --- 英雄基础蓝图 (返回 1 级原始数值，成长由 ModifierManager 处理) ---
         if (this.heroData && this.heroData.id === type) {
-            const s = this.heroData.stats;
             const identity = this.getHeroIdentity(type);
             const cb = identity.combatBase;
 
-            stats.hp = cb.hpBase + (s.power * cb.hpScaling); 
-            stats.mp = 160 + (this.heroData.level - 1) * 14; 
-            stats.atk = cb.atk * (1 + s.power * (cb.atkScaling || 0.05));                
-            stats.speed = s.battleSpeed; // 蓝图移速使用局内速度
+            stats.hp = cb.hpBase;
+            stats.mp = 160; 
+            stats.atk = cb.atk;
+            // 核心修复：英雄进入战斗后的基础移速单位应与普通士兵 (4.0 左右) 匹配，使用英雄自身的局内移速
+            stats.speed = this.heroData.stats.battleSpeed || 4.0; 
         }
 
         return stats;
@@ -1725,12 +1754,8 @@ class WorldManager {
         // 1. 应用所有全局动态修正
         const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', blueprint.hp));
         
-        let finalAtk;
-        if (type === 'healer') {
-            finalAtk = Math.abs(modifierManager.getModifiedValue(dummyUnit, 'attackDamage', -blueprint.atk));
-        } else {
-            finalAtk = modifierManager.getModifiedValue(dummyUnit, 'attackDamage', blueprint.atk);
-        }
+        // 核心修正：治疗职业也使用正数进行数值计算，避免数学公式导致的数值倒扣 Bug
+        const finalAtk = modifierManager.getModifiedValue(dummyUnit, 'attackDamage', blueprint.atk);
         
         // 核心重构：区分局内局外速度修正
         const finalSpeed = modifierManager.getModifiedValue(dummyUnit, 'speed', blueprint.speed);
@@ -1787,6 +1812,70 @@ class WorldManager {
             }
         }
         return current;
+    }
+
+    /**
+     * 刷新英雄的所有全局修正器 (包含成长、统帅加成等)
+     * 职责：将英雄的当前状态 (Level, Power, Morale) 同步到 ModifierManager
+     */
+    refreshHeroStats() {
+        if (!this.heroData) return;
+        
+        const data = this.heroData;
+        const s = data.stats;
+        const identity = this.getHeroIdentity(data.id);
+        if (!identity) return;
+        
+        const cb = identity.combatBase;
+
+        // --- 核心优化：利用 addModifier 的原地更新特性 ---
+
+        // 1. 统率修正
+        modifierManager.addModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'attackDamage', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
+        modifierManager.addModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
+
+        // 2. 英雄自身基础数值与成长 (专家建议：不再注册 spells/haste 的 raw modifier，改为在调用 getModifiedValue 时传入 baseValue)
+        // 这样可以彻底避免“点数加倍”的风险，并保持 Single Source of Truth
+        
+        modifierManager.addModifier({
+            id: 'hero_growth_hp',
+            side: 'player',
+            unitType: data.id, 
+            stat: 'hp',
+            offset: s.power * cb.hpScaling,
+            source: 'hero_stats'
+        });
+
+        modifierManager.addModifier({
+            id: 'hero_growth_atk',
+            side: 'player',
+            unitType: data.id,
+            stat: 'attackDamage',
+            multiplier: 1.0 + (s.power * (cb.atkScaling || 0.05)),
+            source: 'hero_stats'
+        });
+
+        // 3. 同步更新 heroData 冗余字段 (仅用于 UI 简单显示)
+        const dummy = { side: 'player', type: data.id, isHero: true };
+        data.hpMax = Math.ceil(modifierManager.getModifiedValue(dummy, 'hp', cb.hpBase));
+        data.mpMax = 160 + (data.level - 1) * 6;
+        
+        // 核心新增：确保 stats 中的冗余字段反映的是 ModifierManager 的最终输出
+        // 这样可以解决专家 Point 3 提到的不对称问题
+        data.stats.finalSpells = modifierManager.getModifiedValue(dummy, 'skill_power', 0);
+        data.stats.finalHaste = modifierManager.getModifiedValue(dummy, 'haste', 0);
+        
+        // 4. 重新加载英雄固有天赋 (Traits 仍然建议先清理，因为不同英雄的 Trait 数量和 ID 可能不同)
+        modifierManager.removeModifiersBySource('trait');
+        const traits = this.getHeroTraits(data.id);
+        traits.forEach(trait => {
+            modifierManager.addModifier({
+                ...trait,
+                side: 'player',
+                unitType: trait.unitType || data.id,
+                source: 'trait'
+            });
+        });
     }
 
     /**

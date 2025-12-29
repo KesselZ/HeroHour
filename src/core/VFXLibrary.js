@@ -85,7 +85,7 @@ export class VFXLibrary {
 
         const startTime = Date.now();
         const anim = () => {
-            const isActive = activeKey === 'stun' ? (parent.stunnedUntil && Date.now() < parent.stunnedUntil) : parent.isFleeing;
+            const isActive = activeKey === 'stun' ? parent.isStunned : parent.isFleeing;
             
             if (isActive && !parent.isDead) {
                 const elapsed = Date.now() - startTime;
