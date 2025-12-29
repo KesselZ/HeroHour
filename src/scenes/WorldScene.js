@@ -204,6 +204,11 @@ export class WorldScene {
             const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
             this.moveSpeed = heroDetails.qinggong * 0.6;
             console.log(`%c[属性同步] 奇穴已更新，当前大世界移速: ${this.moveSpeed.toFixed(3)}`, "color: #5b8a8a");
+            
+            // 核心修复：奇穴更新后，如果城镇面板开着，也要刷新它，否则费用显示不更新
+            if (this.activeCityId) {
+                this.refreshTownUI(this.activeCityId);
+            }
         };
         window.addEventListener('talents-updated', this._onTalentsUpdated);
 
@@ -677,7 +682,8 @@ export class WorldScene {
      */
     bindUnitTooltip(element, type) {
         const stats = worldManager.getUnitDetails(type);
-        const cost = worldManager.unitCosts[type]?.cost || 0;
+        // 核心修复：直接从 getUnitDetails 中获取 cost，它是带了天赋修正的最终值
+        const cost = stats.cost;
         // 遵照要求：UI 上依然统一显示为“伤害”，不再显示“秒伤”等现代术语
         const label = '伤害'; 
         
@@ -1052,11 +1058,12 @@ export class WorldScene {
 
         if (result && result.winner === 'player') {
             // 核心改动：奇穴效果 - 战利清缴 (战后额外金钱)
-            const killGoldMult = modifierManager.getModifiedValue({ side: 'player' }, 'kill_gold_mult', 0);
-            if (killGoldMult > 0) {
-                // 假设敌人强度为 result.enemyPower，如果没有则用默认值 100
-                const enemyPower = result.enemyPower || 100;
-                const bonusGold = Math.floor(enemyPower * killGoldMult);
+            // 优雅实现：传入敌人强度作为基础值，中转站会自动根据 50% 加成返还 1.5 倍结果
+            const enemyPower = result.enemyPower || 100;
+            const totalGold = modifierManager.getModifiedValue({ side: 'player' }, 'kill_gold', enemyPower);
+            const bonusGold = Math.floor(totalGold - enemyPower); // 差值即为额外奖励
+            
+            if (bonusGold > 0) {
                 worldManager.addGold(bonusGold);
                 worldManager.showNotification(`战利清缴：额外获得 💰${bonusGold}`);
             }
@@ -1239,9 +1246,8 @@ export class WorldScene {
         const pz = Math.round(this.playerHero.position.z + halfSize);
         
         // 核心改动：奇穴效果 - 慧眼识珠 (迷雾半径增加)
-        let revealRadius = 33; // 探索半径 (基础 33)
-        const radiusMult = modifierManager.getModifiedValue({ side: 'player' }, 'reveal_radius_mult', 0);
-        if (radiusMult > 0) revealRadius = Math.round(revealRadius * (1 + radiusMult));
+        // 优雅实现：传入基础半径 33，中转站根据百分比加成(如+50%)自动返还最终半径(如49)
+        const revealRadius = Math.round(modifierManager.getModifiedValue({ side: 'player' }, 'reveal_radius', 33));
         
         // 标记已探索
         for (let dz = -revealRadius; dz <= revealRadius; dz++) {

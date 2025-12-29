@@ -8,67 +8,67 @@ export const TALENT_UNITS = {
     'unit_income_base': { 
         name: '生财有道', icon: 'talent_point_1', 
         description: '生财有方，每座城池季度金钱产出提升 20 点。', 
-        effects: [{ type: 'modifier', target: 'global', key: 'city_gold_income', value: 20 }] 
+        effects: [{ type: 'modifier', target: 'global', key: 'city_gold_income', value: 20, method: 'add' }] 
     },
     'unit_kill_gold': { 
         name: '战利清缴', icon: 'talent_point_1', 
         description: '以战养战，战斗胜利后额外获得相当于敌人强度 50% 的金钱。', 
-        effects: [{ type: 'modifier', target: 'hero', key: 'kill_gold_mult', value: 0.5 }] 
+        effects: [{ type: 'modifier', target: 'hero', key: 'kill_gold', value: 0.5, method: 'percent' }] 
     },
     'unit_wood_save': { 
         name: '以物易物', icon: 'talent_point_1', 
         description: '建筑升级所需的 wood 消耗降低 25%。', 
-        effects: [{ type: 'modifier', target: 'global', key: 'building_wood_cost_mult', value: -0.25 }] 
+        effects: [{ type: 'modifier', target: 'global', key: 'building_wood_cost', value: -0.25, method: 'percent' }] 
     },
     'unit_loot_bonus': { 
         name: '赏金猎人', icon: 'talent_point_1', 
         description: '拾取野外资源点（金矿、宝箱）时，获得金钱增加 100%。', 
-        effects: [{ type: 'modifier', target: 'hero', key: 'world_loot_mult', value: 1.0 }] 
+        effects: [{ type: 'modifier', target: 'hero', key: 'world_loot', value: 1.0, method: 'percent' }] 
     },
 
     // --- 第二组：将道·铁骑 (统御与军队) ---
     'unit_elite_cost': { 
         name: '兵贵神速', icon: 'talent_point_3', 
         description: '名将统领，统御占用(Cost)为 3 或以上的精锐，其占用永久 -1 点。', 
-        effects: [{ type: 'modifier', target: 'army', key: 'elite_cost_minus', value: 1 }] 
+        effects: [{ type: 'modifier', target: 'army', key: 'elite_cost_minus', value: 1, method: 'add' }] 
     },
     'unit_recruit_save': { 
         name: '整军经武', icon: 'talent_point_6', 
         description: '全军招募成本降低 15%。', 
-        effects: [{ type: 'modifier', target: 'global', key: 'recruit_cost_mult', value: -0.15 }] 
+        effects: [{ type: 'modifier', target: 'global', key: 'recruit_cost', value: -0.15, method: 'percent' }] 
     },
     'unit_army_def': { 
         name: '坚不可摧', icon: 'talent_point_5', 
         description: '士兵百战不殆，在战斗中受到的伤害降低 10%。', 
-        effects: [{ type: 'modifier', target: 'army', key: 'damage_reduction', value: -0.1 }] 
+        effects: [{ type: 'modifier', target: 'army', key: 'damage_reduction', value: -0.1, method: 'percent' }] 
     },
     'unit_battle_start_buff': { 
         name: '激励士气', icon: 'talent_point_3', 
         description: '战斗开始时，全军获得 10 秒“振奋”效果（攻速 +20%）。', 
-        effects: [{ type: 'modifier', target: 'army', key: 'battle_start_haste', value: 0.2 }] 
+        effects: [{ type: 'modifier', target: 'army', key: 'battle_start_haste', value: 0.2, method: 'percent' }] 
     },
 
     // --- 第三组：侠道·逍遥 (探索与回复) ---
     'unit_world_speed_boost': { 
         name: '神行千里', icon: 'talent_point_6', 
         description: '身轻如燕，轻功等级永久 +3。', 
-        effects: [{ type: 'stat', stat: 'qinggong', value: 3 }] 
+        effects: [{ type: 'stat', stat: 'qinggong', value: 3, method: 'add' }] 
     },
     'unit_season_mp_regen': { 
         name: '气吞山河', icon: 'talent_point_4', 
         description: '每当季节更替时，侠客立即恢复 30% 的最大内力值。', 
-        effects: [{ type: 'modifier', target: 'hero', key: 'season_mp_regen', value: 0.3 }] 
+        effects: [{ type: 'modifier', target: 'hero', key: 'season_mp_regen', value: 0.3, method: 'percent' }] 
     },
     'unit_reveal_radius': { 
         name: '慧眼识珠', icon: 'talent_point_2', 
         description: '明察秋毫，小地图探索迷雾揭开半径增加 50%。', 
-        effects: [{ type: 'modifier', target: 'global', key: 'reveal_radius_mult', value: 0.5 }] 
+        effects: [{ type: 'modifier', target: 'global', key: 'reveal_radius', value: 0.5, method: 'percent' }] 
     },
 
     // 基础属性类 (保留作为填充或后续使用)
     'unit_power_base': { name: '力道', icon: 'talent_point_1', description: '基础力道提升 8 点', effects: [{ type: 'stat', stat: 'power', value: 8, perLevel: true }] },
     'unit_spells_base': { name: '功法', icon: 'talent_point_2', description: '基础功法提升 10 点', effects: [{ type: 'stat', stat: 'spells', value: 10, perLevel: true }] },
-    'unit_hp_base': { name: '气血', icon: 'talent_point_5', description: '基础气血提升 5%', effects: [{ type: 'modifier', target: 'hero', key: 'hp_mult', value: 0.05, perLevel: true }] },
+    'unit_hp_base': { name: '气血', icon: 'talent_point_5', description: '基础气血提升 5%', effects: [{ type: 'modifier', target: 'hero', key: 'hp', value: 0.05, perLevel: true, method: 'percent' }] },
     'unit_speed': { name: '轻功', icon: 'talent_point_6', description: '大世界移动速度提升 10%', effects: [{ type: 'stat', stat: 'qinggong', value: 1.2, perLevel: true }] }
 };
 

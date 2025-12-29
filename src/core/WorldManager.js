@@ -155,10 +155,8 @@ class City {
         }
 
         // 核心改动：奇穴效果 - 以物易物 (降低木材消耗)
-        const woodCostMult = modifierManager.getModifiedValue({ side: 'player' }, 'building_wood_cost_mult', 0);
-        if (woodCostMult !== 0) {
-            costResult.wood = Math.ceil(costResult.wood * (1 + woodCostMult));
-        }
+        // 优雅实现：直接将计算好的木材成本扔进中转站，返还扣除后的最终成本
+        costResult.wood = Math.ceil(modifierManager.getModifiedValue({ side: 'player' }, 'building_wood_cost', costResult.wood));
 
         return costResult;
     }
@@ -713,7 +711,8 @@ class WorldManager {
     getUnitCost(type) {
         const baseCost = this.unitCosts[type]?.cost || 0;
         // 获取针对该单位或军队的减费修正
-        const minus = modifierManager.getModifiedValue({ side: 'player', type: type }, 'elite_cost_minus', 0);
+        // 核心修复：明确传出 isHero: false，确保 army 目标的修正能准确匹配
+        const minus = modifierManager.getModifiedValue({ side: 'player', type: type, isHero: false }, 'elite_cost_minus', 0);
         
         // 规则：只有基础占用 >= 3 的精锐单位享受减费
         if (baseCost >= 3 && minus > 0) {
@@ -1178,7 +1177,8 @@ class WorldManager {
         for (const type in this.heroArmy) {
             const count = this.heroArmy[type];
             if (count > 0 && this.unitCosts[type]) {
-                total += count * (this.unitCosts[type].cost || 0);
+                // 核心修复：使用 getUnitCost 以包含天赋减费
+                total += count * this.getUnitCost(type);
             }
         }
 
@@ -1195,6 +1195,64 @@ class WorldManager {
         const entity = this.mapState.entities.find(e => e.id === id);
         if (entity) {
             entity.isRemoved = true;
+            console.log(`%c[逻辑同步] 实体 ${id} 已从地图逻辑中移除`, "color: #888");
+        }
+    }
+
+    /**
+     * 将建筑效果同步到 ModifierManager
+     * 职责：将静态建筑等级转化为动态属性修正
+     */
+    syncBuildingsToModifiers() {
+        modifierManager.removeModifiersBySource('building');
+
+        for (const cityId in this.cities) {
+            const city = this.cities[cityId];
+            const side = city.owner;
+            if (side !== 'player') continue; // 目前仅处理玩家建筑
+
+            // 1. 驿站：降低全军招募成本
+            const tradePostLv = city.buildingLevels['trade_post'] || 0;
+            if (tradePostLv > 0) {
+                modifierManager.addModifier({
+                    id: `build_${cityId}_trade_post`,
+                    side: 'player',
+                    unitType: 'global',
+                    stat: 'recruit_cost',
+                    value: -0.05 * tradePostLv,
+                    type: 'percent',
+                    source: 'building'
+                });
+            }
+
+            // 2. 兵营/靶场/马厩等：提升对应兵种属性
+            const barracksLv = city.buildingLevels['barracks'] || 0;
+            if (barracksLv > 0) {
+                modifierManager.addModifier({
+                    id: `build_${cityId}_barracks_hp`,
+                    side: 'player',
+                    unitType: 'melee',
+                    stat: 'hp',
+                    value: 0.1 * barracksLv,
+                    type: 'percent',
+                    source: 'building'
+                });
+            }
+
+            const rangeLv = city.buildingLevels['archery_range'] || 0;
+            if (rangeLv > 0) {
+                modifierManager.addModifier({
+                    id: `build_${cityId}_range_dmg`,
+                    side: 'player',
+                    unitType: 'ranged',
+                    stat: 'damage',
+                    value: 0.1 * rangeLv,
+                    type: 'percent',
+                    source: 'building'
+                });
+            }
+
+            // ... 其他建筑逻辑可以在此继续扩展
         }
     }
 
@@ -1242,19 +1300,18 @@ class WorldManager {
         let msg = "";
 
         // 获取奇穴加成：赏金猎人 (拾取翻倍)
-        const lootMult = modifierManager.getModifiedValue({ side: 'player' }, 'world_loot_mult', 0);
-
+        // 优雅实现：传入原始奖励，中转站自动叠算所有百分比加成
         switch (itemType) {
             case 'gold_pile':
-                reward.gold = Math.floor(Math.random() * 100) + 50; // 50-150 金币
-                if (lootMult > 0) reward.gold = Math.floor(reward.gold * (1 + lootMult));
+                const rawGold = Math.floor(Math.random() * 100) + 50; // 50-150 金币
+                reward.gold = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'world_loot', rawGold));
                 msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
                 break;
             case 'chest':
                 // 宝箱随机给金币或木材
                 if (Math.random() > 0.5) {
-                    reward.gold = Math.floor(Math.random() * 300) + 100;
-                    if (lootMult > 0) reward.gold = Math.floor(reward.gold * (1 + lootMult));
+                    const rawChestGold = Math.floor(Math.random() * 300) + 100;
+                    reward.gold = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'world_loot', rawChestGold));
                     msg = `开启了宝箱，获得 ${reward.gold} 💰`;
                 } else {
                     reward.wood = Math.floor(Math.random() * 100) + 50;
@@ -1436,6 +1493,9 @@ class WorldManager {
     }
 
     updateHUD() {
+        // 核心改动：在 HUD 更新前，同步建筑效果，确保显示的属性（如招募价格）是最新的
+        this.syncBuildingsToModifiers();
+
         const resources = ['gold', 'wood'];
         resources.forEach(res => {
             const el = document.getElementById(`world-${res}`);
@@ -1630,7 +1690,8 @@ class WorldManager {
      */
     getUnitBlueprint(type) {
         const baseBlueprint = UNIT_STATS_DATA_INTERNAL[type];
-        const cost = this.unitCosts[type]?.cost || 0;
+        // 核心修复：蓝图层级就使用 getUnitCost，确保所有由此创建的单位 (BaseUnit) 初始 cost 正确
+        const cost = this.getUnitCost(type);
 
         // 基础数据克隆
         let stats = baseBlueprint ? { ...baseBlueprint, cost } : { 
@@ -1658,7 +1719,7 @@ class WorldManager {
      */
     getUnitDetails(type, side = 'player') {
         const blueprint = this.getUnitBlueprint(type);
-        const dummyUnit = { side: side, type: type };
+        const dummyUnit = { side: side, type: type, isHero: this.heroData && this.heroData.id === type };
         
         // 1. 应用所有全局动态修正
         const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', blueprint.hp));
@@ -1692,7 +1753,7 @@ class WorldManager {
             speed: finalSpeed,
             qinggong: finalQinggong || finalSpeed, // 如果不是英雄，则 fallback 到普通速度
             dps: dps,
-            cost: blueprint.cost
+            cost: this.getUnitCost(type) // 确保这里也带上最新的 cost
         };
     }
 
@@ -1746,6 +1807,7 @@ class WorldManager {
         if (city.availableUnits[type] >= amount) {
             city.availableUnits[type] -= amount;
             this.heroArmy[type] = (this.heroArmy[type] || 0) + amount;
+            this.updateHUD(); // 确保调兵后刷新 HUD
             return true;
         }
         return false;

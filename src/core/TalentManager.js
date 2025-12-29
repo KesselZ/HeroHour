@@ -94,15 +94,30 @@ class TalentManager {
             node.effects?.forEach(effect => {
                 const finalValue = effect.perLevel ? effect.value * level : effect.value;
 
+                // 统一使用 addModifier，并显式传递计算类型
                 if (effect.type === 'stat') {
                     modifierManager.addModifier({
-                        side: 'player', type: 'hero', stat: effect.stat,
-                        value: finalValue, source: 'talent', id: `talent_${nodeId}_${effect.stat}`
+                        side: 'player', 
+                        unitType: 'hero', // 映射到新的 unitType 字段
+                        stat: effect.stat,
+                        value: finalValue, 
+                        type: 'add', // 英雄基础属性通常是加法
+                        source: 'talent', 
+                        id: `talent_${nodeId}_${effect.stat}`
                     });
                 } else if (effect.type === 'modifier') {
+                    // 天赋配置中，如果有 value < 0 且绝对值小于 1，或者是明确的比例，判定为 percent
+                    // 未来可以在 TALENT_UNITS 中显式定义 method
+                    const method = (Math.abs(finalValue) < 1 && finalValue !== 0) ? 'percent' : 'add';
+                    
                     modifierManager.addModifier({
-                        side: 'player', type: effect.target, stat: effect.key,
-                        value: finalValue, source: 'talent', id: `talent_${nodeId}_${effect.key}`
+                        side: 'player', 
+                        unitType: effect.target, 
+                        stat: effect.key,
+                        value: finalValue, 
+                        type: effect.method || method,
+                        source: 'talent', 
+                        id: `talent_${nodeId}_${effect.key}`
                     });
                 }
             });

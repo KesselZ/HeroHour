@@ -523,12 +523,14 @@ export class BattleScene {
         }
 
         // --- 核心改动：奇穴效果 - 激励士气 (战斗开始全军振奋) ---
-        const startHasteVal = modifierManager.getModifiedValue({ side: 'player' }, 'battle_start_haste', 0);
-        if (startHasteVal > 0) {
+        const startHasteMultiplier = modifierManager.getModifiedValue({ side: 'player' }, 'battle_start_haste', 1.0);
+        
+        if (startHasteMultiplier > 1.0) {
+            console.log(`[战斗开始] 激励士气生效：攻速倍率=${startHasteMultiplier.toFixed(2)}`);
             this.applyBuffToUnits(this.playerUnits, {
                 tag: 'talent_haste',
                 stat: 'attackSpeed',
-                multiplier: 1.0 + startHasteVal,
+                multiplier: startHasteMultiplier,
                 duration: 10000,
                 color: 0xffffaa, // 浅金色振奋
                 vfxName: 'rising_particles'

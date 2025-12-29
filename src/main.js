@@ -408,16 +408,19 @@ function applyHeroTraits(heroId) {
 function syncHeroStatsToModifiers() {
     const s = worldManager.heroData.stats;
     const heroId = worldManager.heroData.id;
-    modifierManager.clear();
+    
+    // 核心修复：不再直接 clear()，否则会冲掉奇穴天赋产生的 Modifier
+    // 改为按来源清除，只清理属于 'hero_stats' 的部分
+    modifierManager.removeModifiersBySource('hero_stats');
 
     // 0. 获取英雄身份数据用于计算上限 (彻底消除 Hardcode)
     const identity = worldManager.getHeroIdentity(heroId);
     if (!identity) return;
     const cb = identity.combatBase;
 
-    // 1. 统帅：军队影响士兵攻击和血量
-    modifierManager.addGlobalModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'damage', multiplier: 1.0 + (s.morale / 100) });
-    modifierManager.addGlobalModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100) });
+    // 1. 统帅：军队影响士兵攻击和血量 (显式标记 source: 'hero_stats')
+    modifierManager.addGlobalModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'damage', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
+    modifierManager.addGlobalModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
 
     // 2. 武力与功法：根据身份表动态计算上限
     worldManager.heroData.hpMax = cb.hpBase + (s.power * cb.hpScaling);
@@ -429,7 +432,8 @@ function syncHeroStatsToModifiers() {
         side: 'player',
         unitType: heroId, 
         stat: 'damage',
-        multiplier: 1.0 + (s.power * (cb.atkScaling || 0.05))
+        multiplier: 1.0 + (s.power * (cb.atkScaling || 0.05)),
+        source: 'hero_stats'
     });
 
     // 3. 核心重构：自动加载英雄固有天赋 (数据驱动)
@@ -439,7 +443,8 @@ function syncHeroStatsToModifiers() {
             ...trait,
             side: 'player',
             // 如果 trait 没写 unitType，默认加给英雄本人
-            unitType: trait.unitType || heroId 
+            unitType: trait.unitType || heroId,
+            source: 'trait' // 明确来源为 trait，使其进入独立乘区
         });
     });
 }
