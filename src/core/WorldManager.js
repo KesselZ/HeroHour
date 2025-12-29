@@ -1827,22 +1827,25 @@ class WorldManager {
         if (!identity) return;
         
         const cb = identity.combatBase;
+        const dummy = this.getPlayerHeroDummy();
 
-        // --- 核心优化：利用 addModifier 的原地更新特性 ---
+        // --- 核心修复：获取经过奇穴/天赋加成后的“真实属性点” ---
+        // 这一步至关重要，否则奇穴点的力道不会增加血量和攻击
+        const realPower = modifierManager.getModifiedValue(dummy, 'power', s.power);
+        const realSpells = modifierManager.getModifiedValue(dummy, 'spells', s.spells);
+        const realMorale = modifierManager.getModifiedValue(dummy, 'morale', s.morale);
 
-        // 1. 统率修正
-        modifierManager.addModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'attackDamage', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
-        modifierManager.addModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
+        // 1. 统率修正 (基于真实统帅值)
+        modifierManager.addModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'attackDamage', multiplier: 1.0 + (realMorale / 100), source: 'hero_stats' });
+        modifierManager.addModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (realMorale / 100), source: 'hero_stats' });
 
-        // 2. 英雄自身基础数值与成长 (专家建议：不再注册 spells/haste 的 raw modifier，改为在调用 getModifiedValue 时传入 baseValue)
-        // 这样可以彻底避免“点数加倍”的风险，并保持 Single Source of Truth
-        
+        // 2. 英雄自身基础数值与成长
         modifierManager.addModifier({
             id: 'hero_growth_hp',
             side: 'player',
             unitType: data.id, 
             stat: 'hp',
-            offset: s.power * cb.hpScaling,
+            offset: realPower * cb.hpScaling,
             source: 'hero_stats'
         });
 
@@ -1851,21 +1854,19 @@ class WorldManager {
             side: 'player',
             unitType: data.id,
             stat: 'attackDamage',
-            multiplier: 1.0 + (s.power * (cb.atkScaling || 0.05)),
+            multiplier: 1.0 + (realPower * (cb.atkScaling || 0.05)),
             source: 'hero_stats'
         });
 
         // 3. 同步更新 heroData 冗余字段 (仅用于 UI 简单显示)
-        const dummy = { side: 'player', type: data.id, isHero: true };
         data.hpMax = Math.ceil(modifierManager.getModifiedValue(dummy, 'hp', cb.hpBase));
         data.mpMax = 160 + (data.level - 1) * 6;
         
-        // 核心新增：确保 stats 中的冗余字段反映的是 ModifierManager 的最终输出
-        // 这样可以解决专家 Point 3 提到的不对称问题
-        data.stats.finalSpells = modifierManager.getModifiedValue(dummy, 'skill_power', 0);
+        // 确保 stats 中的冗余字段反映的是 ModifierManager 的最终输出
+        data.stats.finalSpells = modifierManager.getModifiedValue(dummy, 'skill_power', realSpells);
         data.stats.finalHaste = modifierManager.getModifiedValue(dummy, 'haste', 0);
         
-        // 4. 重新加载英雄固有天赋 (Traits 仍然建议先清理，因为不同英雄的 Trait 数量和 ID 可能不同)
+        // 4. 重新加载英雄固有天赋
         modifierManager.removeModifiersBySource('trait');
         const traits = this.getHeroTraits(data.id);
         traits.forEach(trait => {

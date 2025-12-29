@@ -296,15 +296,18 @@ export class WorldScene {
         const powerName = heroInfo ? heroInfo.primaryStat : '力道';
         if (powerLabel) powerLabel.innerText = powerName;
         
-        document.getElementById('attr-primary-val').innerText = data.stats.power;
-        document.getElementById('attr-fali').innerText = data.stats.spells;
+        const dummy = worldManager.getPlayerHeroDummy();
+        document.getElementById('attr-primary-val').innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'power', data.stats.power));
+        document.getElementById('attr-fali').innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'spells', data.stats.spells));
         
         // 核心修复：显示经过 ModifierManager 截断后的真实调息百分比
-        const actualHaste = modifierManager.getModifiedValue({ side: 'player', isHero: true, type: data.id }, 'haste', 0);
+        const actualHaste = modifierManager.getModifiedValue(dummy, 'haste', 0);
         document.getElementById('attr-haste').innerText = Math.floor(actualHaste * 100);
         
         const leaderMax = document.getElementById('attr-leadership-max');
-        if (leaderMax) leaderMax.innerText = data.stats.leadership;
+        if (leaderMax) {
+            leaderMax.innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'leadership', data.stats.leadership));
+        }
 
         // 绑定属性 Tooltip (简化介绍，隐藏具体数值)
         this.bindAttrTooltip('attr-box-morale', '军队', `统御三军，提升帐下所有士兵的攻击能力与气血上限`);

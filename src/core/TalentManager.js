@@ -123,6 +123,13 @@ class TalentManager {
             });
         }
 
+        // 核心修复：应用奇穴效果后，立即刷新英雄的全局二次属性 (如 Power -> HP/ATK 的转化)
+        if (this.heroData) {
+            import('./WorldManager.js').then(m => {
+                m.worldManager.refreshHeroStats();
+            });
+        }
+
         window.dispatchEvent(new CustomEvent('talents-updated'));
     }
 }
