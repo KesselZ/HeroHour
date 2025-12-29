@@ -40,7 +40,7 @@ export const TALENT_UNITS = {
     'unit_army_def': { 
         name: '坚不可摧', icon: 'talent_point_5', 
         description: '士兵百战不殆，在战斗中受到的伤害降低 10%。', 
-        effects: [{ type: 'modifier', target: 'army', key: 'damage_reduction', value: -0.1, method: 'percent' }] 
+        effects: [{ type: 'modifier', target: 'army', key: 'damageResist', value: -0.1, method: 'percent' }] 
     },
     'unit_battle_start_buff': { 
         name: '激励士气', icon: 'talent_point_3', 

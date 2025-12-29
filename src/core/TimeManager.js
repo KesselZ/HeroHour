@@ -80,7 +80,7 @@ class TimeManager {
         const statMult = this.getStatMultiplier();
         
         // 注入 HP 修正
-        modifierManager.addGlobalModifier({
+        modifierManager.addModifier({
             id: 'difficulty_hp',
             side: 'enemy',
             stat: 'hp',
@@ -88,7 +88,7 @@ class TimeManager {
         });
 
         // 注入伤害修正
-        modifierManager.addGlobalModifier({
+        modifierManager.addModifier({
             id: 'difficulty_damage',
             side: 'enemy',
             stat: 'damage',

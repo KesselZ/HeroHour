@@ -419,19 +419,19 @@ function syncHeroStatsToModifiers() {
     const cb = identity.combatBase;
 
     // 1. 统帅：军队影响士兵攻击和血量 (显式标记 source: 'hero_stats')
-    modifierManager.addGlobalModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'damage', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
-    modifierManager.addGlobalModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
+    modifierManager.addModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'attackDamage', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
+    modifierManager.addModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (s.morale / 100), source: 'hero_stats' });
 
     // 2. 武力与功法：根据身份表动态计算上限
     worldManager.heroData.hpMax = cb.hpBase + (s.power * cb.hpScaling);
     // 核心修改：所有人统一 160 基础，每级 +14
     worldManager.heroData.mpMax = 160 + (worldManager.heroData.level - 1) * 14;
     
-    modifierManager.addGlobalModifier({
+    modifierManager.addModifier({
         id: 'hero_damage_bonus',
         side: 'player',
         unitType: heroId, 
-        stat: 'damage',
+        stat: 'attackDamage',
         multiplier: 1.0 + (s.power * (cb.atkScaling || 0.05)),
         source: 'hero_stats'
     });
@@ -439,7 +439,13 @@ function syncHeroStatsToModifiers() {
     // 3. 核心重构：自动加载英雄固有天赋 (数据驱动)
     const traits = worldManager.getHeroTraits(heroId);
     traits.forEach(trait => {
-        modifierManager.addGlobalModifier({
+        // 映射旧的 stat 名到新的 stat 名
+        if (trait.stat === 'damage') trait.stat = 'attackDamage';
+        if (trait.stat === 'range') trait.stat = 'attackRange';
+        if (trait.stat === 'speed') trait.stat = 'moveSpeed';
+        if (trait.stat === 'attack_speed') trait.stat = 'attackSpeed';
+
+        modifierManager.addModifier({
             ...trait,
             side: 'player',
             // 如果 trait 没写 unitType，默认加给英雄本人

@@ -997,19 +997,20 @@ export class BattleScene {
         const { stat, multiplier, offset, duration, color, vfxName, tag } = options;
 
         units.forEach(unit => {
-            // 核心修复：如果指定了 tag 且该 Buff 已存在，则仅刷新持续时间，不重复叠加属性
+            // 1. 如果指定了 tag 且该 Buff 已存在，则仅刷新持续时间，不重复添加 Modifier
             if (tag && unit.activeBuffs) {
                 const existing = unit.activeBuffs.find(b => b.tag === tag);
                 if (existing) {
                     clearTimeout(existing.timer);
                     existing.timer = setTimeout(existing.cleanup, duration);
-                    return; // 跳过属性叠加逻辑
+                    return; 
                 }
             }
 
+            // 2. 播放特效
             if (vfxName) this.playVFX(vfxName, { unit, duration, color: color || 0xffffff, radius: unit.isHero ? 1.5 : 0.8 });
             
-            // 记录 Buff 颜色 (解决多 Buff 颜色冲突)
+            // 3. 记录颜色
             if (color && tag && unit.activeColors) {
                 unit.activeColors.set(tag, color);
             }
@@ -1018,53 +1019,41 @@ export class BattleScene {
             const multipliers = Array.isArray(multiplier) ? multiplier : [multiplier];
             const offsets = Array.isArray(offset) ? offset : [offset];
 
+            // 4. 为每个属性添加 Modifier
+            const modifierIds = [];
             stats.forEach((s, i) => {
-                const m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
-                const o = offsets[i] !== undefined ? offsets[i] : (offsets[0] !== undefined ? offsets[0] : 0);
+                let m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
+                let o = offsets[i] !== undefined ? offsets[i] : (offsets[0] !== undefined ? offsets[0] : 0);
 
-                if (unit[s] !== undefined) {
-                    unit[s] = unit[s] * m + o;
-                } else if (s === 'attackSpeed') {
-                    unit.attackCooldownTime *= (1 / m);
-                } else if (s === 'invincible') {
-                    unit.isInvincible = true;
-                } else if (s === 'controlImmune') {
-                    unit.isControlImmune = true;
-                } else if (s === 'damageResist') {
-                    unit.damageMultiplier *= m;
-                } else if (s === 'tigerHeart') {
-                    unit.isTigerHeart = true;
+                // --- 核心增强：自动识别并激活“开关型”Buff (Flag Stats) ---
+                // 像无敌、锁血、免控这类属性，基础值通常是 0，只要有任意正向修正就视为开启
+                const isFlagStat = ['invincible', 'controlImmune', 'tigerHeart'].includes(s);
+                if (isFlagStat && m === 1.0 && o === 0) {
+                    o = 1; // 默认赋予 1 点偏移量以激活该状态
                 }
+
+                const modId = `buff_${unit.side}_${unit.type}_${unit.index}_${tag || 'anon'}_${s}`;
+                
+                modifierManager.addModifier({
+                    id: modId,
+                    stat: s,
+                    multiplier: m,
+                    offset: o,
+                    targetUnit: unit,
+                    source: 'skill'
+                });
+                modifierIds.push(modId);
             });
 
-            // 定时恢复函数
+            // 5. 定时清理函数 (经销商负责撤场)
             const cleanup = () => {
                 if (!unit.isDead) {
-                    stats.forEach((s, i) => {
-                        const m = multipliers[i] !== undefined ? multipliers[i] : (multipliers[0] !== undefined ? multipliers[0] : 1.0);
-                        const o = offsets[i] !== undefined ? offsets[i] : (offsets[0] !== undefined ? offsets[0] : 0);
-
-                        if (unit[s] !== undefined) {
-                            unit[s] = (unit[s] - o) / m;
-                        } else if (s === 'attackSpeed') {
-                            unit.attackCooldownTime /= (1 / m);
-                        } else if (s === 'invincible') {
-                            unit.isInvincible = false;
-                        } else if (s === 'controlImmune') {
-                            unit.isControlImmune = false;
-                        } else if (s === 'damageResist') {
-                            unit.damageMultiplier /= m;
-                        } else if (s === 'tigerHeart') {
-                            unit.isTigerHeart = false;
-                        }
-                    });
+                    modifierIds.forEach(id => modifierManager.removeModifier(id));
                     
-                    // 移除 Buff 颜色
                     if (color && tag && unit.activeColors) {
                         unit.activeColors.delete(tag);
                     }
                 }
-                // 从单位的 activeBuffs 中移除自己
                 if (tag && unit.activeBuffs) {
                     unit.activeBuffs = unit.activeBuffs.filter(b => b.timer !== timer);
                 }
@@ -1072,7 +1061,7 @@ export class BattleScene {
 
             const timer = setTimeout(cleanup, duration);
 
-            // 如果有 tag，记录到单位身上以便中途取消
+            // 6. 登记在册，方便中途维护
             if (tag) {
                 if (!unit.activeBuffs) unit.activeBuffs = [];
                 unit.activeBuffs.push({ tag, timer, cleanup });

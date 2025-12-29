@@ -101,7 +101,7 @@ export const HERO_IDENTITY = {
         initialStats: { power: 10, spells: 18, morale: 2, qinggong: 11.8, battleSpeed: 7.0, leadership: 15 },
         combatBase: { atk: 5, hpBase: 360, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
-            { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attack_speed', multiplier: 0.833, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
+            { id: 'yeying_sect_as', unitType: 'cangjian', stat: 'attackSpeed', multiplier: 1.2, description: '心剑合一：藏剑弟子攻击频率提高 20%' }
         ]
     }
 };

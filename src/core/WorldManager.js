@@ -244,7 +244,7 @@ class City {
         } else if (id === 'trade_post') {
             // 每级增加 80 木材，并降低全局招募成本 5%
             this.production.wood += 80;
-            modifierManager.addGlobalModifier({ 
+            modifierManager.addModifier({ 
                 id: `city_${this.id}_recruit_discount`, 
                 side: 'player', 
                 stat: 'recruit_cost', 
@@ -252,7 +252,7 @@ class City {
             });
         } else if (id === 'inn') {
             // 每级增加全军阅历获取 10%
-            modifierManager.addGlobalModifier({ 
+            modifierManager.addModifier({ 
                 id: `city_${this.id}_xp_bonus`, 
                 side: 'player', 
                 stat: 'xp_gain', 
@@ -286,34 +286,34 @@ class City {
         
         switch (id) {
             case 'barracks':
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: multiplier });
                 break;
             case 'archery_range':
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'damage', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'attackDamage', multiplier: multiplier });
                 break;
             case 'stable':
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'damage', multiplier: multiplier });
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_tiance_hp`, side: 'player', unitType: 'tiance', stat: 'hp', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'attackDamage', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_tiance_hp`, side: 'player', unitType: 'tiance', stat: 'hp', multiplier: multiplier });
                 break;
             case 'sword_forge':
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangjian_bonus`, side: 'player', unitType: 'cangjian', stat: 'damage', multiplier: multiplier });
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangjian_hp`, side: 'player', unitType: 'cangjian', stat: 'hp', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_cangjian_bonus`, side: 'player', unitType: 'cangjian', stat: 'attackDamage', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_cangjian_hp`, side: 'player', unitType: 'cangjian', stat: 'hp', multiplier: multiplier });
                 break;
             case 'martial_shrine':
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: multiplier });
                 // 核心重构：1级解锁，2级开始每级增加 10% 减伤百分点
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damage_reduction', offset: Math.max(0, (level - 1) * 0.10) });
+                modifierManager.addModifier({ id: `city_${this.id}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damageResist', offset: Math.max(0, (level - 1) * 0.10) });
                 break;
             case 'mage_guild':
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'damage', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'attackDamage', multiplier: multiplier });
                 break;
             case 'medical_pavilion':
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: multiplier });
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'damage', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: multiplier });
+                modifierManager.addModifier({ id: `city_${this.id}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'attackDamage', multiplier: multiplier });
                 break;
             case 'clinic':
                 // 仁心仁术：每级增加 20% 战场存活率 (修正器 offset 模式)
-                modifierManager.addGlobalModifier({ id: `city_${this.id}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.20 });
+                modifierManager.addModifier({ id: `city_${this.id}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.20 });
                 break;
         }
     }
@@ -1740,7 +1740,9 @@ class WorldManager {
             finalQinggong = modifierManager.getModifiedValue(dummyUnit, 'qinggong', this.heroData.stats.qinggong);
         }
 
-        const finalInterval = modifierManager.getModifiedValue(dummyUnit, 'attack_speed', blueprint.attackSpeed);
+        // 核心修正：应用全局攻速加成 (注意：攻速加成是频率提升，对应间隔缩短)
+        const speedMult = modifierManager.getModifiedValue(dummyUnit, 'attackSpeed', 1.0);
+        const finalInterval = blueprint.attackSpeed / speedMult;
         
         // 2. DPS 换算
         const burstCount = blueprint.burstCount || 1;

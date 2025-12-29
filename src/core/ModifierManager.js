@@ -11,28 +11,33 @@ class ModifierManager {
      * 添加一个修正器 (核心 API)
      * @param {Object} mod 
      * { 
-     *   id: 唯一标识, 
+     *   id: 唯一标识 (必填，用于覆盖 and 移除), 
      *   stat: 属性名, 
      *   value: 数值, 
-     *   type: 'add' | 'mult' | 'percent', // 显式指定计算类型
-     *   source: 来源 (talent/building/hero_stats),
+     *   type: 'add' | 'mult' | 'percent', 
+     *   source: 来源 (talent/building/skill),
      *   unitType: 作用兵种 (army/hero/global/具体兵种),
-     *   side: 阵营 (player/enemy)
+     *   side: 阵营 (player/enemy),
+     *   targetUnit: 明确指向的单位对象 (可选，用于单个单位的 Buff)
      * }
      */
     addModifier(mod) {
+        if (!mod.id) {
+            console.warn('[ModifierManager] mod.id is required for reliable removal');
+        }
+
         const normalizedMod = {
             id: mod.id,
             side: mod.side,
-            unitType: mod.unitType || mod.type,
+            unitType: mod.unitType || mod.type || 'global',
             stat: mod.stat,
             source: mod.source,
-            // 允许直接传入 multiplier 或 offset，也支持通过 value + type 指定
-            multiplier: mod.multiplier,
-            offset: mod.offset
+            targetUnit: mod.targetUnit, // 新增：支持直接锁定单位
+            multiplier: mod.multiplier !== undefined ? mod.multiplier : 1.0,
+            offset: mod.offset || 0
         };
 
-        // 处理显式类型
+        // 处理显式类型转换
         if (mod.value !== undefined) {
             switch (mod.type) {
                 case 'mult':
@@ -44,25 +49,14 @@ class ModifierManager {
                 case 'add':
                 default:
                     normalizedMod.offset = mod.value;
+                    normalizedMod.multiplier = 1.0; // 确保加法时不带乘法
                     break;
             }
         }
 
-        this.addGlobalModifier(normalizedMod);
-    }
-
-    /**
-     * 添加一个全局修正器
-     * @param {Object} mod { id, side, unitType, stat, multiplier, offset, source }
-     * multiplier: 1.2 表示增加 20%
-     * offset: 10 表示增加 10 点固定值
-     */
-    addGlobalModifier(mod) {
-        // 防止重复添加同一个 ID 的修正器
-        if (this.globalModifiers.find(m => m.id === mod.id)) {
-            this.removeModifier(mod.id);
-        }
-        this.globalModifiers.push(mod);
+        // 防止重复添加同一个 ID 的修正器 (唯一性保证)
+        this.removeModifier(mod.id);
+        this.globalModifiers.push(normalizedMod);
     }
 
     /**
@@ -78,6 +72,7 @@ class ModifierManager {
      * @param {string} id 
      */
     removeModifier(id) {
+        if (!id) return;
         this.globalModifiers = this.globalModifiers.filter(m => m.id !== id);
     }
 
@@ -119,9 +114,14 @@ class ModifierManager {
      */
     _isMatch(mod, unit, statName) {
         if (mod.stat !== statName) return false;
+        
+        // 1. 如果指定了具体单位，则必须匹配该单位
+        if (mod.targetUnit && mod.targetUnit !== unit) return false;
+
+        // 2. 阵营过滤
         if (mod.side && unit.side !== mod.side) return false;
         
-        // 核心增强：支持 army (所有非英雄) 和 global (所有人) 关键字
+        // 3. 兵种类型过滤：支持 army (所有非英雄) 和 global (所有人) 关键字
         const isTypeMatch = !mod.unitType || 
                            mod.unitType === 'global' ||
                            (mod.unitType === 'army' && !unit.isHero) ||
@@ -140,4 +140,3 @@ class ModifierManager {
 }
 
 export const modifierManager = new ModifierManager();
-

@@ -32,30 +32,23 @@ export class BaseUnit extends THREE.Group {
         this.projectileManager = projectileManager;
         this.cost = cost;
         this.mass = mass; // 质量越大，越难被推开
-        this.maxHealth = modifierManager.getModifiedValue(this, 'hp', hp);
-        console.log(`%c[BaseUnit] %c${this.type} %c初始化: 传入hp=${hp}, 计算出的maxHealth=${this.maxHealth}`, 
-            'color: #d4af37; font-weight: bold', 'color: #fff', 'color: #aaa');
+        
+        // --- 核心属性初始化 (使用 _ 前缀保存基础值) ---
+        this._baseHp = hp;
+        
+        // 基础移速叠加随机微差
+        this._baseMoveSpeed = (speed + (rng.next() - 0.5) * 0.01) * 0.5; // 全局移速再降低 30% (总计约降低 50%)
+        
+        this._baseAttackRange = attackRange;
+        this._baseAttackDamage = attackDamage;
+        this._baseAttackInterval = attackSpeed;
+        this._baseDamageMultiplier = 1.0;
+
+        // 当前血量初始化
         this.health = this.maxHealth;
         
-        // 基础移速叠加随机微差后，再应用全局修正
-        const rawSpeed = (speed + (rng.next() - 0.5) * 0.01) * 0.5; // 全局移速再降低 30% (总计约降低 50%)
-        this.moveSpeed = modifierManager.getModifiedValue(this, 'speed', rawSpeed);
-        this.baseMoveSpeed = this.moveSpeed; // 记录基础移速，用于判定减速特效
-        
-        this.attackRange = modifierManager.getModifiedValue(this, 'range', attackRange);
-        this.attackDamage = modifierManager.getModifiedValue(this, 'damage', attackDamage);
-        
-        // 核心改动：攻击频率修正 (攻击间隔的倒数即频率，增加频率等于减小间隔)
-        this.attackCooldownTime = modifierManager.getModifiedValue(this, 'attack_speed', attackSpeed);
-        
         this.isDead = false;
-        this.isInvincible = false;
-        this.isControlImmune = false; // 新增：控制免疫 (生太极)
         
-        // 核心精简：全部统一使用 getModifiedValue，减伤只是受损倍率为 0.85
-        this.damageMultiplier = modifierManager.getModifiedValue(this, 'damage_reduction', 1.0);
-        
-        this.isTigerHeart = false; // 啸如虎：锁血状态
         this.stunnedUntil = 0; // 眩晕截止时间戳
         this.hitFlashUntil = 0; // 受击闪红截止时间戳
         this.activeColors = new Map(); // 记录当前生效的 Buff 颜色 (Tag -> Color)
@@ -171,6 +164,50 @@ export class BaseUnit extends THREE.Group {
         if (this.hpSprite) {
             this.hpSprite.material.map.needsUpdate = true;
         }
+    }
+
+    // --- 动态属性 Getters (核心：实时从 ModifierManager 获取计算后的数值) ---
+    
+    get maxHealth() {
+        return modifierManager.getModifiedValue(this, 'hp', this._baseHp);
+    }
+
+    get moveSpeed() {
+        return modifierManager.getModifiedValue(this, 'moveSpeed', this._baseMoveSpeed);
+    }
+
+    get baseMoveSpeed() {
+        return this._baseMoveSpeed;
+    }
+
+    get attackRange() {
+        return modifierManager.getModifiedValue(this, 'attackRange', this._baseAttackRange);
+    }
+
+    get attackDamage() {
+        return modifierManager.getModifiedValue(this, 'attackDamage', this._baseAttackDamage);
+    }
+
+    get attackCooldownTime() {
+        // 攻击频率 (attackSpeed) 增加时，冷却间隔缩短
+        const speedMult = modifierManager.getModifiedValue(this, 'attackSpeed', 1.0);
+        return this._baseAttackInterval / speedMult;
+    }
+
+    get damageMultiplier() {
+        return modifierManager.getModifiedValue(this, 'damageResist', this._baseDamageMultiplier);
+    }
+
+    get isInvincible() {
+        return modifierManager.getModifiedValue(this, 'invincible', 0) > 0;
+    }
+
+    get isControlImmune() {
+        return modifierManager.getModifiedValue(this, 'controlImmune', 0) > 0;
+    }
+
+    get isTigerHeart() {
+        return modifierManager.getModifiedValue(this, 'tigerHeart', 0) > 0;
     }
 
     /**
@@ -923,11 +960,11 @@ export class HeroUnit extends BaseUnit {
             this.clearBuffs('mengquan');
             this.baseColor = 0xffffff; // 重剑底色保持白色
             this.scale.set(1.5, 1.5, 1.5);
-            this.attackRange = details.range; // 恢复心剑范围 (2.5)
+            this._baseAttackRange = details.range; // 恢复心剑范围 (2.5)
         } else {
             this.baseColor = 0xffffff; // 轻剑底色恢复白色
             this.scale.set(1.5, 1.5, 1.5);
-            this.attackRange = 1.0; // 轻剑单体攻击范围缩短
+            this._baseAttackRange = 1.0; // 轻剑单体攻击范围缩短
         }
     }
 
@@ -1580,10 +1617,10 @@ export class Chunyang extends BaseUnit {
             // 如果目标进入 4.5 范围，则切换为近战模式并缩短攻击范围，促使其跑位贴脸
             if (dist < this.meleeSwitchThreshold) {
                 this.isMeleeMode = true;
-                this.attackRange = this.meleeAttackRange;
+                this._baseAttackRange = this.meleeAttackRange;
             } else {
                 this.isMeleeMode = false;
-                this.attackRange = this.remoteAttackRange;
+                this._baseAttackRange = this.remoteAttackRange;
             }
         }
     }
