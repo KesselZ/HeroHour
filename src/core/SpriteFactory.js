@@ -12,6 +12,9 @@ export const ASSET_REGISTRY = {
         ITEMS: '/assets/items/items.png',
         ITEMS2: '/assets/items/items2.png',
         ENEMY: '/assets/enemies/enemy.png',
+        ENEMY3: '/assets/enemies/enemy3.png',
+        ENEMY4: '/assets/enemies/enemy4.png',
+        ENEMY5: '/assets/enemies/enemy5.png',
         SKILL1: '/assets/skills/skill.png',
         SKILL2: '/assets/skills/skill2.png',
         SKILL3: '/assets/skills/skill3.png',
@@ -200,6 +203,37 @@ export const ASSET_REGISTRY = {
         'zombie':        { name: '毒尸傀儡', sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4, defaultFacing: 'right' },
         'heavy_knight':  { name: '铁浮屠重骑', sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 3, scale: 1.6, defaultFacing: 'right' },
         'shadow_ninja':  { name: '隐之影', sheet: 'ENEMY', rows: 4, cols: 4, r: 4, c: 4, scale: 1.4, defaultFacing: 'right' },
+
+        // --- 天一教 (ENEMY4) ---
+        'tianyi_guard': { name: '天一教卫', sheet: 'ENEMY4', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'tianyi_crossbowman': { name: '天一弩手', sheet: 'ENEMY4', rows: 4, cols: 4, r: 1, c: 1, scale: 1.4, defaultFacing: 'left' },
+        'tianyi_apothecary': { name: '天一药师', sheet: 'ENEMY4', rows: 4, cols: 4, r: 1, c: 3, scale: 1.4, defaultFacing: 'left' },
+        'tianyi_venom_zombie': { name: '天一毒尸', sheet: 'ENEMY4', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4, defaultFacing: 'left' },
+        'tianyi_priest': { name: '天一祭司', sheet: 'ENEMY4', rows: 4, cols: 4, r: 3, c: 1, scale: 1.5, defaultFacing: 'left' },
+        'tianyi_abomination': { name: '缝合巨怪', sheet: 'ENEMY4', rows: 4, cols: 4, r: 3, c: 3, scale: 2.2, defaultFacing: 'left' },
+        'tianyi_elder': { name: '天一长老', sheet: 'ENEMY4', rows: 4, cols: 4, r: 4, c: 1, scale: 1.6, defaultFacing: 'left' },
+        'tianyi_shadow_guard': { name: '天一影卫', sheet: 'ENEMY4', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4, defaultFacing: 'left' },
+
+        // --- 神策军 (ENEMY3) ---
+        'shence_infantry': { name: '神策步兵', sheet: 'ENEMY3', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'left' },
+        'shence_shieldguard': { name: '神策盾卫', sheet: 'ENEMY3', rows: 4, cols: 4, r: 1, c: 3, scale: 1.5, defaultFacing: 'left' },
+        'shence_crossbowman': { name: '神策弩手', sheet: 'ENEMY3', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'shence_bannerman': { name: '神策旗手', sheet: 'ENEMY3', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'left' },
+        'shence_cavalry': { name: '神策精骑', sheet: 'ENEMY3', rows: 4, cols: 4, r: 3, c: 1, scale: 1.6, defaultFacing: 'left' },
+        'shence_overseer': { name: '神策督军', sheet: 'ENEMY3', rows: 4, cols: 4, r: 2, c: 3, scale: 1.6, defaultFacing: 'left' },
+        'shence_assassin': { name: '神策暗刺', sheet: 'ENEMY3', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'left' },
+        'shence_iron_pagoda': { name: '铁甲神策', sheet: 'ENEMY3', rows: 4, cols: 4, r: 4, c: 3, scale: 2.0, defaultFacing: 'left' },
+
+        // --- 红衣教 (ENEMY5) ---
+        'red_cult_priestess': { name: '红衣祭司', sheet: 'ENEMY5', rows: 4, cols: 4, r: 1, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'red_cult_high_priestess': { name: '红衣圣女', sheet: 'ENEMY5', rows: 4, cols: 4, r: 1, c: 4, scale: 1.6, defaultFacing: 'right' },
+        'red_cult_enforcer': { name: '红衣武者', sheet: 'ENEMY5', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4, defaultFacing: 'right' },
+        'red_cult_swordsman': { name: '红衣剑卫', sheet: 'ENEMY5', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
+        'red_cult_archer': { name: '红衣弩手', sheet: 'ENEMY5', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'right' },
+        'red_cult_assassin': { name: '红衣暗刺', sheet: 'ENEMY5', rows: 4, cols: 4, r: 3, c: 2, scale: 1.4, defaultFacing: 'right' },
+        'red_cult_firemage': { name: '红衣法师', sheet: 'ENEMY5', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'right' },
+        'red_cult_executioner': { name: '红衣惩戒者', sheet: 'ENEMY5', rows: 4, cols: 4, r: 3, c: 4, scale: 1.5, defaultFacing: 'right' },
+        'red_cult_acolyte': { name: '红衣教众', sheet: 'ENEMY5', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4, defaultFacing: 'right' },
 
         // --- 局内战斗单位 (兵种) ---
         'melee':    { name: '天策弟子', sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 1, scale: 1.4, defaultFacing: 'right' },

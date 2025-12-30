@@ -45,6 +45,37 @@ export const UNIT_STATS_DATA = {
     'heavy_knight': { name: '铁浮屠重骑', hp: 300, atk: 25, range: 1.5, rangeType: '冲锋', speed: 2.7, attackSpeed: 1500, mass: 4.0, targets: 1.5 },
     'shadow_ninja': { name: '隐之影', hp: 120, atk: 18, range: 1.2, rangeType: '近战', speed: 8.1, attackSpeed: 600, targets: 1.0 },
 
+    // --- 天一教势力 (来自 enemy4.png) ---
+    'tianyi_guard': { name: '天一教卫', hp: 220, atk: 15, range: 1.2, rangeType: '近战', speed: 3.5, attackSpeed: 1000, targets: 1.0 },
+    'tianyi_crossbowman': { name: '天一弩手', hp: 150, atk: 25, range: 15.0, rangeType: '远程', speed: 3.2, attackSpeed: 2000, targets: 1.0 },
+    'tianyi_apothecary': { name: '天一药师', hp: 180, atk: 12, range: 8.0, rangeType: '毒瓶', speed: 3.8, attackSpeed: 1500, targets: 1.0 },
+    'tianyi_venom_zombie': { name: '天一毒尸', hp: 350, atk: 10, range: 1.2, rangeType: '近战', speed: 2.2, attackSpeed: 1000, targets: 1.0 },
+    'tianyi_priest': { name: '天一祭司', hp: 200, atk: 20, range: 10.0, rangeType: '咒术', speed: 3.0, attackSpeed: 2000, targets: 2.0 },
+    'tianyi_abomination': { name: '缝合巨怪', hp: 800, atk: 35, range: 2.0, rangeType: '重击', speed: 2.5, attackSpeed: 2500, mass: 5.0, targets: 3.0 },
+    'tianyi_elder': { name: '天一长老', hp: 450, atk: 45, range: 12.0, rangeType: '法术', speed: 2.8, attackSpeed: 2200, targets: 1.5 },
+    'tianyi_shadow_guard': { name: '天一影卫', hp: 260, atk: 22, range: 1.2, rangeType: '暗杀', speed: 6.5, attackSpeed: 800, targets: 1.0 },
+
+    // --- 神策军势力 (来自 enemy3.png) ---
+    'shence_infantry': { name: '神策步兵', hp: 200, atk: 14, range: 1.5, rangeType: '近战', speed: 3.4, attackSpeed: 1000, targets: 1.0 },
+    'shence_shieldguard': { name: '神策盾卫', hp: 450, atk: 8, range: 1.2, rangeType: '坦', speed: 2.5, attackSpeed: 1200, mass: 3.0, targets: 1.0 },
+    'shence_crossbowman': { name: '神策弩手', hp: 160, atk: 28, range: 15.0, rangeType: '远程', speed: 3.0, attackSpeed: 2200, targets: 1.0 },
+    'shence_bannerman': { name: '神策旗手', hp: 220, atk: 10, range: 5.0, rangeType: '增益', speed: 3.6, attackSpeed: 2000, targets: 1.0, description: '神策军的精神支柱，提升周围友军的士气。' },
+    'shence_cavalry': { name: '神策精骑', hp: 500, atk: 35, range: 2.0, rangeType: '冲锋', speed: 6.0, attackSpeed: 1500, mass: 4.0, targets: 2.0 },
+    'shence_overseer': { name: '神策督军', hp: 600, atk: 50, range: 1.8, rangeType: '精英', speed: 3.2, attackSpeed: 1800, mass: 2.5, targets: 1.5 },
+    'shence_assassin': { name: '神策暗刺', hp: 180, atk: 25, range: 1.2, rangeType: '爆发', speed: 7.0, attackSpeed: 600, targets: 1.0 },
+    'shence_iron_pagoda': { name: '铁甲神策', hp: 1200, atk: 60, range: 2.2, rangeType: '重装', speed: 1.8, attackSpeed: 2500, mass: 10.0, targets: 3.0 },
+
+    // --- 红衣教势力 (来自 enemy5.png) ---
+    'red_cult_priestess': { name: '红衣教祭司', hp: 220, atk: 25, range: 10.0, rangeType: '法术', speed: 3.2, attackSpeed: 2000, targets: 1.0, description: '红衣教的中坚力量，能够释放灼热的惩戒。' },
+    'red_cult_high_priestess': { name: '红衣圣女', hp: 550, atk: 40, range: 12.0, rangeType: '神圣', speed: 3.0, attackSpeed: 1800, targets: 2.0, description: '地位崇高的圣女，周围散发着令人疯狂的狂热气息。' },
+    'red_cult_swordsman': { name: '红衣剑卫', hp: 240, atk: 18, range: 1.5, rangeType: '近战', speed: 3.8, attackSpeed: 1000, targets: 1.0 },
+    'red_cult_archer': { name: '红衣教弩手', hp: 180, atk: 22, range: 15.0, rangeType: '远程', speed: 3.4, attackSpeed: 2000, targets: 1.0 },
+    'red_cult_assassin': { name: '红衣暗刺', hp: 200, atk: 30, range: 1.2, rangeType: '暗杀', speed: 6.8, attackSpeed: 700, targets: 1.0 },
+    'red_cult_firemage': { name: '红衣法师', hp: 210, atk: 35, range: 8.0, rangeType: '灼烧', speed: 2.8, attackSpeed: 2500, targets: 3.0, description: '红衣教的控火者，能让大片战场陷入火海。' },
+    'red_cult_executioner': { name: '红衣惩戒者', hp: 400, atk: 25, range: 1.8, rangeType: '重击', speed: 2.6, attackSpeed: 1500, mass: 2.5, targets: 1.5 },
+    'red_cult_acolyte': { name: '红衣教众', hp: 150, atk: 12, range: 1.2, rangeType: '狂热', speed: 4.5, attackSpeed: 900, targets: 1.0 },
+    'red_cult_enforcer': { name: '红衣武者', hp: 200, atk: 16, range: 1.2, rangeType: '近战', speed: 4.8, attackSpeed: 800, targets: 1.0 },
+
     // --- 英雄单位 (物理常数，数值在大世界中动态同步) ---
     'qijin':      { 
         name: '祁进', 
@@ -135,6 +166,37 @@ export const UNIT_COSTS = {
     'assassin_monk': { gold: 150, cost: 5 },
     'zombie': { gold: 120, cost: 4 },
     'heavy_knight': { gold: 195, cost: 7 },
-    'shadow_ninja': { gold: 135, cost: 5 }
+    'shadow_ninja': { gold: 135, cost: 5 },
+
+    // --- 天一教势力消耗 ---
+    'tianyi_guard': { gold: 150, cost: 5 },
+    'tianyi_crossbowman': { gold: 120, cost: 4 },
+    'tianyi_apothecary': { gold: 100, cost: 3 },
+    'tianyi_venom_zombie': { gold: 155, cost: 5 },
+    'tianyi_priest': { gold: 180, cost: 6 },
+    'tianyi_abomination': { gold: 450, cost: 15 },
+    'tianyi_elder': { gold: 300, cost: 10 },
+    'tianyi_shadow_guard': { gold: 210, cost: 7 },
+
+    // --- 神策军消耗 ---
+    'shence_infantry': { gold: 120, cost: 4 },
+    'shence_shieldguard': { gold: 200, cost: 6 },
+    'shence_crossbowman': { gold: 140, cost: 5 },
+    'shence_bannerman': { gold: 180, cost: 6 },
+    'shence_cavalry': { gold: 400, cost: 12 },
+    'shence_overseer': { gold: 500, cost: 15 },
+    'shence_assassin': { gold: 220, cost: 8 },
+    'shence_iron_pagoda': { gold: 1000, cost: 30 },
+
+    // --- 红衣教消耗 ---
+    'red_cult_priestess': { gold: 180, cost: 6 },
+    'red_cult_high_priestess': { gold: 450, cost: 15 },
+    'red_cult_swordsman': { gold: 130, cost: 4 },
+    'red_cult_archer': { gold: 120, cost: 4 },
+    'red_cult_assassin': { gold: 240, cost: 8 },
+    'red_cult_firemage': { gold: 300, cost: 10 },
+    'red_cult_executioner': { gold: 280, cost: 9 },
+    'red_cult_acolyte': { gold: 80, cost: 3 },
+    'red_cult_enforcer': { gold: 110, cost: 4 }
 };
 

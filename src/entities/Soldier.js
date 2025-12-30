@@ -250,8 +250,12 @@ export class BaseUnit extends THREE.Group {
     initVisual() {
         // 1. 侠客 Sprite
         this.unitSprite = spriteFactory.createUnitSprite(this.type);
-        // 移除原本的 scale.x 翻转逻辑，改用统一的 updateFacing 处理
         this.add(this.unitSprite);
+
+        // --- 核心修复：初始朝向同步 ---
+        // 在部署/生成阶段，根据所属阵营立即应用初始翻转，防止开战瞬间才“回头”
+        // 规则：玩家单位默认看右，敌人单位默认看左
+        this.setSpriteFacing(this.side === 'player' ? 'right' : 'left');
 
         // 2. 阵营环（Influence Ring）- 进一步增强可见度
         const ringGeo = new THREE.PlaneGeometry(2.5, 2.5);
@@ -1792,6 +1796,504 @@ export class ShadowNinja extends BaseUnit {
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('shadow_ninja');
         super({ side, index, type: 'shadow_ninja', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+}
+
+// ==========================================
+// 天一教势力 (基于 enemy4.png)
+// ==========================================
+
+export class TianyiGuard extends BaseUnit {
+    static displayName = '天一教卫';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_guard');
+        super({ side, index, type: 'tianyi_guard', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
+    }
+}
+
+export class TianyiCrossbowman extends BaseUnit {
+    static displayName = '天一弩手';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_crossbowman');
+        super({ side, index, type: 'tianyi_crossbowman', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_arrow', { volume: 0.3 });
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 
+                target: this.target, 
+                speed: 0.25, 
+                damage: this.attackDamage, 
+                type: 'arrow' 
+            });
+        }
+    }
+}
+
+export class TianyiApothecary extends BaseUnit {
+    static displayName = '天一药师';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_apothecary');
+        super({ side, index, type: 'tianyi_apothecary', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.2, pitchVar: 0.4 });
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 
+                target: this.target, 
+                speed: 0.15, 
+                damage: this.attackDamage, 
+                type: 'wave', 
+                color: 0x00ff00 // 毒药绿色
+            });
+        }
+    }
+}
+
+export class TianyiVenomZombie extends BaseUnit {
+    static displayName = '天一毒尸';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_venom_zombie');
+        super({ side, index, type: 'tianyi_venom_zombie', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
+    }
+}
+
+export class TianyiPriest extends BaseUnit {
+    static displayName = '天一祭司';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_priest');
+        super({ side, index, type: 'tianyi_priest', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.3, pitchVar: 0.5 });
+            
+            // 多目标攻击逻辑
+            const nearbyEnemies = window.battle.getUnitsInArea(this.target.position, { shape: 'circle', radius: 4.0 }, 'enemy');
+            const targetCount = Math.min(nearbyEnemies.length, 2);
+            
+            for (let i = 0; i < targetCount; i++) {
+                this.projectileManager?.spawn({ 
+                    startPos: this.position.clone().add(new THREE.Vector3(0, 0.8, 0)), 
+                    target: nearbyEnemies[i], 
+                    speed: 0.1, 
+                    damage: this.attackDamage, 
+                    type: 'wave',
+                    color: 0x8800ff 
+                });
+            }
+        }
+    }
+}
+
+export class TianyiAbomination extends BaseUnit {
+    static displayName = '缝合巨怪';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_abomination');
+        super({ side, index, type: 'tianyi_abomination', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, mass: 5.0, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_unarmed', { volume: 0.8 });
+            
+            // 范围重击
+            this.executeAOE(enemies, {
+                radius: 2.5,
+                damage: this.attackDamage,
+                knockbackForce: 0.2
+            });
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('stomp', { pos: this.position, radius: 2.5, color: 0x664422, duration: 400 });
+            }
+        }
+    }
+}
+
+export class TianyiElder extends BaseUnit {
+    static displayName = '天一长老';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_elder');
+        super({ side, index, type: 'tianyi_elder', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.4, pitchVar: 0.2 });
+            
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 1.0, 0)), 
+                target: this.target, 
+                speed: 0.2, 
+                damage: this.attackDamage, 
+                type: 'wave',
+                scale: 2.0,
+                color: 0x00ff88 
+            });
+        }
+    }
+}
+
+export class TianyiShadowGuard extends BaseUnit {
+    static displayName = '天一影卫';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tianyi_shadow_guard');
+        super({ side, index, type: 'tianyi_shadow_guard', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+}
+
+// ==========================================
+// 神策军势力 (基于 enemy3.png)
+// ==========================================
+
+export class ShenceInfantry extends BaseUnit {
+    static displayName = '神策步兵';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_infantry');
+        super({ side, index, type: 'shence_infantry', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
+    }
+}
+
+export class ShenceShieldguard extends BaseUnit {
+    static displayName = '神策盾卫';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_shieldguard');
+        super({ side, index, type: 'shence_shieldguard', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 3.0, projectileManager });
+    }
+}
+
+export class ShenceCrossbowman extends BaseUnit {
+    static displayName = '神策弩手';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_crossbowman');
+        super({ side, index, type: 'shence_crossbowman', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_arrow', { volume: 0.3 });
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 
+                target: this.target, 
+                speed: 0.3, 
+                damage: this.attackDamage, 
+                type: 'arrow' 
+            });
+        }
+    }
+}
+
+export class ShenceBannerman extends BaseUnit {
+    static displayName = '神策旗手';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_bannerman');
+        super({ side, index, type: 'shence_bannerman', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
+    }
+    updateAI(enemies, allies) {
+        super.updateAI(enemies, allies);
+        // 旗手会周期性给周围友军加Buff
+        const now = Date.now();
+        if (now - (this.lastBuffTime || 0) > 4000) {
+            this.lastBuffTime = now;
+            const nearbyAllies = allies.filter(u => !u.isDead && u.position.distanceTo(this.position) < 5.0);
+            if (window.battle) {
+                window.battle.applyBuffToUnits(nearbyAllies, {
+                    stat: 'attackDamage',
+                    multiplier: 1.15,
+                    duration: 3000,
+                    color: 0xffff00,
+                    tag: 'shence_morale',
+                    vfxName: 'rising_particles'
+                });
+            }
+        }
+    }
+}
+
+export class ShenceCavalry extends BaseUnit {
+    static displayName = '神策精骑';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_cavalry');
+        super({ side, index, type: 'shence_cavalry', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 4.0, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_melee', { volume: 0.5, force: true });
+            
+            this.executeAOE(enemies, {
+                radius: 2.5,
+                angle: Math.PI / 2,
+                damage: this.attackDamage,
+                knockbackForce: 0.1
+            });
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('tiance_sweep', { unit: this, radius: 2.5, color: 0xff4444, duration: 250 });
+            }
+        }
+    }
+}
+
+export class ShenceOverseer extends BaseUnit {
+    static displayName = '神策督军';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_overseer');
+        super({ side, index, type: 'shence_overseer', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 2.5, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_melee', { volume: 0.6, force: true });
+            
+            // 强力顺劈
+            this.executeAOE(enemies, {
+                radius: 2.0,
+                angle: Math.PI,
+                damage: this.attackDamage,
+                knockbackForce: 0.08
+            });
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('advanced_sweep', { unit: this, radius: 2.0, color: 0xff0000, duration: 300 });
+            }
+        }
+    }
+}
+
+export class ShenceAssassin extends BaseUnit {
+    static displayName = '神策暗刺';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_assassin');
+        super({ side, index, type: 'shence_assassin', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+}
+
+export class ShenceIronPagoda extends BaseUnit {
+    static displayName = '铁甲神策';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('shence_iron_pagoda');
+        super({ side, index, type: 'shence_iron_pagoda', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 10.0, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_unarmed', { volume: 0.9 });
+            
+            // 大范围地裂击
+            this.executeAOE(enemies, {
+                radius: 3.5,
+                damage: this.attackDamage,
+                knockbackForce: 0.3
+            });
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('stomp', { pos: this.position, radius: 3.5, color: 0x333333, duration: 600 });
+            }
+        }
+    }
+}
+
+// ==========================================
+// 红衣教势力 (基于 enemy5.png)
+// ==========================================
+
+export class RedCultPriestess extends BaseUnit {
+    static displayName = '红衣祭司';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_priestess');
+        super({ side, index, type: 'red_cult_priestess', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.3, pitchVar: 0.2 });
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.8, 0)), 
+                target: this.target, 
+                speed: 0.2, 
+                damage: this.attackDamage, 
+                type: 'wave',
+                color: 0xff4444 
+            });
+        }
+    }
+}
+
+export class RedCultHighPriestess extends BaseUnit {
+    static displayName = '红衣圣女';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_high_priestess');
+        super({ side, index, type: 'red_cult_high_priestess', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    updateAI(enemies, allies) {
+        super.updateAI(enemies, allies);
+        // 圣女周期性赋予周围友军狂热 Buff (攻速提升)
+        const now = Date.now();
+        if (now - (this.lastBuffTime || 0) > 5000) {
+            this.lastBuffTime = now;
+            const nearbyAllies = allies.filter(u => !u.isDead && u.position.distanceTo(this.position) < 6.0);
+            if (window.battle) {
+                window.battle.applyBuffToUnits(nearbyAllies, {
+                    stat: 'attackSpeed',
+                    multiplier: 1.3,
+                    duration: 4000,
+                    color: 0xff0000,
+                    tag: 'red_cult_fanaticism',
+                    vfxName: 'rising_particles'
+                });
+            }
+        }
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.4, pitchVar: 0.1 });
+            
+            // 发射两枚圣光
+            for (let i = 0; i < 2; i++) {
+                setTimeout(() => {
+                    if (this.isDead || !this.target || this.target.isDead) return;
+                    this.projectileManager?.spawn({ 
+                        startPos: this.position.clone().add(new THREE.Vector3((i-0.5)*0.5, 1.0, 0)), 
+                        target: this.target, 
+                        speed: 0.15, 
+                        damage: this.attackDamage / 2, 
+                        type: 'wave',
+                        scale: 1.5,
+                        color: 0xffaa00 
+                    });
+                }, i * 200);
+            }
+        }
+    }
+}
+
+export class RedCultSwordsman extends BaseUnit {
+    static displayName = '红衣剑卫';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_swordsman');
+        super({ side, index, type: 'red_cult_swordsman', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
+    }
+}
+
+export class RedCultArcher extends BaseUnit {
+    static displayName = '红衣弩手';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_archer');
+        super({ side, index, type: 'red_cult_archer', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_arrow', { volume: 0.3 });
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 
+                target: this.target, 
+                speed: 0.25, 
+                damage: this.attackDamage, 
+                type: 'arrow' 
+            });
+        }
+    }
+}
+
+export class RedCultAssassin extends BaseUnit {
+    static displayName = '红衣暗刺';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_assassin');
+        super({ side, index, type: 'red_cult_assassin', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+}
+
+export class RedCultFireMage extends BaseUnit {
+    static displayName = '红衣法师';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_firemage');
+        super({ side, index, type: 'red_cult_firemage', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.4 });
+            
+            // 范围火焰轰击
+            if (window.battle) {
+                const targetPos = this.target.position.clone();
+                window.battle.playVFX('pulse', { pos: targetPos, radius: 2.5, color: 0xff4400, duration: 500 });
+                const targets = window.battle.getUnitsInArea(targetPos, { shape: 'circle', radius: 2.5 }, 'enemy');
+                window.battle.applyDamageToUnits(targets, this.attackDamage);
+            }
+        }
+    }
+}
+
+export class RedCultExecutioner extends BaseUnit {
+    static displayName = '红衣惩戒者';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_executioner');
+        super({ side, index, type: 'red_cult_executioner', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, mass: 2.5, projectileManager });
+    }
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_melee', { volume: 0.6, force: true });
+            
+            this.executeAOE(enemies, {
+                radius: 2.0,
+                damage: this.attackDamage,
+                knockbackForce: 0.15
+            });
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('advanced_sweep', { unit: this, radius: 2.0, color: 0xff0000, duration: 300 });
+            }
+        }
+    }
+}
+
+export class RedCultEnforcer extends BaseUnit {
+    static displayName = '红衣武者';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_enforcer');
+        super({ side, index, type: 'red_cult_enforcer', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, projectileManager });
+    }
+}
+
+export class RedCultAcolyte extends BaseUnit {
+    static displayName = '红衣教众';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('red_cult_acolyte');
+        super({ side, index, type: 'red_cult_acolyte', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, projectileManager });
     }
 }
 

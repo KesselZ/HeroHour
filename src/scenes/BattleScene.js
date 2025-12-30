@@ -6,6 +6,12 @@ import {
     Bandit, BanditArcher, RebelSoldier, RebelAxeman,
     Snake, Bats, Deer, Pheasant,
     AssassinMonk, Zombie, HeavyKnight, ShadowNinja,
+    TianyiGuard, TianyiCrossbowman, TianyiApothecary, TianyiVenomZombie,
+    TianyiPriest, TianyiAbomination, TianyiElder, TianyiShadowGuard,
+    ShenceInfantry, ShenceShieldguard, ShenceCrossbowman, ShenceBannerman,
+    ShenceCavalry, ShenceOverseer, ShenceAssassin, ShenceIronPagoda,
+    RedCultPriestess, RedCultHighPriestess, RedCultSwordsman, RedCultArcher,
+    RedCultAssassin, RedCultFireMage, RedCultExecutioner, RedCultAcolyte, RedCultEnforcer,
     HeroUnit
 } from '../entities/Soldier.js';
 
@@ -40,7 +46,32 @@ const UnitTypeMap = {
     'assassin_monk': AssassinMonk,
     'zombie': Zombie,
     'heavy_knight': HeavyKnight,
-    'shadow_ninja': ShadowNinja
+    'shadow_ninja': ShadowNinja,
+    'tianyi_guard': TianyiGuard,
+    'tianyi_crossbowman': TianyiCrossbowman,
+    'tianyi_apothecary': TianyiApothecary,
+    'tianyi_venom_zombie': TianyiVenomZombie,
+    'tianyi_priest': TianyiPriest,
+    'tianyi_abomination': TianyiAbomination,
+    'tianyi_elder': TianyiElder,
+    'tianyi_shadow_guard': TianyiShadowGuard,
+    'shence_infantry': ShenceInfantry,
+    'shence_shieldguard': ShenceShieldguard,
+    'shence_crossbowman': ShenceCrossbowman,
+    'shence_bannerman': ShenceBannerman,
+    'shence_cavalry': ShenceCavalry,
+    'shence_overseer': ShenceOverseer,
+    'shence_assassin': ShenceAssassin,
+    'shence_iron_pagoda': ShenceIronPagoda,
+    'red_cult_priestess': RedCultPriestess,
+    'red_cult_high_priestess': RedCultHighPriestess,
+    'red_cult_swordsman': RedCultSwordsman,
+    'red_cult_archer': RedCultArcher,
+    'red_cult_assassin': RedCultAssassin,
+    'red_cult_firemage': RedCultFireMage,
+    'red_cult_executioner': RedCultExecutioner,
+    'red_cult_acolyte': RedCultAcolyte,
+    'red_cult_enforcer': RedCultEnforcer
 };
 
 import { GrasslandEnvironment } from '../environment/Environments.js';
@@ -330,9 +361,9 @@ export class BattleScene {
             let zoneX; 
             const type = unit.type;
 
-            if (['melee', 'cangyun', 'tiance', 'cangjian', 'wild_boar', 'wolf', 'tiger', 'bear', 'bandit', 'rebel_soldier', 'rebel_axeman', 'heavy_knight'].includes(type)) {
+            if (['melee', 'cangyun', 'tiance', 'cangjian', 'wild_boar', 'wolf', 'tiger', 'bear', 'bandit', 'rebel_soldier', 'rebel_axeman', 'heavy_knight', 'tianyi_guard', 'tianyi_venom_zombie', 'tianyi_abomination', 'shence_infantry', 'shence_shieldguard', 'shence_iron_pagoda', 'red_cult_swordsman', 'red_cult_executioner', 'red_cult_acolyte', 'red_cult_enforcer'].includes(type)) {
                 zoneX = 2 + Math.random() * 8;  // 前排 (X: 2-10)
-            } else if (['ranged', 'archer', 'chunyang', 'bandit_archer', 'shadow_ninja', 'assassin_monk'].includes(type)) {
+            } else if (['ranged', 'archer', 'chunyang', 'bandit_archer', 'shadow_ninja', 'assassin_monk', 'tianyi_crossbowman', 'tianyi_apothecary', 'tianyi_shadow_guard', 'shence_crossbowman', 'shence_cavalry', 'shence_overseer', 'shence_assassin', 'red_cult_archer', 'red_cult_assassin'].includes(type)) {
                 zoneX = 12 + Math.random() * 8; // 中排 (X: 12-20)
             } else {
                 zoneX = 22 + Math.random() * 6; // 后排 (X: 22-28)

@@ -488,6 +488,108 @@ class WorldManager {
                 baseWeight: 0,
                 sectHero: 'yeying', 
                 description: '西子湖畔藏剑山庄的弟子，擅长剑法。'
+            },
+            
+            // --- 天一教势力组 (基于 enemy4.png) ---
+            'tianyi_scouts': {
+                name: '天一教巡逻队',
+                overworldIcon: 'tianyi_guard', 
+                unitPool: ['tianyi_guard', 'tianyi_crossbowman', 'tianyi_venom_zombie'], 
+                basePoints: 55,        
+                baseWeight: 40,
+                description: '天一教在野外的基础巡逻队，由教卫和毒尸组成。'
+            },
+            'tianyi_venom_lab': {
+                name: '天一教炼毒场',
+                overworldIcon: 'tianyi_apothecary', 
+                unitPool: ['tianyi_apothecary', 'tianyi_venom_zombie', 'tianyi_shadow_guard'], 
+                basePoints: 80,        
+                baseWeight: 30,
+                description: '天一教炼制毒药的秘密场所，守备森严，毒气弥漫。'
+            },
+            'tianyi_altar': {
+                name: '天一教祭坛',
+                overworldIcon: 'tianyi_priest', 
+                unitPool: ['tianyi_priest', 'tianyi_guard', 'tianyi_elder'], 
+                basePoints: 110,        
+                baseWeight: 20,
+                description: '天一教进行诡异祭祀的地方，祭司与长老亲自坐镇。'
+            },
+            'tianyi_core_forces': {
+                name: '天一教核心主力',
+                overworldIcon: 'tianyi_abomination', 
+                unitPool: ['tianyi_abomination', 'tianyi_elder', 'tianyi_shadow_guard'], 
+                basePoints: 160,        
+                baseWeight: 15,
+                description: '天一教最恐怖的作战单位集结，包括巨大的缝合怪与高阶影卫。'
+            },
+
+            // --- 神策军势力组 (基于 enemy3.png) ---
+            'shence_patrol': {
+                name: '神策军巡逻队',
+                overworldIcon: 'shence_infantry', 
+                unitPool: ['shence_infantry', 'shence_crossbowman', 'shence_shieldguard'], 
+                basePoints: 75,        
+                baseWeight: 40,
+                description: '神策军的基础巡逻力量，守卫严密，不容侵犯。'
+            },
+            'shence_vanguard': {
+                name: '神策军先锋营',
+                overworldIcon: 'shence_cavalry', 
+                unitPool: ['shence_cavalry', 'shence_infantry', 'shence_assassin'], 
+                basePoints: 110,        
+                baseWeight: 30,
+                description: '神策军的突击部队，骑兵冲锋配合刺客突袭，极具杀伤力。'
+            },
+            'shence_oversight': {
+                name: '神策督战小队',
+                overworldIcon: 'shence_overseer', 
+                unitPool: ['shence_overseer', 'shence_bannerman', 'shence_shieldguard', 'shence_crossbowman'], 
+                basePoints: 150,        
+                baseWeight: 20,
+                description: '由督军指挥的精英小队，军旗所指，军心震荡。'
+            },
+            'shence_imperial_guards': {
+                name: '神策禁卫禁军',
+                overworldIcon: 'shence_iron_pagoda', 
+                unitPool: ['shence_iron_pagoda', 'shence_overseer', 'shence_cavalry', 'shence_bannerman'], 
+                basePoints: 250,        
+                baseWeight: 10,
+                description: '神策军中最强悍的力量，重型铁甲与指挥官的完美配合。'
+            },
+
+            // --- 红衣教势力组 (基于 enemy5.png) ---
+            'red_cult_zealots': {
+                name: '红衣教狂热者',
+                overworldIcon: 'red_cult_acolyte', 
+                unitPool: ['red_cult_acolyte', 'red_cult_enforcer', 'red_cult_archer'], 
+                basePoints: 60,        
+                baseWeight: 40,
+                description: '红衣教的基础部队，由武者带领狂热信徒组成。'
+            },
+            'red_cult_inquisition': {
+                name: '红衣教审判廷',
+                overworldIcon: 'red_cult_executioner', 
+                unitPool: ['red_cult_executioner', 'red_cult_enforcer', 'red_cult_assassin'], 
+                basePoints: 100,        
+                baseWeight: 30,
+                description: '红衣教的审判力量，红衣武者负责快速突进。'
+            },
+            'red_cult_ritual': {
+                name: '红衣教祭祀仪式',
+                overworldIcon: 'red_cult_high_priestess', 
+                unitPool: ['red_cult_high_priestess', 'red_cult_firemage', 'red_cult_priestess'], 
+                basePoints: 140,        
+                baseWeight: 20,
+                description: '正在进行神秘仪式的红衣教高层，魔法火力极强。'
+            },
+            'red_cult_conflagration': {
+                name: '红衣教焚世军',
+                overworldIcon: 'red_cult_high_priestess', 
+                unitPool: ['red_cult_high_priestess', 'red_cult_firemage', 'red_cult_executioner', 'red_cult_assassin'], 
+                basePoints: 220,        
+                baseWeight: 15,
+                description: '红衣教最狂暴的部队，所到之处皆为焦土。'
             }
         };
     }
@@ -1013,7 +1115,7 @@ class WorldManager {
                         config: { owner: 'none', type: bType }
                     });
                     placed = true;
-                } else if (roll < 0.008) {
+                } else if (roll < 0.018) {
                     // --- 核心优化：使用动态权重系统选择敌人类型 ---
                     const tId = this.getDynamicEnemyType(worldX, worldZ);
                     const template = this.enemyTemplates[tId];
@@ -1035,10 +1137,10 @@ class WorldManager {
                         }
                     });
                     placed = true;
-                } else if (roll < 0.015) {
+                } else if (roll < 0.025) {
                     entities.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.017) {
+                } else if (roll < 0.027) {
                     entities.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
                     placed = true;
                 }
