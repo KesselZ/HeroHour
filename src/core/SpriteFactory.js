@@ -40,6 +40,7 @@ export const ASSET_REGISTRY = {
         // skill2.png 第一行
         'skill_wanjiangui_zong': { name: '五方行尽图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 1 },
         'skill_liuhe':           { name: '六合独尊图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 1, c: 2 },
+        'skill_quanningyue':     { name: '泉凝月图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 1, c: 1 },
         'skill_shengtaiji':      { name: '生太极图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 1, c: 3 },
         'skill_jijieling':       { name: '集结令图标', sheet: 'SKILL3', rows: 4, cols: 4, r: 2, c: 1 }, 
         'skill_tunriyue':        { name: '吞日月图标', sheet: 'SKILL2', rows: 4, cols: 4, r: 3, c: 4 },
@@ -50,6 +51,7 @@ export const ASSET_REGISTRY = {
         'skill_hegui':           { name: '鹤归孤山图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 2, c: 2 },
         'skill_fengcha':         { name: '峰插云景图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 1, c: 3 },
         'skill_songshe':         { name: '松舍问霞图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 2, c: 3 },
+        'skill_yingmingliu':     { name: '莺鸣柳图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 3, c: 3 },
         'skill_mengquan':        { name: '梦泉虎跑图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 4, c: 4 },
         'skill_pinghu':          { name: '平湖断月图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 1, c: 1 },
 
@@ -145,7 +147,10 @@ export const ASSET_REGISTRY = {
         'talent_tiance_bleeding': { name: '龙牙图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 4 },
 
         // 藏剑专属
-        'talent_cangjian_fengming': { name: '凤鸣图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 3, c: 1 }, // 借用技能图标
+        'talent_cangjian_fengming': { name: '凤鸣图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 3, c: 1 }, 
+        'talent_cangjian_shield':   { name: '映波锁澜图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 1, c: 1 }, // 借用泉凝月图标
+        'talent_cangjian_burst':    { name: '莺鸣柳浪图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 4, c: 3 }, 
+        'talent_cangjian_jump':     { name: '层云图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 4, c: 2 }, 
         
         // --- 核心节点占位符 (如果需要) ---
         'talent_core': { name: '核心', sheet: 'TALENT4', rows: 4, cols: 4, r: 4, c: 4 },

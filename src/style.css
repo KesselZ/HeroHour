@@ -2078,6 +2078,11 @@ img {
     text-shadow: 0 0 5px rgba(255, 204, 0, 0.3);
 }
 
+/* 技能术语高亮 - 仅颜色变化，不改变字体粗细 */
+.skill-term-highlight {
+    color: #66ccff; /* 淡蓝色 */
+}
+
 /* 结算界面特有样式 */
 .settlement-content {
     margin: 20px 0;

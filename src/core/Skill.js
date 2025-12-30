@@ -104,46 +104,54 @@ export class Skill {
 
                 // 3. 控制时长
                 if (action.type === 'status_aoe' && action.duration) {
-                    const dur = (action.duration / 1000).toFixed(1);
-                    desc = desc.split('{stunDuration}').join(normal(dur));
+                    const isDynamic = action.applySkillPowerToDuration === true;
+                    const dur = (isDynamic ? (action.duration * skillPower) : action.duration) / 1000;
+                    desc = desc.split('{stunDuration}').join(isDynamic ? hl(dur.toFixed(1)) : normal(dur.toFixed(1)));
                 }
 
-                // 4. Buff 加成 (支持普通 Buff 和 Tick Buff)
-                const buffAction = (action.type === 'buff_aoe') ? action : (action.onTickBuff ? { params: action.onTickBuff, ...action } : null);
-                
-                if (buffAction && buffAction.params) {
-                    const p = buffAction.params;
-                    const isMultDynamic = buffAction.applySkillPowerToMultiplier !== false;
-                    
-                    if (p.multiplier) {
-                        const multipliers = Array.isArray(p.multiplier) ? p.multiplier : [p.multiplier];
-                        const stats = Array.isArray(p.stat) ? p.stat : [p.stat];
+                // 4. Buff 与 护盾 加成处理
+                let bonusVal = null;
+                let isMultDynamic = false;
 
-                        multipliers.forEach((m, idx) => {
-                            const statName = stats[idx] || stats[0];
-                            const currentPower = isMultDynamic ? skillPower : 1.0;
-                            
-                            let bonusPct;
-                            if (statName === 'damageReduction') {
-                                // 减伤逻辑：offset 0.65 代表 65%
-                                const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
-                                const off = offsets[idx] !== undefined ? offsets[idx] : (offsets[0] || 0);
-                                bonusPct = Math.round(off * currentPower * 100);
-                            } else {
-                                bonusPct = Math.abs(Math.round((m - 1.0) * currentPower * 100));
-                            }
-                            
-                            const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
-                            desc = desc.split(placeholder).join(isMultDynamic ? hl(bonusPct) : normal(bonusPct));
-                        });
+                if (action.type === 'buff_aoe' || (action.onTickBuff)) {
+                    const buffAction = (action.type === 'buff_aoe') ? action : { params: action.onTickBuff, ...action };
+                    if (buffAction.params) {
+                        const p = buffAction.params;
+                        isMultDynamic = buffAction.applySkillPowerToMultiplier !== false;
+                        
+                        if (p.multiplier) {
+                            const multipliers = Array.isArray(p.multiplier) ? p.multiplier : [p.multiplier];
+                            const stats = Array.isArray(p.stat) ? p.stat : [p.stat];
+
+                            multipliers.forEach((m, idx) => {
+                                const statName = stats[idx] || stats[0];
+                                const currentPower = isMultDynamic ? skillPower : 1.0;
+                                
+                                let bonusPct;
+                                if (statName === 'damageReduction') {
+                                    const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
+                                    const off = offsets[idx] !== undefined ? offsets[idx] : (offsets[0] || 0);
+                                    bonusPct = Math.round(off * currentPower * 100);
+                                } else {
+                                    bonusPct = Math.abs(Math.round((m - 1.0) * currentPower * 100));
+                                }
+                                
+                                const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
+                                desc = desc.split(placeholder).join(isMultDynamic ? hl(bonusPct) : normal(bonusPct));
+                            });
+                        }
                     }
-                    if (p.offset) {
-                        const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
-                        offsets.forEach((o, idx) => {
-                            const finalVal = Math.abs(o) < 1 ? Math.round(o * skillPower * 100) : Math.round(o * skillPower);
-                            const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
-                            desc = desc.split(placeholder).join(hl(finalVal));
-                        });
+                } else if (action.type === 'shield') {
+                    // 护盾数值处理
+                    isMultDynamic = action.applySkillPowerToMultiplier !== false; // 护盾默认也随功法提升
+                    const currentPower = isMultDynamic ? skillPower : 1.0;
+                    
+                    if (action.percent) {
+                        const val = Math.round(action.percent * 100 * currentPower);
+                        desc = desc.split('{bonus}').join(isMultDynamic ? hl(val) : normal(val));
+                    } else if (action.value) {
+                        const val = Math.floor(action.value * currentPower);
+                        desc = desc.split('{damage}').join(isMultDynamic ? hl(val) : normal(val));
                     }
                 }
 
@@ -198,6 +206,8 @@ export class Skill {
                 caster.cangjianStance = 'heavy'; // 自动切换为重剑形态
             } else if (this.category === '问水决') {
                 caster.cangjianStance = 'light'; // 自动切换为轻剑形态
+            } else if (this.category === '西子情') {
+                // 西子情系列技能不会导致形态切换
             }
         }
 
@@ -207,6 +217,11 @@ export class Skill {
             const center = targetPos || caster.position;
             this._executeAction(action, battleScene, caster, center, skillPower);
         });
+
+        // 播放动作级震屏
+        if (this.actions.some(a => a.shake)) {
+            battleScene.cameraShake?.(0.15, 200);
+        }
 
         // --- 核心：处理“行云流水”天赋效果 ---
         const isComboChainEnabled = modifierManager.getModifiedValue(caster, 'combo_chain_enabled', 0) > 0;
@@ -365,6 +380,22 @@ export class Skill {
                         action.landActions.forEach(la => {
                             this._executeAction(la, battleScene, caster, caster.position.clone(), skillPower);
                         });
+
+                        // --- 核心：藏剑【层云】奇穴落地特效 ---
+                        if ((this.id === 'hegui' || this.id === 'songshe') && caster.isHero) {
+                            const isJumpWhirlwindEnabled = modifierManager.getModifiedValue(caster, 'cangjian_jump_whirlwind_enabled', 0) > 0;
+                            if (isJumpWhirlwindEnabled) {
+                                setTimeout(() => {
+                                    if (caster.isDead) return;
+                                    const landPos = caster.position.clone();
+                                    // 播放重剑普通攻击的旋风斩特效，颜色设为明显的橙色，半径增大至与风来吴山一致 (5.0)
+                                    battleScene.playVFX('cangjian_whirlwind', { pos: landPos, radius: 5.0, color: 0xff8800, duration: 250 });
+                                    // 造成基础 35 的范围伤害 (受功法加成)
+                                    const jumpTargets = battleScene.getUnitsInArea(landPos, { shape: 'circle', radius: 5.0 }, 'enemy');
+                                    battleScene.applyDamageToUnits(jumpTargets, 35 * skillPower, landPos, 0.035, true);
+                                }, 500); // 延迟 0.5 秒
+                            }
+                        }
                     };
                 }
                 battleScene.executeMovement(caster, action.moveType, center, moveOptions);
@@ -386,6 +417,27 @@ export class Skill {
                         color: action.color,
                         isHeroSource: caster.isHero
                     });
+                });
+                break;
+
+            case 'shield':
+                // 护盾动作：给指定目标（默认为 caster）添加护盾
+                const shieldTargetSide = action.side || 'caster';
+                const shieldTargets = (shieldTargetSide === 'caster') ? [caster] : battleScene.getUnitsInArea(center, action.targeting || this.targeting, shieldTargetSide);
+                
+                shieldTargets.forEach(target => {
+                    if (target.isDead || !target.addShield) return;
+                    
+                    // 动态计算护盾量：支持百分比最大生命值或固定数值
+                    let shieldAmount = 0;
+                    if (action.percent) {
+                        shieldAmount = target.maxHealth * action.percent * skillPower;
+                    } else if (action.value) {
+                        shieldAmount = action.value * skillPower;
+                    }
+                    
+                    const shieldDuration = action.applySkillPowerToDuration ? (action.duration * skillPower) : action.duration;
+                    target.addShield(shieldAmount, shieldDuration, action.id || this.id);
                 });
                 break;
 

@@ -70,6 +70,10 @@ export class BaseUnit extends THREE.Group {
 
         this._martyrdomTriggered = false; // 哀兵必胜触发标记
 
+        // --- 护盾系统初始化 ---
+        this.shield = 0;
+        this.activeShields = []; // [{ id, amount, endTime }]
+
         // 攻击动画状态机 (平滑冲刺)
         this.lungeState = {
             active: false,
@@ -135,31 +139,49 @@ export class BaseUnit extends THREE.Group {
 
     updateHealthBar() {
         if (!this.hpCtx || !this.hpCanvas) return;
-        const pct = Math.max(0, this.health / this.maxHealth);
+        
+        // 核心逻辑：总显示量 = Max(最大生命值, 当前生命值 + 护盾值)
+        const totalValue = Math.max(this.maxHealth, this.health + this.shield);
+        
+        // 计算各项占比 (基于 totalValue)
+        const hpPct = Math.max(0, this.health / totalValue);
+        const shieldPct = Math.max(0, this.shield / totalValue);
         
         const ctx = this.hpCtx;
         const w = this.hpCanvas.width;
         const h = this.hpCanvas.height;
-        
         const isPlayer = this.side === 'player';
         
         // 1. 完全清空
         ctx.clearRect(0, 0, w, h);
         
-        // 2. 绘制黑色像素边框 (铺满整个 Canvas 作为底)
+        // 2. 绘制黑色背景
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, w, h);
         
-        // 3. 绘制内槽背景 (收缩 1px，显著提升敌方底色亮度)
+        // 3. 绘制内槽底色
         ctx.fillStyle = isPlayer ? 'rgba(0, 40, 0, 0.9)' : 'rgba(100, 20, 20, 0.9)';
         ctx.fillRect(1, 1, w - 2, h - 2);
         
-        // 4. 绘制填充内容 (使用更鲜艳、亮眼的红/绿)
-        ctx.fillStyle = isPlayer ? '#44ff44' : '#ff4444';
         const maxFillW = w - 2;
-        const fillW = Math.floor(maxFillW * pct);
-        if (fillW > 0) {
-            ctx.fillRect(1, 1, fillW, h - 2);
+        
+        // 4. 绘制血量部分
+        ctx.fillStyle = isPlayer ? '#44ff44' : '#ff4444';
+        const hpW = Math.floor(maxFillW * hpPct);
+        if (hpW > 0) {
+            ctx.fillRect(1, 1, hpW, h - 2);
+        }
+
+        // 5. 绘制护盾部分 (白色，紧跟在当前血量后面)
+        if (shieldPct > 0) {
+            ctx.fillStyle = '#ffffff';
+            const shieldStartX = 1 + hpW;
+            const shieldW = Math.ceil(maxFillW * shieldPct); // 使用 ceil 确保哪怕很小的盾也能看到 1 像素
+            if (shieldW > 0) {
+                // 护盾宽度不会超出整个槽
+                const finalShieldW = Math.min(shieldW, w - 1 - shieldStartX);
+                ctx.fillRect(shieldStartX, 1, finalShieldW, h - 2);
+            }
         }
         
         if (this.hpSprite) {
@@ -462,6 +484,9 @@ export class BaseUnit extends THREE.Group {
 
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
+
+        // 0. 更新护盾过期
+        this.updateShields();
 
         // 0. 统一视觉状态更新
         this.updateVisualState();
@@ -799,10 +824,27 @@ export class BaseUnit extends THREE.Group {
     takeDamage(amount, isHeroSource = false) {
         if (this.isDead || this.isInvincible) return;
         
-        // 核心修正：如果是治疗 (amount < 0)，跳过减伤计算
+        // 核心修正：如果是治疗 (amount < 0)，跳过减伤和护盾计算
         let finalAmount = amount;
         if (amount > 0) {
             finalAmount = amount * this.damageMultiplier;
+            
+            // --- 护盾优先吸收伤害 ---
+            if (this.shield > 0) {
+                const absorbed = this._consumeShields(finalAmount);
+                if (absorbed > 0) {
+                    // 护盾跳字反馈：亮白色
+                    if (window.battle && window.battle.playVFX) {
+                        window.battle.playVFX('damage_number', { 
+                            pos: this.position.clone(), 
+                            value: absorbed, 
+                            color: '#ffffff',
+                            scale: 0.8
+                        });
+                    }
+                    finalAmount -= absorbed;
+                }
+            }
         }
         
         if (finalAmount > 0) {
@@ -816,13 +858,12 @@ export class BaseUnit extends THREE.Group {
             });
             this.hitFlashUntil = Date.now() + 150;
 
-            // --- 新增：跳字特效 ---
-            // 暂时只对主角或技能造成的伤害生效，增加战斗透明度
-            if (isHeroSource && window.battle && window.battle.playVFX) {
+            // --- 剩余伤害跳字 ---
+            if (window.battle && window.battle.playVFX) {
                 window.battle.playVFX('damage_number', { 
                     pos: this.position.clone(), 
                     value: finalAmount, 
-                    color: '#ff3333',
+                    color: isHeroSource ? '#ff3333' : '#ffaa00',
                     scale: 1.0
                 });
             }
@@ -870,6 +911,9 @@ export class BaseUnit extends THREE.Group {
                     targetUnit: this,
                     source: 'talent',
                     onCleanup: () => {
+                        // 哀兵结束时，如果是被英雄打进这个状态的，依然算英雄击杀吗？
+                        // 通常这种锁血状态结束后的自然死亡较难判定来源，这里简化处理：
+                        // 如果在死亡瞬间判定
                         this.die(); // 2 秒后强行死亡
                     }
                 });
@@ -878,12 +922,28 @@ export class BaseUnit extends THREE.Group {
                     window.battle.playVFX('vfx_sparkle', { unit: this, color: 0xff4444, duration: 2000, radius: 1.0 });
                 }
             } else {
+                // --- 核心：触发英雄击杀相关天赋 ---
+                if (isHeroSource && !this.isDead && window.battle && window.battle.heroUnit) {
+                    this._triggerHeroKillTalents(window.battle.heroUnit);
+                }
                 this.die();
             }
         }
 
         // 核心更新：任何受损都会更新血条
         this.updateHealthBar();
+    }
+
+    _triggerHeroKillTalents(hero) {
+        // 1. 藏剑专属：映波锁澜 (重剑杀敌获盾)
+        if (hero.type === 'yeying' && hero.cangjianStance === 'heavy') {
+            const shieldRatio = modifierManager.getModifiedValue(hero, 'cangjian_kill_shield_enabled', 0);
+            if (shieldRatio > 0) {
+                const shieldAmount = hero.maxHealth * shieldRatio;
+                // 添加 2 秒护盾，ID 设为 kill_shield 以便刷新
+                hero.addShield(shieldAmount, 2000, 'cangjian_kill_shield');
+            }
+        }
     }
 
     die() {
@@ -913,6 +973,103 @@ export class BaseUnit extends THREE.Group {
                 this.removeFromParent();
             }
         }, 50); // 每 50ms 检测一次，约 0.5 秒内彻底消失
+    }
+
+    /**
+     * 添加护盾
+     * @param {number} amount 护盾值
+     * @param {number} duration 持续时间 (ms)，0 为永久
+     * @param {string} id 唯一标识符
+     */
+    addShield(amount, duration = 0, id = null) {
+        if (this.isDead) return;
+        
+        const shieldId = id || `shield_${Date.now()}_${Math.random()}`;
+        const endTime = duration > 0 ? Date.now() + duration : Infinity;
+        
+        // 如果存在同 ID 护盾，则更新它
+        const existing = this.activeShields.find(s => s.id === shieldId);
+        if (existing) {
+            existing.amount = amount;
+            existing.endTime = endTime;
+        } else {
+            this.activeShields.push({ id: shieldId, amount, endTime });
+        }
+        
+        this.refreshShieldValue();
+        
+        // 护盾视觉反馈
+        if (window.battle && window.battle.playVFX) {
+            window.battle.playVFX('vfx_sparkle', { unit: this, color: 0xffffff, duration: 500, radius: 0.8 });
+        }
+    }
+
+    /**
+     * 移除特定护盾
+     */
+    removeShield(id) {
+        this.activeShields = this.activeShields.filter(s => s.id !== id);
+        this.refreshShieldValue();
+    }
+
+    /**
+     * 刷新当前护盾总值
+     */
+    refreshShieldValue() {
+        const oldShield = this.shield;
+        this.shield = this.activeShields.reduce((sum, s) => sum + s.amount, 0);
+        if (this.shield !== oldShield) {
+            this.updateHealthBar();
+        }
+    }
+
+    /**
+     * 每帧更新护盾过期
+     */
+    updateShields() {
+        if (this.activeShields.length === 0) return;
+        
+        const now = Date.now();
+        const originalCount = this.activeShields.length;
+        this.activeShields = this.activeShields.filter(s => s.endTime > now);
+        
+        if (this.activeShields.length !== originalCount) {
+            this.refreshShieldValue();
+        }
+    }
+
+    /**
+     * 内部方法：按照过期时间顺序消耗护盾 (优先消耗快过期的)
+     * @returns {number} 实际吸收的伤害量
+     */
+    _consumeShields(amount) {
+        if (this.activeShields.length === 0) return 0;
+        
+        // 按照过期时间排序，快过期的排在前面 (Infinity 会排在最后)
+        this.activeShields.sort((a, b) => a.endTime - b.endTime);
+        
+        let remainingDamage = amount;
+        let totalAbsorbed = 0;
+        
+        for (let i = 0; i < this.activeShields.length; i++) {
+            const s = this.activeShields[i];
+            if (s.amount >= remainingDamage) {
+                s.amount -= remainingDamage;
+                totalAbsorbed += remainingDamage;
+                remainingDamage = 0;
+                break;
+            } else {
+                totalAbsorbed += s.amount;
+                remainingDamage -= s.amount;
+                s.amount = 0;
+            }
+        }
+        
+        // 清理掉已经扣成 0 的护盾
+        this.activeShields = this.activeShields.filter(s => s.amount > 0);
+        this.refreshShieldValue();
+        
+        return totalAbsorbed;
     }
 }
 
@@ -1027,7 +1184,7 @@ export class HeroUnit extends BaseUnit {
             this.executeAOE(enemies, {
                 radius: 2.5,
                 damage: this.attackDamage, 
-                knockbackForce: 0.05
+                knockbackForce: 0.035
             });
         }
     }
@@ -1191,7 +1348,8 @@ export class HeroUnit extends BaseUnit {
             if (this.cangjianStance === 'heavy') {
                 // 重剑模式：心剑旋风 (禁用冲刺位移)
                 const cfg = m.yeying_heavy;
-                const burst = cfg.burstCount || 1;
+                const bonusBurst = modifierManager.getModifiedValue(this, 'yeying_heavy_burst_bonus', 0);
+                const burst = (cfg.burstCount || 1) + bonusBurst;
                 for (let i = 0; i < burst; i++) {
                     setTimeout(() => {
                         if (this.isDead) return;
@@ -1202,7 +1360,7 @@ export class HeroUnit extends BaseUnit {
                         this.executeAOE(enemies, {
                             radius: this.attackRange,
                             damage: this.attackDamage * (cfg.atk / baseAtk),
-                            knockbackForce: 0.05
+                            knockbackForce: 0.035
                         });
                     }, i * 250);
                 }
@@ -1684,7 +1842,7 @@ export class Cangjian extends BaseUnit {
                         radius: this.attackRange,
                         angle: Math.PI * 2,
                         damage: this.attackDamage,
-                        knockbackForce: 0.05
+                        knockbackForce: 0.035
                     });
                 }, i * 250); // 间隔拉长
             }

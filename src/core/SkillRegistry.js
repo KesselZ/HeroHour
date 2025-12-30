@@ -519,6 +519,57 @@ export const SkillRegistry = {
             { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 200, radius: 2.5, angle: Math.PI / 2 } },
             { type: 'damage_aoe', value: 45, knockback: 0 }
         ]
+    }),
+    'quanningyue': new Skill('quanningyue', {
+        name: '泉凝月',
+        level: '初级',
+        category: '西子情',
+        icon: 'skill_quanningyue',
+        cost: 35,
+        cooldown: 8000,
+        audio: 'skill_field',
+        targeting: { type: 'instant' },
+        description: '【西子情】运转藏剑高深内功，使自身获得一层相当于最大生命值 {bonus}% 的护盾，持续 {duration} 秒。',
+        actions: [
+            {
+                type: 'shield',
+                side: 'caster',
+                percent: 0.3,
+                duration: 3000,
+                applySkillPowerToDuration: false,
+                applySkillPowerToMultiplier: true // 只有数值受功法影响，会被 getDescription 标黄
+            },
+            {
+                type: 'vfx',
+                name: 'vfx_sparkle',
+                params: { color: 0xffffff, radius: 1.2, duration: 500 }
+            }
+        ]
+    }),
+    'yingmingliu': new Skill('yingmingliu', {
+        name: '莺鸣柳',
+        level: '高级',
+        category: '西子情',
+        icon: 'skill_yingmingliu',
+        cost: 60,
+        cooldown: 20000,
+        audio: 'skill_field',
+        targeting: { type: 'instant' },
+        description: '【西子情】莺鸣柳浪，剑气如虹。使自身造成的伤害提升 {bonus}%（包括普通攻击与招式），持续 {duration} 秒。',
+        actions: [
+            {
+                type: 'buff_aoe',
+                side: 'caster',
+                applySkillPowerToMultiplier: true, // 伤害提升量随功法变化
+                params: {
+                    stat: ['attackDamage', 'skill_power'],
+                    multiplier: [1.5, 1.5],
+                    duration: 3000,
+                    vfxName: 'vfx_sparkle',
+                    color: 0xffff00
+                }
+            }
+        ]
     })
 };
 
@@ -528,6 +579,6 @@ export const SkillRegistry = {
 export const SectSkills = {
     'chunyang': ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing'],
     'tiance': ['battle_shout', 'summon_militia', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'],
-    'cangjian': ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'fenglaiwushan']
+    'cangjian': ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'quanningyue', 'yingmingliu', 'fenglaiwushan']
 };
 
