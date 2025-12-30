@@ -877,11 +877,11 @@ class WorldManager {
         });
 
         // --- 2. 放置主城逻辑 ---
-        if (generator.pois && generator.pois.length >= 3) {
+        if (generator.pois && generator.pois.length > 0) {
             // 核心优化：不再随机选取，而是计算间距最大的 POI 分布
             // 势力总数 = 玩家(1) + AI(aiHeroes.length)
             const factionCount = 1 + aiHeroes.length;
-            const spreadPois = this._selectSpreadPOIs(generator.pois, factionCount);
+            const spreadPois = this._selectSpreadPOIs(generator.pois, Math.min(factionCount, generator.pois.length));
 
             // 分配玩家出生点 (从 spreadPois 中取第一个)
             const playerPoi = spreadPois[0];
@@ -908,7 +908,9 @@ class WorldManager {
                 const factionId = `ai_faction_${index + 1}`;
                 const cityId = `ai_city_${index + 1}`;
                 
-                const aiPoi = spreadPois[index + 1];
+                // 如果 POI 不够分，则循环利用或采取其他策略，确保不报错
+                const poiIndex = (index + 1) < spreadPois.length ? (index + 1) : (index % spreadPois.length);
+                const aiPoi = spreadPois[poiIndex];
                 const ax = aiPoi.x - halfSize;
                 const az = aiPoi.z - halfSize;
                 
@@ -923,6 +925,30 @@ class WorldManager {
                     z: az 
                 });
             });
+        } else {
+            // 兜底逻辑：如果地图上一个 POI 都没找到（理论上不应该），随机找一个草地
+            console.warn("[WorldManager] 未能找到任何 POI 候选点，启动兜底随机出生逻辑");
+            let found = false;
+            for (let retry = 0; retry < 100; retry++) {
+                const rx = Math.floor(Math.random() * size);
+                const rz = Math.floor(Math.random() * size);
+                if (generator.grid[rz][rx] === 'grass') {
+                    const px = rx - halfSize;
+                    const pz = rz - halfSize;
+                    this.mapState.playerPos = { x: px, z: pz };
+                    
+                    const pCity = this.cities['main_city_1'];
+                    pCity.x = px;
+                    pCity.z = pz;
+                    entities.push({ id: 'main_city_1', type: 'city', x: px, z: pz });
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // 极端兜底：强制中心点
+                this.mapState.playerPos = { x: 0, z: 0 };
+            }
         }
 
         // --- 3. 随机实体生成 ---
@@ -1367,42 +1393,62 @@ class WorldManager {
      * @param {Object} buildingItem 交互项
      */
     /**
-     * 在可选 POI 中选择 n 个彼此间距最大的点
-     * 解决“势力过于拥挤”的问题 (Max-Min 算法)
+     * 重构后的势力分配逻辑：
+     * 1. 在全图范围内寻找 count 个彼此距离最远的点
+     * 2. 这里的 allPois 已经是按平原质量（半径）降序排列的，我们加入随机种子点和全局洗牌
      */
     _selectSpreadPOIs(allPois, count) {
-        if (allPois.length <= count) return allPois;
+        if (allPois.length <= count) {
+            // 如果点数不够，先拷贝一份再洗牌返回
+            const shuffled = [...allPois];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
 
         const selected = [];
-        // 1. 随机选第一个点作为起点
-        const firstIdx = Math.floor(Math.random() * allPois.length);
-        selected.push(allPois[firstIdx]);
+        
+        // 1. 锚点随机化：从前 40% 的优质 POI 中随机选一个作为起始“种子”
+        // 这样既保证了地盘质量，又保证了位置的随机性
+        const seedIdx = Math.floor(Math.random() * Math.min(allPois.length, Math.ceil(allPois.length * 0.4)));
+        selected.push(allPois[seedIdx]);
 
-        // 2. 迭代选择剩余的点
+        // 2. 使用 Max-Min 算法迭代寻找剩余的点
+        // 确保后续每一个加入的点，都离当前已选点集最远 (全局互斥)
         while (selected.length < count) {
-            let bestPoi = null;
+            let bestCandidate = null;
             let maxMinDist = -1;
 
             for (let i = 0; i < allPois.length; i++) {
                 const poi = allPois[i];
                 if (selected.includes(poi)) continue;
 
-                // 计算该候选点到已选点集的最小距离
+                // 计算该候选点到已选集合中所有点的最小距离
                 let minDist = Infinity;
                 for (const s of selected) {
                     const d = Math.sqrt(Math.pow(poi.x - s.x, 2) + Math.pow(poi.z - s.z, 2));
                     if (d < minDist) minDist = d;
                 }
 
-                // 核心：寻找一个让“到已选集合最小距离”最大的点
+                // 寻找那个让“最小距离”最大的点
                 if (minDist > maxMinDist) {
                     maxMinDist = minDist;
-                    bestPoi = poi;
+                    bestCandidate = poi;
                 }
             }
 
-            if (bestPoi) selected.push(bestPoi);
+            if (bestCandidate) selected.push(bestCandidate);
             else break;
+        }
+
+        // 3. 核心变动：全局随机洗牌！
+        // 虽然选出的 count 个点彼此最远，但顺序原本是有规律的。
+        // 通过洗牌，让“谁拿第一个点”完全随机，实现主角与 AI 的地位平等。
+        for (let i = selected.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [selected[i], selected[j]] = [selected[j], selected[i]];
         }
 
         return selected;

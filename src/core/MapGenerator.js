@@ -146,55 +146,63 @@ export class MapGenerator {
     }
 
     /**
-     * 寻找适合作为聚落（POI）的平原中心点
-     * 优化后的逻辑：探测每个点能支持的最大半径，优先选择最大的平原（自适应探测）
+     * 重构后的 POI 寻找逻辑：寻找真正的平原重心 (Local Maxima + NMS)
      */
-    findPOICandidates(count = 10) {
+    findPOICandidates(count = 15) {
         const candidates = [];
-        const step = 6; 
-        const maxRadius = 25; // 最大探测上限
-        const border = 50; // 避开边缘山脉屏障
+        const step = 4; // 缩小步长，提高精度
+        const border = 55; // 稍微收缩边界范围
 
-        for (let z = border + 10; z < this.size - border - 10; z += step) {
-            for (let x = border + 10; x < this.size - border - 10; x += step) {
+        // 第一步：密集采样，计算每个点的“深度”（即到最近障碍的距离）
+        for (let z = border; z < this.size - border; z += step) {
+            for (let x = border; x < this.size - border; x += step) {
                 if (this.grid[z][x] !== TILE_TYPES.GRASS) continue;
 
-                let bestR = 0;
-                for (let r = 8; r <= maxRadius; r += 2) {
-                    let isSafe = true;
-                    const samples = Math.floor(r * 1.5);
+                // 计算该点能支持的真实最大半径 (不封顶，直到碰到非草地)
+                let r = 2;
+                let isSafe = true;
+                while (isSafe && r < 120) { 
+                    const samples = Math.max(8, Math.floor(r * 1.5));
                     for (let i = 0; i < samples; i++) {
                         const angle = (i / samples) * Math.PI * 2;
-                        const nx = Math.floor(x + Math.cos(angle) * r);
-                        const nz = Math.floor(z + Math.sin(angle) * r);
-                        
+                        const nx = Math.round(x + Math.cos(angle) * r);
+                        const nz = Math.round(z + Math.sin(angle) * r);
                         if (nx < 0 || nx >= this.size || nz < 0 || nz >= this.size || 
                             this.grid[nz][nx] !== TILE_TYPES.GRASS) {
                             isSafe = false;
                             break;
                         }
                     }
-                    if (isSafe) bestR = r;
+                    if (isSafe) r += 2;
                     else break;
                 }
 
-                if (bestR >= 8) {
-                    candidates.push({ 
-                        x, z, 
-                        radius: bestR, 
-                        score: bestR // 移除冗余的 Math.pow 和 Math.random
-                    });
+                if (r >= 8) {
+                    candidates.push({ x, z, radius: r, score: r });
                 }
             }
         }
 
-        // 确定性排序：优先选最大的平原
-        candidates.sort((a, b) => b.score - a.score);
+        // 第二步：非极大值抑制 (NMS) - 确保选中的点是其局部范围内“最中心”的
+        // 只有当一个点的半径大于等于它周围一定范围内所有点的半径时，它才保留
+        const localPeaks = candidates.filter(cand => {
+            return !candidates.some(other => {
+                if (cand === other) return false;
+                const dist = Math.sqrt(Math.pow(cand.x - other.x, 2) + Math.pow(cand.z - other.z, 2));
+                // 抑制半径设为 12，如果 12 米内有比我分数更高（更中心）的点，我就被剔除
+                // 如果分数一样，则保留先扫描到的，防止大平原中心点全军覆没
+                return dist < 12 && (other.score > cand.score);
+            });
+        });
 
+        // 第三步：按半径（即中心化程度）从大到小排序
+        localPeaks.sort((a, b) => b.score - a.score);
+
+        // 第四步：最终筛选，确保 POI 之间有足够的战略间距
         const finalPois = [];
-        for (const cand of candidates) {
-            // 动态间距：越大的聚落需要越大的排他空间
-            const minDist = 45 + cand.radius; 
+        for (const cand of localPeaks) {
+            // 基础间距，防止聚落挤在一起
+            const minDist = 40; 
             if (!finalPois.some(p => Math.sqrt(Math.pow(p.x - cand.x, 2) + Math.pow(p.z - cand.z, 2)) < minDist)) {
                 finalPois.push(cand);
                 if (finalPois.length >= count) break;

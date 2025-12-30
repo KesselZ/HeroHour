@@ -1202,8 +1202,8 @@ export class WorldScene {
      * 初始化小地图系统
      */
     initMinimap() {
-        // --- 开发开关：一键开启/关闭迷雾 ---
-        this.enableFog = true; 
+        // --- 开发调试：临时解除迷雾 ---
+        this.enableFog = false; 
 
         let container = document.querySelector('.minimap-container');
         if (!container) {
@@ -1325,6 +1325,33 @@ export class WorldScene {
                 y: (wz + halfSize) - margin
             };
         };
+
+        // --- 4.5 调试专用：绘制所有 ROI (POIs) ---
+        if (mapGenerator.pois) {
+            mapGenerator.pois.forEach((poi, index) => {
+                // 将 grid 坐标转换为小地图相对坐标
+                const px = poi.x - margin;
+                const py = poi.z - margin;
+
+                if (px >= 0 && px <= displaySize && py >= 0 && py <= displaySize) {
+                    // 绘制探测半径圆圈
+                    ctx.beginPath();
+                    ctx.arc(px, py, poi.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)'; // 青色透明圆圈
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // 绘制中心点
+                    ctx.fillStyle = 'cyan';
+                    ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+
+                    // 绘制索引号 (可选)
+                    ctx.font = '8px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(index.toString(), px + 4, py + 4);
+                }
+            });
+        }
 
         // 5. 绘制重要建筑 (如果关闭迷雾，则始终显示)
         this.interactables.forEach(item => {
