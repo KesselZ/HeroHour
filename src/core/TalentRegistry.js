@@ -363,7 +363,7 @@ export function getHeroTalentTree(heroId) {
         
         // --- 大天赋节点 ---
         const majorId = `node_major_${groupIdx}`;
-        const majorDist = 180;
+        const majorDist = 240; // 进一步增加，让整体布局更松弛
         const processedMajor = processUnit(TALENT_UNITS[group.major]);
 
         nodes[majorId] = {
@@ -381,20 +381,45 @@ export function getHeroTalentTree(heroId) {
         links.push({ source: coreId, target: majorId });
 
         // --- 小天赋节点 ---
-        // 核心优化：动态计算扇形宽度。
-        // 分支越多，每个分支允许展开的角度就越窄，防止重叠。
-        // 留出 20% 的安全空隙
-        const maxAvailableAngle = (Math.PI * 2 / groupCount) * 0.8;
-        const subAngleWidth = Math.min(Math.PI / 2, maxAvailableAngle); 
+        // 优化：根据子节点数量动态调整扇区，并增加基础宽度
+        const nodeCount = group.minors.length;
+        // 允许扇区占用的最大比例，根据组数动态调整
+        const safetyFactor = 0.85; 
+        const maxSectorAngle = (Math.PI * 2 / groupCount) * safetyFactor;
+        
+        // 基础展开角度：每个节点预留约 15 度的呼吸空间
+        const preferredAngleWidth = (nodeCount - 1) * (Math.PI / 12); 
+        const subAngleWidth = Math.min(preferredAngleWidth, maxSectorAngle);
 
         group.minors.forEach((minorUnitId, minorIdx) => {
             const minorId = `node_minor_${groupIdx}_${minorIdx}`;
-            // 在大天赋节点周围扇形展开
-            const minorAngle = (group.minors.length <= 1) 
-                ? groupAngle 
-                : groupAngle - subAngleWidth/2 + (minorIdx / (group.minors.length - 1)) * subAngleWidth;
             
-            const minorDist = 320; 
+            // --- 升级：全局相位交错布局 (Global Interleaved Layout) ---
+            
+            // 1. 计算角度
+            let minorAngle = groupAngle;
+            if (nodeCount > 1) {
+                const startAngle = groupAngle - subAngleWidth / 2;
+                const angleStep = subAngleWidth / (nodeCount - 1);
+                minorAngle = startAngle + minorIdx * angleStep;
+            }
+            
+            // 2. 核心算法：半径相位对冲 (Radius Phase Shifting)
+            // 相邻组(groupIdx)使用不同的基准半径偏移，确保边缘节点不在同一圆周
+            const groupOffset = (groupIdx % 2) * 50; 
+            const baseMinorDist = 420 + groupOffset;
+            
+            // 3. 错层分布
+            const layers = 3; 
+            const staggerStep = 95; 
+            const layerIdx = minorIdx % layers;
+            
+            // 4. 边缘推力：越靠近组边缘的节点，半径额外增加，形成自然的张力感
+            const edgePush = (nodeCount > 1) 
+                ? Math.abs(minorIdx - (nodeCount-1)/2) * 25 
+                : 0;
+
+            const minorDist = baseMinorDist + (layerIdx * staggerStep) + edgePush; 
 
             const isBaseStat = ['unit_power_base', 'unit_spells_base', 'unit_leadership_base', 'unit_army_hp', 'unit_haste_base', 'unit_mp_base'].includes(minorUnitId);
             const processedMinor = processUnit(TALENT_UNITS[minorUnitId]);

@@ -345,25 +345,36 @@ class UIManager {
             const target = nodes[link.target];
             if (!source || !target) return;
 
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            const x1 = source.pos.x + 400;
-            const y1 = source.pos.y + 300;
-            const x2 = target.pos.x + 400;
-            const y2 = target.pos.y + 300;
+            // 升级：使用 SVG Path 绘制带有张力的贝塞尔曲线 (Quadratic Bezier)
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const offsetX = 700; // 适配新的 1400 宽度容器
+            const offsetY = 700; // 适配新的 1400 高度容器
+            
+            const x1 = source.pos.x + offsetX;
+            const y1 = source.pos.y + offsetY;
+            const x2 = target.pos.x + offsetX;
+            const y2 = target.pos.y + offsetY;
 
-            line.setAttribute('x1', x1);
-            line.setAttribute('y1', y1);
-            line.setAttribute('x2', x2);
-            line.setAttribute('y2', y2);
-            line.setAttribute('class', 'talent-link');
+            // 计算控制点：让连线呈现自然的弧度
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            
+            // 简单的弧度算法：向原点方向反向推一点点，或者根据法线偏移
+            // 这里采用简单的中点偏移，让连线看起来更有“经脉”感
+            const curveStrength = 15; 
+            const cx = midX + (midX - offsetX) * 0.14; // 进一步增加弧度，适配大空间
+            const cy = midY + (midY - offsetY) * 0.14;
+
+            path.setAttribute('d', `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
+            path.setAttribute('class', 'talent-link');
             
             const isSourceActive = (talentManager.activeTalents[link.source] || 0) > 0;
             const isTargetActive = (talentManager.activeTalents[link.target] || 0) > 0;
             if (isSourceActive && isTargetActive) {
-                line.classList.add('active');
+                path.classList.add('active');
             }
 
-            svg.appendChild(line);
+            svg.appendChild(path);
         });
 
         // 2. 绘制奇穴节点
@@ -382,8 +393,8 @@ class UIManager {
                 displayName = (heroId === 'qijin' || heroId === 'yeying') ? '身法' : '力道';
             }
 
-            node.style.left = `${nodeData.pos.x + 400}px`; 
-            node.style.top = `${nodeData.pos.y + 300}px`;
+            node.style.left = `${nodeData.pos.x + 700}px`; 
+            node.style.top = `${nodeData.pos.y + 700}px`;
 
             const iconStyle = spriteFactory.getIconStyle(nodeData.icon);
             node.innerHTML = `
