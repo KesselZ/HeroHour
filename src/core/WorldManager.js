@@ -319,6 +319,9 @@ class City {
  */
 class WorldManager {
     constructor() {
+        // --- 调试开关 ---
+        this.DEBUG_INFLUENCE = true; // 设为 true 即可在小地图显示势力范围
+
         // 核心修复：显式指定 Side (针对专家建议 Point 1)
         // 这样当 WorldManager 调用 getModifiedValue 时，能正确匹配 side: 'player' 的全局修正
         this.side = 'player'; 
@@ -388,7 +391,8 @@ class WorldManager {
             playerPos: { x: 0, z: 0 }, // 记录玩家位置
             exploredMap: null,  // 新增：小地图探索迷雾数据 (Uint8Array)
             interactionLocks: new Set(), // 新增：全局交互锁，确保战斗回来后状态保留
-            pendingBattleEnemyId: null   // 新增：正在进行的战斗目标 ID
+            pendingBattleEnemyId: null,   // 新增：正在进行的战斗目标 ID
+            influenceCenters: [] // 新增：势力影响力中心 [{type, faction, x, z, strength}]
         };
 
         // 5. 占领建筑状态 (已整合进 entities，保留此数组用于快速结算收益)
@@ -467,7 +471,7 @@ class WorldManager {
                 overworldIcon: 'qijin', 
                 unitPool: ['chunyang', 'ranged'],
                 basePoints: 70,
-                baseWeight: 0, 
+                baseWeight: 0.1, // 从 0 改为 0.1，允许极低概率全图偶遇
                 sectHero: 'qijin', 
                 description: '纯阳与长歌的弟子结伴而行，攻守兼备。'
             },
@@ -476,7 +480,7 @@ class WorldManager {
                 overworldIcon: 'melee', 
                 unitPool: ['tiance', 'melee'],
                 basePoints: 70,
-                baseWeight: 0, 
+                baseWeight: 0.1, 
                 sectHero: 'lichengen', 
                 description: '天策府的精锐小队，包含强悍的骑兵和坚韧的步兵。'
             },
@@ -485,7 +489,7 @@ class WorldManager {
                 overworldIcon: 'cangjian', 
                 unitPool: ['cangjian', 'melee'],
                 basePoints: 70,
-                baseWeight: 0,
+                baseWeight: 0.1,
                 sectHero: 'yeying', 
                 description: '西子湖畔藏剑山庄的弟子，擅长剑法。'
             },
@@ -496,7 +500,7 @@ class WorldManager {
                 overworldIcon: 'tianyi_guard', 
                 unitPool: ['tianyi_guard', 'tianyi_crossbowman', 'tianyi_venom_zombie'], 
                 basePoints: 55,        
-                baseWeight: 40,
+                baseWeight: 1, // 大幅降低基础权重，使其仅在势力范围内出没
                 description: '天一教在野外的基础巡逻队，由教卫和毒尸组成。'
             },
             'tianyi_venom_lab': {
@@ -504,7 +508,7 @@ class WorldManager {
                 overworldIcon: 'tianyi_apothecary', 
                 unitPool: ['tianyi_apothecary', 'tianyi_venom_zombie', 'tianyi_shadow_guard'], 
                 basePoints: 80,        
-                baseWeight: 30,
+                baseWeight: 0.5,
                 description: '天一教炼制毒药的秘密场所，守备森严，毒气弥漫。'
             },
             'tianyi_altar': {
@@ -512,7 +516,7 @@ class WorldManager {
                 overworldIcon: 'tianyi_priest', 
                 unitPool: ['tianyi_priest', 'tianyi_guard', 'tianyi_elder'], 
                 basePoints: 110,        
-                baseWeight: 20,
+                baseWeight: 0.2,
                 description: '天一教进行诡异祭祀的地方，祭司与长老亲自坐镇。'
             },
             'tianyi_core_forces': {
@@ -520,7 +524,7 @@ class WorldManager {
                 overworldIcon: 'tianyi_abomination', 
                 unitPool: ['tianyi_abomination', 'tianyi_elder', 'tianyi_shadow_guard'], 
                 basePoints: 160,        
-                baseWeight: 15,
+                baseWeight: 0.1,
                 description: '天一教最恐怖的作战单位集结，包括巨大的缝合怪与高阶影卫。'
             },
 
@@ -530,7 +534,7 @@ class WorldManager {
                 overworldIcon: 'shence_infantry', 
                 unitPool: ['shence_infantry', 'shence_crossbowman', 'shence_shieldguard'], 
                 basePoints: 75,        
-                baseWeight: 40,
+                baseWeight: 1,
                 description: '神策军的基础巡逻力量，守卫严密，不容侵犯。'
             },
             'shence_vanguard': {
@@ -538,7 +542,7 @@ class WorldManager {
                 overworldIcon: 'shence_cavalry', 
                 unitPool: ['shence_cavalry', 'shence_infantry', 'shence_assassin'], 
                 basePoints: 110,        
-                baseWeight: 30,
+                baseWeight: 0.5,
                 description: '神策军的突击部队，骑兵冲锋配合刺客突袭，极具杀伤力。'
             },
             'shence_oversight': {
@@ -546,7 +550,7 @@ class WorldManager {
                 overworldIcon: 'shence_overseer', 
                 unitPool: ['shence_overseer', 'shence_bannerman', 'shence_shieldguard', 'shence_crossbowman'], 
                 basePoints: 150,        
-                baseWeight: 20,
+                baseWeight: 0.2,
                 description: '由督军指挥的精英小队，军旗所指，军心震荡。'
             },
             'shence_imperial_guards': {
@@ -554,7 +558,7 @@ class WorldManager {
                 overworldIcon: 'shence_iron_pagoda', 
                 unitPool: ['shence_iron_pagoda', 'shence_overseer', 'shence_cavalry', 'shence_bannerman'], 
                 basePoints: 250,        
-                baseWeight: 10,
+                baseWeight: 0.1,
                 description: '神策军中最强悍的力量，重型铁甲与指挥官的完美配合。'
             },
 
@@ -564,7 +568,7 @@ class WorldManager {
                 overworldIcon: 'red_cult_acolyte', 
                 unitPool: ['red_cult_acolyte', 'red_cult_enforcer', 'red_cult_archer'], 
                 basePoints: 60,        
-                baseWeight: 40,
+                baseWeight: 1,
                 description: '红衣教的基础部队，由武者带领狂热信徒组成。'
             },
             'red_cult_inquisition': {
@@ -572,7 +576,7 @@ class WorldManager {
                 overworldIcon: 'red_cult_executioner', 
                 unitPool: ['red_cult_executioner', 'red_cult_enforcer', 'red_cult_assassin'], 
                 basePoints: 100,        
-                baseWeight: 30,
+                baseWeight: 0.5,
                 description: '红衣教的审判力量，红衣武者负责快速突进。'
             },
             'red_cult_ritual': {
@@ -580,7 +584,7 @@ class WorldManager {
                 overworldIcon: 'red_cult_high_priestess', 
                 unitPool: ['red_cult_high_priestess', 'red_cult_firemage', 'red_cult_priestess'], 
                 basePoints: 140,        
-                baseWeight: 20,
+                baseWeight: 0.2,
                 description: '正在进行神秘仪式的红衣教高层，魔法火力极强。'
             },
             'red_cult_conflagration': {
@@ -588,76 +592,67 @@ class WorldManager {
                 overworldIcon: 'red_cult_high_priestess', 
                 unitPool: ['red_cult_high_priestess', 'red_cult_firemage', 'red_cult_executioner', 'red_cult_assassin'], 
                 basePoints: 220,        
-                baseWeight: 15,
+                baseWeight: 0.1,
                 description: '红衣教最狂暴的部队，所到之处皆为焦土。'
             }
         };
     }
 
     /**
-     * 工业级动态权重系统：完全基于地理生态的敌人生成
+     * 工业级动态权重系统：完全基于“影响力中心”的热力图算法
+     * 优雅地处理玩家中心、门派中心、邪恶中心之间的权重过渡
      */
     getDynamicEnemyType(worldX, worldZ) {
-        const playerHeroId = this.heroData.id;
-        const distToPlayer = Math.sqrt(Math.pow(worldX - this.mapState.playerPos.x, 2) + Math.pow(worldZ - this.mapState.playerPos.z, 2));
+        const weights = {};
+        const centers = this.mapState.influenceCenters || [];
         
-        const tempWeights = {};
-        let sumBaseWeights = 0;
-
-        // --- 1. 计算环境基础权重 ---
+        // --- 1. 计算全图基础权重叠加 ---
         for (const [id, template] of Object.entries(this.enemyTemplates)) {
-            let w = template.baseWeight || 0;
-            if (w <= 0 && !template.sectHero) continue; // 排除无权重的非门派单位
+            let baseW = template.baseWeight || 0;
+            if (baseW <= 0 && !template.sectHero) continue;
 
-            // 稻香村平滑保护 (仅影响 45m 内)
-            if (distToPlayer < 45) {
-                const protectionFactor = distToPlayer / 45; // 0.0(中心) -> 1.0(边缘)
-                if (template.isBasic) {
-                    // 越简单的怪，在稻香村附近的权重提升越夸张
-                    // 特别针对最简单的“林间小生灵”和“山贼前哨”
-                    let simplicityBonus = 5;
-                    if (id === 'woodland_critters') simplicityBonus = 15; // 极大幅度提升
-                    if (id === 'bandit_outpost') simplicityBonus = 10;    // 大幅度提升
-                    
-                    w *= (1 + (1 - protectionFactor) * simplicityBonus);
-                } else {
-                    // 强力怪在稻香村附近几乎绝迹 (使用二次方衰减)
-                    w *= Math.pow(protectionFactor, 2); 
+            let weightBonus = 0;
+            let suppressionFactor = 1.0;
+
+            centers.forEach(center => {
+                const dist = Math.sqrt(Math.pow(worldX - center.x, 2) + Math.pow(worldZ - center.z, 2));
+                if (dist > center.radius) return;
+
+                // 使用余弦衰减函数 (更平滑的边缘过渡)
+                const influence = 0.5 * (1 + Math.cos(Math.PI * (dist / center.radius))); // 1.0(中心) -> 0.0(边缘)
+                const power = center.strength * influence;
+
+                if (center.type === 'player_home') {
+                    // 玩家出生点附近：大幅加成简单怪，剧烈压制强力怪
+                    if (template.isBasic) {
+                        weightBonus += power;
+                    } else {
+                        suppressionFactor *= Math.pow(1 - influence, 2); // 二次方压制
+                    }
+                } 
+                else if (center.type === 'sect') {
+                    // 门派城市附近：仅加成对应门派的兵种
+                    if (template.sectHero === center.factionHero) {
+                        weightBonus += power;
+                    }
+                } 
+                else if (center.type === 'evil') {
+                    // 邪恶据点附近：加成属于该势力的整组怪物
+                    // 逻辑：检查 template ID 是否以 center.faction 开头 (如 tianyi_scouts 匹配 tianyi)
+                    if (id.startsWith(center.faction)) {
+                        weightBonus += power;
+                    } else if (!template.isBasic) {
+                        // 邪恶据点核心区也会排斥其他势力的强力怪，形成单一势力区
+                        suppressionFactor *= (1 - influence * 0.8);
+                    }
                 }
-            }
-            
-            tempWeights[id] = w;
-            sumBaseWeights += w;
+            });
+
+            // 最终权重 = (基础权重 + 所有中心加成) * 所有中心的压制系数
+            weights[id] = (baseW + weightBonus) * suppressionFactor;
         }
 
-        // --- 2. 注入势力地理权重 (平滑激活门派兵) ---
-        Object.values(this.cities).forEach(city => {
-            const distToCity = Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2));
-            if (distToCity >= 45) return;
-
-            const faction = this.factions[city.owner];
-            if (!faction || faction.heroId === playerHeroId) return;
-
-            const falloff = 1 - (distToCity / 45); // 1.0(中心) -> 0.0(边缘)
-            
-            // 查找所有匹配该城市英雄的模板
-            for (const [id, template] of Object.entries(this.enemyTemplates)) {
-                if (template.sectHero === faction.heroId) {
-                    // 动态注入权重：在中心处占比 80% (即其他总分的 4 倍)
-                    const bonus = (sumBaseWeights * 4) * falloff;
-                    tempWeights[id] = (tempWeights[id] || 0) + bonus;
-                }
-            }
-
-            // 敌对城市周围的基础威胁度加成
-            if (city.owner !== 'player') {
-                ['rebels', 'shadow_sect'].forEach(id => {
-                    if (tempWeights[id]) tempWeights[id] *= (1 + falloff * 2);
-                });
-            }
-        });
-
-        return this.weightedRandomSelect(tempWeights);
+        return this.weightedRandomSelect(weights);
     }
 
     /**
@@ -1027,6 +1022,49 @@ class WorldManager {
                     z: az 
                 });
             });
+
+            // --- 2.5 挑选并放置邪恶势力据点 ---
+            // 从三大邪恶势力中挑选 2 个，放置在远离玩家的空余 POI
+            const evilFactions = ['tianyi', 'shence', 'red_cult'];
+            const chosenEvils = [...evilFactions].sort(() => Math.random() - 0.5).slice(0, 2);
+            
+            // 过滤掉已被主城占用的 POI
+            const remainingPois = generator.pois.filter(poi => {
+                const wx = poi.x - halfSize;
+                const wz = poi.z - halfSize;
+                // 检查是否与现有城市重叠
+                return !Object.values(this.cities).some(c => c.x === wx && c.z === wz);
+            });
+
+            chosenEvils.forEach((factionId, index) => {
+                // 寻找距离玩家最远的空余 POI
+                const playerPos = this.mapState.playerPos;
+                remainingPois.sort((a, b) => {
+                    const distA = Math.sqrt(Math.pow(a.x - halfSize - playerPos.x, 2) + Math.pow(a.z - halfSize - playerPos.z, 2));
+                    const distB = Math.sqrt(Math.pow(b.x - halfSize - playerPos.x, 2) + Math.pow(b.z - halfSize - playerPos.z, 2));
+                    return distB - distA; // 降序，最远的在前
+                });
+
+                if (remainingPois.length > 0) {
+                    const targetPoi = remainingPois.shift();
+                    const ex = targetPoi.x - halfSize;
+                    const ez = targetPoi.z - halfSize;
+                    
+                    const factionNames = { 'tianyi': '天一教总坛', 'shence': '神策军营', 'red_cult': '红衣教祭坛' };
+                    const iconKeys = { 'tianyi': 'tianyi_abomination', 'shence': 'shence_iron_pagoda', 'red_cult': 'red_cult_high_priestess' };
+
+                    entities.push({
+                        id: `evil_base_${factionId}`,
+                        type: 'decoration', // 暂时作为装饰物展示，后期可扩展为特殊交互点
+                        spriteKey: iconKeys[factionId],
+                        x: ex, z: ez,
+                        scale: 2.5,
+                        config: { isEvilBase: true, faction: factionId, name: factionNames[factionId] }
+                    });
+
+                    console.log(`%c[势力] %c${factionNames[factionId]} 已在偏远地区 POI (${ex}, ${ez}) 扎根`, 'color: #ff4444; font-weight: bold', 'color: #fff');
+                }
+            });
         } else {
             // 兜底逻辑：如果地图上一个 POI 都没找到（理论上不应该），随机找一个草地
             console.warn("[WorldManager] 未能找到任何 POI 候选点，启动兜底随机出生逻辑");
@@ -1053,105 +1091,125 @@ class WorldManager {
             }
         }
 
-        // --- 3. 随机实体生成 ---
+        // --- 3. 核心重构：构建全图影响力中心缓存 (Influence Centers) ---
+        // 在生成随机实体前初始化，确保 getDynamicEnemyType 能读取到热力图数据
+        this.mapState.influenceCenters = [];
+        
+        // A. 玩家主城 (提供简单怪加成)
+        this.mapState.influenceCenters.push({
+            type: 'player_home',
+            x: this.mapState.playerPos.x,
+            z: this.mapState.playerPos.z,
+            strength: 1500, 
+            radius: 50
+        });
+
+        // B. AI 门派城市 (提供对应门派兵加成)
+        Object.values(this.cities).forEach(city => {
+            if (city.owner !== 'player') {
+                const faction = this.factions[city.owner];
+                this.mapState.influenceCenters.push({
+                    type: 'sect',
+                    factionHero: faction?.heroId,
+                    x: city.x,
+                    z: city.z,
+                    strength: 1000,
+                    radius: 40
+                });
+            }
+        });
+
+        // C. 邪恶势力据点 (提供整套势力怪加成)
+        entities.forEach(ent => {
+            if (ent.config && ent.config.isEvilBase) {
+                this.mapState.influenceCenters.push({
+                    type: 'evil',
+                    faction: ent.config.faction,
+                    x: ent.x,
+                    z: ent.z,
+                    strength: 1200,
+                    radius: 60
+                });
+            }
+        });
+
+        // --- 4. 随机实体生成 (重构：泊松盘采样) ---
+        // 使用泊松盘采样生成分布均匀的候选点，最小间距为 3.0 (约 3 个格子)
+        const candidatePoints = this._poissonDiskSampling(size, size, 3.0);
         const playerSpawnX = this.mapState.playerPos.x;
         const playerSpawnZ = this.mapState.playerPos.z;
 
-        // 新增：使用占据图来确保物体不紧贴
-        const occupied = new Uint8Array(size * size); 
+        candidatePoints.forEach(p => {
+            const x = Math.floor(p.x);
+            const z = Math.floor(p.y);
 
-        for (let z = 0; z < size; z++) {
-            for (let x = 0; x < size; x++) {
-                if (!generator.isSafeGrass(x, z)) continue;
+            // 基础合法性检查
+            if (x < 0 || x >= size || z < 0 || z >= size) return;
+            if (!generator.isSafeGrass(x, z)) return;
 
-                // 检查相邻格子是否已有物体 (相邻 8 格)
-                let hasAdjacent = false;
-                for (let dz = -1; dz <= 1; dz++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        if (dx === 0 && dz === 0) continue;
-                        const nx = x + dx;
-                        const nz = z + dz;
-                        if (nx >= 0 && nx < size && nz >= 0 && nz < size) {
-                            if (occupied[nz * size + nx]) {
-                                hasAdjacent = true;
-                                break;
-                            }
-                        }
+            const worldX = x - halfSize;
+            const worldZ = z - halfSize;
+
+            // 避开玩家和 AI 出生点 (半径增加到 12，确保初始视野清爽)
+            const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
+            const aiCity = this.cities['ai_city_1'];
+            const distToAI = aiCity ? Math.sqrt(Math.pow(worldX - aiCity.x, 2) + Math.pow(worldZ - aiCity.z, 2)) : 100;
+
+            if (distToPlayer < 12 || distToAI < 12) return;
+
+            // 在泊松候选点上，我们使用相对较高的概率来分配物体
+            const roll = Math.random();
+            
+            // 概率分段逻辑 (总概率约 65%，其余 35% 保持空旷)
+            if (roll < 0.05) {
+                entities.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
+            } else if (roll < 0.08) {
+                entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
+            } else if (roll < 0.12) {
+                entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
+            } else if (roll < 0.14) {
+                const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
+                const sKey = bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2';
+                entities.push({ 
+                    id: `${bType}_${x}_${z}`, 
+                    type: 'captured_building', 
+                    spriteKey: sKey,
+                    buildingType: bType, 
+                    x: worldX, z: worldZ,
+                    config: { owner: 'none', type: bType }
+                });
+            } else if (roll < 0.35) {
+                // 重点：敌人生成逻辑 (约 21% 的候选点会变成敌人)
+                const tId = this.getDynamicEnemyType(worldX, worldZ);
+                const template = this.enemyTemplates[tId];
+                const variance = 0.05;
+                const randomFactor = 1 + (Math.random() * variance * 2 - variance);
+                const points = Math.max(1, Math.floor(template.basePoints * randomFactor));
+                
+                entities.push({ 
+                    id: `enemy_${x}_${z}`, 
+                    type: 'enemy_group', 
+                    templateId: tId,
+                    x: worldX, z: worldZ,
+                    config: {
+                        name: template.name,
+                        unitPool: template.unitPool,
+                        totalPoints: points
                     }
-                    if (hasAdjacent) break;
-                }
-                if (hasAdjacent) continue;
-
-                const worldX = x - halfSize;
-                const worldZ = z - halfSize;
-
-                // 避开玩家和 AI 出生点
-                const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
-                const aiCity = this.cities['ai_city_1'];
-                const distToAI = aiCity ? Math.sqrt(Math.pow(worldX - aiCity.x, 2) + Math.pow(worldZ - aiCity.z, 2)) : 100;
-
-                if (distToPlayer < 10 || distToAI < 10) continue;
-
-                const roll = Math.random();
-                let placed = false;
-                if (roll < 0.002) {
-                    entities.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.003) {
-                    entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.005) {
-                    entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.0055) {
-                    const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
-                    const sKey = bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2';
-                    entities.push({ 
-                        id: `${bType}_${x}_${z}`, 
-                        type: 'captured_building', 
-                        spriteKey: sKey,
-                        buildingType: bType, 
-                        x: worldX, z: worldZ,
-                        config: { owner: 'none', type: bType }
-                    });
-                    placed = true;
-                } else if (roll < 0.018) {
-                    // --- 核心优化：使用动态权重系统选择敌人类型 ---
-                    const tId = this.getDynamicEnemyType(worldX, worldZ);
-                    const template = this.enemyTemplates[tId];
-                    
-                    // 统一计算逻辑：基础战力 + 正负 5% 的随机波动
-                    const variance = 0.05;
-                    const randomFactor = 1 + (Math.random() * variance * 2 - variance);
-                    const points = Math.max(1, Math.floor(template.basePoints * randomFactor));
-                    
-                    entities.push({ 
-                        id: `enemy_${x}_${z}`, 
-                        type: 'enemy_group', 
-                        templateId: tId,
-                        x: worldX, z: worldZ,
-                        config: {
-                            name: template.name,
-                            unitPool: template.unitPool,
-                            totalPoints: points
-                        }
-                    });
-                    placed = true;
-                } else if (roll < 0.025) {
-                    entities.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.027) {
-                    entities.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
-                    placed = true;
-                }
-
-                if (placed) {
-                    occupied[z * size + x] = 1;
-                }
+                });
+            } else if (roll < 0.60) {
+                // 装饰物 (约 25% 的候选点)
+                const isHouse = Math.random() < 0.1;
+                entities.push({ 
+                    id: `decor_${x}_${z}`, 
+                    type: 'decoration', 
+                    spriteKey: isHouse ? 'house_1' : 'tree', 
+                    x: worldX, z: worldZ 
+                });
             }
-        }
+        });
 
-        // --- 4. 自动分配周边矿产逻辑 (圈地系统) ---
+        // --- 5. 自动分配周边矿产逻辑 (圈地系统) ---
         // 规则：50米范围内的矿产自动归属于最近的敌方主城。
         // 注意：此逻辑不对玩家生效，玩家需要手动跑位占领以保留探索感。
         entities.forEach(entity => {
@@ -2025,6 +2083,76 @@ class WorldManager {
                 source: 'trait'
             });
         });
+    }
+
+    /**
+     * 泊松盘采样 (Poisson Disk Sampling)
+     * 生成分布均匀但不规则的点阵，避免物体扎堆。
+     */
+    _poissonDiskSampling(width, height, radius, k = 30) {
+        const cellSize = radius / Math.sqrt(2);
+        const gridW = Math.ceil(width / cellSize);
+        const gridH = Math.ceil(height / cellSize);
+        const grid = new Array(gridW * gridH).fill(-1);
+        
+        const points = [];
+        const active = [];
+        
+        const firstPoint = { x: Math.random() * width, y: Math.random() * height };
+        const firstIdx = Math.floor(firstPoint.x / cellSize) + Math.floor(firstPoint.y / cellSize) * gridW;
+        grid[firstIdx] = 0;
+        points.push(firstPoint);
+        active.push(0);
+
+        while (active.length > 0) {
+            const randomIndex = Math.floor(Math.random() * active.length);
+            const pIdx = active[randomIndex];
+            const p = points[pIdx];
+            let found = false;
+
+            for (let i = 0; i < k; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = radius + Math.random() * radius;
+                const candidate = {
+                    x: p.x + Math.cos(angle) * dist,
+                    y: p.y + Math.sin(angle) * dist
+                };
+
+                if (candidate.x >= 0 && candidate.x < width && candidate.y >= 0 && candidate.y < height) {
+                    const col = Math.floor(candidate.x / cellSize);
+                    const row = Math.floor(candidate.y / cellSize);
+                    
+                    let ok = true;
+                    for (let r = Math.max(0, row - 2); r <= Math.min(gridH - 1, row + 2); r++) {
+                        for (let c = Math.max(0, col - 2); c <= Math.min(gridW - 1, col + 2); c++) {
+                            const neighborIdx = grid[c + r * gridW];
+                            if (neighborIdx !== -1) {
+                                const d = Math.sqrt(Math.pow(candidate.x - points[neighborIdx].x, 2) + Math.pow(candidate.y - points[neighborIdx].y, 2));
+                                if (d < radius) {
+                                    ok = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!ok) break;
+                    }
+
+                    if (ok) {
+                        const cIdx = points.length;
+                        points.push(candidate);
+                        grid[col + row * gridW] = cIdx;
+                        active.push(cIdx);
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!found) {
+                active.splice(randomIndex, 1);
+            }
+        }
+        return points;
     }
 
     /**

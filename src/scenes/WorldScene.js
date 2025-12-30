@@ -1326,7 +1326,43 @@ export class WorldScene {
             };
         };
 
-        // --- 4.5 调试专用：绘制所有 ROI (POIs) ---
+        // --- 4.5 调试专用：势力影响力热力图 ---
+        if (worldManager.DEBUG_INFLUENCE && ms.influenceCenters) {
+            ms.influenceCenters.forEach(center => {
+                const pos = worldToMinimap(center.x, center.z);
+                
+                // 绘制影响力半径
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, center.radius, 0, Math.PI * 2);
+                
+                // 根据势力类型选择颜色
+                let color = 'rgba(255, 255, 255, 0.2)';
+                if (center.type === 'player_home') color = 'rgba(0, 255, 0, 0.15)'; // 玩家：绿色
+                else if (center.type === 'evil') {
+                    if (center.faction === 'tianyi') color = 'rgba(128, 0, 128, 0.25)'; // 天一：紫色
+                    else if (center.faction === 'shence') color = 'rgba(255, 165, 0, 0.25)'; // 神策：橙色
+                    else if (center.faction === 'red_cult') color = 'rgba(255, 0, 0, 0.25)'; // 红衣：红色
+                }
+                else if (center.type === 'sect') color = 'rgba(0, 191, 255, 0.2)'; // 门派：天蓝色
+
+                ctx.fillStyle = color;
+                ctx.fill();
+                
+                // 绘制外圈
+                ctx.strokeStyle = color.replace('0.2', '0.5').replace('0.15', '0.4').replace('0.25', '0.6');
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // 标注势力名称 (仅中心点)
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 9px Arial';
+                ctx.textAlign = 'center';
+                const label = center.faction || center.factionHero || (center.type === 'player_home' ? 'Home' : 'Sect');
+                ctx.fillText(label, pos.x, pos.y - 5);
+            });
+        }
+
+        // --- 4.6 调试专用：绘制所有 ROI (POIs) ---
         if (mapGenerator.pois) {
             mapGenerator.pois.forEach((poi, index) => {
                 // 将 grid 坐标转换为小地图相对坐标
