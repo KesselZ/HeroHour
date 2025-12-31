@@ -915,6 +915,17 @@ export class WorldManager {
     }
 
     /**
+     * 获取单位的中文名称 (带缓存逻辑)
+     */
+    getUnitDisplayName(type) {
+        const stats = UNIT_STATS_DATA[type];
+        if (stats && stats.name) return stats.name;
+        
+        // 兜底方案
+        return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+
+    /**
      * 招募士兵到指定城市
      * @param {string} type 兵种类型
      * @param {string} cityId 城市 ID
@@ -930,11 +941,13 @@ export class WorldManager {
 
             if (canTakeNow) {
                 this.heroArmy[type] = (this.heroArmy[type] || 0) + 1;
-                console.log(`%c[招募] %c${type} 已直接加入英雄队伍`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+                const unitName = this.getUnitDisplayName(type);
+                console.log(`%c[招募] %c【${unitName}】已直接加入英雄队伍`, 'color: #5b8a8a; font-weight: bold', 'color: #fff');
             } else {
                 const city = this.cities[cityId];
                 city.availableUnits[type] = (city.availableUnits[type] || 0) + 1;
-                console.log(`%c[招募] %c${type} 已进入城市 ${city.name} 预备役`, 'color: #5b8a8a', 'color: #fff');
+                const unitName = this.getUnitDisplayName(type);
+                console.log(`%c[招募] %c【${unitName}】已进入城市 ${city.name} 预备役`, 'color: #5b8a8a', 'color: #fff');
             }
 
             this.updateHUD();
@@ -1853,12 +1866,23 @@ export class WorldManager {
      * @param {Object} changes 兵力变动，如 { melee: -2, archer: -1 }
      */
     updateHeroArmy(changes) {
+        let changed = false;
         for (const type in changes) {
-            if (this.heroArmy[type] !== undefined) {
-                this.heroArmy[type] = Math.max(0, this.heroArmy[type] + changes[type]);
+            if (this.heroArmy[type] !== undefined || changes[type] > 0) {
+                const oldValue = this.heroArmy[type] || 0;
+                this.heroArmy[type] = Math.max(0, oldValue + changes[type]);
+                if (this.heroArmy[type] !== oldValue) {
+                    changed = true;
+                    const unitName = this.getUnitDisplayName(type);
+                    const diff = changes[type];
+                    const sign = diff > 0 ? '+' : '';
+                    console.log(`%c[兵力变动] %c【${unitName}】 ${sign}${diff}`, diff > 0 ? 'color: #44ff44' : 'color: #ff4444', 'color: #fff');
+                }
             }
         }
-        console.log("%c[兵力变动] %c英雄队伍已更新", 'color: #5b8a8a; font-weight: bold', 'color: #fff', changes);
+        if (changed) {
+            this.updateHUD();
+        }
     }
 
     /**

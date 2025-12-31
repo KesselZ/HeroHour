@@ -1,6 +1,137 @@
 import * as THREE from 'three';
 
 /**
+ * 弹道视觉工厂：定义各种弹道的外观
+ */
+const ProjectileVisuals = {
+    wave: (group, color) => {
+        const geo = new THREE.TorusGeometry(0.5, 0.08, 8, 16, Math.PI); 
+        const mat = new THREE.MeshBasicMaterial({ 
+            color: color, 
+            transparent: true, 
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.y = Math.PI / 2;
+        group.add(mesh);
+        
+        const glowGeo = new THREE.SphereGeometry(0.25, 8, 8); 
+        const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.6 });
+        group.add(new THREE.Mesh(glowGeo, glowMat));
+    },
+
+    fireball: (group, color) => {
+        // 核心亮点 (白色核心)
+        const coreGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        group.add(new THREE.Mesh(coreGeo, coreMat));
+        
+        // 内焰 (动态颜色)
+        const innerGeo = new THREE.SphereGeometry(0.25, 8, 8);
+        const innerMat = new THREE.MeshBasicMaterial({ color: color || 0xffaa00, transparent: true, opacity: 0.9 });
+        group.add(new THREE.Mesh(innerGeo, innerMat));
+        
+        // 外焰/光晕 (动态颜色)
+        const outerGeo = new THREE.SphereGeometry(0.4, 8, 8);
+        const outerMat = new THREE.MeshBasicMaterial({ 
+            color: color || 0xff4400, 
+            transparent: true, 
+            opacity: 0.4,
+            blending: THREE.AdditiveBlending 
+        });
+        group.add(new THREE.Mesh(outerGeo, outerMat));
+
+        // --- 新增：固定尾焰 (Mesh 表现) ---
+        // 使用一个圆锥体作为拖尾，尖端朝后
+        const tailGeo = new THREE.ConeGeometry(0.25, 0.8, 8);
+        tailGeo.rotateX(-Math.PI / 2); // 旋转使尖端指向 -Z (后方)
+        const tailMat = new THREE.MeshBasicMaterial({
+            color: color || 0xff4400,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending
+        });
+        const tail = new THREE.Mesh(tailGeo, tailMat);
+        tail.position.z = -0.3; // 往后偏移
+        group.add(tail);
+
+        group.userData.isFireball = true;
+    },
+
+    spit: (group, color) => {
+        const geo = new THREE.SphereGeometry(0.12, 8, 8);
+        geo.scale(0.7, 0.7, 2.0);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        const mesh = new THREE.Mesh(geo, mat);
+        group.add(mesh);
+        
+        for (let i = 1; i <= 3; i++) {
+            const trailGeo = new THREE.SphereGeometry(0.12 - i*0.02, 6, 6);
+            const trailMat = new THREE.MeshBasicMaterial({ 
+                color: color, 
+                transparent: true, 
+                opacity: 0.6 - i*0.15 
+            });
+            const trail = new THREE.Mesh(trailGeo, trailMat);
+            trail.position.z = -i * 0.15;
+            group.add(trail);
+        }
+    },
+
+    lob: (group, color) => {
+        const geo = new THREE.CylinderGeometry(0.2, 0.15, 0.5, 8);
+        geo.rotateX(Math.PI / 2);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        group.add(new THREE.Mesh(geo, mat));
+    },
+
+    pill: (group, color) => {
+        const geo = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 8);
+        geo.rotateX(Math.PI / 2);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        group.add(new THREE.Mesh(geo, mat));
+    },
+
+    heal: (group, color) => {
+        const ringGeo = new THREE.TorusGeometry(0.4, 0.05, 8, 16);
+        const ringMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1.0 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        group.add(ring);
+        
+        const coreGeo = new THREE.SphereGeometry(0.2, 8, 8);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        group.add(new THREE.Mesh(coreGeo, coreMat));
+    },
+
+    arrow: (group, color) => {
+        const geo = new THREE.BoxGeometry(0.12, 0.12, 0.6);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        const mesh = new THREE.Mesh(geo, mat);
+        group.add(mesh);
+    },
+
+    air_sword: (group, color) => {
+        const subGroup = new THREE.Group();
+        const bladeGeo = new THREE.BoxGeometry(0.05, 0.05, 0.8);
+        const bladeMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
+        subGroup.add(new THREE.Mesh(bladeGeo, bladeMat));
+
+        const hiltGeo = new THREE.BoxGeometry(0.3, 0.05, 0.05);
+        const hilt = new THREE.Mesh(hiltGeo, bladeMat);
+        hilt.position.z = -0.2;
+        subGroup.add(hilt);
+
+        group.add(subGroup);
+
+        const glowGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.4 });
+        group.add(new THREE.Mesh(glowGeo, glowMat));
+    }
+};
+
+/**
  * 弹道特效类 (如箭矢、剑气等)
  */
 class Projectile extends THREE.Group {
@@ -17,11 +148,17 @@ class Projectile extends THREE.Group {
             scale = 1.0,
             penetration = 0, // 新增：穿透属性，默认 0 为不穿透
             isHeroSource = false,
-            arcHeight = 0 // 新增：弧度高度
+            arcHeight = 0, // 新增：弧度高度
+            explosionRadius = 0, // 新增：爆炸半径
+            explosionColor = null, // 新增：爆炸颜色
+            explosionVFX = null // 新增：爆炸特效类型
         } = config;
 
         this.startPos = startPos.clone();
         this.arcHeight = arcHeight;
+        this.explosionRadius = explosionRadius;
+        this.explosionColor = explosionColor || color;
+        this.explosionVFX = explosionVFX;
         this.target = target;
         this.speed = speed;
         this.damage = damage;
@@ -47,107 +184,11 @@ class Projectile extends THREE.Group {
     }
 
     initVisual(type, color) {
-        if (type === 'wave') {
-            // 强化音波/法术波：使用传入的 color
-            const geo = new THREE.TorusGeometry(0.5, 0.08, 8, 16, Math.PI); 
-            const mat = new THREE.MeshBasicMaterial({ 
-                color: color, 
-                transparent: true, 
-                opacity: 0.9,
-                side: THREE.DoubleSide
-            });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.rotation.y = Math.PI / 2;
-            this.add(mesh);
-            
-            const glowGeo = new THREE.SphereGeometry(0.25, 8, 8); 
-            const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.6 });
-            this.add(new THREE.Mesh(glowGeo, glowMat));
-        } else if (type === 'fireball') {
-            // 火球：核心黄色，外围红色
-            const geo = new THREE.SphereGeometry(0.3, 8, 8);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
-            this.add(new THREE.Mesh(geo, mat));
-            
-            const outerGeo = new THREE.SphereGeometry(0.45, 8, 8);
-            const outerMat = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.5 });
-            this.add(new THREE.Mesh(outerGeo, outerMat));
-        } else if (type === 'spit') {
-            // 毒液/口水：显著减小尺寸 (0.12)，并增加拖尾表现
-            const geo = new THREE.SphereGeometry(0.12, 8, 8);
-            geo.scale(2.0, 0.7, 0.7); // 更加尖锐的流体感
-            const mat = new THREE.MeshBasicMaterial({ color: color });
-            const mesh = new THREE.Mesh(geo, mat);
-            this.add(mesh);
-            
-            // 强化拖尾：多层半透明粒子
-            for (let i = 1; i <= 3; i++) {
-                const trailGeo = new THREE.SphereGeometry(0.12 - i*0.02, 6, 6);
-                const trailMat = new THREE.MeshBasicMaterial({ 
-                    color: color, 
-                    transparent: true, 
-                    opacity: 0.6 - i*0.15 
-                });
-                const trail = new THREE.Mesh(trailGeo, trailMat);
-                trail.position.x = -i * 0.15;
-                this.add(trail);
-            }
-        } else if (type === 'lob') {
-            // 投掷类弹道（如药罐）：稍大一点的容器形状
-            const geo = new THREE.CylinderGeometry(0.2, 0.15, 0.5, 8);
-            const mat = new THREE.MeshBasicMaterial({ color: color });
-            this.add(new THREE.Mesh(geo, mat));
-        } else if (type === 'pill') {
-            // 药瓶/药丸：小圆柱体
-            const geo = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 8);
-            geo.rotateZ(Math.PI / 2);
-            const mat = new THREE.MeshBasicMaterial({ color: color });
-            this.add(new THREE.Mesh(geo, mat));
-        } else if (type === 'heal') {
-            // 强化治疗：使用传入的 color (通常是绿色)
-            const ringGeo = new THREE.TorusGeometry(0.4, 0.05, 8, 16);
-            const ringMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1.0 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = Math.PI / 2;
-            this.add(ring);
-            
-            const coreGeo = new THREE.SphereGeometry(0.2, 8, 8);
-            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            this.add(new THREE.Mesh(coreGeo, coreMat));
-        } else if (type === 'arrow') {
-            // 强化箭矢
-            const geo = new THREE.BoxGeometry(0.6, 0.12, 0.12);
-            const mat = new THREE.MeshBasicMaterial({ color: color }); // 支持不同颜色的箭
-            const mesh = new THREE.Mesh(geo, mat);
-            this.add(mesh);
-        } else if (type === 'air_sword') {
-            // 纯阳：气剑 - 使用传入的 color
-            const group = new THREE.Group();
-            
-            // 剑身
-            const bladeGeo = new THREE.BoxGeometry(0.8, 0.05, 0.05);
-            const bladeMat = new THREE.MeshBasicMaterial({ 
-                color: color, 
-                transparent: true, 
-                opacity: 0.8 
-            });
-            const blade = new THREE.Mesh(bladeGeo, bladeMat);
-            group.add(blade);
-
-            // 护手/剑格
-            const hiltGeo = new THREE.BoxGeometry(0.05, 0.3, 0.05);
-            const hilt = new THREE.Mesh(hiltGeo, bladeMat);
-            hilt.position.x = -0.2;
-            group.add(hilt);
-
-            group.rotation.y = -Math.PI / 2; 
-            this.add(group);
-
-            // 增加外发光
-            const glowGeo = new THREE.SphereGeometry(0.1, 8, 8);
-            const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.4 });
-            const glow = new THREE.Mesh(glowGeo, glowMat);
-            this.add(glow);
+        if (ProjectileVisuals[type]) {
+            ProjectileVisuals[type](this, color);
+        } else {
+            // 默认视觉效果
+            ProjectileVisuals.arrow(this, color);
         }
     }
 
@@ -203,6 +244,28 @@ class Projectile extends THREE.Group {
             }
         }
 
+        // --- 核心改进：为火球添加实时拖尾粒子 ---
+        if (this.config.type === 'fireball' && Math.random() > 0.3) {
+            const battle = window.battle;
+            if (battle && battle.vfx) {
+                battle.vfx.createParticleSystem({
+                    pos: this.position.clone(),
+                    color: 0xff4400,
+                    duration: 300,
+                    density: 0.5,
+                    spawnRate: 100,
+                    geometry: new THREE.BoxGeometry(0.1, 0.1, 0.1),
+                    initFn: (p) => {
+                        p.position.add(new THREE.Vector3((Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2));
+                    },
+                    updateFn: (p, prg) => {
+                        p.scale.setScalar(1 - prg);
+                        p.material.opacity = 0.5 * (1 - prg);
+                    }
+                });
+            }
+        }
+
         // 4. 边界清理
         if (this.distanceTraveled > this.maxDistance) {
             this.isDone = true;
@@ -236,14 +299,37 @@ class Projectile extends THREE.Group {
     }
 
     hit(unit) {
-        if (!unit || unit.isDead) return;
+        // 如果没有传入 unit，说明是定点落地或者目标丢失，但我们仍可能需要触发 AOE
+        const hitPos = this.position.clone();
         
-        // 执行击中回调 (用于爆炸等额外效果)
+        // 执行击中回调 (用于自定义逻辑)
         if (this.config.onHit) {
-            this.config.onHit(this.position.clone());
+            this.config.onHit(hitPos);
         }
 
-        unit.takeDamage(this.damage, this.isHeroSource);
+        const battle = window.battle;
+        
+        // 处理爆炸/范围伤害
+        if (this.explosionRadius > 0 && battle) {
+            // 播放爆炸特效
+            if (this.explosionVFX) {
+                battle.playVFX(this.explosionVFX, { 
+                    pos: hitPos, 
+                    radius: this.explosionRadius, 
+                    color: this.explosionColor,
+                    duration: 500 
+                });
+            }
+
+            // 范围伤害判定
+            const enemySide = this.target ? this.target.side : (this.isHeroSource ? 'enemy' : 'player');
+            const targets = battle.getUnitsInArea(hitPos, { shape: 'circle', radius: this.explosionRadius }, enemySide);
+            battle.applyDamageToUnits(targets, this.damage, this.isHeroSource);
+        } else if (unit && !unit.isDead) {
+            // 普通单体伤害
+            unit.takeDamage(this.damage, this.isHeroSource);
+        }
+
         this.hitUnits.add(unit);
 
         if (this.penetration > 0) {

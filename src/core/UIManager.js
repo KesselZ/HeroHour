@@ -291,12 +291,22 @@ class UIManager {
     }
 
     /**
-     * 重置奇穴视图位置
+     * 重置奇穴视图位置并自动居中
      */
     resetTalentView() {
-        this.talentDrag.offsetX = 0;
-        this.talentDrag.offsetY = 0;
+        const talentPanel = document.getElementById('talent-panel');
+        if (!talentPanel) return;
+
+        const panelWidth = talentPanel.offsetWidth || window.innerWidth;
+        const panelHeight = talentPanel.offsetHeight || window.innerHeight;
+
+        // 由于 offsetX/offsetY = 1000 是中心点在容器中的坐标
+        // 我们需要让这个 (1000, 1000) 点显示在屏幕中心 (panelWidth/2, panelHeight/2)
+        // 变换公式：offset = 屏幕中心 - 容器中心坐标
+        this.talentDrag.offsetX = (panelWidth / 2) - 1000;
+        this.talentDrag.offsetY = (panelHeight / 2) - 1000;
         this.talentDrag.scale = 1.0;
+
         this.updateTalentView();
     }
 
@@ -347,8 +357,8 @@ class UIManager {
 
             // 升级：使用 SVG Path 绘制带有张力的贝塞尔曲线 (Quadratic Bezier)
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const offsetX = 700; // 适配新的 1400 宽度容器
-            const offsetY = 700; // 适配新的 1400 高度容器
+            const offsetX = 1000; 
+            const offsetY = 1000; 
             
             const x1 = source.pos.x + offsetX;
             const y1 = source.pos.y + offsetY;
@@ -362,12 +372,20 @@ class UIManager {
             // 简单的弧度算法：向原点方向反向推一点点，或者根据法线偏移
             // 这里采用简单的中点偏移，让连线看起来更有“经脉”感
             const curveStrength = 15; 
-            const cx = midX + (midX - offsetX) * 0.14; // 进一步增加弧度，适配大空间
+            const cx = midX + (midX - offsetX) * 0.14; 
             const cy = midY + (midY - offsetY) * 0.14;
 
             path.setAttribute('d', `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
             path.setAttribute('class', 'talent-link');
             
+            // 记录原始坐标用于计算边界
+            path.dataset.x1 = x1;
+            path.dataset.y1 = y1;
+            path.dataset.x2 = x2;
+            path.dataset.y2 = y2;
+            path.dataset.cx = cx;
+            path.dataset.cy = cy;
+
             const isSourceActive = (talentManager.activeTalents[link.source] || 0) > 0;
             const isTargetActive = (talentManager.activeTalents[link.target] || 0) > 0;
             if (isSourceActive && isTargetActive) {
@@ -376,6 +394,9 @@ class UIManager {
 
             svg.appendChild(path);
         });
+
+        // 1.5 动态调整 SVG 尺寸防止截断
+        this.updateSvgDimensions(svg);
 
         // 2. 绘制奇穴节点
         for (const id in nodes) {
@@ -393,8 +414,8 @@ class UIManager {
                 displayName = (heroId === 'liwangsheng' || heroId === 'yeying') ? '身法' : '力道';
             }
 
-            node.style.left = `${nodeData.pos.x + 700}px`; 
-            node.style.top = `${nodeData.pos.y + 700}px`;
+            node.style.left = `${nodeData.pos.x + 1000}px`; 
+            node.style.top = `${nodeData.pos.y + 1000}px`;
 
             const iconStyle = spriteFactory.getIconStyle(nodeData.icon);
             node.innerHTML = `
@@ -428,6 +449,43 @@ class UIManager {
             };
 
             container.appendChild(node);
+        }
+    }
+
+    /**
+     * 动态调整 SVG 尺寸防止连线被截断
+     */
+    updateSvgDimensions(svg) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const paths = svg.querySelectorAll('path');
+        if (paths.length === 0) return;
+
+        paths.forEach(path => {
+            const x1 = parseFloat(path.dataset.x1);
+            const y1 = parseFloat(path.dataset.y1);
+            const x2 = parseFloat(path.dataset.x2);
+            const y2 = parseFloat(path.dataset.y2);
+            const cx = parseFloat(path.dataset.cx);
+            const cy = parseFloat(path.dataset.cy);
+
+            minX = Math.min(minX, x1, x2, cx);
+            minY = Math.min(minY, y1, y2, cy);
+            maxX = Math.max(maxX, x1, x2, cx);
+            maxY = Math.max(maxY, y1, y2, cy);
+        });
+
+        // 增加边距缓冲
+        const padding = 100;
+        const width = maxX + padding;
+        const height = maxY + padding;
+
+        svg.style.width = `${width}px`;
+        svg.style.height = `${height}px`;
+        // 同时更新容器尺寸以确保背景能覆盖
+        const container = document.getElementById('talent-container');
+        if (container) {
+            container.style.width = `${width}px`;
+            container.style.height = `${height}px`;
         }
     }
 

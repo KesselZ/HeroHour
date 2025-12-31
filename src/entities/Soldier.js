@@ -673,8 +673,20 @@ export class BaseUnit extends THREE.Group {
     }
 
     updateAI(enemies, allies) {
-        if (!this.target || this.target.isDead) {
-            this.target = this.findNearestEnemy(enemies);
+        // 1. 基础逻辑：目标死亡或不存在时索敌
+        const needsNewTarget = !this.target || this.target.isDead;
+        
+        // 2. 优化：远程单位在准备好攻击时重新索敌，增加灵活性
+        // 设定 2.0 为远程阈值，确保他们总是攻击当前最近的威胁
+        const isRanged = this.attackRange > 2.0;
+        const isReadyToAttack = (Date.now() - this.lastAttackTime) >= this.attackCooldownTime;
+        const shouldRefreshTarget = isRanged && isReadyToAttack;
+
+        if (needsNewTarget || shouldRefreshTarget) {
+            const newTarget = this.findNearestEnemy(enemies);
+            if (newTarget) {
+                this.target = newTarget;
+            }
         }
     }
 
@@ -793,6 +805,89 @@ export class BaseUnit extends THREE.Group {
 
             // 默认单体攻击
             this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5, this.isHero);
+        }
+    }
+
+    /**
+     * 核心重构：通用的多段攻击 (Burst Attack) 支持
+     * 解决了手动使用 setTimeout 导致的逻辑零散与难以维护问题
+     * @param {Object} options { count, interval, damage, type, vfx, sound, onHit }
+     */
+    executeBurstAttack(options) {
+        const { 
+            count = 1, 
+            interval = 150, 
+            damage = this.attackDamage,
+            isAOE = false,
+            aoeRadius = 2.0,
+            aoeAngle = Math.PI * 2,
+            vfxName = null,
+            projectileType = null,
+            projectileColor = 0xffffff,
+            projectileScale = 1.0,
+            projectilePenetration = 0,
+            soundName = 'attack_melee',
+            noLunge = false
+        } = options;
+
+        for (let i = 0; i < count; i++) {
+            setTimeout(() => {
+                if (this.isDead) return;
+
+                // 1. 动画与音效 (仅第一段触发位移动画，后续仅触发受击感)
+                if (soundName) audioManager.play(soundName, { volume: 0.25, pitchVar: 0.2 });
+                if (i === 0) {
+                    this.onAttackAnimation(noLunge);
+                }
+
+                // 2. 视觉特效 (VFX)
+                if (vfxName && window.battle) {
+                    window.battle.playVFX(vfxName, { 
+                        unit: this, 
+                        pos: isAOE ? this.position : null,
+                        radius: aoeRadius, 
+                        color: projectileColor, 
+                        duration: interval + 100 
+                    });
+                }
+
+                // 3. 伤害逻辑处理
+                if (projectileType && this.projectileManager && this.target) {
+                    // 远程/弹道模式
+                    const spawnPos = this.position.clone().add(new THREE.Vector3(0, 0.8, 0));
+                    // 气剑等连发时的扇形偏移
+                    if (count > 1) {
+                        const offset = (i - (count-1)/2) * 0.4;
+                        spawnPos.x += offset;
+                    }
+                    this.projectileManager.spawn({
+                        startPos: spawnPos,
+                        target: this.target,
+                        speed: 0.25,
+                        damage: damage,
+                        type: projectileType,
+                        color: projectileColor,
+                        scale: projectileScale,
+                        penetration: projectilePenetration,
+                        isHeroSource: this.isHero
+                    });
+                } else if (isAOE) {
+                    // 范围攻击模式
+                    const targets = (this.side === 'player') ? 
+                        (window.battle?.enemyUnits || []) : 
+                        (window.battle?.playerUnits || []);
+                    
+                    this.executeAOE(targets, {
+                        radius: aoeRadius,
+                        angle: aoeAngle,
+                        damage: damage,
+                        knockbackForce: 0.035
+                    });
+                } else if (this.target && !this.target.isDead) {
+                    // 基础单体模式
+                    this.target.takeDamage(damage + (rng.next() - 0.5) * 5, this.isHero);
+                }
+            }, i * interval);
         }
     }
 
@@ -1415,26 +1510,14 @@ export class HeroUnit extends BaseUnit {
      */
     performChunyangAttack(enemies, details) {
         if (!this.target || this.target.isDead) return;
-        const swordCount = details.burstCount || 5; 
-        for (let i = 0; i < swordCount; i++) {
-            setTimeout(() => {
-                if (this.isDead || !this.target || this.target.isDead) return;
-                
-                // 每柄气剑发射时播放音效
-                audioManager.play('attack_air_sword', { volume: 0.2, force: true, pitchVar: 0.3 });
-
-                const offset = new THREE.Vector3((i - (swordCount-1)/2) * 0.5, 1.2, (rng.next() - 0.5) * 0.5);
-                const spawnPos = this.position.clone().add(offset);
-                this.projectileManager?.spawn({
-                    startPos: spawnPos,
-                    target: this.target,
-                    speed: 0.25,
-                    damage: this.attackDamage, 
-                    type: 'air_sword',
-                    isHeroSource: true // 确保命中时的音效也是 100%
-                });
-            }, i * 100);
-        }
+        this.executeBurstAttack({
+            count: details.burstCount || 3,
+            interval: 100,
+            damage: this.attackDamage,
+            projectileType: 'air_sword',
+            projectileColor: 0x00ffff,
+            soundName: 'attack_air_sword'
+        });
     }
 }
 
@@ -1943,9 +2026,9 @@ export class TianyiElder extends BaseUnit {
                 target: this.target, 
                 speed: 0.2, 
                 damage: this.attackDamage, 
-                type: 'wave',
-                scale: 2.0,
-                color: 0x00ff88 
+                type: 'fireball', // 改用火球效果
+                scale: 0.8, // 缩小尺寸
+                color: 0x006600 // 暗绿色
             });
         }
     }
@@ -2257,14 +2340,10 @@ export class RedCultFireMage extends BaseUnit {
                     speed: 0.2,
                     damage: this.attackDamage,
                     type: 'fireball',
-                    onHit: (targetPos) => {
-                        // 击中时触发 pulse 特效和范围伤害
-                        if (window.battle) {
-                            window.battle.playVFX('pulse', { pos: targetPos, radius: 2.5, color: 0xff4400, duration: 500 });
-                            const targets = window.battle.getUnitsInArea(targetPos, { shape: 'circle', radius: 2.5 }, 'enemy');
-                            window.battle.applyDamageToUnits(targets, this.attackDamage);
-                        }
-                    }
+                    scale: 0.5, // 尺寸缩小 50%
+                    explosionRadius: 2.5,
+                    explosionColor: 0xff4400,
+                    explosionVFX: 'fire_explosion'
                 });
             }
         }
@@ -2343,26 +2422,16 @@ export class Cangjian extends BaseUnit {
             this.lastAttackTime = now;
 
             const details = worldManager.getUnitBlueprint('cangjian');
-            const burstCount = details.burstCount || 3;
-
-            // 核心修正：藏剑弟子也改为爆发模式，缩小范围 (1.5)
-            for (let i = 0; i < burstCount; i++) {
-                setTimeout(() => {
-                    if (this.isDead) return;
-                    // 补全音效：每一段旋风斩都播放挥砍音效
-                    audioManager.play('attack_melee', { volume: 0.2, chance: 0.8, pitchVar: 0.2 });
-                    
-                    this.onAttackAnimation(true); // 旋风斩禁用位移
-                    // 核心修复：使用修正后的 attackRange (Point 1)
-                    window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: this.attackRange, color: 0xffcc00, duration: 500 });
-                    this.executeAOE(enemies, {
-                        radius: this.attackRange,
-                        angle: Math.PI * 2,
-                        damage: this.attackDamage,
-                        knockbackForce: 0.035
-                    });
-                }, i * 250); // 间隔拉长
-            }
+            this.executeBurstAttack({
+                count: details.burstCount || 3,
+                interval: 250,
+                damage: this.attackDamage,
+                isAOE: true,
+                aoeRadius: this.attackRange,
+                vfxName: 'cangjian_whirlwind',
+                soundName: 'attack_melee',
+                noLunge: true
+            });
         }
     }
 }
@@ -2410,24 +2479,16 @@ export class CYSwordArray extends BaseUnit {
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
             this.lastAttackTime = now;
-            this.onAttackAnimation();
-            audioManager.play('attack_air_sword', { volume: 0.3 });
-
-            // 发射两枚具有穿透力的气剑
-            for (let i = 0; i < 2; i++) {
-                setTimeout(() => {
-                    if (this.isDead || !this.target || this.target.isDead) return;
-                    this.projectileManager?.spawn({ 
-                        startPos: this.position.clone().add(new THREE.Vector3((i-0.5)*0.4, 0.8, 0)), 
-                        target: this.target, 
-                        speed: 0.2, 
-                        damage: this.attackDamage / 2, 
-                        type: 'air_sword',
-                        penetration: 2, // 穿透 2 个目标
-                        color: 0x88ffff 
-                    });
-                }, i * 200);
-            }
+            
+            this.executeBurstAttack({
+                count: 2,
+                interval: 200,
+                damage: this.attackDamage / 2,
+                projectileType: 'air_sword',
+                projectileColor: 0x88ffff,
+                projectilePenetration: 2,
+                soundName: 'attack_air_sword'
+            });
         }
     }
 }
@@ -2454,23 +2515,15 @@ export class CYZixiaDisciple extends BaseUnit {
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
             this.lastAttackTime = now;
-            this.onAttackAnimation();
             
             const stats = worldManager.getUnitBlueprint('cy_zixia_disciple');
-            const burstCount = stats.burstCount || 3;
-            for (let i = 0; i < burstCount; i++) {
-                setTimeout(() => {
-                    if (this.isDead || !this.target || this.target.isDead) return;
-                    audioManager.play('attack_air_sword', { volume: 0.2, pitchVar: 0.3 });
-                    this.projectileManager?.spawn({
-                        startPos: this.position.clone().add(new THREE.Vector3(0, 1.0, 0)),
-                        target: this.target,
-                        speed: 0.25,
-                        damage: this.attackDamage,
-                        type: 'air_sword'
-                    });
-                }, i * 150);
-            }
+            this.executeBurstAttack({
+                count: stats.burstCount || 3,
+                interval: 150,
+                damage: this.attackDamage,
+                projectileType: 'air_sword',
+                soundName: 'attack_air_sword'
+            });
         }
     }
 }
@@ -2560,17 +2613,12 @@ export class CJWenshui extends BaseUnit {
             this.lastAttackTime = now;
             
             const stats = worldManager.getUnitBlueprint('cj_wenshui');
-            const burstCount = stats.burstCount || 2;
-            for (let i = 0; i < burstCount; i++) {
-                setTimeout(() => {
-                    if (this.isDead || !this.target || this.target.isDead) return;
-                    
-                    audioManager.play('attack_melee', { volume: 0.25, pitchVar: 0.2 });
-                    if (i === 0) this.onAttackAnimation();
-                    
-                    this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 3);
-                }, i * 200);
-            }
+            this.executeBurstAttack({
+                count: stats.burstCount || 2,
+                interval: 200,
+                damage: this.attackDamage,
+                soundName: 'attack_melee'
+            });
         }
     }
 }
@@ -2705,25 +2753,16 @@ export class CJElder extends BaseUnit {
             this.lastAttackTime = now;
 
             const stats = worldManager.getUnitBlueprint('cj_elder');
-            const burstCount = stats.burstCount || 3;
-            for (let i = 0; i < burstCount; i++) {
-                setTimeout(() => {
-                    if (this.isDead) return;
-                    audioManager.play('attack_melee', { volume: 0.4, pitchVar: 0.1 });
-                    this.onAttackAnimation(true);
-                    
-                    if (window.battle && window.battle.playVFX) {
-                        window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: this.attackRange, color: 0xffcc00, duration: 500 });
-                    }
-                    
-                    this.executeAOE(enemies, {
-                        radius: this.attackRange,
-                        angle: Math.PI * 2,
-                        damage: this.attackDamage,
-                        knockbackForce: 0.05
-                    });
-                }, i * 300);
-            }
+            this.executeBurstAttack({
+                count: stats.burstCount || 3,
+                interval: 300,
+                damage: this.attackDamage,
+                isAOE: true,
+                aoeRadius: this.attackRange,
+                vfxName: 'cangjian_whirlwind',
+                soundName: 'attack_melee',
+                noLunge: true
+            });
         }
     }
 }
@@ -2956,6 +2995,19 @@ export class TCDualBlade extends BaseUnit {
             projectileManager,
             cost: stats.cost
         });
+    }
+
+    performAttack(enemies, allies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.executeBurstAttack({
+                count: 2,
+                interval: 150,
+                damage: this.attackDamage,
+                soundName: 'attack_melee'
+            });
+        }
     }
 }
 

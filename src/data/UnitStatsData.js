@@ -104,10 +104,10 @@ export const UNIT_STATS_DATA = {
         name: '李忘生', 
         range: 15.0, 
         rangeType: '五剑连发', 
+        burstCount: 3, 
         attackSpeed: 1000, 
-        burstCount: 5, 
-        targets: 1.0,
-        description: '纯阳掌门，剑气凌人，擅长远程密集压制。' 
+        speed: 6.0,
+        description: '纯阳现任掌门。虚怀若谷，正气凛然。'
     },
     'lichengen': { 
         name: '李承恩', 

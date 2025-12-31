@@ -268,6 +268,103 @@ export class VFXLibrary {
         });
     }
 
+    /**
+     * 火球爆炸特效：核心白光脉冲 + 扩散火球 + 升腾烟雾粒子
+     */
+    createFireExplosionVFX(pos, radius, color, duration) {
+        const actualParent = this.scene;
+        
+        // --- 核心修正：将爆炸特效锚定在地面 ---
+        // 弹道击中时 pos 是在空中（约 0.6 高度），但爆炸效果应该以敌人脚下为基准
+        const groundPos = pos.clone();
+        groundPos.y = 0.05; // 略高于地面，避免 z-fighting
+        
+        // 1. 核心白光脉冲 (瞬间爆发感)
+        const flashGeo = new THREE.SphereGeometry(radius * 0.5, 16, 16);
+        const flashMat = this._createMaterial({ 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 1.0,
+            blending: THREE.AdditiveBlending 
+        });
+        const flash = new THREE.Mesh(flashGeo, flashMat);
+        flash.position.copy(groundPos);
+        actualParent.add(flash);
+
+        // 2. 扩散的火环 (波纹感) - 现在完全贴合地面
+        const ringGeo = new THREE.RingGeometry(0.1, radius, 32);
+        const ringMat = this._createMaterial({ 
+            color: color, 
+            transparent: true, 
+            opacity: 0.8,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(groundPos);
+        ring.rotation.x = -Math.PI / 2;
+        actualParent.add(ring);
+
+        const startTime = Date.now();
+        const anim = () => {
+            const elapsed = Date.now() - startTime;
+            const prg = elapsed / duration;
+            if (prg < 1) {
+                // 核心闪光迅速缩小消失
+                const flashS = 1 + prg * 2;
+                flash.scale.set(flashS, flashS, flashS);
+                flashMat.opacity = 1 - prg * 2;
+                if (flashMat.opacity < 0) flashMat.opacity = 0;
+
+                // 火环向外扩散淡出
+                ring.scale.set(1 + prg * 0.5, 1 + prg * 0.5, 1);
+                ringMat.opacity = 0.8 * (1 - prg);
+
+                requestAnimationFrame(anim);
+            } else {
+                actualParent.remove(flash);
+                actualParent.remove(ring);
+                flashGeo.dispose(); flashMat.dispose();
+                ringGeo.dispose(); ringMat.dispose();
+            }
+        };
+        anim();
+
+        // 3. 升腾的烟火粒子 - 从地面开始上升
+        this.createParticleSystem({
+            pos: groundPos.clone(),
+            color: color,
+            duration: duration * 1.5,
+            density: 3,
+            spawnRate: 50,
+            geometry: new THREE.BoxGeometry(0.15, 0.15, 0.15),
+            initFn: (p) => {
+                const angle = Math.random() * Math.PI * 2;
+                const r = radius * Math.random() * 0.8;
+                p.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+                p.userData.vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.1,
+                    0.05 + Math.random() * 0.1,
+                    (Math.random() - 0.5) * 0.1
+                );
+            },
+            updateFn: (p, prg) => {
+                p.position.add(p.userData.vel);
+                p.rotation.set(p.rotation.x + 0.1, p.rotation.y + 0.1, p.rotation.z + 0.1);
+                // 颜色演变：火红 -> 暗红 -> 灰黑
+                const c = p.material.color;
+                if (prg < 0.5) {
+                    c.lerp(new THREE.Color(0xff4400), 0.1);
+                } else {
+                    c.lerp(new THREE.Color(0x333333), 0.1);
+                }
+                p.material.opacity = 0.8 * (1 - prg);
+                p.scale.setScalar(1.2 * (1 - prg));
+            }
+        });
+    }
+
     createPulseVFX(pos, radius, color, duration, parent = null) {
         const actualParent = parent || this.scene;
         for (let i = 0; i < 3; i++) {
@@ -781,6 +878,122 @@ export class VFXLibrary {
                 p.scale.setScalar(1.5 * (1 - prg));
             }
         });
+    }
+
+    /**
+     * 三清化神：在单位身后创建 5 把环绕的气剑
+     */
+    createSanqingSwordsVFX(parent, color, duration) {
+        if (!parent || parent.isDead) return;
+
+        const group = new THREE.Group();
+        this.scene.add(group);
+
+        const swords = [];
+        const swordCount = 5;
+        const swordGeo = new THREE.BoxGeometry(0.05, 0.05, 0.8);
+        const swordMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
+
+        for (let i = 0; i < swordCount; i++) {
+            const swordGroup = new THREE.Group();
+            const mesh = new THREE.Mesh(swordGeo, swordMat);
+            // 核心修正：Pivot 设在剑柄末端 (0,0,0)，+Z 轴指向剑尖。
+            // 剑身中心在 0.4，覆盖 0 到 0.8
+            mesh.position.z = 0.4; 
+            swordGroup.add(mesh);
+
+            // 护手放在靠近剑柄的位置
+            const hiltGeo = new THREE.BoxGeometry(0.25, 0.05, 0.05);
+            const hilt = new THREE.Mesh(hiltGeo, swordMat);
+            hilt.position.z = 0.2; // 留出 0.2 的剑柄空间
+            swordGroup.add(hilt);
+
+            group.add(swordGroup);
+            swords.push({
+                obj: swordGroup,
+                baseAngle: (i / swordCount) * Math.PI * 2,
+                state: 'follow', // follow, attack, return
+                targetUnit: null,
+                attackStartTime: 0
+            });
+        }
+
+        const startTime = Date.now();
+        const anim = () => {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > duration || parent.isDead) {
+                this.scene.remove(group);
+                swordGeo.dispose();
+                swordMat.dispose();
+                return;
+            }
+
+            const time = elapsed * 0.002;
+            swords.forEach((s, i) => {
+                if (s.state === 'follow') {
+                    // 环绕逻辑
+                    const angle = s.baseAngle + time;
+                    const radius = 1.2;
+                    const targetX = parent.position.x + Math.cos(angle) * radius;
+                    const targetZ = parent.position.z + Math.sin(angle) * radius;
+                    const targetY = parent.position.y + 0.8 + Math.sin(time * 2 + i) * 0.15; // 稍微抬高并增加起伏
+
+                    const targetPos = new THREE.Vector3(targetX, targetY, targetZ);
+                    s.obj.position.lerp(targetPos, 0.1);
+                    
+                    // 闲置状态：剑尖垂直向下
+                    // 由于 Pivot 在剑柄，+Z 指向剑尖，我们将 +Z 轴旋转到指向下方 (-Y)
+                    // 使用 lookAt 指向正下方，确保方向一致性
+                    const downPos = s.obj.position.clone().add(new THREE.Vector3(0, -1, 0));
+                    s.obj.lookAt(downPos);
+                } else if (s.state === 'attack' && s.targetUnit) {
+                    // 攻击冲刺逻辑
+                    const attackProgress = (Date.now() - s.attackStartTime) / 400; 
+                    if (attackProgress < 1) {
+                        const targetPos = s.targetUnit.position.clone().add(new THREE.Vector3(0, 0.5, 0));
+                        
+                        // 重置旋转以允许 lookAt 正常工作（或者 lookAt 会自动覆盖）
+                        s.obj.lookAt(targetPos);
+                        
+                        // 为了让剑尖 (z=0.8) 恰好刺中敌人，剑柄 (Pivot) 应该停在距离敌人 0.8 的位置
+                        const direction = targetPos.clone().sub(s.obj.position).normalize();
+                        const hiltTarget = targetPos.clone().sub(direction.multiplyScalar(0.8));
+                        
+                        s.obj.position.lerp(hiltTarget, attackProgress);
+                    } else {
+                        s.state = 'return';
+                        s.attackStartTime = Date.now();
+                    }
+                } else if (s.state === 'return') {
+                    // 返回逻辑
+                    const returnProgress = (Date.now() - s.attackStartTime) / 400;
+                    const targetPos = parent.position.clone().add(new THREE.Vector3(0, 0.5, 0));
+                    if (returnProgress < 1) {
+                        // 返回时剑尖指向英雄
+                        s.obj.lookAt(targetPos);
+                        s.obj.position.lerp(targetPos, returnProgress);
+                    } else {
+                        s.state = 'follow';
+                    }
+                }
+            });
+
+            requestAnimationFrame(anim);
+        };
+        anim();
+
+        return {
+            group,
+            swords,
+            attack: (index, target) => {
+                const s = swords[index];
+                if (s && s.state === 'follow') {
+                    s.state = 'attack';
+                    s.targetUnit = target;
+                    s.attackStartTime = Date.now();
+                }
+            }
+        };
     }
 
     /**

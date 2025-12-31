@@ -30,6 +30,7 @@ export const ASSET_REGISTRY = {
         TALENT5: '/assets/talents/talent5.png',
         TALENT6: '/assets/talents/talent6.png',
         TALENT_TIANCE: '/assets/talents/talent_tiance.png',
+        TALENT_TIANCE2: '/assets/talents/talent_tiance2.png',
         BUILDING2: '/assets/buildings/building2.png',
         BUILDING3: '/assets/buildings/building3.png',
         CHUNYANG: '/assets/characters/chunyang.png',
@@ -40,6 +41,7 @@ export const ASSET_REGISTRY = {
         CANGJIAN3: '/assets/characters/cangjian3.png',
         TIANCE: '/assets/characters/tiance.png',
         TIANCE2: '/assets/characters/tiance2.png',
+        TIANCE3: '/assets/characters/tiance3.png',
         TIANCE4: '/assets/characters/tiance4.png'
     },
     UNITS: {
@@ -60,6 +62,7 @@ export const ASSET_REGISTRY = {
         'skill_liangyi':         { name: '两仪化形图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 4, c: 3 },
         'skill_wanshi':          { name: '万世不竭图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 3, c: 3 },
         'skill_huasanqing':      { name: '化三清图标', sheet: 'SKILL8', rows: 4, cols: 4, r: 3, c: 1 },
+        'skill_sanqing_huashen': { name: '三清化神图标', sheet: 'SKILL8', rows: 4, cols: 4, r: 3, c: 2 },
         'skill_hegui':           { name: '鹤归孤山图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 2, c: 2 },
         'skill_fengcha':         { name: '峰插云景图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 1, c: 3 },
         'skill_songshe':         { name: '松舍问霞图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 2, c: 3 },
@@ -76,7 +79,7 @@ export const ASSET_REGISTRY = {
         'skill_tu': { name: '突图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 2, c: 1 },
 
         // --- 主角 ---
-        'liwangsheng': { name: '李忘生', sheet: 'CHUNYANG3', rows: 4, cols: 4, r: 3, c: 1, scale: 1.4, defaultFacing: 'left' },
+        'liwangsheng': { name: '李忘生', sheet: 'CHUNYANG3', rows: 4, cols: 4, r: 3, c: 1, scale: 1.4, defaultFacing: 'right' },
         'lichengen': { name: '李承恩', sheet: 'TIANCE4', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
         'yeying': { name: '叶英', sheet: 'CANGJIAN', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'right' },
         
@@ -123,9 +126,9 @@ export const ASSET_REGISTRY = {
 
         // --- 奇穴节点 (Talent Nodes) ---
         // 商道系列 (TALENT1)
-        'talent_gold_base': { name: '金钱产出', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_loot':      { name: '战利奖励', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 2 },
-        'talent_wood':      { name: '木材节约', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_gold_base': { name: '生财有道', sheet: 'TALENT3', rows: 4, cols: 4, r: 2, c: 2 },
+        'talent_loot':      { name: '赏金猎人', sheet: 'TALENT3', rows: 4, cols: 4, r: 3, c: 2 },
+        'talent_wood':      { name: '以物易物', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 3 },
         'talent_monopoly':  { name: '资源垄断', sheet: 'TALENT1', rows: 4, cols: 4, r: 2, c: 1 },
 
         // 武道/演武系列 (TALENT2)
@@ -133,6 +136,9 @@ export const ASSET_REGISTRY = {
         'talent_combo':       { name: '连招联动', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 2 },
         'talent_mp':          { name: '内力根基', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 3 },
         'talent_spell_epic':  { name: '功参造化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 1 },
+        'talent_chunyang_duration': { name: '气场时长', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 2 },
+        'talent_chunyang_radius':   { name: '气场范围', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 3 },
+        'talent_chunyang_huasanqing': { name: '化三清强化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 4 },
 
         // 将道/兵流系列 (TALENT3)
         'talent_army_hp':   { name: '军队气血', sheet: 'TALENT3', rows: 4, cols: 4, r: 1, c: 1 },
@@ -148,14 +154,15 @@ export const ASSET_REGISTRY = {
         // 基础属性与爆发 (TALENT5 & TALENT6)
         'talent_power':       { name: '力道提升', sheet: 'TALENT5', rows: 4, cols: 4, r: 1, c: 1 },
         'talent_haste':       { name: '加速调息', sheet: 'TALENT6', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_leadership':  { name: '统御大旗', sheet: 'TALENT3', rows: 4, cols: 4, r: 3, c: 1 },
-        'talent_power_epic':  { name: '神力惊世', sheet: 'TALENT5', rows: 4, cols: 4, r: 2, c: 1 },
+        'talent_leadership':  { name: '统御大旗', sheet: 'TALENT5', rows: 4, cols: 4, r: 1, c: 1 },
+        'talent_power_epic':  { name: '惊世神力', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 2 },
         'talent_haste_epic':  { name: '迅疾如风', sheet: 'TALENT6', rows: 4, cols: 4, r: 2, c: 1 },
 
         // 天策专属系列 (TALENT_TIANCE)
         'talent_tiance_sweep':    { name: '横扫图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 1 },
         'talent_tiance_cavalry':  { name: '骑兵图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 2 },
-        'talent_tiance_tu':       { name: '奔雷图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_tiance_tu':       { name: '奔雷枪术', sheet: 'TALENT_TIANCE2', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_tiance_monarch':  { name: '王者之气', sheet: 'TALENT_TIANCE2', rows: 4, cols: 4, r: 3, c: 1 },
         'talent_tiance_bleeding': { name: '龙牙图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 4 },
 
         // 藏剑专属
@@ -271,7 +278,7 @@ export const ASSET_REGISTRY = {
         // --- 天策扩充势力单位 ---
         'tc_crossbow': { name: '天策羽林弩手', sheet: 'TIANCE', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'right' },
         'tc_banner': { name: '天策战旗使', sheet: 'TIANCE', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4, defaultFacing: 'right' },
-        'tc_dual_blade': { name: '天策双刃校尉', sheet: 'TIANCE3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'right' },
+        'tc_dual_blade': { name: '天策双刃校尉', sheet: 'TIANCE3', rows: 4, cols: 4, r: 4, c: 4, scale: 1.4, defaultFacing: 'right' },
         'tc_halberdier': { name: '持戟中郎将', sheet: 'TIANCE', rows: 4, cols: 4, r: 1, c: 4, scale: 1.5, defaultFacing: 'right' },
         'tc_shield_vanguard': { name: '天策前锋', sheet: 'TIANCE', rows: 4, cols: 4, r: 4, c: 4, scale: 1.5, defaultFacing: 'right' },
         'tc_mounted_crossbow': { name: '骁骑弩手', sheet: 'TIANCE4', rows: 4, cols: 4, r: 2, c: 4, scale: 1.5, defaultFacing: 'right' },

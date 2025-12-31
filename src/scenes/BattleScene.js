@@ -726,7 +726,7 @@ export class BattleScene {
 
         if (skill.targeting.type === 'location') {
             this.activeSkill = skillId;
-            this.showSkillIndicator(skill.targeting);
+            this.showSkillIndicator(skillId, skill.targeting);
         } else {
             this.executeSkill(skillId);
         }
@@ -811,11 +811,18 @@ export class BattleScene {
         update();
     }
 
-    showSkillIndicator(config) {
+    showSkillIndicator(skillId, config) {
         this.hideSkillIndicator();
-        // range: 释放距离, impactRadius: 生效半径, radius: 兼容旧逻辑
-        const { shape = 'circle', radius = 1, impactRadius, range = 0 } = config;
-        const visualRadius = impactRadius || radius;
+        const skill = SkillRegistry[skillId];
+        if (!skill) return;
+
+        // 核心：使用 getActualRadius 获取最终半径（尊重 CoC 修正器）
+        const heroData = this.worldManager.heroData;
+        const baseRadius = config.impactRadius || config.radius || 1;
+        const actualRadius = skill.getActualRadius(heroData, baseRadius);
+
+        // range: 释放距离
+        const { range = 0, shape = 'circle' } = config;
         
         const group = new THREE.Group();
         
@@ -831,7 +838,7 @@ export class BattleScene {
         }
 
         // 2. 技能生效预览圈 (随鼠标移动)
-        let geo = (shape === 'circle') ? new THREE.CircleGeometry(visualRadius, 32) : new THREE.PlaneGeometry(visualRadius * 2, visualRadius * 2);
+        let geo = (shape === 'circle') ? new THREE.CircleGeometry(actualRadius, 32) : new THREE.PlaneGeometry(actualRadius * 2, actualRadius * 2);
         const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.2, depthWrite: false });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = -Math.PI / 2;
@@ -920,6 +927,9 @@ export class BattleScene {
                 break;
             case 'cangjian_whirlwind': 
                 this.vfxLibrary.createWhirlwindVFX(vfxPos, radius, color, duration, parent); 
+                break;
+            case 'fire_explosion':
+                this.vfxLibrary.createFireExplosionVFX(vfxPos, radius, color, duration);
                 break;
             case 'rising_particles': 
                 this.vfxLibrary.createParticleSystem({
@@ -1023,8 +1033,53 @@ export class BattleScene {
     }
 
     /**
+     * 三清化神逻辑实现
+     */
+    applySanqingHuashen(caster, options) {
+        const { duration, interval, damage, swordCount, color } = options;
+        
+        // 1. 创建视觉表现
+        const vfxCtrl = this.vfxLibrary.createSanqingSwordsVFX(caster, color, duration);
+        if (!vfxCtrl) return;
+
+        const startTime = Date.now();
+        const executeCycle = () => {
+            const elapsed = Date.now() - startTime;
+            if (elapsed >= duration || !this.isActive || caster.isDead) return;
+
+            // 2. 依次发射 5 把剑，每把剑独立寻敌
+            for (let i = 0; i < swordCount; i++) {
+                setTimeout(() => {
+                    if (caster.isDead || !this.isActive) return;
+                    
+                    // 3. 动态寻找当前最近目标
+                    const target = caster.findNearestEnemy ? caster.findNearestEnemy(this.enemyUnits) : null;
+                    if (!target || target.isDead) return;
+
+                    // 触发视觉攻击
+                    vfxCtrl.attack(i, target);
+                    
+                    // 400ms 后造成伤害（对应 VFX 中的冲刺时间）
+                    setTimeout(() => {
+                        if (!target || target.isDead || !this.isActive) return;
+                        target.takeDamage(damage, true);
+                        // 播放击中音效
+                        audioManager.play('attack_air_sword', { volume: 0.15, pitchVar: 0.2 });
+                    }, 400);
+                    
+                }, i * 200); // 每把剑间隔 200ms 发射
+            }
+
+            // 下一个周期
+            setTimeout(executeCycle, interval);
+        };
+
+        // 立即开始第一个周期
+        executeCycle();
+    }
+
+    /**
      * 持续伤害 API (DOT - Damage Over Time)
-     * 适用于流血、中毒等直接挂在单位身上的效果
      */
     applyDOT(unit, options) {
         const { damage, interval, count, color = 0xff3333, isHeroSource = false } = options;
@@ -1707,7 +1762,7 @@ export class BattleScene {
     }
 
     getUnitName(type) {
-        const names = { 'melee': '天策弟子', 'ranged': '长歌弟子', 'tiance': '天策骑兵', 'chunyang': '纯阳弟子', 'cangjian': '藏剑弟子', 'cangyun': '苍云将士', 'archer': '唐门射手', 'healer': '万花补给' };
-        return names[type] || type;
+        // 核心修复：通过 worldManager 获取中文名，彻底解决导入冲突与 ID 显示问题
+        return worldManager.getUnitDisplayName(type);
     }
 }

@@ -155,6 +155,26 @@ export const TALENT_UNITS = {
         effects: [{ type: 'modifier', target: 'hero', key: 'cangjian_jump_whirlwind_enabled', value: 1, method: 'add' }]
     },
 
+    // --- 纯阳职业特色奇穴 (仅李忘生可见) ---
+    'chunyang_array_duration': {
+        name: '不竭', icon: 'talent_chunyang_duration',
+        description: '道法自然，生生不息。所有【气场】类招式的<span class="skill-term-highlight">持续时间</span>延长 <span class="skill-num-highlight">2</span> 秒。',
+        requires: ['node_core'],
+        effects: [{ type: 'modifier', target: 'hero', key: 'category_气场_duration_offset', value: 2000, method: 'add' }]
+    },
+    'chunyang_array_radius': {
+        name: '广域', icon: 'talent_chunyang_radius',
+        description: '乾坤之内，皆为道场。所有【气场】类招式的<span class="skill-term-highlight">影响半径</span>提升 <span class="skill-num-highlight">30%</span>。',
+        requires: ['node_core'],
+        effects: [{ type: 'modifier', target: 'hero', key: 'category_气场_radius_multiplier', value: 1.3, method: 'mult' }]
+    },
+    'chunyang_huasanqing_permanent': {
+        name: '化三清·恒', icon: 'talent_chunyang_huasanqing',
+        description: '悟彻三清，气劲恒常。【化三清】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
+        requires: ['node_core'],
+        effects: [{ type: 'modifier', target: 'hero', key: 'skill_huasanqing_duration_override', value: 999000, method: 'add' }]
+    },
+
     // 基础属性类 (每个可升 3 级)
     'unit_power_base': { 
         name: '主属性', // UI 会根据英雄动态改为 力道/身法
@@ -291,6 +311,15 @@ export const TALENT_GROUPS = {
         name: '山居剑意·厚重',
         major: 'cangjian_kill_shield', // 映波锁澜 (核心：重剑杀敌获盾)
         minors: ['cangjian_jump_whirlwind', 'unit_haste_base', 'unit_spells_base'] // 层云 + 调息 + 功法
+    },
+
+    // --- 纯阳专属组 ---
+
+    // 【纯阳·气场】主打气场增益与范围控制
+    'group_chunyang_array': {
+        name: '太虚剑意·气场',
+        major: 'chunyang_array_duration', 
+        minors: ['chunyang_array_radius', 'chunyang_huasanqing_permanent', 'unit_spells_epic']
     }
 };
 
@@ -306,7 +335,8 @@ export const HERO_TREE_CONFIG = {
     'liwangsheng': {
         core: { name: '纯阳宫', icon: 'core_liwangsheng', description: '太极生两仪，剑气荡乾坤。', effects: [{ type: 'stat', stat: 'spells', value: 15 }] },
         groups: [
-            'group_military', 'group_economy', 'group_exploration', 'group_combat', 'group_attributes' // 目前全通用
+            'group_chunyang_array', // 新增：气场特色组
+            'group_military', 'group_economy', 'group_exploration', 'group_combat', 'group_attributes'
         ]
     },
     'yeying': {

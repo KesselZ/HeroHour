@@ -64,6 +64,58 @@ export class Skill {
     }
 
     /**
+     * 获取当前实际的持续时间 (考虑通用协议修正)
+     */
+    getActualDuration(heroData, baseDuration) {
+        const dummy = { side: 'player', isHero: true, type: heroData.id };
+        
+        let duration = baseDuration;
+        
+        // 1. 优先级最高：技能特定覆盖 (Override)
+        const skillOverride = modifierManager.getModifiedValue(dummy, `skill_${this.id}_duration_override`, 0);
+        if (skillOverride > 0) return skillOverride;
+
+        // 2. 类别覆盖 (Override)
+        const categoryOverride = modifierManager.getModifiedValue(dummy, `category_${this.category}_duration_override`, 0);
+        if (categoryOverride > 0) return categoryOverride;
+
+        // 3. 累加与倍率 (Offset & Multiplier)
+        // 顺序：(Base + Offset) * Multiplier
+        const offset = modifierManager.getModifiedValue(dummy, `skill_${this.id}_duration_offset`, 0) + 
+                       modifierManager.getModifiedValue(dummy, `category_${this.category}_duration_offset`, 0);
+        
+        const multiplier = modifierManager.getModifiedValue(dummy, `skill_${this.id}_duration_multiplier`, 1.0) * 
+                           modifierManager.getModifiedValue(dummy, `category_${this.category}_duration_multiplier`, 1.0);
+
+        return (duration + offset) * multiplier;
+    }
+
+    /**
+     * 获取当前实际的半径 (考虑通用协议修正)
+     */
+    getActualRadius(heroData, baseRadius) {
+        const dummy = { side: 'player', isHero: true, type: heroData.id };
+        
+        let radius = baseRadius;
+
+        // 1. 覆盖
+        const skillOverride = modifierManager.getModifiedValue(dummy, `skill_${this.id}_radius_override`, 0);
+        if (skillOverride > 0) return skillOverride;
+
+        const categoryOverride = modifierManager.getModifiedValue(dummy, `category_${this.category}_radius_override`, 0);
+        if (categoryOverride > 0) return categoryOverride;
+
+        // 2. 累加与倍率
+        const offset = modifierManager.getModifiedValue(dummy, `skill_${this.id}_radius_offset`, 0) + 
+                       modifierManager.getModifiedValue(dummy, `category_${this.category}_radius_offset`, 0);
+        
+        const multiplier = modifierManager.getModifiedValue(dummy, `skill_${this.id}_radius_multiplier`, 1.0) * 
+                           modifierManager.getModifiedValue(dummy, `category_${this.category}_radius_multiplier`, 1.0);
+
+        return (radius + offset) * multiplier;
+    }
+
+    /**
      * 获取动态描述（支持 {damage} 等占位符替换）
      */
     getDescription(heroData) {
@@ -89,16 +141,18 @@ export class Skill {
                     desc = desc.split('{tickDamage}').join(hl(finalDmg));
                 }
 
-                // 2. 持续时间预处理：如果是 VFX 且持续时间很短，除非没有别的选择，否则不作为主 duration
+                // 2. 持续时间预处理
                 const baseDur = action.duration || (action.params && action.params.duration);
                 if (baseDur) {
                     const isVFX = action.type === 'vfx';
                     const isDynamic = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
                     
-                    // 优先级：逻辑动作 > VFX 动作；长持续时间 > 短持续时间
+                    // 优先级：逻辑动作 > VFX 动作
                     if (foundDuration === null || (!isVFX && baseDur > 1000)) {
-                        foundDuration = baseDur;
-                        isDurationDynamic = isDynamic;
+                        // 核心：应用气场增强后的时长
+                        const actualDur = this.getActualDuration(heroData, baseDur);
+                        foundDuration = isDynamic ? (actualDur * skillPower) : actualDur;
+                        isDurationDynamic = isDynamic; // 修正：只有受 skillPower 影响才标记为动态(金色)
                     }
                 }
 
@@ -110,7 +164,6 @@ export class Skill {
                 }
 
                 // 4. Buff 与 护盾 加成处理
-                let bonusVal = null;
                 let isMultDynamic = false;
 
                 if (action.type === 'buff_aoe' || (action.onTickBuff)) {
@@ -119,6 +172,7 @@ export class Skill {
                         const p = buffAction.params;
                         isMultDynamic = buffAction.applySkillPowerToMultiplier !== false;
                         
+                        // 处理 multiplier 形式的 bonus
                         if (p.multiplier) {
                             const multipliers = Array.isArray(p.multiplier) ? p.multiplier : [p.multiplier];
                             const stats = Array.isArray(p.stat) ? p.stat : [p.stat];
@@ -138,6 +192,30 @@ export class Skill {
                                 
                                 const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
                                 desc = desc.split(placeholder).join(isMultDynamic ? hl(bonusPct) : normal(bonusPct));
+                            });
+                        }
+
+                        // 处理 offset 形式的 bonus (如化三清的功法提升)
+                        if (p.offset) {
+                            const offsets = Array.isArray(p.offset) ? p.offset : [p.offset];
+                            const stats = Array.isArray(p.stat) ? p.stat : [p.stat];
+
+                            offsets.forEach((o, idx) => {
+                                const statName = stats[idx] || stats[0];
+                                const currentPower = isMultDynamic ? skillPower : 1.0;
+                                
+                                let val;
+                                if (statName === 'haste') {
+                                    val = Math.round(o * currentPower * 100);
+                                } else {
+                                    val = Math.floor(o * currentPower);
+                                }
+                                
+                                const placeholder = idx === 0 ? '{bonus}' : `{bonus${idx + 1}}`;
+                                // 如果占位符还在（没被 multiplier 处理过），则替换
+                                if (desc.includes(placeholder)) {
+                                    desc = desc.split(placeholder).join(isMultDynamic ? hl(val) : normal(val));
+                                }
                             });
                         }
                     }
@@ -172,9 +250,13 @@ export class Skill {
 
         // 最后替换持续时间
         if (foundDuration !== null) {
-            const finalDur = isDurationDynamic ? (foundDuration * skillPower) : foundDuration;
-            const durStr = (finalDur / 1000).toFixed(1);
-            desc = desc.split('{duration}').join(isDurationDynamic ? hl(durStr) : normal(durStr));
+            // 特殊处理：化三清 999 秒显示为“永久”
+            if (foundDuration >= 900000) {
+                desc = desc.split('{duration}').join(hl('永久'));
+            } else {
+                const durStr = (foundDuration / 1000).toFixed(1);
+                desc = desc.split('{duration}').join(isDurationDynamic ? hl(durStr) : normal(durStr));
+            }
         }
 
         return desc;
@@ -250,19 +332,32 @@ export class Skill {
             audioManager.play(action.audio, { force: true });
         }
 
+        const heroData = battleScene.worldManager.heroData;
+
         switch (action.type) {
             case 'vfx':
                 const vfxParams = { ...action.params };
-                if (vfxParams.duration && (action.applySkillPowerToDuration || vfxParams.durationPrefix)) {
-                    vfxParams.duration *= skillPower;
+                let vfxDur = vfxParams.duration || 0;
+                if (vfxDur && (action.applySkillPowerToDuration || vfxParams.durationPrefix)) {
+                    vfxDur *= skillPower;
                 }
-                // 核心重构：无需再手动计算方向，playVFX 内部会自动补全
+                
+                // 应用气场增强
+                const finalVfxDur = this.getActualDuration(heroData, vfxDur);
+                if (vfxParams.radius) {
+                    vfxParams.radius = this.getActualRadius(heroData, vfxParams.radius);
+                }
+                vfxParams.duration = finalVfxDur;
+
                 const vfxUnit = (this.targeting.type === 'instant') ? caster : null;
                 battleScene.playVFX(action.name, { pos: center, unit: vfxUnit, ...vfxParams });
                 break;
 
             case 'damage_aoe':
                 const dmgTargeting = { ...this.targeting, ...(action.targeting || {}) };
+                if (dmgTargeting.radius) {
+                    dmgTargeting.radius = this.getActualRadius(heroData, dmgTargeting.radius);
+                }
                 if (dmgTargeting.shape === 'sector') {
                     // 核心修复：如果是瞬发扇形技能，优先朝向当前目标，否则朝向移动方向
                     if (caster.target) {
@@ -276,9 +371,13 @@ export class Skill {
                 break;
 
             case 'buff_aoe':
-                const buffTargets = battleScene.getUnitsInArea(center, this.targeting, action.side || 'all');
+                const buffTargeting = { ...this.targeting };
+                if (buffTargeting.radius) {
+                    buffTargeting.radius = this.getActualRadius(heroData, buffTargeting.radius);
+                }
+                const buffTargets = battleScene.getUnitsInArea(center, buffTargeting, action.side || 'all');
                 const isDynamicBuff = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
-                const isMultDynamic = action.applySkillPowerToMultiplier !== false; // 默认随功法提升
+                const isMultDynamic = action.applySkillPowerToMultiplier !== false; 
                 
                 const buffParams = { ...action.params };
                 if (buffParams.multiplier) {
@@ -293,7 +392,9 @@ export class Skill {
                         : (buffParams.offset * skillPower);
                 }
 
-                let finalDuration = isDynamicBuff ? action.params.duration * skillPower : action.params.duration;
+                let baseBuffDur = action.params.duration;
+                let finalBuffDur = isDynamicBuff ? baseBuffDur * skillPower : baseBuffDur;
+                finalBuffDur = this.getActualDuration(heroData, finalBuffDur);
 
                 // --- 核心：藏剑【凤鸣】时长延长 ---
                 if (action.params && action.params.tag === 'mengquan' && caster.isHero) {
@@ -324,8 +425,16 @@ export class Skill {
 
             case 'tick_effect':
                 const isDynamicTick = action.applySkillPowerToDuration || (action.params && action.params.applySkillPowerToDuration);
-                battleScene.applyTickEffect(center, action.targeting || this.targeting, {
-                    duration: isDynamicTick ? action.duration * skillPower : action.duration,
+                const tickTargeting = { ...(action.targeting || this.targeting) };
+                
+                tickTargeting.radius = this.getActualRadius(heroData, tickTargeting.radius);
+
+                let baseTickDur = action.duration;
+                let tickDuration = isDynamicTick ? baseTickDur * skillPower : baseTickDur;
+                tickDuration = this.getActualDuration(heroData, tickDuration);
+
+                battleScene.applyTickEffect(center, tickTargeting, {
+                    duration: tickDuration,
                     interval: action.interval,
                     targetSide: action.side || 'enemy',
                     onTick: (targets) => {
@@ -402,7 +511,10 @@ export class Skill {
                 break;
 
             case 'status_aoe':
-                const statusTargets = battleScene.getUnitsInArea(center, this.targeting, 'enemy');
+                const statusTargeting = { ...this.targeting };
+                statusTargeting.radius = this.getActualRadius(heroData, statusTargeting.radius);
+                
+                const statusTargets = battleScene.getUnitsInArea(center, statusTargeting, 'enemy');
                 battleScene.applyStatusToUnits(statusTargets, action.status, action.duration);
                 break;
 
@@ -458,6 +570,18 @@ export class Skill {
                     spread: action.spread || 0.5,
                     scale: action.scale || 1.0,
                     isHeroSource: caster.isHero // 关键：标记为主角来源
+                });
+                break;
+
+            case 'sanqing_huashen':
+                const sqDuration = action.applySkillPowerToDuration ? (action.duration * skillPower) : action.duration;
+                const sqDamage = action.applySkillPowerToDamage ? (action.damage * skillPower) : action.damage;
+                battleScene.applySanqingHuashen(caster, {
+                    duration: sqDuration,
+                    interval: action.interval || 3000,
+                    damage: sqDamage,
+                    swordCount: action.swordCount || 5,
+                    color: action.color || 0x00ffff
                 });
                 break;
         }

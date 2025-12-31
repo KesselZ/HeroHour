@@ -570,14 +570,36 @@ export const SkillRegistry = {
                 }
             }
         ]
-    })
+    }),
+    'sanqing_huashen': new Skill('sanqing_huashen', {
+        name: '三清化神',
+        level: '绝技',
+        category: '紫霞功',
+        icon: 'skill_sanqing_huashen',
+        cost: 65,
+        cooldown: 25000,
+        audio: 'skill_field',
+        targeting: { type: 'instant' },
+        description: '【纯阳绝技】身后化出五把气剑，持续 {duration} 秒。每过 3 秒，五把气剑将依次飞向最近敌人造成 {damage} 点伤害后返回。',
+        actions: [
+            { 
+                type: 'sanqing_huashen', 
+                duration: 8000, 
+                interval: 3000, 
+                damage: 5, 
+                swordCount: 5,
+                applySkillPowerToDamage: true,
+                applySkillPowerToDuration: true
+            }
+        ]
+    }),
 };
 
 /**
  * 定义各门派可研习的招式表
  */
 export const SectSkills = {
-    'chunyang': ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing'],
+    'chunyang': ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing', 'sanqing_huashen'],
     'tiance': ['battle_shout', 'summon_militia', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'],
     'cangjian': ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'quanningyue', 'yingmingliu', 'fenglaiwushan']
 };

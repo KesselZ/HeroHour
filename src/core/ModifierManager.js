@@ -15,11 +15,19 @@
  * ============================================================================
  * 
  * 1. 技能控制协议 (Skill Control Protocol)
- *    消费端: src/core/Skill.js -> getActualCooldown() / execute()
+ *    消费端: src/core/Skill.js -> getActualCooldown() / getActualDuration() / getActualRadius()
  *    ------------------------------------------------------------------------
- *    - [skillId]_cooldown_multiplier: [倍率] 独立乘法修正 (如: pinghu_cooldown_multiplier)
- *    - [skillId]_cooldown_override:   [绝对值] 强制覆盖 CD，优先级最高，单位 ms (如: tu_cooldown_override)
- *    - [skillId]_mana_cost_multiplier: [倍率] 内力消耗倍率
+ *    - [skillId/category]_cooldown_multiplier: [倍率] 独立乘法修正
+ *    - [skillId/category]_cooldown_override:   [绝对值] 强制覆盖 CD (ms)
+ *    - [skillId/category]_duration_offset:     [绝对值] 增加时长 (ms)
+ *    - [skillId/category]_duration_override:   [绝对值] 强制覆盖时长 (ms)
+ *    - [skillId/category]_radius_multiplier:   [倍率] 范围缩放
+ *    - [skillId/category]_mana_cost_multiplier: [倍率] 内力消耗倍率
+ * 
+ *    协议格式约定: [作用域]_[标识符]_[属性]_[方式]
+ *    作用域(Scope): skill (针对具体 ID) 或 category (针对招式类别)
+ *    属性(Property): cooldown, duration, radius, mana_cost
+ *    方式(Method): multiplier (乘法), offset (加法), override (覆盖)
  * 
  * 2. 英雄机制协议 (Hero Mechanism Protocol)
  *    消费端: src/entities/Soldier.js -> performAttack() 或其他特定逻辑
