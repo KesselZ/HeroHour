@@ -317,18 +317,27 @@ class City {
  * 大世界数据管理器 (单例)
  * 负责追踪资源、英雄兵力、城镇兵力
  */
-class WorldManager {
-    constructor() {
-        // --- 调试开关 ---
-        this.DEBUG_INFLUENCE = true; // 设为 true 即可在小地图显示势力范围
+export class WorldManager {
+    /**
+     * 全局调试配置中心 (唯一控制台)
+     * 职责：统一管理所有测试相关的 Hack 开关，保证生产环境一键切换
+     */
+    static DEBUG = {
+        ENABLED: true,             // 总开关：开启后激活下方子功能
+        REVEAL_MAP: true,          // 自动揭开全图迷雾
+        SHOW_INFLUENCE: true,      // 在小地图显示势力范围 (影响力热力图)
+        SHOW_POIS: true,           // 显示所有资源点/兴趣点标记
+        LICHENGEN_GOD_MODE: true   // 李承恩起始获得全兵种各 2 个 + 无限统御
+    };
 
+    constructor() {
         // 核心修复：显式指定 Side (针对专家建议 Point 1)
         // 这样当 WorldManager 调用 getModifiedValue 时，能正确匹配 side: 'player' 的全局修正
         this.side = 'player'; 
 
         // 0. 势力定义
         this.availableHeroes = {
-            'qijin': { name: '祁进', title: '紫虚子', icon: 'qijin', sect: 'chunyang', color: '#44ccff', primaryStat: '力道' }, 
+            'liwangsheng': { name: '李忘生', title: '纯阳掌门', icon: 'liwangsheng', sect: 'chunyang', color: '#44ccff', primaryStat: '力道' }, 
             'lichengen': { name: '李承恩', title: '天策府统领', icon: 'lichengen', sect: 'tiance', color: '#ff4444', primaryStat: '力道' }, 
             'yeying': { name: '叶英', title: '藏剑大庄主', icon: 'cangjian', sect: 'cangjian', color: '#ffcc00', primaryStat: '身法' } 
         };
@@ -343,7 +352,7 @@ class WorldManager {
 
         // 2. 英雄数据 (持久化状态)
         this.heroData = {
-            id: 'qijin', // 默认，初始化时会被覆盖
+            id: 'liwangsheng', // 默认，初始化时会被覆盖
             level: 1,
             xp: 0,
             xpMax: 120, // 下一级所需经验 (使用新公式：L=0时为120)
@@ -366,16 +375,7 @@ class WorldManager {
             }
         };
 
-        this.heroArmy = {
-            'melee': 4,
-            'ranged': 3,
-            'tiance': 0,
-            'chunyang': 0,
-            'cangjian': 0,
-            'cangyun': 0,
-            'archer': 0,
-            'healer': 0
-        };
+        this.heroArmy = {}; // 初始为空，由 initHeroArmy 初始化
 
         // 3. 城镇中的兵力与建设
         this.cities = {
@@ -468,11 +468,11 @@ class WorldManager {
             },
             'chunyang_changge': {
                 name: '纯阳长歌众',
-                overworldIcon: 'qijin', 
+                overworldIcon: 'liwangsheng', 
                 unitPool: ['chunyang', 'ranged'],
                 basePoints: 70,
                 baseWeight: 0.1, // 从 0 改为 0.1，允许极低概率全图偶遇
-                sectHero: 'qijin', 
+                sectHero: 'liwangsheng', 
                 description: '纯阳与长歌的弟子结伴而行，攻守兼备。'
             },
             'tiance_disciples_group': {
@@ -594,8 +594,89 @@ class WorldManager {
                 basePoints: 220,        
                 baseWeight: 0.1,
                 description: '红衣教最狂暴的部队，所到之处皆为焦土。'
+            },
+            'chunyang_rogues': {
+                name: '纯阳巡山弟子',
+                overworldIcon: 'cy_taixu_disciple',
+                unitPool: ['cy_twin_blade', 'cy_taixu_disciple', 'cy_zixia_disciple'],
+                basePoints: 80,
+                baseWeight: 0.1,
+                sectHero: 'liwangsheng',
+                description: '在门派周围巡视的纯阳弟子，对擅闯者绝不留情。'
+            },
+            'chunyang_trial': {
+                name: '纯阳真传高手',
+                overworldIcon: 'cy_sword_array',
+                unitPool: ['cy_twin_blade', 'cy_sword_array', 'cy_zixia_disciple', 'cy_taixu_disciple'],
+                basePoints: 120,
+                baseWeight: 0.1,
+                sectHero: 'liwangsheng',
+                description: '由数位真传弟子组成的精锐小队，剑法超群，是极大的威胁。'
+            },
+            'cangjian_patrol': {
+                name: '藏剑巡山弟子',
+                overworldIcon: 'cj_wenshui',
+                unitPool: ['cj_retainer', 'cj_wenshui', 'cj_golden_guard'],
+                basePoints: 80,
+                baseWeight: 0.1,
+                sectHero: 'yeying',
+                description: '在西湖边巡视的藏剑弟子，个个身姿轻盈，剑法凌厉。'
+            },
+            'cangjian_master': {
+                name: '藏剑真传高手',
+                overworldIcon: 'cj_elder',
+                unitPool: ['cj_shanju', 'cj_xinjian', 'cj_elder'],
+                basePoints: 150,
+                baseWeight: 0.1,
+                sectHero: 'yeying',
+                description: '由藏剑山庄真传弟子和长老组成的精锐，重剑无锋，大巧不工。'
             }
         };
+    }
+
+    /**
+     * 初始化英雄起始兵力
+     * 职责：确保不同英雄、不同模式下的开局兵力配置高度统一且数据驱动
+     */
+    initHeroArmy(heroId) {
+        // 1. 定义标准开局 (Source of Truth for normal gameplay)
+        const standardStart = {
+            'melee': 4,
+            'ranged': 3
+        };
+
+        // 2. 调试模式判定
+        const useDebugArmy = WorldManager.DEBUG.ENABLED && 
+                             WorldManager.DEBUG.LICHENGEN_GOD_MODE && 
+                             heroId === 'lichengen';
+
+        if (useDebugArmy) {
+            console.log("%c[DEBUG] %c李承恩神将模式激活：获得全兵种各 2 名，统御上限解锁", "color: #ff4444; font-weight: bold", "color: #fff");
+            
+            const godArmy = {};
+            // 遍历所有合法兵种
+            for (const type in UNIT_STATS_DATA) {
+                // 排除非战斗兵种的 ID (即排除英雄本人)
+                if (!['liwangsheng', 'lichengen', 'yeying'].includes(type)) {
+                    godArmy[type] = 2;
+                }
+            }
+            this.heroArmy = godArmy;
+            
+            // 暴力解锁统御上限，保证能带下
+            this.heroData.stats.leadership = 999;
+        } else {
+            // 正常逻辑：应用标准开局
+            this.heroArmy = { ...standardStart };
+        }
+    }
+
+    /**
+     * 获取全图探索数据 (用于调试模式)
+     */
+    revealFullMap() {
+        if (!this.mapState.exploredMap) return;
+        this.mapState.exploredMap.fill(1);
     }
 
     /**
@@ -670,6 +751,30 @@ class WorldManager {
             random -= weight;
         }
         return entries[0][0];
+    }
+
+    /**
+     * 获取局部生成密度乘子 (1.0 - 4.0)
+     * 职责：根据势力影响力动态调整物体的疏密程度
+     */
+    getDensityMultiplier(worldX, worldZ) {
+        let multiplier = 1.0;
+        const centers = (this.mapState && this.mapState.influenceCenters) || [];
+        
+        centers.forEach(center => {
+            const dist = Math.sqrt(Math.pow(worldX - center.x, 2) + Math.pow(worldZ - center.z, 2));
+            if (dist > center.radius) return;
+
+            // 计算平滑的影响力系数 (1.0 -> 0.0)
+            const influence = 0.5 * (1 + Math.cos(Math.PI * (dist / center.radius)));
+            
+            // 强度叠加：根据中心类型增加密度
+            if (center.type === 'sect') multiplier += influence * 1.5; // 门派最高 +1.5 (共 2.5倍)
+            else if (center.type === 'evil') multiplier += influence * 3.0; // 邪恶据点最高 +3.0 (共 4.0倍)
+            else if (center.type === 'player_home') multiplier += influence * 0.5; // 新手村最高 +0.5 (共 1.5倍)
+        });
+
+        return Math.min(4.0, multiplier); // 严格限制最高 4 倍
     }
 
     /**
@@ -1133,81 +1238,93 @@ class WorldManager {
             }
         });
 
-        // --- 4. 随机实体生成 (重构：泊松盘采样) ---
-        // 使用泊松盘采样生成分布均匀的候选点，最小间距为 3.0 (约 3 个格子)
-        const candidatePoints = this._poissonDiskSampling(size, size, 3.0);
+        // --- 4. 随机实体生成 (回归：优雅的网格随机采样) ---
+        // 这种方式能带来比泊松采样更自然的疏密变化，同时保留了新系统的所有特性
+        const occupied = new Uint8Array(size * size); 
         const playerSpawnX = this.mapState.playerPos.x;
         const playerSpawnZ = this.mapState.playerPos.z;
 
-        candidatePoints.forEach(p => {
-            const x = Math.floor(p.x);
-            const z = Math.floor(p.y);
+        for (let z = 0; z < size; z++) {
+            for (let x = 0; x < size; x++) {
+                // 1. 基础合法性检查
+                if (!generator.isSafeGrass(x, z)) continue;
 
-            // 基础合法性检查
-            if (x < 0 || x >= size || z < 0 || z >= size) return;
-            if (!generator.isSafeGrass(x, z)) return;
-
-            const worldX = x - halfSize;
-            const worldZ = z - halfSize;
-
-            // 避开玩家和 AI 出生点 (半径增加到 12，确保初始视野清爽)
-            const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
-            const aiCity = this.cities['ai_city_1'];
-            const distToAI = aiCity ? Math.sqrt(Math.pow(worldX - aiCity.x, 2) + Math.pow(worldZ - aiCity.z, 2)) : 100;
-
-            if (distToPlayer < 12 || distToAI < 12) return;
-
-            // 在泊松候选点上，我们使用相对较高的概率来分配物体
-            const roll = Math.random();
-            
-            // 概率分段逻辑 (总概率约 65%，其余 35% 保持空旷)
-            if (roll < 0.05) {
-                entities.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
-            } else if (roll < 0.08) {
-                entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
-            } else if (roll < 0.12) {
-                entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
-            } else if (roll < 0.14) {
-                const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
-                const sKey = bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2';
-                entities.push({ 
-                    id: `${bType}_${x}_${z}`, 
-                    type: 'captured_building', 
-                    spriteKey: sKey,
-                    buildingType: bType, 
-                    x: worldX, z: worldZ,
-                    config: { owner: 'none', type: bType }
-                });
-            } else if (roll < 0.35) {
-                // 重点：敌人生成逻辑 (约 21% 的候选点会变成敌人)
-                const tId = this.getDynamicEnemyType(worldX, worldZ);
-                const template = this.enemyTemplates[tId];
-                const variance = 0.05;
-                const randomFactor = 1 + (Math.random() * variance * 2 - variance);
-                const points = Math.max(1, Math.floor(template.basePoints * randomFactor));
-                
-                entities.push({ 
-                    id: `enemy_${x}_${z}`, 
-                    type: 'enemy_group', 
-                    templateId: tId,
-                    x: worldX, z: worldZ,
-                    config: {
-                        name: template.name,
-                        unitPool: template.unitPool,
-                        totalPoints: points
+                // 2. 邻域互斥检查 (升级：扩大至 2 格半径，增加稀疏感)
+                let hasAdjacent = false;
+                for (let dz = -2; dz <= 2; dz++) {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        if (dx === 0 && dz === 0) continue;
+                        const nx = x + dx, nz = z + dz;
+                        if (nx >= 0 && nx < size && nz >= 0 && nz < size) {
+                            if (occupied[nz * size + nx]) { hasAdjacent = true; break; }
+                        }
                     }
-                });
-            } else if (roll < 0.60) {
-                // 装饰物 (约 25% 的候选点)
-                const isHouse = Math.random() < 0.1;
-                entities.push({ 
-                    id: `decor_${x}_${z}`, 
-                    type: 'decoration', 
-                    spriteKey: isHouse ? 'house_1' : 'tree', 
-                    x: worldX, z: worldZ 
-                });
+                    if (hasAdjacent) break;
+                }
+                if (hasAdjacent) continue;
+
+                const worldX = x - halfSize;
+                const worldZ = z - halfSize;
+
+                // 3. 安全区检查 (半径 3)
+                const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
+                let inCitySafetyZone = distToPlayer < 3;
+                if (!inCitySafetyZone) {
+                    for (const cityId in this.cities) {
+                        const city = this.cities[cityId];
+                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 3) {
+                            inCitySafetyZone = true; break;
+                        }
+                    }
+                }
+                if (inCitySafetyZone) continue;
+
+                // 4. 核心逻辑：结合动态密度进行概率判定
+                const roll = Math.random();
+                const density = this.getDensityMultiplier(worldX, worldZ);
+                
+                // 老版本基础概率对齐：敌人 0.25%，总概率 1.7%
+                const enemyProb = 0.0025 * density;
+
+                let placed = false;
+                if (roll < 0.002) {
+                    entities.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.003) {
+                    entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.005) {
+                    entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.0055) {
+                    const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
+                    entities.push({ 
+                        id: `${bType}_${x}_${z}`, type: 'captured_building', 
+                        spriteKey: bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2',
+                        buildingType: bType, x: worldX, z: worldZ,
+                        config: { owner: 'none', type: bType }
+                    });
+                    placed = true;
+                } else if (roll < 0.0055 + enemyProb) {
+                    const tId = this.getDynamicEnemyType(worldX, worldZ);
+                    const template = this.enemyTemplates[tId];
+                    const points = Math.max(1, Math.floor(template.basePoints * (0.95 + Math.random() * 0.1)));
+                    entities.push({ 
+                        id: `enemy_${x}_${z}`, type: 'enemy_group', templateId: tId, x: worldX, z: worldZ,
+                        config: { name: template.name, unitPool: template.unitPool, totalPoints: points }
+                    });
+                    placed = true;
+                } else if (roll < 0.0055 + enemyProb + 0.007) {
+                    entities.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.0055 + enemyProb + 0.009) {
+                    entities.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
+                    placed = true;
+                }
+
+                if (placed) occupied[z * size + x] = 1;
             }
-        });
+        }
 
         // --- 5. 自动分配周边矿产逻辑 (圈地系统) ---
         // 规则：50米范围内的矿产自动归属于最近的敌方主城。
@@ -2083,76 +2200,6 @@ class WorldManager {
                 source: 'trait'
             });
         });
-    }
-
-    /**
-     * 泊松盘采样 (Poisson Disk Sampling)
-     * 生成分布均匀但不规则的点阵，避免物体扎堆。
-     */
-    _poissonDiskSampling(width, height, radius, k = 30) {
-        const cellSize = radius / Math.sqrt(2);
-        const gridW = Math.ceil(width / cellSize);
-        const gridH = Math.ceil(height / cellSize);
-        const grid = new Array(gridW * gridH).fill(-1);
-        
-        const points = [];
-        const active = [];
-        
-        const firstPoint = { x: Math.random() * width, y: Math.random() * height };
-        const firstIdx = Math.floor(firstPoint.x / cellSize) + Math.floor(firstPoint.y / cellSize) * gridW;
-        grid[firstIdx] = 0;
-        points.push(firstPoint);
-        active.push(0);
-
-        while (active.length > 0) {
-            const randomIndex = Math.floor(Math.random() * active.length);
-            const pIdx = active[randomIndex];
-            const p = points[pIdx];
-            let found = false;
-
-            for (let i = 0; i < k; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = radius + Math.random() * radius;
-                const candidate = {
-                    x: p.x + Math.cos(angle) * dist,
-                    y: p.y + Math.sin(angle) * dist
-                };
-
-                if (candidate.x >= 0 && candidate.x < width && candidate.y >= 0 && candidate.y < height) {
-                    const col = Math.floor(candidate.x / cellSize);
-                    const row = Math.floor(candidate.y / cellSize);
-                    
-                    let ok = true;
-                    for (let r = Math.max(0, row - 2); r <= Math.min(gridH - 1, row + 2); r++) {
-                        for (let c = Math.max(0, col - 2); c <= Math.min(gridW - 1, col + 2); c++) {
-                            const neighborIdx = grid[c + r * gridW];
-                            if (neighborIdx !== -1) {
-                                const d = Math.sqrt(Math.pow(candidate.x - points[neighborIdx].x, 2) + Math.pow(candidate.y - points[neighborIdx].y, 2));
-                                if (d < radius) {
-                                    ok = false;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!ok) break;
-                    }
-
-                    if (ok) {
-                        const cIdx = points.length;
-                        points.push(candidate);
-                        grid[col + row * gridW] = cIdx;
-                        active.push(cIdx);
-                        found = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!found) {
-                active.splice(randomIndex, 1);
-            }
-        }
-        return points;
     }
 
     /**

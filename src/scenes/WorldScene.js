@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { spriteFactory } from '../core/SpriteFactory.js';
 import { modifierManager } from '../core/ModifierManager.js';
-import { worldManager } from '../core/WorldManager.js'; // 引入数据管家
+import { WorldManager, worldManager } from '../core/WorldManager.js'; // 引入数据管家
 import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
 import { timeManager } from '../core/TimeManager.js';
 import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
@@ -263,7 +263,7 @@ export class WorldScene {
         const heroInfo = worldManager.availableHeroes[data.id];
         
         // 填充数据
-        document.getElementById('hero-panel-name').innerText = (data.id === 'qijin' ? '祁进' : (data.id === 'lichengen' ? '李承恩' : '叶英'));
+        document.getElementById('hero-panel-name').innerText = (data.id === 'liwangsheng' ? '李忘生' : (data.id === 'lichengen' ? '李承恩' : '叶英'));
         document.getElementById('hero-panel-title').innerText = heroInfo ? heroInfo.title : '';
         
         const portrait = document.getElementById('hero-panel-portrait');
@@ -1202,8 +1202,14 @@ export class WorldScene {
      * 初始化小地图系统
      */
     initMinimap() {
-        // --- 开发调试：临时解除迷雾 ---
-        this.enableFog = false; 
+        // --- 优雅重构：基于 DEBUG 配置决定迷雾与探测状态 ---
+        const debug = WorldManager.DEBUG;
+        this.enableFog = !(debug.ENABLED && debug.REVEAL_MAP); 
+        
+        if (!this.enableFog) {
+            console.log("%c[DEBUG] %c迷雾已全局解除", "color: #ffaa00", "color: #fff");
+            worldManager.revealFullMap();
+        }
 
         let container = document.querySelector('.minimap-container');
         if (!container) {
@@ -1275,6 +1281,7 @@ export class WorldScene {
     updateMinimap() {
         if (!this.minimapCtx || !this.playerHero) return;
 
+        const debug = WorldManager.DEBUG;
         const size = mapGenerator.size;
         const ctx = this.minimapCtx;
         const margin = this.cropMargin || 0;
@@ -1326,8 +1333,8 @@ export class WorldScene {
             };
         };
 
-        // --- 4.5 调试专用：势力影响力热力图 ---
-        if (worldManager.DEBUG_INFLUENCE && ms.influenceCenters) {
+        // --- 4.5 优雅重构：调试专用势力热力图 ---
+        if (debug.ENABLED && debug.SHOW_INFLUENCE && ms.influenceCenters) {
             ms.influenceCenters.forEach(center => {
                 const pos = worldToMinimap(center.x, center.z);
                 
@@ -1362,8 +1369,8 @@ export class WorldScene {
             });
         }
 
-        // --- 4.6 调试专用：绘制所有 ROI (POIs) ---
-        if (mapGenerator.pois) {
+        // --- 4.6 优雅重构：调试专用兴趣点标记 ---
+        if (debug.ENABLED && debug.SHOW_POIS && mapGenerator.pois) {
             mapGenerator.pois.forEach((poi, index) => {
                 // 将 grid 坐标转换为小地图相对坐标
                 const px = poi.x - margin;

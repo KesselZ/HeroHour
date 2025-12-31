@@ -1891,15 +1891,40 @@ img {
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 8px 8px 12px 8px; /* 增加底部内边距，防止兵力文字被截断 */
+    min-width: 0; /* 核心修复：防止 grid/flex 子元素被内部长内容撑开，强制触发滚动条 */
 }
 
 .army-slots-v3 {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap; /* 核心：禁止换行，确保单行水平排列 */
     gap: 8px;
-    min-height: 70px; /* 恢复高度，确保两排或一排大尺寸图标不被截断 */
-    justify-content: center;
+    height: 85px; /* 核心：固定高度，禁止垂直扩展，保证原始尺寸稳定 */
+    justify-content: flex-start; /* 核心：必须靠左对齐，以便在溢出时正确滚动 */
     padding: 8px;
+    overflow-x: auto; /* 开启水平滚动 */
+    overflow-y: hidden; /* 禁止垂直溢出 */
+    scrollbar-width: thin;
+    scrollbar-color: var(--jx3-gold) rgba(0,0,0,0.05);
+}
+
+/* 确保兵力槽在滚动时不收缩 */
+.army-slots-v3 .unit-slot {
+    flex-shrink: 0;
+}
+
+/* 自定义水平滚动条样式 */
+.army-slots-v3::-webkit-scrollbar {
+    height: 6px;
+}
+
+.army-slots-v3::-webkit-scrollbar-thumb {
+    background: var(--jx3-gold);
+    border-radius: 3px;
+}
+
+.army-slots-v3::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.05);
+    border-radius: 3px;
 }
 
 .army-label {
@@ -2808,6 +2833,22 @@ canvas { image-rendering: pixelated; }
 .unit-slots {
     display: flex;
     gap: 15px;
+    overflow-x: auto; /* 核心：开启水平滚动 */
+    overflow-y: hidden;
+    padding: 10px;
+    max-width: 600px; /* 恢复原比例：限制容器最大宽度 */
+    width: auto;      /* 关键：宽度自适应，兵少时容器收缩以保持居中 */
+    scrollbar-width: thin;
+    scrollbar-color: var(--jx3-gold) rgba(0,0,0,0.05);
+}
+
+.unit-slots::-webkit-scrollbar {
+    height: 6px;
+}
+
+.unit-slots::-webkit-scrollbar-thumb {
+    background: var(--jx3-gold);
+    border-radius: 3px;
 }
 
 .unit-slot {
@@ -2819,6 +2860,8 @@ canvas { image-rendering: pixelated; }
     padding: 5px;
     background: white;
     transition: transform 0.15s;
+    flex-shrink: 0; /* 禁止收缩，保证像素清晰 */
+    min-width: 60px;
 }
 
 .unit-slot:hover {

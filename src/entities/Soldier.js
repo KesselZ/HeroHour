@@ -118,7 +118,7 @@ export class BaseUnit extends THREE.Group {
         
         this.hpSprite = new THREE.Sprite(material);
         // 主角血条长一点 (0.9)，普通士兵现在也变大一点 (0.8)
-        const isHeroType = ['qijin', 'lichengen', 'yeying'].includes(this.type);
+        const isHeroType = ['liwangsheng', 'lichengen', 'yeying'].includes(this.type);
         const s = isHeroType ? 0.9 : 0.8;
         this.hpSprite.scale.set(s, 0.12, 1); 
         
@@ -1384,8 +1384,8 @@ export class HeroUnit extends BaseUnit {
                     }, i * 150); 
                 }
             }
-        } else if (heroId === 'qijin') {
-            // 祁进改为 performChunyangAttack 内部控制音效
+        } else if (heroId === 'liwangsheng') {
+            // 李忘生改为 performChunyangAttack 内部控制音效
             this.onAttackAnimation();
             this.performChunyangAttack(enemies, details);
         } else if (heroId === 'lichengen') {
@@ -1735,7 +1735,7 @@ export class Snake extends BaseUnit {
                 target: this.target, 
                 speed: 0.15, 
                 damage: this.attackDamage, 
-                type: 'wave', // 使用 wave 粒子模拟口水
+                type: 'spit', // 改为口水特效
                 color: 0x8800ff // 紫色口水
             });
         }
@@ -1828,7 +1828,8 @@ export class TianyiCrossbowman extends BaseUnit {
                 target: this.target, 
                 speed: 0.25, 
                 damage: this.attackDamage, 
-                type: 'arrow' 
+                type: 'arrow',
+                color: 0x88ff88 // 天一教特有的翠绿色毒箭
             });
         }
     }
@@ -1851,7 +1852,8 @@ export class TianyiApothecary extends BaseUnit {
                 target: this.target, 
                 speed: 0.15, 
                 damage: this.attackDamage, 
-                type: 'wave', 
+                type: 'lob', // 改为投掷模式
+                arcHeight: 2.0, // 增加抛物线高度
                 color: 0x00ff00 // 毒药绿色
             });
         }
@@ -1994,7 +1996,8 @@ export class ShenceCrossbowman extends BaseUnit {
                 target: this.target, 
                 speed: 0.3, 
                 damage: this.attackDamage, 
-                type: 'arrow' 
+                type: 'arrow',
+                color: 0xffffaa // 神策军特有的浅金色箭羽
             });
         }
     }
@@ -2218,7 +2221,8 @@ export class RedCultArcher extends BaseUnit {
                 target: this.target, 
                 speed: 0.25, 
                 damage: this.attackDamage, 
-                type: 'arrow' 
+                type: 'arrow',
+                color: 0xff8888 // 红衣教特有的暗红色箭羽
             });
         }
     }
@@ -2243,14 +2247,25 @@ export class RedCultFireMage extends BaseUnit {
         if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
             this.lastAttackTime = now;
             this.onAttackAnimation();
-            audioManager.play('attack_air_sword', { volume: 0.4 });
+            audioManager.play('attack_arrow', { volume: 0.4 }); // 使用射箭音效模拟火球飞行
             
-            // 范围火焰轰击
-            if (window.battle) {
-                const targetPos = this.target.position.clone();
-                window.battle.playVFX('pulse', { pos: targetPos, radius: 2.5, color: 0xff4400, duration: 500 });
-                const targets = window.battle.getUnitsInArea(targetPos, { shape: 'circle', radius: 2.5 }, 'enemy');
-                window.battle.applyDamageToUnits(targets, this.attackDamage);
+            // 发射火球，击中后触发爆炸
+            if (this.projectileManager) {
+                this.projectileManager.spawn({
+                    startPos: this.position.clone().add(new THREE.Vector3(0, 0.8, 0)),
+                    target: this.target,
+                    speed: 0.2,
+                    damage: this.attackDamage,
+                    type: 'fireball',
+                    onHit: (targetPos) => {
+                        // 击中时触发 pulse 特效和范围伤害
+                        if (window.battle) {
+                            window.battle.playVFX('pulse', { pos: targetPos, radius: 2.5, color: 0xff4400, duration: 500 });
+                            const targets = window.battle.getUnitsInArea(targetPos, { shape: 'circle', radius: 2.5 }, 'enemy');
+                            window.battle.applyDamageToUnits(targets, this.attackDamage);
+                        }
+                    }
+                });
             }
         }
     }
@@ -2347,6 +2362,367 @@ export class Cangjian extends BaseUnit {
                         knockbackForce: 0.035
                     });
                 }, i * 250); // 间隔拉长
+            }
+        }
+    }
+}
+
+// --- 纯阳扩充单位类 ---
+
+export class CYTwinBlade extends BaseUnit {
+    static displayName = '双剑剑宗精锐';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cy_twin_blade');
+        super({ 
+            side, 
+            index, 
+            type: 'cy_twin_blade', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+}
+
+export class CYSwordArray extends BaseUnit {
+    static displayName = '玄门阵法师';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cy_sword_array');
+        super({ 
+            side, 
+            index, 
+            type: 'cy_sword_array', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.3 });
+
+            // 发射两枚具有穿透力的气剑
+            for (let i = 0; i < 2; i++) {
+                setTimeout(() => {
+                    if (this.isDead || !this.target || this.target.isDead) return;
+                    this.projectileManager?.spawn({ 
+                        startPos: this.position.clone().add(new THREE.Vector3((i-0.5)*0.4, 0.8, 0)), 
+                        target: this.target, 
+                        speed: 0.2, 
+                        damage: this.attackDamage / 2, 
+                        type: 'air_sword',
+                        penetration: 2, // 穿透 2 个目标
+                        color: 0x88ffff 
+                    });
+                }, i * 200);
+            }
+        }
+    }
+}
+
+export class CYZixiaDisciple extends BaseUnit {
+    static displayName = '紫霞功真传弟子';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cy_zixia_disciple');
+        super({ 
+            side, 
+            index, 
+            type: 'cy_zixia_disciple', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            
+            const stats = worldManager.getUnitBlueprint('cy_zixia_disciple');
+            const burstCount = stats.burstCount || 3;
+            for (let i = 0; i < burstCount; i++) {
+                setTimeout(() => {
+                    if (this.isDead || !this.target || this.target.isDead) return;
+                    audioManager.play('attack_air_sword', { volume: 0.2, pitchVar: 0.3 });
+                    this.projectileManager?.spawn({
+                        startPos: this.position.clone().add(new THREE.Vector3(0, 1.0, 0)),
+                        target: this.target,
+                        speed: 0.25,
+                        damage: this.attackDamage,
+                        type: 'air_sword'
+                    });
+                }, i * 150);
+            }
+        }
+    }
+}
+
+export class CYTaixuDisciple extends BaseUnit {
+    static displayName = '太虚剑意真传弟子';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cy_taixu_disciple');
+        super({ 
+            side, 
+            index, 
+            type: 'cy_taixu_disciple', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_melee', { volume: 0.5, force: true });
+            
+            // 范围横扫
+            this.executeAOE(enemies, {
+                radius: this.attackRange,
+                angle: Math.PI, // 180度
+                damage: this.attackDamage,
+                knockbackForce: 0.05
+            });
+            
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('tiance_sweep', { unit: this, radius: this.attackRange, color: 0x00ffff, duration: 200 });
+            }
+        }
+    }
+}
+
+// --- 藏剑扩充单位类 ---
+
+export class CJRetainer extends BaseUnit {
+    static displayName = '藏剑入门弟子';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cj_retainer');
+        super({ 
+            side, 
+            index, 
+            type: 'cj_retainer', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+}
+
+export class CJWenshui extends BaseUnit {
+    static displayName = '问水剑客';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cj_wenshui');
+        super({ 
+            side, 
+            index, 
+            type: 'cj_wenshui', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            
+            const stats = worldManager.getUnitBlueprint('cj_wenshui');
+            const burstCount = stats.burstCount || 2;
+            for (let i = 0; i < burstCount; i++) {
+                setTimeout(() => {
+                    if (this.isDead || !this.target || this.target.isDead) return;
+                    
+                    audioManager.play('attack_melee', { volume: 0.25, pitchVar: 0.2 });
+                    if (i === 0) this.onAttackAnimation();
+                    
+                    this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 3);
+                }, i * 200);
+            }
+        }
+    }
+}
+
+export class CJShanju extends BaseUnit {
+    static displayName = '山居力士';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cj_shanju');
+        super({ 
+            side, 
+            index, 
+            type: 'cj_shanju', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_melee', { volume: 0.5, force: true });
+            
+            // 范围横扫 180度
+            this.executeAOE(enemies, {
+                radius: this.attackRange,
+                angle: Math.PI, 
+                damage: this.attackDamage,
+                knockbackForce: 0.1
+            });
+            
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('tiance_sweep', { unit: this, radius: this.attackRange, color: 0xffcc00, duration: 250 });
+            }
+        }
+    }
+}
+
+export class CJXinjian extends BaseUnit {
+    static displayName = '灵峰侍剑师';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cj_xinjian');
+        super({ 
+            side, 
+            index, 
+            type: 'cj_xinjian', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.3 });
+
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.8, 0)), 
+                target: this.target, 
+                speed: 0.2, 
+                damage: this.attackDamage, 
+                type: 'air_sword',
+                color: 0xffcc00 // 金色剑气
+            });
+        }
+    }
+}
+
+export class CJGoldenGuard extends BaseUnit {
+    static displayName = '黄金剑卫';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cj_golden_guard');
+        super({ 
+            side, 
+            index, 
+            type: 'cj_golden_guard', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost,
+            mass: stats.mass || 3.0
+        });
+        
+        // 固有被动：20% 减伤
+        modifierManager.addModifier({
+            id: `cj_golden_guard_reduction_${this.index}`,
+            targetUnit: this,
+            stat: 'damage_multiplier',
+            multiplier: 0.8,
+            source: 'passive'
+        });
+    }
+}
+
+export class CJElder extends BaseUnit {
+    static displayName = '剑庐大长老';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cj_elder');
+        super({ 
+            side, 
+            index, 
+            type: 'cj_elder', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+
+            const stats = worldManager.getUnitBlueprint('cj_elder');
+            const burstCount = stats.burstCount || 3;
+            for (let i = 0; i < burstCount; i++) {
+                setTimeout(() => {
+                    if (this.isDead) return;
+                    audioManager.play('attack_melee', { volume: 0.4, pitchVar: 0.1 });
+                    this.onAttackAnimation(true);
+                    
+                    if (window.battle && window.battle.playVFX) {
+                        window.battle.playVFX('cangjian_whirlwind', { pos: this.position, radius: this.attackRange, color: 0xffcc00, duration: 500 });
+                    }
+                    
+                    this.executeAOE(enemies, {
+                        radius: this.attackRange,
+                        angle: Math.PI * 2,
+                        damage: this.attackDamage,
+                        knockbackForce: 0.05
+                    });
+                }, i * 300);
             }
         }
     }
@@ -2479,6 +2855,234 @@ export class Chunyang extends BaseUnit {
                     }, i * 200);
                 }
             }
+        }
+    }
+}
+
+// --- 天策扩充势力类 ---
+
+export class TCCrossbow extends BaseUnit {
+    static displayName = '天策羽林弩手';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tc_crossbow');
+        super({ 
+            side, 
+            index, 
+            type: 'tc_crossbow', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_arrow', { volume: 0.4 });
+
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.8, 0)), 
+                target: this.target, 
+                speed: 0.25, 
+                damage: this.attackDamage, 
+                type: 'arrow',
+                scale: 1.2
+            });
+        }
+    }
+}
+
+export class TCBanner extends BaseUnit {
+    static displayName = '天策战旗使';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tc_banner');
+        super({ 
+            side, 
+            index, 
+            type: 'tc_banner', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+        
+        this.lastBuffTime = 0;
+        this.buffInterval = 3000;
+    }
+
+    updateAI(enemies, allies, deltaTime) {
+        super.updateAI(enemies, allies, deltaTime);
+        
+        const now = Date.now();
+        if (now - this.lastBuffTime > this.buffInterval) {
+            this.lastBuffTime = now;
+            // 激励光环：提升 8 米内友军 15% 攻速
+            if (window.battle) {
+                const affectedAllies = allies.filter(a => !a.isDead && a.position.distanceTo(this.position) < 8.0);
+                window.battle.applyBuffToUnits(affectedAllies, {
+                    stat: 'attackSpeed',
+                    multiplier: 1.15,
+                    duration: 3000,
+                    color: 0xffaa00,
+                    vfxName: 'vfx_sparkle'
+                });
+            }
+        }
+    }
+}
+
+export class TCDualBlade extends BaseUnit {
+    static displayName = '天策双刃校尉';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tc_dual_blade');
+        super({ 
+            side, 
+            index, 
+            type: 'tc_dual_blade', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+}
+
+export class TCHalberdier extends BaseUnit {
+    static displayName = '持戟中郎将';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tc_halberdier');
+        super({ 
+            side, 
+            index, 
+            type: 'tc_halberdier', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_melee', { volume: 0.4 });
+            
+            // AOE 横扫：伤害范围内所有目标
+            this.executeAOE(enemies, {
+                radius: 2.8,
+                damage: this.attackDamage,
+                knockback: 0.15
+            });
+        }
+    }
+}
+
+export class TCShieldVanguard extends BaseUnit {
+    static displayName = '天策前锋';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tc_shield_vanguard');
+        super({ 
+            side, 
+            index, 
+            type: 'tc_shield_vanguard', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost,
+            mass: 3.0
+        });
+    }
+}
+
+export class TCMountedCrossbow extends BaseUnit {
+    static displayName = '骁骑弩手';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tc_mounted_crossbow');
+        super({ 
+            side, 
+            index, 
+            type: 'tc_mounted_crossbow', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_arrow', { volume: 0.3 });
+
+            this.projectileManager?.spawn({ 
+                startPos: this.position.clone().add(new THREE.Vector3(0, 1.0, 0)), 
+                target: this.target, 
+                speed: 0.22, 
+                damage: this.attackDamage, 
+                type: 'arrow',
+                penetration: 3 // 新增：3次穿透属性
+            });
+        }
+    }
+}
+
+export class TCHeavyCavalry extends BaseUnit {
+    static displayName = '玄甲陷阵骑';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('tc_heavy_cavalry');
+        super({ 
+            side, 
+            index, 
+            type: 'tc_heavy_cavalry', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost,
+            mass: 5.0
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('attack_melee', { volume: 0.6 });
+            
+            // 强力冲锋横扫：伤害范围内所有目标
+            this.executeAOE(enemies, {
+                radius: 2.2,
+                damage: this.attackDamage,
+                knockback: 0.4
+            });
         }
     }
 }

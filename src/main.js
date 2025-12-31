@@ -207,10 +207,10 @@ const menuBg = document.querySelector('#menu-background');
 // 初始化 UI 图标 (使用统一 API 替换 CSS 硬编码)
 function initUIIcons() {
     // 1. 初始化角色选择界面的肖像
-    const qijinPortrait = document.querySelector('.qijin-portrait');
+    const liwangshengPortrait = document.querySelector('.liwangsheng-portrait');
     const lichengenPortrait = document.querySelector('.lichengen-portrait');
     const yeyingPortrait = document.querySelector('.yeying-portrait');
-    if (qijinPortrait) Object.assign(qijinPortrait.style, spriteFactory.getIconStyle('qijin'));
+    if (liwangshengPortrait) Object.assign(liwangshengPortrait.style, spriteFactory.getIconStyle('liwangsheng'));
     if (lichengenPortrait) Object.assign(lichengenPortrait.style, spriteFactory.getIconStyle('lichengen'));
     if (yeyingPortrait) Object.assign(yeyingPortrait.style, spriteFactory.getIconStyle('yeying'));
 
@@ -385,9 +385,12 @@ function applyHeroTraits(heroId) {
     if (identity) {
         Object.assign(worldManager.heroData.stats, identity.initialStats);
     }
+
+    // 1.5 初始化兵力 (支持调试模式)
+    worldManager.initHeroArmy(heroId);
     
     // 2. 设定初始技能 (这些也可以数据化，目前暂留)
-    if (heroId === 'qijin') worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing'];
+    if (heroId === 'liwangsheng') worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing'];
     if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'];
     if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'quanningyue', 'yingmingliu', 'fenglaiwushan'];
 

@@ -40,7 +40,7 @@ function calculateMetrics(unit) {
     const dps = (unit.atk * burst * targets) / (unit.attackSpeed / 1000);
     const baseScore = Math.sqrt(unit.hp * dps);
     const rangeBonus = 1 + (unit.range / MAX_RANGE) * 0.2;
-    return { dps, score: baseScore * rangeBonus };
+    return { dps, targets, score: baseScore * rangeBonus };
 }
 
 // 辅助函数：计算包含中文字符串的显示宽度
@@ -62,8 +62,8 @@ function runBalanceCheck() {
     const baseline = calculateMetrics(UNIT_STATS['melee']);
     const k = 2.0 / baseline.score; 
 
-    console.log(`\n=== 士兵单位属性平衡分析报告 (经济效率增强版 v5) ===`);
-    const header = `${padRight("单位名称", 14)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Range".padEnd(5)} | ${"Cost".padEnd(4)} | ${"Gold".padEnd(5)} | ${"理论战力".padEnd(6)} | ${"统御平衡".padEnd(8)} | ${"经济效率"}`;
+    console.log(`\n=== 士兵单位属性平衡 analysis 报告 (经济效率增强版 v5) ===`);
+    const header = `${padRight("单位名称", 14)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Range".padEnd(5)} | ${"Targets".padEnd(8)} | ${"Cost".padEnd(4)} | ${"Gold".padEnd(5)} | ${"理论战力".padEnd(6)} | ${"统御平衡".padEnd(8)} | ${"经济效率"}`;
     console.log(`-`.repeat(header.length + 10));
     console.log(header);
     console.log(`-`.repeat(header.length + 10));
@@ -71,7 +71,7 @@ function runBalanceCheck() {
     for (const [id, unit] of Object.entries(UNIT_STATS)) {
         if (unit.hp === undefined || unit.atk === undefined) continue;
 
-        const { dps, score } = calculateMetrics(unit);
+        const { dps, targets, score } = calculateMetrics(unit);
         const theoreticalPower = score * k;
         
         // 1. 统御平衡度
@@ -92,12 +92,13 @@ function runBalanceCheck() {
         const hpStr = (unit.hp || 0).toString().padEnd(4);
         const dpsStr = dps.toFixed(1).toString().padEnd(7);
         const rangeStr = (unit.range || 0).toString().padEnd(5);
+        const targetsStr = targets.toFixed(1).toString().padEnd(8);
         const costStr = (unit.cost || 0).toString().padEnd(4);
         const goldStr = (unit.gold || 0).toString().padEnd(5);
         const powerStr = theoreticalPower.toFixed(2).padEnd(6);
 
         // 颜色代码不计入宽度，所以手动对齐
-        console.log(`${nameStr} | ${hpStr} | ${dpsStr} | ${rangeStr} | ${costStr} | ${goldStr} | ${powerStr} | ${balanceStr.padEnd(balance > 115 || balance < 85 ? 17 : 8)} | ${geStr}`);
+        console.log(`${nameStr} | ${hpStr} | ${dpsStr} | ${rangeStr} | ${targetsStr} | ${costStr} | ${goldStr} | ${powerStr} | ${balanceStr.padEnd(balance > 115 || balance < 85 ? 17 : 8)} | ${geStr}`);
     }
 }
 

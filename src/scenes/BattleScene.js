@@ -12,7 +12,9 @@ import {
     ShenceCavalry, ShenceOverseer, ShenceAssassin, ShenceIronPagoda,
     RedCultPriestess, RedCultHighPriestess, RedCultSwordsman, RedCultArcher,
     RedCultAssassin, RedCultFireMage, RedCultExecutioner, RedCultAcolyte, RedCultEnforcer,
-    HeroUnit
+    HeroUnit, CYTwinBlade, CYSwordArray, CYZixiaDisciple, CYTaixuDisciple,
+    CJRetainer, CJWenshui, CJShanju, CJXinjian, CJGoldenGuard, CJElder,
+    TCCrossbow, TCBanner, TCDualBlade, TCHalberdier, TCShieldVanguard, TCMountedCrossbow, TCHeavyCavalry
 } from '../entities/Soldier.js';
 
 import { worldManager } from '../core/WorldManager.js';
@@ -71,7 +73,24 @@ const UnitTypeMap = {
     'red_cult_firemage': RedCultFireMage,
     'red_cult_executioner': RedCultExecutioner,
     'red_cult_acolyte': RedCultAcolyte,
-    'red_cult_enforcer': RedCultEnforcer
+    'red_cult_enforcer': RedCultEnforcer,
+    'cy_twin_blade': CYTwinBlade,
+    'cy_sword_array': CYSwordArray,
+    'cy_zixia_disciple': CYZixiaDisciple,
+    'cy_taixu_disciple': CYTaixuDisciple,
+    'cj_retainer': CJRetainer,
+    'cj_wenshui': CJWenshui,
+    'cj_shanju': CJShanju,
+    'cj_xinjian': CJXinjian,
+    'cj_golden_guard': CJGoldenGuard,
+    'cj_elder': CJElder,
+    'tc_crossbow': TCCrossbow,
+    'tc_banner': TCBanner,
+    'tc_dual_blade': TCDualBlade,
+    'tc_halberdier': TCHalberdier,
+    'tc_shield_vanguard': TCShieldVanguard,
+    'tc_mounted_crossbow': TCMountedCrossbow,
+    'tc_heavy_cavalry': TCHeavyCavalry
 };
 
 import { GrasslandEnvironment } from '../environment/Environments.js';
@@ -230,11 +249,35 @@ export class BattleScene {
     }
 
     setupUIListeners() {
-        const slots = document.querySelectorAll('.unit-slot');
-        slots.forEach(slot => {
-            const type = slot.getAttribute('data-type');
+        const container = document.querySelector('.unit-slots');
+        if (!container) return;
 
-            // --- 核心新增：部署阶段查看己方兵种属性 ---
+        // 1. 清空原有硬编码占位符
+        container.innerHTML = '';
+
+        // 2. 动态生成当前英雄拥有的所有兵种槽位
+        Object.keys(this.unitCounts).forEach(type => {
+            // 只显示数量大于 0 的兵种，避免 UI 过于拥挤
+            if (this.unitCounts[type] <= 0) return;
+
+            const slot = document.createElement('div');
+            slot.className = 'unit-slot';
+            slot.setAttribute('data-type', type);
+
+            const icon = document.createElement('div');
+            icon.className = 'slot-icon';
+            // 应用来自 SpriteFactory 的精灵图样式 (支持全兵种)
+            Object.assign(icon.style, spriteFactory.getIconStyle(type));
+            
+            const count = document.createElement('span');
+            count.className = 'slot-count';
+            count.innerText = `x${this.unitCounts[type]}`;
+
+            slot.appendChild(icon);
+            slot.appendChild(count);
+            container.appendChild(slot);
+
+            // 3. 绑定事件监听 (维持原逻辑)
             slot.onmouseenter = () => {
                 const stats = worldManager.getUnitDetails(type, 'player');
                 const cost = worldManager.unitCosts[type]?.cost || 0;
@@ -249,7 +292,7 @@ export class BattleScene {
 
             slot.onclick = (e) => {
                 // 移除其他选中状态
-                slots.forEach(s => s.classList.remove('selected'));
+                document.querySelectorAll('.unit-slot').forEach(s => s.classList.remove('selected'));
                 if (this.unitCounts[type] > 0) {
                     this.selectedType = type;
                     slot.classList.add('selected');
@@ -261,9 +304,11 @@ export class BattleScene {
             };
         });
 
-        document.getElementById('fight-btn').onclick = () => {
-            this.startFighting();
-        };
+        // 4. 绑定开战按钮
+        const fightBtn = document.getElementById('fight-btn');
+        if (fightBtn) {
+            fightBtn.onclick = () => this.startFighting();
+        }
     }
 
     updatePreviewSprite(type) {

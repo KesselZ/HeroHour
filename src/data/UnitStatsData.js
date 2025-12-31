@@ -26,6 +26,20 @@ export const UNIT_STATS_DATA = {
     'cangjian': { name: '藏剑弟子', hp: 200, atk: 6.0, range: 1.5, rangeType: 'AOE', speed: 4.7, attackSpeed: 2000, burstCount: 3, targets: 4.0, description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
     'cangyun': { name: '苍云将士', hp: 390, atk: 10, range: 1.2, rangeType: '盾墙', speed: 2.7, attackSpeed: 1200, targets: 1.2, description: '玄甲军魂，战场上最难以逾越的铁壁。' },
     'healer': { name: '万花补给', hp: 120, atk: 30, range: 5.0, rangeType: '治疗', speed: 2.7, attackSpeed: 2500, targets: 1.0, description: '妙手回春，能够有效保障精锐部队的存活。' },
+
+    // --- 藏剑扩充势力 ---
+    'cj_retainer': { name: '藏剑入门弟子', hp: 100, atk: 9, range: 1.2, rangeType: '近战', speed: 4.2, attackSpeed: 1000, targets: 1.0, description: '藏剑山庄的入门弟子，虽年轻但剑法扎实。' },
+    'cj_wenshui': { name: '问水剑客', hp: 150, atk: 8, range: 1.2, rangeType: '爆发', speed: 4.7, attackSpeed: 1000, targets: 1.0, burstCount: 2, description: '手持轻剑，身姿轻盈，能瞬间发动多段刺击。' },
+    'cj_shanju': { name: '山居力士', hp: 280, atk: 22, range: 1.8, rangeType: '近战AOE', speed: 3.2, attackSpeed: 1500, targets: 2.0, description: '手持重剑，力大无穷，横扫千军。' },
+    'cj_xinjian': { name: '灵峰侍剑师', hp: 180, atk: 16, range: 12.0, rangeType: '远程', speed: 3.8, attackSpeed: 1200, targets: 1.0, description: '藏剑门客，感悟西湖灵峰剑意，能凝聚金色气剑点射敌军。' },
+    'cj_golden_guard': { name: '黄金剑卫', hp: 400, atk: 12, range: 1.2, rangeType: '重装', speed: 2.8, attackSpeed: 1200, mass: 3.0, targets: 1.0, description: '身披金甲，不动如山，是藏剑最坚固的盾。' },
+    'cj_elder': { name: '剑庐大长老', hp: 650, atk: 15, range: 2.5, rangeType: 'AOE旋风', speed: 3.5, attackSpeed: 2000, targets: 5.0, description: '剑庐长老，周身剑气纵横，旋风斩毁灭一切。' },
+
+    // --- 纯阳扩充势力 ---
+    'cy_twin_blade': { name: '双剑剑宗精锐', hp: 150, atk: 14, range: 1.2, rangeType: '近战', speed: 4.8, attackSpeed: 600, targets: 1.0, description: '剑宗精锐，双剑挥舞如风，攻击频率极高。' },
+    'cy_sword_array': { name: '玄门阵法师', hp: 200, atk: 25, range: 15.0, rangeType: '穿透', speed: 3.2, attackSpeed: 1800, targets: 1.0, description: '纯阳高徒，精通北斗阵法，发射具有强大穿透力的玄门剑气。' },
+    'cy_zixia_disciple': { name: '紫霞功真传弟子', hp: 180, atk: 12, range: 12.0, rangeType: '远程爆发', speed: 3.5, attackSpeed: 1200, targets: 1.0, burstCount: 3, description: '气宗真传，能够连续发射三枚气剑压制敌人。' },
+    'cy_taixu_disciple': { name: '太虚剑意真传弟子', hp: 320, atk: 25, range: 1.5, rangeType: '近战AOE', speed: 4.0, attackSpeed: 1500, targets: 2.5, description: '剑宗高手，重剑横扫，造成范围伤害。' },
     
     // --- 野外单位 ---
     'wild_boar': { name: '野猪', hp: 100, atk: 8, range: 1.2, rangeType: '冲撞', speed: 4.0, attackSpeed: 1000, targets: 1.0 },
@@ -76,15 +90,24 @@ export const UNIT_STATS_DATA = {
     'red_cult_acolyte': { name: '红衣教众', hp: 150, atk: 12, range: 1.2, rangeType: '狂热', speed: 4.5, attackSpeed: 900, targets: 1.0 },
     'red_cult_enforcer': { name: '红衣武者', hp: 200, atk: 16, range: 1.2, rangeType: '近战', speed: 4.8, attackSpeed: 800, targets: 1.0 },
 
+    // --- 天策扩充势力 (强度/Cost 4-15) ---
+    'tc_crossbow': { name: '天策羽林弩手', hp: 140, atk: 32, range: 18.0, rangeType: '远程', speed: 3.2, attackSpeed: 2800, targets: 1.0, description: '威力巨大的劲弩，装填虽慢但足以致命。' },
+    'tc_banner': { name: '天策战旗使', hp: 350, atk: 5, range: 5.0, rangeType: '辅助', speed: 3.5, attackSpeed: 2000, targets: 1.0, description: '天策之魂，能够显著激励周围友军的斗志。' },
+    'tc_dual_blade': { name: '天策双刃校尉', hp: 240, atk: 14, range: 1.2, rangeType: '近战', speed: 4.8, attackSpeed: 600, targets: 1.0, description: '双刀挥舞如风，天策府中的突击尖兵。' },
+    'tc_halberdier': { name: '持戟中郎将', hp: 420, atk: 22, range: 2.8, rangeType: '中程群伤', speed: 3.8, attackSpeed: 1600, targets: 2.0, description: '长戟所到之处，敌军人仰马翻。' },
+    'tc_shield_vanguard': { name: '天策前锋', hp: 600, atk: 12, range: 1.2, rangeType: '重装坦克', speed: 2.8, attackSpeed: 1200, mass: 3.0, targets: 1.0, description: '身披厚甲持重盾，是天策阵地最稳固的前锋。' },
+    'tc_mounted_crossbow': { name: '骁骑弩手', hp: 380, atk: 26, range: 14.0, rangeType: '骑射', speed: 6.5, attackSpeed: 2000, targets: 1.0, description: '羽林骑精锐，在马上亦能精准射杀敌军。' },
+    'tc_heavy_cavalry': { name: '玄甲陷阵骑', hp: 850, atk: 45, range: 2.2, rangeType: '重装冲锋', speed: 5.5, attackSpeed: 1500, targets: 3.0, description: '大唐最强重骑，冲锋之时无坚不摧。' },
+
     // --- 英雄单位 (物理常数，数值在大世界中动态同步) ---
-    'qijin':      { 
-        name: '祁进', 
+    'liwangsheng':      { 
+        name: '李忘生', 
         range: 15.0, 
         rangeType: '五剑连发', 
         attackSpeed: 1000, 
         burstCount: 5, 
         targets: 1.0,
-        description: '紫虚子，剑气凌人，擅长远程密集压制。' 
+        description: '纯阳掌门，剑气凌人，擅长远程密集压制。' 
     },
     'lichengen': { 
         name: '李承恩', 
@@ -116,12 +139,12 @@ export const UNIT_STATS_DATA = {
  * 英雄身份与初始数据 (面板数据)
  */
 export const HERO_IDENTITY = {
-    'qijin': {
+    'liwangsheng': {
         initialStats: { power: 7, spells: 12, morale: 6, qinggong: 11.8, battleSpeed: 6.0, leadership: 20 },
         combatBase: { atk: 9, hpBase: 200, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
-            { id: 'qijin_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
-            { id: 'qijin_sect_dmg', unitType: 'chunyang', stat: 'attackDamage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
+            { id: 'liwangsheng_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
+            { id: 'liwangsheng_sect_dmg', unitType: 'chunyang', stat: 'attackDamage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }
         ]
     },
     'lichengen': {
@@ -150,6 +173,30 @@ export const UNIT_COSTS = {
     'cangyun': { gold: 145, cost: 5 },   // 160 -> 145
     'archer': { gold: 65, cost: 3 },     // 100 -> 65 (大幅降价)
     'healer': { gold: 90, cost: 4 },     // 120 -> 90 (降价)
+
+    // --- 藏剑扩充势力消耗 ---
+    'cj_retainer': { gold: 100, cost: 3 },
+    'cj_wenshui': { gold: 200, cost: 5 },
+    'cj_shanju': { gold: 320, cost: 7 },
+    'cj_xinjian': { gold: 350, cost: 8 },
+    'cj_golden_guard': { gold: 280, cost: 6 },
+    'cj_elder': { gold: 1200, cost: 15 },
+
+    // --- 纯阳扩充势力消耗 ---
+    'cy_twin_blade': { gold: 180, cost: 6 },
+    'cy_sword_array': { gold: 380, cost: 11 },
+    'cy_zixia_disciple': { gold: 300, cost: 9 },
+    'cy_taixu_disciple': { gold: 260, cost: 8 },
+
+    // --- 天策扩充势力消耗 ---
+    'tc_crossbow': { gold: 120, cost: 4 },
+    'tc_banner': { gold: 180, cost: 6 },
+    'tc_dual_blade': { gold: 150, cost: 5 },
+    'tc_halberdier': { gold: 250, cost: 7 },
+    'tc_shield_vanguard': { gold: 300, cost: 8 },
+    'tc_mounted_crossbow': { gold: 450, cost: 12 },
+    'tc_heavy_cavalry': { gold: 1200, cost: 15 },
+
     // 野外 (价格调整主要为了让分析表好看，同时也影响战力评估)
     'wild_boar': { gold: 60, cost: 2 },
     'wolf': { gold: 55, cost: 2 },

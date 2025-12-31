@@ -303,8 +303,8 @@ export const HERO_TREE_CONFIG = {
             'group_military', 'group_economy', 'group_exploration', 'group_combat', 'group_attributes' // 通用
         ]
     },
-    'qijin': {
-        core: { name: '纯阳宫', icon: 'core_qijin', description: '太极生两仪，剑气荡乾坤。', effects: [{ type: 'stat', stat: 'spells', value: 15 }] },
+    'liwangsheng': {
+        core: { name: '纯阳宫', icon: 'core_liwangsheng', description: '太极生两仪，剑气荡乾坤。', effects: [{ type: 'stat', stat: 'spells', value: 15 }] },
         groups: [
             'group_military', 'group_economy', 'group_exploration', 'group_combat', 'group_attributes' // 目前全通用
         ]
@@ -323,9 +323,9 @@ export const HERO_TREE_CONFIG = {
  */
 export function getHeroTalentTree(heroId) {
     // 动态确定主属性名称 (身法/力道)
-    const powerName = (heroId === 'qijin' || heroId === 'yeying') ? '身法' : '力道';
+    const powerName = (heroId === 'liwangsheng' || heroId === 'yeying') ? '身法' : '力道';
 
-    const config = HERO_TREE_CONFIG[heroId] || HERO_TREE_CONFIG['qijin'];
+    const config = HERO_TREE_CONFIG[heroId] || HERO_TREE_CONFIG['liwangsheng'];
     const nodes = {};
     const links = [];
 

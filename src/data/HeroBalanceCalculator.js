@@ -56,7 +56,7 @@ function calculateHeroCombat(heroId, mode = 'default') {
             actualBurst = cfg.burstCount || 1;
             range = cfg.range || 1.5; 
         }
-    } else if (heroId === 'qijin') {
+    } else if (heroId === 'liwangsheng') {
         actualTargets = 1.0; // 纯阳剑气是单体
     } else if (heroId === 'lichengen') {
         const modes = stats.modes;
@@ -85,6 +85,7 @@ function calculateHeroCombat(heroId, mode = 'default') {
         atk: actualAtk, 
         dps, 
         range,
+        targets: actualTargets,
         theoreticalPower 
     };
 }
@@ -120,12 +121,12 @@ function runHeroCheck() {
     }
 
     console.log(`\n=== 英雄战斗力平衡评估表 (相对于天策弟子=2.0) ===`);
-    console.log(`---------------------------------------------------------------------------------------------------------`);
-    console.log(`${padRight("名称", 12)} | ${padRight("换算HP", 8)} | ${padRight("综合DPS", 10)} | ${padRight("Range", 8)} | ${padRight("设定Cost", 10)} | ${padRight("理论战力", 10)} | ${padRight("平衡度", 10)}`);
-    console.log(`---------------------------------------------------------------------------------------------------------`);
+    console.log(`------------------------------------------------------------------------------------------------------------------`);
+    console.log(`${padRight("名称", 12)} | ${padRight("换算HP", 8)} | ${padRight("综合DPS", 10)} | ${padRight("Range", 8)} | ${padRight("Targets", 8)} | ${padRight("设定Cost", 10)} | ${padRight("理论战力", 10)} | ${padRight("平衡度", 10)}`);
+    console.log(`------------------------------------------------------------------------------------------------------------------`);
     
     const heroesToCheck = [
-        { id: 'qijin', mode: 'default' },
+        { id: 'liwangsheng', mode: 'default' },
         { id: 'lichengen', mode: 'default' },
         { id: 'lichengen', mode: 'tiance_sweep' },
         { id: 'yeying', mode: 'yeying_heavy' },
@@ -147,9 +148,9 @@ function runHeroCheck() {
         const resetCode = '\x1b[0m';
         const balanceStr = `${colorCode}${balance.toFixed(1)}%${resetCode}`;
         
-        console.log(`${padRight(nameDisplay, 12)} | ${padRight(result.hp, 8)} | ${padRight(result.dps.toFixed(1), 10)} | ${padRight(result.range.toFixed(1), 8)} | ${padRight(cost, 10)} | ${padRight(result.theoreticalPower.toFixed(2), 10)} | ${balanceStr}`);
+        console.log(`${padRight(nameDisplay, 12)} | ${padRight(result.hp, 8)} | ${padRight(result.dps.toFixed(1), 10)} | ${padRight(result.range.toFixed(1), 8)} | ${padRight(result.targets.toFixed(1), 8)} | ${padRight(cost, 10)} | ${padRight(result.theoreticalPower.toFixed(2), 10)} | ${balanceStr}`);
     }
-    console.log(`---------------------------------------------------------------------------------------------------------`);
+    console.log(`------------------------------------------------------------------------------------------------------------------`);
     console.log(`提示：英雄战力目标为 15.0 左右。目前已同步最新数值调整。`);
 }
 

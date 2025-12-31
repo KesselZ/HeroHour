@@ -390,7 +390,7 @@ class UIManager {
             let displayName = nodeData.name;
             if (id.includes('minor') && nodeData.name === '主属性') {
                 const heroId = worldManager.heroData?.id;
-                displayName = (heroId === 'qijin' || heroId === 'yeying') ? '身法' : '力道';
+                displayName = (heroId === 'liwangsheng' || heroId === 'yeying') ? '身法' : '力道';
             }
 
             node.style.left = `${nodeData.pos.x + 700}px`; 

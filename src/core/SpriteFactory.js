@@ -31,7 +31,16 @@ export const ASSET_REGISTRY = {
         TALENT6: '/assets/talents/talent6.png',
         TALENT_TIANCE: '/assets/talents/talent_tiance.png',
         BUILDING2: '/assets/buildings/building2.png',
-        BUILDING3: '/assets/buildings/building3.png'
+        BUILDING3: '/assets/buildings/building3.png',
+        CHUNYANG: '/assets/characters/chunyang.png',
+        CHUNYANG2: '/assets/characters/chunyang2.png',
+        CHUNYANG3: '/assets/characters/chunyang3.png',
+        CANGJIAN: '/assets/characters/cangjian.png',
+        CANGJIAN2: '/assets/characters/cangjian2.png',
+        CANGJIAN3: '/assets/characters/cangjian3.png',
+        TIANCE: '/assets/characters/tiance.png',
+        TIANCE2: '/assets/characters/tiance2.png',
+        TIANCE4: '/assets/characters/tiance4.png'
     },
     UNITS: {
         // --- 技能图标 (Skill Icons) ---
@@ -67,9 +76,9 @@ export const ASSET_REGISTRY = {
         'skill_tu': { name: '突图标', sheet: 'SKILL4', rows: 4, cols: 4, r: 2, c: 1 },
 
         // --- 主角 ---
-        'qijin': { name: '祁进', sheet: 'CHARS3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'left' },
-        'lichengen': { name: '李承恩', sheet: 'CHARS1', rows: 4, cols: 4, r: 1, c: 2, scale: 1.4, defaultFacing: 'right' },
-        'yeying': { name: '叶英', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
+        'liwangsheng': { name: '李忘生', sheet: 'CHUNYANG3', rows: 4, cols: 4, r: 3, c: 1, scale: 1.4, defaultFacing: 'left' },
+        'lichengen': { name: '李承恩', sheet: 'TIANCE4', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
+        'yeying': { name: '叶英', sheet: 'CANGJIAN', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'right' },
         
         // --- 环境与建筑 ---
         'main_city': { name: '主城', sheet: 'ITEMS', rows: 4, cols: 4, r: 1, c: 2, scale: 4.0 }, 
@@ -159,7 +168,7 @@ export const ASSET_REGISTRY = {
         'talent_core': { name: '核心', sheet: 'TALENT4', rows: 4, cols: 4, r: 4, c: 4 },
 
         // --- 职业中心节点图标 (Hero Core Icons) ---
-        'core_qijin':   { name: '纯阳核心', sheet: 'TALENT5', rows: 4, cols: 4, r: 2, c: 1 },
+        'core_liwangsheng':   { name: '纯阳核心', sheet: 'TALENT5', rows: 4, cols: 4, r: 2, c: 1 },
         'core_yeying':  { name: '藏剑核心', sheet: 'SKILL6',  rows: 4, cols: 4, r: 3, c: 2 },
         'core_tiance':  { name: '天策核心', sheet: 'SKILL4',  rows: 4, cols: 4, r: 1, c: 4 },
 
@@ -243,7 +252,30 @@ export const ASSET_REGISTRY = {
         'archer':   { name: '唐门射手', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'left' },
         'healer':   { name: '万花补给', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 2, scale: 1.4, defaultFacing: 'right' },
         'cangjian': { name: '藏剑弟子', sheet: 'CHARS1', rows: 4, cols: 4, r: 2, c: 3, scale: 1.4, defaultFacing: 'right' },
-        'cangyun':  { name: '苍云将士', sheet: 'CHARS1', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'right' }
+        'cangyun':  { name: '苍云将士', sheet: 'CHARS1', rows: 4, cols: 4, r: 3, c: 3, scale: 1.4, defaultFacing: 'right' },
+
+        // --- 藏剑扩充势力单位 ---
+        'cj_retainer': { name: '藏剑入门弟子', sheet: 'CANGJIAN', rows: 4, cols: 4, r: 4, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'cj_wenshui':  { name: '问水剑客', sheet: 'CANGJIAN3', rows: 4, cols: 4, r: 1, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'cj_shanju':   { name: '山居力士', sheet: 'CANGJIAN2', rows: 4, cols: 4, r: 2, c: 3, scale: 1.5, defaultFacing: 'right' },
+        'cj_xinjian':  { name: '灵峰侍剑师', sheet: 'CANGJIAN2', rows: 4, cols: 4, r: 3, c: 2, scale: 1.4, defaultFacing: 'right' },
+        'cj_golden_guard': { name: '黄金剑卫', sheet: 'CANGJIAN', rows: 4, cols: 4, r: 2, c: 4, scale: 1.5, defaultFacing: 'right' },
+        'cj_elder':    { name: '剑庐大长老', sheet: 'CANGJIAN', rows: 4, cols: 4, r: 1, c: 1, scale: 1.6, defaultFacing: 'right' },
+
+        // --- 新增纯阳势力单位 ---
+        'cy_twin_blade': { name: '双剑剑宗精锐', sheet: 'CHUNYANG2', rows: 4, cols: 4, r: 1, c: 4, scale: 1.4, defaultFacing: 'right' },
+        'cy_sword_array': { name: '玄门阵法师', sheet: 'CHUNYANG', rows: 4, cols: 4, r: 2, c: 4, scale: 1.5, defaultFacing: 'right' },
+        'cy_zixia_disciple': { name: '紫霞功真传弟子', sheet: 'CHUNYANG3', rows: 4, cols: 4, r: 3, c: 1, scale: 1.4, defaultFacing: 'right' },
+        'cy_taixu_disciple': { name: '太虚剑意真传弟子', sheet: 'CHUNYANG3', rows: 4, cols: 4, r: 2, c: 1, scale: 1.5, defaultFacing: 'right' },
+
+        // --- 天策扩充势力单位 ---
+        'tc_crossbow': { name: '天策羽林弩手', sheet: 'TIANCE', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'right' },
+        'tc_banner': { name: '天策战旗使', sheet: 'TIANCE', rows: 4, cols: 4, r: 4, c: 2, scale: 1.4, defaultFacing: 'right' },
+        'tc_dual_blade': { name: '天策双刃校尉', sheet: 'TIANCE3', rows: 4, cols: 4, r: 3, c: 4, scale: 1.4, defaultFacing: 'right' },
+        'tc_halberdier': { name: '持戟中郎将', sheet: 'TIANCE', rows: 4, cols: 4, r: 1, c: 4, scale: 1.5, defaultFacing: 'right' },
+        'tc_shield_vanguard': { name: '天策前锋', sheet: 'TIANCE', rows: 4, cols: 4, r: 4, c: 4, scale: 1.5, defaultFacing: 'right' },
+        'tc_mounted_crossbow': { name: '骁骑弩手', sheet: 'TIANCE4', rows: 4, cols: 4, r: 2, c: 4, scale: 1.5, defaultFacing: 'right' },
+        'tc_heavy_cavalry': { name: '玄甲陷阵骑', sheet: 'TIANCE4', rows: 4, cols: 4, r: 4, c: 3, scale: 1.7, defaultFacing: 'right' }
     }
 };
 
