@@ -140,77 +140,75 @@ class ModifierManager {
 
     /**
      * 计算修正后的数值 (核心 API)
-     * 优雅重构：支持逻辑依赖属性
+     * 遵循标准的 RPG 数值模型：Final = (Base * Product(More) * (1 + Sum(Inc))) + Sum(Flat)
      */
     getModifiedValue(unit, statName, baseValue) {
-        // --- 1. 处理具有逻辑依赖的派生属性 (cooldown_multiplier 依赖 haste) ---
+        // --- 1. 处理具有逻辑依赖的派生属性 ---
         if (statName === 'cooldown_multiplier' || statName === 'mana_cost_multiplier') {
-            // 获取基础急速值 (此调用内部会自动应用 0.4 的阈值截断)
             const hasteVal = this.getModifiedValue(unit, 'haste', 0);
             const hasteMultiplier = 1 - hasteVal;
 
-            // 获取该属性特有的额外修正 (专家建议：此处只建议使用 multiplier)
             let extraMultiplier = 1.0;
             let extraOffset = 0;
             for (const mod of this.globalModifiers) {
                 if (!this._isMatch(mod, unit, statName)) continue;
-                if (mod.multiplier) extraMultiplier *= mod.multiplier;
-                if (mod.offset) extraOffset += mod.offset;
+                if (mod.type === 'mult') extraMultiplier *= mod.multiplier;
+                else extraOffset += mod.offset;
             }
-
-            // 最终公式：(1 - 急速) * 额外加成 + 额外偏移 (注意：extraOffset 需谨慎使用)
             return Math.max(0.1, baseValue * hasteMultiplier * extraMultiplier + extraOffset);
         }
 
-        // --- 2. 属性名映射 (解耦 原始点数 与 最终倍率) ---
+        // --- 2. 属性名映射 ---
         const targetStat = this._getActualStatMapping(statName);
         
-        // --- 3. 特殊处理：乘法堆叠属性 (减伤) ---
-        if (statName === 'damage_multiplier') {
-            // 核心修复：允许 0 作为合法的基数，只在 undefined 时回退到 1.0
-            let finalMultiplier = (baseValue !== undefined) ? baseValue : 1.0;
-            
-            for (const mod of this.globalModifiers) {
-                if (!this._isMatch(mod, unit, targetStat)) continue;
-                if (mod.offset) finalMultiplier *= Math.max(0, 1.0 - mod.offset);
-                if (mod.multiplier !== 1.0) finalMultiplier *= mod.multiplier;
-            }
-            return finalMultiplier;
-        }
-
-        // --- 4. 常规加法/乘法堆叠逻辑 ---
-        let traitMultiplier = 1.0;      
-        let commonAdditiveBonus = 0;    
-        let offsetTotal = 0;            
+        // --- 3. 核心计算循环 (三区模型) ---
+        let moreProduct = 1.0;      // 独立乘区 (More)
+        let incSum = 0;             // 加法乘区 (Increased)
+        let flatSum = 0;            // 基础加算 (Flat)
 
         for (const mod of this.globalModifiers) {
             if (!this._isMatch(mod, unit, targetStat)) continue;
 
-            if (mod.source === 'trait') {
-                if (mod.multiplier) traitMultiplier *= mod.multiplier;
+            // 根据 mod.type 自动分流
+            if (mod.type === 'mult' || mod.method === 'mult') {
+                if (mod.multiplier !== undefined) moreProduct *= mod.multiplier;
+            } else if (mod.type === 'percent' || mod.method === 'percent') {
+                incSum += (mod.multiplier - 1);
             } else {
-                if (mod.multiplier) {
-                    commonAdditiveBonus += (mod.multiplier - 1);
+                // 兼容性逻辑：如果 mod 只有 multiplier 但没标 type，默认视为加法增伤 (Inc)
+                if (mod.multiplier !== undefined && mod.multiplier !== 1.0) {
+                    incSum += (mod.multiplier - 1);
                 }
+                flatSum += mod.offset;
             }
-            if (mod.offset) offsetTotal += mod.offset;
         }
 
-        const totalMultiplier = traitMultiplier * (1 + commonAdditiveBonus);
+        // 特殊处理：减伤属性 (damage_multiplier) 采用乘法堆叠逻辑
+        // 逻辑：每层减伤独立，计算最终剩余承伤比。例如 20% + 20% = 0.8 * 0.8 = 0.64 (即减伤 36%)
+        if (statName === 'damage_multiplier') {
+            let finalReduction = 1.0;
+            for (const mod of this.globalModifiers) {
+                if (!this._isMatch(mod, unit, targetStat)) continue;
+                if (mod.offset) finalReduction *= Math.max(0, 1.0 - mod.offset);
+                // 允许使用 mult 类型直接提供 More 减伤系数
+                if (mod.multiplier !== 1.0 && (mod.type === 'mult' || mod.method === 'mult')) finalReduction *= mod.multiplier;
+            }
+            return finalReduction;
+        }
+
+        // --- 4. 最终公式应用 (Inc/More/Flat) ---
+        // 公式：(Base * More * (1 + Sum(Inc))) + Flat
+        const totalMultiplier = moreProduct * (1 + incSum);
         
-        // --- 5. 应用最终公式与阈值截断 ---
-        // 核心修正：区分“叠加型”属性和“基础型”属性 (针对主角不动 Bug)
-        // 逻辑：
-        // A. 如果是产出类(income)或标记类(stun/invincible)，使用 (base + offset) * mult，确保 0 基础也能加成
-        // B. 如果是原生战斗属性(hp/atk/speed)，使用 base * mult + offset，确保基础值不被偏移量反向稀释
+        // 区分产出类和战斗属性类 (保持原有 Base+Flat 的位置逻辑)
         const incomeStats = ['gold_income', 'wood_income', 'final_gold_income', 'final_wood_income', 'recruit_cost', 'xp_gain', 'survival_rate'];
         const flagStats = ['stun', 'invincible', 'controlImmune', 'tigerHeart'];
         
         let rawValue;
         if (incomeStats.includes(statName) || flagStats.includes(statName)) {
-            rawValue = (baseValue + offsetTotal) * totalMultiplier;
+            rawValue = (baseValue + flatSum) * totalMultiplier;
         } else {
-            rawValue = baseValue * totalMultiplier + offsetTotal;
+            rawValue = baseValue * totalMultiplier + flatSum;
         }
 
         return this._applyFinalFormula(statName, rawValue);

@@ -6,6 +6,8 @@
  * 2. 黄色 (<span class="skill-num-highlight">): 影响程度/数值 (如：200点、12%、翻倍)
  */
 
+import { HERO_IDENTITY } from '../data/UnitStatsData.js';
+
 // 1. 最小天赋单位 (原子效果)
 export const TALENT_UNITS = {
     // --- 第一组：商道·金戈 (经济与财富) ---
@@ -174,6 +176,44 @@ export const TALENT_UNITS = {
         requires: ['node_core'],
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_huasanqing_duration_override', value: 999000, method: 'add' }]
     },
+    'chunyang_array_mana_regen': {
+        name: '坐忘无我', icon: 'talent_mp_regen',
+        description: '坐忘玄机，物我两忘。侠客在【气场】范围内时，每秒额外<span class="skill-term-highlight">恢复内力</span> <span class="skill-num-highlight">3</span> 点。',
+        requires: ['node_core'],
+        effects: [{ type: 'modifier', target: 'hero', key: 'chunyang_array_mp_regen_enabled', value: 3, method: 'add' }]
+    },
+    'chunyang_sanqing_huashen_permanent': {
+        name: '三清化神·恒', icon: 'talent_chunyang_huasanqing',
+        description: '玄门化神，剑气长存。【三清化神】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
+        requires: ['node_core'],
+        effects: [{ type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_duration_override', value: 999000, method: 'add' }]
+    },
+    'chunyang_sanqing_huashen_mastery': {
+        name: '三清化神·极', icon: 'talent_chunyang_huasanqing',
+        description: '三清造化，神技自成。【三清化神】的<span class="skill-term-highlight">内力消耗</span>降低为 <span class="skill-num-highlight">0</span>，且发射<span class="skill-term-highlight">间隔</span>缩短 <span class="skill-num-highlight">1</span> 秒。',
+        requires: ['chunyang_sanqing_huashen_permanent'],
+        effects: [
+            { type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_mana_cost_multiplier', value: 0, method: 'mult' },
+            { type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_interval_offset', value: -1000, method: 'add' }
+        ]
+    },
+    'chunyang_sword_penetration': {
+        name: '万剑归宗', icon: 'talent_power_epic',
+        description: '心剑合一，气剑纵横。普通攻击获得 <span class="skill-num-highlight">3</span> 次<span class="skill-term-highlight">穿透</span>效果，且<span class="skill-term-highlight">攻击范围</span>提高 <span class="skill-num-highlight">20%</span>。',
+        requires: ['node_core'],
+        effects: [
+            { type: 'modifier', target: 'hero', key: 'projectile_penetration', value: 3, method: 'add' },
+            { type: 'modifier', target: 'hero', key: 'attackRange', value: 0.2, method: 'percent' }
+        ]
+    },
+    'chunyang_sword_damage_boost': {
+        name: '凭虚御风', icon: 'talent_power',
+        description: '剑气如风，虚怀若谷。普通攻击造成的<span class="skill-term-highlight">伤害</span>提升 <span class="skill-num-highlight">50%</span>（独立乘区）。',
+        requires: ['node_core'],
+        effects: [
+            { type: 'modifier', target: 'hero', key: 'more_damage', value: 1.5, method: 'mult' }
+        ]
+    },
 
     // 基础属性类 (每个可升 3 级)
     'unit_power_base': { 
@@ -271,19 +311,16 @@ export const TALENT_GROUPS = {
     'group_exploration': {
         name: '侠道·神行',
         major: 'unit_world_speed_boost', // 轻功+开图
-        minors: ['unit_season_mp_regen', 'unit_kill_gold', 'unit_mp_epic'] // 加入内力史诗
-    },
-    // 【演武】技能频率与内力基础
-    'group_combat': {
-        name: '武道·极诣',
-        major: 'unit_combo_chain', // 连招增益
-        minors: ['unit_battle_start_buff', 'unit_haste_base', 'unit_spells_epic'] // 加入功法史诗
+        minors: ['unit_season_mp_regen', 'unit_kill_gold', 'unit_mp_epic', 'unit_battle_start_buff']
     },
     // 【属性】全属性基础强化
     'group_attributes': {
         name: '根骨·造化',
         major: 'unit_all_stats_boost', // 全属性提升
-        minors: ['unit_power_base', 'unit_spells_base', 'unit_leadership_base', 'unit_mp_base', 'unit_haste_base']
+        minors: [
+            'unit_power_base', 'unit_spells_base', 'unit_leadership_base', 
+            'unit_mp_base', 'unit_haste_base', 'unit_spells_epic', 'unit_haste_epic'
+        ]
     },
 
     // --- 职业专属组 ---
@@ -315,11 +352,17 @@ export const TALENT_GROUPS = {
 
     // --- 纯阳专属组 ---
 
-    // 【纯阳·气场】主打气场增益与范围控制
+    // 【纯阳·气宗】主打气场增益、内力恢复与范围控制
     'group_chunyang_array': {
         name: '太虚剑意·气场',
         major: 'chunyang_array_duration', 
-        minors: ['chunyang_array_radius', 'chunyang_huasanqing_permanent', 'unit_spells_epic']
+        minors: ['chunyang_array_radius', 'chunyang_huasanqing_permanent', 'chunyang_array_mana_regen', 'unit_spells_epic']
+    },
+    // 【纯阳·剑宗】主打普通攻击强化、气剑穿透与三清化神爆发
+    'group_chunyang_sword': {
+        name: '紫霞功·心剑',
+        major: 'chunyang_sword_penetration',
+        minors: ['chunyang_sword_damage_boost', 'chunyang_sanqing_huashen_permanent', 'chunyang_sanqing_huashen_mastery', 'unit_power_epic']
     }
 };
 
@@ -333,10 +376,18 @@ export const HERO_TREE_CONFIG = {
         ]
     },
     'liwangsheng': {
-        core: { name: '纯阳宫', icon: 'core_liwangsheng', description: '太极生两仪，剑气荡乾坤。', effects: [{ type: 'stat', stat: 'spells', value: 15 }] },
+        core: { 
+            name: '纯阳宫', icon: 'core_liwangsheng', 
+            description: '太极生两仪，剑气荡乾坤。<span class="skill-term-highlight">释放招式</span>后，提升 <span class="skill-num-highlight">20%</span> <span class="skill-term-highlight">功法</span>，持续 3 秒，可刷新。', 
+            effects: [
+                { type: 'stat', stat: 'spells', value: 15 },
+                { type: 'modifier', target: 'hero', key: 'combo_chain_enabled', value: 1, method: 'add' }
+            ] 
+        },
         groups: [
-            'group_chunyang_array', // 新增：气场特色组
-            'group_military', 'group_economy', 'group_exploration', 'group_combat', 'group_attributes'
+            'group_chunyang_sword', 
+            'group_chunyang_array', 
+            'group_military', 'group_economy', 'group_exploration', 'group_attributes'
         ]
     },
     'yeying': {
@@ -353,7 +404,9 @@ export const HERO_TREE_CONFIG = {
  */
 export function getHeroTalentTree(heroId) {
     // 动态确定主属性名称 (身法/力道)
-    const powerName = (heroId === 'liwangsheng' || heroId === 'yeying') ? '身法' : '力道';
+    // 核心优化：从 HERO_IDENTITY 动态获取英雄的主属性显示名称
+    const heroInfo = HERO_IDENTITY[heroId];
+    const powerName = heroInfo ? heroInfo.primaryStat : '力道';
 
     const config = HERO_TREE_CONFIG[heroId] || HERO_TREE_CONFIG['liwangsheng'];
     const nodes = {};

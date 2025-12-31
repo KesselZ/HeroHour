@@ -140,6 +140,7 @@ export const UNIT_STATS_DATA = {
  */
 export const HERO_IDENTITY = {
     'liwangsheng': {
+        primaryStat: '根骨', 
         initialStats: { power: 7, spells: 12, morale: 6, qinggong: 11.8, battleSpeed: 6.0, leadership: 20 },
         combatBase: { atk: 9, hpBase: 200, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
@@ -148,6 +149,7 @@ export const HERO_IDENTITY = {
         ]
     },
     'lichengen': {
+        primaryStat: '力道',
         initialStats: { power: 5, spells: 8, morale: 10, qinggong: 11.8, battleSpeed: 9.0, leadership: 25 },
         combatBase: { atk: 22, hpBase: 390, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [
@@ -156,6 +158,7 @@ export const HERO_IDENTITY = {
         ]
     },
     'yeying': {
+        primaryStat: '身法',
         initialStats: { power: 10, spells: 18, morale: 2, qinggong: 11.8, battleSpeed: 7.0, leadership: 15 },
         combatBase: { atk: 5, hpBase: 360, hpScaling: 5, atkScaling: 0.02 }, 
         traits: [

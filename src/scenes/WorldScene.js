@@ -297,6 +297,9 @@ export class WorldScene {
         if (powerLabel) powerLabel.innerText = powerName;
         
         const dummy = worldManager.getPlayerHeroDummy();
+        const identity = worldManager.getHeroIdentity(data.id);
+        const cb = identity.combatBase;
+        
         document.getElementById('attr-primary-val').innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'power', data.stats.power));
         document.getElementById('attr-fali').innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'spells', data.stats.spells));
         
@@ -309,12 +312,26 @@ export class WorldScene {
             leaderMax.innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'leadership', data.stats.leadership));
         }
 
-        // 绑定属性 Tooltip (简化介绍，隐藏具体数值)
-        this.bindAttrTooltip('attr-box-morale', '军队', `统御三军，提升帐下所有士兵的攻击能力与气血上限`);
-        this.bindAttrTooltip('attr-box-power', powerName, `修习内功外招，增强侠客自身的体质与劈砍威力`);
-        this.bindAttrTooltip('attr-box-spells', '功法', `通过玄妙法门增强招式威力，使技能爆发出更强的效果`);
+        // 绑定属性 Tooltip (动态显示主属性收益)
+        const realMorale = Math.floor(modifierManager.getModifiedValue(dummy, 'morale', data.stats.morale));
+        const realPower = Math.floor(modifierManager.getModifiedValue(dummy, 'power', data.stats.power));
+        const realSpells = Math.floor(modifierManager.getModifiedValue(dummy, 'spells', data.stats.spells));
+        
+        const moraleAtkBonus = (realMorale).toFixed(0);
+        const moraleHpBonus = (realMorale).toFixed(0);
+        this.bindAttrTooltip('attr-box-morale', '军队', `统御三军，使帐下士兵的<span class="skill-term-highlight">攻击力</span>提升 <span class="skill-num-highlight">${moraleAtkBonus}%</span>，<span class="skill-term-highlight">气血上限</span>提升 <span class="skill-num-highlight">${moraleHpBonus}%</span>。`);
+        
+        const powerAtkBonus = (realPower * (cb.atkScaling || 0.05) * 100).toFixed(0);
+        const powerHpBonus = (realPower * cb.hpScaling).toFixed(0);
+        this.bindAttrTooltip('attr-box-power', powerName, `修习内功外招，使侠客自身的<span class="skill-term-highlight">普通攻击</span>伤害提升 <span class="skill-num-highlight">${powerAtkBonus}%</span>，并额外增加 <span class="skill-num-highlight">${powerHpBonus}</span> 点<span class="skill-term-highlight">气血上限</span>。`);
+        
+        const spellBonus = (realSpells).toFixed(0);
+        this.bindAttrTooltip('attr-box-spells', '功法', `通过玄妙法门，使侠客的<span class="skill-term-highlight">招式威力</span>提升 <span class="skill-num-highlight">${spellBonus}%</span>。`);
+        
         this.bindAttrTooltip('attr-box-speed', '轻功', `身轻如燕，提升侠客行走江湖与临阵对敌时的移动速度`);
-        this.bindAttrTooltip('attr-box-haste', '调息', `提升招式运转速度，使其冷却时间缩短并降低内力消耗`);
+        
+        const hasteReduction = (actualHaste * 100).toFixed(0);
+        this.bindAttrTooltip('attr-box-haste', '调息', `提升招式运转速度，使<span class="skill-term-highlight">冷却时间</span>与<span class="skill-term-highlight">内力消耗</span>降低 <span class="skill-num-highlight">${hasteReduction}%</span>。`);
         this.bindAttrTooltip('attr-box-leadership', '统御', `侠客带兵容量上限，每种兵力产生不同的占用点数`);
         
         const skillsContainer = document.getElementById('hero-panel-skills');

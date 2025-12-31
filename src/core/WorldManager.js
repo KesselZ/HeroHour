@@ -336,11 +336,19 @@ export class WorldManager {
         this.side = 'player'; 
 
         // 0. 势力定义
-        this.availableHeroes = {
-            'liwangsheng': { name: '李忘生', title: '纯阳掌门', icon: 'liwangsheng', sect: 'chunyang', color: '#44ccff', primaryStat: '力道' }, 
-            'lichengen': { name: '李承恩', title: '天策府统领', icon: 'lichengen', sect: 'tiance', color: '#ff4444', primaryStat: '力道' }, 
-            'yeying': { name: '叶英', title: '藏剑大庄主', icon: 'cangjian', sect: 'cangjian', color: '#ffcc00', primaryStat: '身法' } 
-        };
+        this.availableHeroes = {};
+        for (const id in HERO_IDENTITY) {
+            const identity = HERO_IDENTITY[id];
+            const blueprint = UNIT_STATS_DATA[id];
+            this.availableHeroes[id] = {
+                name: blueprint.name,
+                title: id === 'liwangsheng' ? '纯阳掌门' : (id === 'lichengen' ? '天策府统领' : '藏剑大庄主'),
+                icon: id === 'yeying' ? 'cangjian' : id,
+                sect: id === 'liwangsheng' ? 'chunyang' : (id === 'lichengen' ? 'tiance' : 'cangjian'),
+                color: id === 'liwangsheng' ? '#44ccff' : (id === 'lichengen' ? '#ff4444' : '#ffcc00'),
+                primaryStat: identity.primaryStat
+            };
+        }
 
         this.factions = {}; // 记录所有势力数据 { factionId: { heroId, cities: [], army: {} } }
 
@@ -2182,9 +2190,23 @@ export class WorldManager {
         const realSpells = modifierManager.getModifiedValue(dummy, 'spells', s.spells);
         const realMorale = modifierManager.getModifiedValue(dummy, 'morale', s.morale);
 
-        // 1. 统率修正 (基于真实统帅值)
-        modifierManager.addModifier({ id: 'soldier_morale_atk', side: 'player', stat: 'attackDamage', multiplier: 1.0 + (realMorale / 100), source: 'hero_stats' });
-        modifierManager.addModifier({ id: 'soldier_morale_hp', side: 'player', stat: 'hp', multiplier: 1.0 + (realMorale / 100), source: 'hero_stats' });
+        // 1. 统率修正 (基于真实统帅值) - 仅对小兵生效 (unitType: 'army')
+        modifierManager.addModifier({ 
+            id: 'soldier_morale_atk', 
+            side: 'player', 
+            unitType: 'army', // 核心修正：只影响非英雄单位
+            stat: 'attackDamage', 
+            multiplier: 1.0 + (realMorale / 100), 
+            source: 'hero_stats' 
+        });
+        modifierManager.addModifier({ 
+            id: 'soldier_morale_hp', 
+            side: 'player', 
+            unitType: 'army', // 核心修正：只影响非英雄单位
+            stat: 'hp', 
+            multiplier: 1.0 + (realMorale / 100), 
+            source: 'hero_stats' 
+        });
 
         // 2. 英雄自身基础数值与成长
         modifierManager.addModifier({
@@ -2200,7 +2222,7 @@ export class WorldManager {
             id: 'hero_growth_atk',
             side: 'player',
             unitType: data.id,
-            stat: 'attackDamage',
+            stat: 'primary_attack_mult', // 专用桶：主属性普攻倍率
             multiplier: 1.0 + (realPower * (cb.atkScaling || 0.05)),
             source: 'hero_stats'
         });

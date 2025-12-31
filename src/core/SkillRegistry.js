@@ -72,10 +72,10 @@ export const SkillRegistry = {
         cooldown: 10000,
         audio: 'skill_shout_extra',
         targeting: { type: 'instant', shape: 'circle', radius: 12 },
-        description: '激发起全军斗志，所有友军攻击力提升 {bonus}%，持续 {duration} 秒',
+        description: '激发起全军斗志，所有友军普通攻击伤害提升 {bonus}%，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'pulse', params: { color: 0xffaa00, duration: 800, radius: 10 } },
-            { type: 'buff_aoe', side: 'player', params: { stat: 'attackDamage', multiplier: 1.2, duration: 4000, color: 0xffaa00, radius: 12 } }
+            { type: 'buff_aoe', side: 'player', params: { stat: 'attack_damage_bonus', multiplier: 1.2, duration: 4000, color: 0xffaa00, radius: 12 } }
         ]
     }),
     'summon_militia': new Skill('summon_militia', {
@@ -261,7 +261,7 @@ export const SkillRegistry = {
         cooldown: 12000,
         audio: 'skill_field',
         targeting: { type: 'location', shape: 'circle', range: 18, radius: 6.0 },
-        description: '【气场】产生生太极气场，使范围内友军移速提升 {bonus}%，伤害提升 {bonus2}%，并免疫控制，持续 {duration} 秒',
+        description: '【气场】产生生太极气场，使范围内友军移速提升 {bonus}%，普通攻击伤害提升 {bonus2}%，并免疫控制，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'field', params: { color: 0x00ffcc, duration: 5000, radius: 6.0 } },
             { 
@@ -270,7 +270,7 @@ export const SkillRegistry = {
                 interval: 500, 
                 side: 'player',
                 onTickBuff: { 
-                    stat: ['moveSpeed', 'attackDamage', 'controlImmune'], 
+                    stat: ['moveSpeed', 'attack_damage_bonus', 'controlImmune'], 
                     multiplier: [1.1, 1.2, 1.0], 
                     duration: 800, 
                     color: 0x00ffcc,
@@ -560,9 +560,10 @@ export const SkillRegistry = {
             {
                 type: 'buff_aoe',
                 side: 'caster',
-                applySkillPowerToMultiplier: true, // 伤害提升量随功法变化
+                applySkillPowerToMultiplier: true,
                 params: {
-                    stat: ['attackDamage', 'skill_power'],
+                    // 同时对物理和魔法增伤桶进行加成，实现“全伤害提升”
+                    stat: ['attack_damage_bonus', 'skill_damage_bonus'],
                     multiplier: [1.5, 1.5],
                     duration: 3000,
                     vfxName: 'vfx_sparkle',
@@ -580,16 +581,17 @@ export const SkillRegistry = {
         cooldown: 25000,
         audio: 'skill_field',
         targeting: { type: 'instant' },
-        description: '【纯阳绝技】身后化出五把气剑，持续 {duration} 秒。每过 3 秒，五把气剑将依次飞向最近敌人造成 {damage} 点伤害后返回。',
+        description: '【纯阳绝技】身后化出五把气剑，持续 {duration} 秒。每过 {interval} 秒，五把气剑将依次飞向最近敌人造成 {damage} 点伤害后返回。伤害取决于【根骨】。',
         actions: [
             { 
                 type: 'sanqing_huashen', 
                 duration: 8000, 
                 interval: 3000, 
-                damage: 5, 
+                damage: 10, 
                 swordCount: 5,
-                applySkillPowerToDamage: true,
-                applySkillPowerToDuration: true
+                applyPowerToDamage: true,
+                applySkillPowerToDamage: false,
+                applySkillPowerToDuration: false
             }
         ]
     }),

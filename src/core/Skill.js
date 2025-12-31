@@ -36,11 +36,11 @@ export class Skill {
         const globalCDMult = modifierManager.getModifiedValue(dummy, 'cooldown_multiplier', 1.0);
         
         // 2. 技能特定倍率劫持 (例如: pinghu_cooldown_multiplier)
-        const specificCDMult = modifierManager.getModifiedValue(dummy, `${this.id}_cooldown_multiplier`, 1.0);
+        const specificCDMult = modifierManager.getModifiedValue(dummy, `skill_${this.id}_cooldown_multiplier`, 1.0) * 
+                               modifierManager.getModifiedValue(dummy, `category_${this.category}_cooldown_multiplier`, 1.0);
         
         // 3. 技能特定数值覆盖 (例如: tu_cooldown_override)
-        // 如果该值 > 0，则直接跳过所有计算，强制返回该值
-        const override = modifierManager.getModifiedValue(dummy, `${this.id}_cooldown_override`, 0);
+        const override = modifierManager.getModifiedValue(dummy, `skill_${this.id}_cooldown_override`, 0);
         
         if (override > 0) return override;
 
@@ -48,16 +48,43 @@ export class Skill {
     }
 
     /**
+     * 获取当前实际的内力消耗 (考虑通用协议修正)
+     */
+    getActualManaCost(heroData) {
+        const dummy = { side: 'player', isHero: true, type: heroData.id };
+        
+        // 1. 获取全局消耗倍率 (如调息加成)
+        const globalMult = modifierManager.getModifiedValue(dummy, 'mana_cost_multiplier', 1.0);
+        
+        // 2. 获取技能/类别特定倍率 (如奇穴加成)
+        const skillMult = modifierManager.getModifiedValue(dummy, `skill_${this.id}_mana_cost_multiplier`, 1.0);
+        const catMult = modifierManager.getModifiedValue(dummy, `category_${this.category}_mana_cost_multiplier`, 1.0);
+
+        return Math.floor(this.cost * globalMult * skillMult * catMult);
+    }
+
+    /**
+     * 获取当前实际的触发间隔 (考虑通用协议修正)
+     */
+    getActualInterval(heroData, baseInterval) {
+        if (!baseInterval) return 0;
+        const dummy = { side: 'player', isHero: true, type: heroData.id };
+        
+        const offset = modifierManager.getModifiedValue(dummy, `skill_${this.id}_interval_offset`, 0) + 
+                       modifierManager.getModifiedValue(dummy, `category_${this.category}_interval_offset`, 0);
+        
+        return Math.max(100, baseInterval + offset);
+    }
+
+    /**
      * 检查技能是否可用
      */
     isReady(heroData) {
         const now = Date.now();
-        // 核心优化：直接请求计算好的倍率 (已包含 40% 上限逻辑)
-        const dummy = { side: 'player', isHero: true, type: heroData.id };
-        const mpMult = modifierManager.getModifiedValue(dummy, 'mana_cost_multiplier', 1.0);
-        
+        const actualCost = this.getActualManaCost(heroData);
         const actualCD = this.getActualCooldown(heroData);
-        const canAffordMP = heroData.mpCurrent >= Math.floor(this.cost * mpMult);
+        
+        const canAffordMP = heroData.mpCurrent >= actualCost;
         const cdReady = (now - this.lastUsed) >= actualCD;
         
         return canAffordMP && cdReady;
@@ -136,7 +163,14 @@ export class Skill {
                 // 1. 伤害数值处理
                 const damageVal = action.value || action.damage || action.onTickDamage;
                 if (damageVal) {
-                    const finalDmg = Math.floor(damageVal * skillPower);
+                    let currentMultiplier = 1.0;
+                    if (action.applyPowerToDamage) {
+                        currentMultiplier = modifierManager.getModifiedValue(dummy, 'primary_attack_mult', 1.0);
+                    } else if (action.applySkillPowerToDamage !== false) {
+                        currentMultiplier = skillPower;
+                    }
+                    
+                    const finalDmg = Math.floor(damageVal * currentMultiplier);
                     desc = desc.split('{damage}').join(hl(finalDmg));
                     desc = desc.split('{tickDamage}').join(hl(finalDmg));
                 }
@@ -239,6 +273,15 @@ export class Skill {
                     desc = desc.split('{count}').join(isCountDynamic ? hl(finalCount) : normal(finalCount));
                 }
 
+                // 5. 触发间隔处理
+                if (action.interval || (action.params && action.params.interval)) {
+                    const baseInterval = action.interval || action.params.interval;
+                    const actualInterval = this.getActualInterval(heroData, baseInterval);
+                    const isIntervalDynamic = actualInterval !== baseInterval;
+                    const intervalStr = (actualInterval / 1000).toFixed(1);
+                    desc = desc.split('{interval}').join(isIntervalDynamic ? hl(intervalStr) : normal(intervalStr));
+                }
+
                 // 递归处理子动作（如 movement 的 landActions）
                 if (action.landActions) {
                     processActions(action.landActions);
@@ -269,10 +312,7 @@ export class Skill {
         const heroData = battleScene.worldManager.heroData;
         if (!this.isReady(heroData)) return false;
 
-        // 核心优化：通过 ModifierManager 分别获取 CD 和 蓝耗倍率
-        const cdMult = modifierManager.getModifiedValue(caster, 'cooldown_multiplier', 1.0);
-        const mpMult = modifierManager.getModifiedValue(caster, 'mana_cost_multiplier', 1.0);
-        const actualCost = Math.floor(this.cost * mpMult);
+        const actualCost = this.getActualManaCost(heroData);
         
         heroData.mpCurrent -= actualCost;
         this.lastUsed = Date.now();
@@ -334,6 +374,15 @@ export class Skill {
 
         const heroData = battleScene.worldManager.heroData;
 
+        // --- 核心优化：技能伤害三桶聚合 (完全解耦普攻) ---
+        // 1. 桶 1 (主属性): skillPower
+        // 2. 桶 2 (增伤): [技能专用增伤桶] (内部加算)
+        const skillBonus = modifierManager.getModifiedValue(caster, 'skill_damage_bonus', 1.0);
+        
+        // 3. 桶 3 (乘区): more_damage (内部乘算)
+        const moreDamage = modifierManager.getModifiedValue(caster, 'more_damage', 1.0);
+        const totalSkillMult = skillPower * skillBonus * moreDamage;
+
         switch (action.type) {
             case 'vfx':
                 const vfxParams = { ...action.params };
@@ -367,7 +416,7 @@ export class Skill {
                     }
                 }
                 const targets = battleScene.getUnitsInArea(center, dmgTargeting, 'enemy');
-                battleScene.applyDamageToUnits(targets, action.value * skillPower, center, action.knockback, caster.isHero);
+                battleScene.applyDamageToUnits(targets, action.value * totalSkillMult, center, action.knockback, caster.isHero);
                 break;
 
             case 'buff_aoe':
@@ -574,11 +623,27 @@ export class Skill {
                 break;
 
             case 'sanqing_huashen':
-                const sqDuration = action.applySkillPowerToDuration ? (action.duration * skillPower) : action.duration;
-                const sqDamage = action.applySkillPowerToDamage ? (action.damage * skillPower) : action.damage;
+                const rawSqDuration = action.applySkillPowerToDuration ? (action.duration * skillPower) : action.duration;
+                const sqDuration = this.getActualDuration(heroData, rawSqDuration);
+                let sqDamage = action.damage;
+                if (action.applyPowerToDamage) {
+                    // 三清化神：它被定义为“视为普攻”，因此抓取普攻的所有桶
+                    // 包括：主属性(根骨) * 普攻增伤桶 * 独立乘区
+                    const atkBonus = modifierManager.getModifiedValue(caster, 'attack_damage_bonus', 1.0);
+                    const powerMult = modifierManager.getModifiedValue(caster, 'primary_attack_mult', 1.0) * 
+                                     atkBonus * 
+                                     modifierManager.getModifiedValue(caster, 'more_damage', 1.0);
+                    sqDamage = Math.floor(sqDamage * powerMult);
+                } else if (action.applySkillPowerToDamage !== false) {
+                    sqDamage = Math.floor(sqDamage * totalSkillMult);
+                }
+                
+                // 核心优化：使用通用的间隔抓取接口
+                const finalInterval = this.getActualInterval(heroData, action.interval || 3000);
+
                 battleScene.applySanqingHuashen(caster, {
                     duration: sqDuration,
-                    interval: action.interval || 3000,
+                    interval: finalInterval,
                     damage: sqDamage,
                     swordCount: action.swordCount || 5,
                     color: action.color || 0x00ffff

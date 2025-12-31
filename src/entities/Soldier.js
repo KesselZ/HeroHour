@@ -208,7 +208,18 @@ export class BaseUnit extends THREE.Group {
     }
 
     get attackDamage() {
-        return modifierManager.getModifiedValue(this, 'attackDamage', this._baseAttackDamage);
+        const baseFlat = modifierManager.getModifiedValue(this, 'attackDamage', this._baseAttackDamage);
+        
+        // 桶 1: 主属性倍率 (Power/Root)
+        const primaryMult = modifierManager.getModifiedValue(this, 'primary_attack_mult', 1.0);
+        
+        // 桶 2: 普攻增伤 (加算 Inc 区)
+        const attackBonus = modifierManager.getModifiedValue(this, 'attack_damage_bonus', 1.0);
+        
+        // 桶 3: 最终乘区 (乘算 More 区)
+        const moreDamage = modifierManager.getModifiedValue(this, 'more_damage', 1.0);
+        
+        return baseFlat * primaryMult * attackBonus * moreDamage;
     }
 
     get attackCooldownTime() {
@@ -488,6 +499,20 @@ export class BaseUnit extends THREE.Group {
 
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
+
+        // --- 核心修复：坐忘无我（仅在拥有特定 Modifier 时生效，非底层机制） ---
+        if (this.isHero && this.side === 'player') {
+            const arrayRegen = modifierManager.getModifiedValue(this, 'chunyang_array_mp_regen_enabled', 0);
+            if (arrayRegen > 0) {
+                // 检查是否在任意气场中
+                const isInArray = this.activeBuffs && this.activeBuffs.some(b => b.tag === 'shengtaiji' || b.tag === 'tunriyue' || b.tag === 'huasanqing');
+                if (isInArray) {
+                    const heroData = worldManager.heroData;
+                    const recoverAmount = arrayRegen * (deltaTime / 1000);
+                    heroData.mpCurrent = Math.min(heroData.mpMax, heroData.mpCurrent + recoverAmount);
+                }
+            }
+        }
 
         // 0. 更新护盾过期
         this.updateShields();
@@ -926,7 +951,13 @@ export class BaseUnit extends THREE.Group {
         // 核心修正：如果是治疗 (amount < 0)，跳过减伤和护盾计算
         let finalAmount = amount;
         if (amount > 0) {
+            // 1. 应用减伤 (Multiplicative Independent Reduction)
             finalAmount = amount * this.damageMultiplier;
+            
+            // 2. 应用易伤桶 (Additive Internal, Multiplicative External)
+            // 易伤计算：1 + (易伤A + 易伤B)
+            const vulnerability = modifierManager.getModifiedValue(this, 'vulnerability', 1.0);
+            finalAmount *= vulnerability;
             
             // --- 护盾优先吸收伤害 ---
             if (this.shield > 0) {
@@ -1510,12 +1541,17 @@ export class HeroUnit extends BaseUnit {
      */
     performChunyangAttack(enemies, details) {
         if (!this.target || this.target.isDead) return;
+
+        // 核心优化：从 ModifierManager 获取穿透次数
+        const penetration = modifierManager.getModifiedValue(this, 'projectile_penetration', 0);
+
         this.executeBurstAttack({
             count: details.burstCount || 3,
             interval: 100,
             damage: this.attackDamage,
             projectileType: 'air_sword',
             projectileColor: 0x00ffff,
+            projectilePenetration: penetration,
             soundName: 'attack_air_sword'
         });
     }

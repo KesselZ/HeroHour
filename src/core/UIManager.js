@@ -411,7 +411,8 @@ class UIManager {
             let displayName = nodeData.name;
             if (id.includes('minor') && nodeData.name === '主属性') {
                 const heroId = worldManager.heroData?.id;
-                displayName = (heroId === 'liwangsheng' || heroId === 'yeying') ? '身法' : '力道';
+                const heroInfo = worldManager.availableHeroes[heroId];
+                displayName = heroInfo ? heroInfo.primaryStat : '力道';
             }
 
             node.style.left = `${nodeData.pos.x + 1000}px`; 
@@ -636,12 +637,8 @@ class UIManager {
         const skill = SkillRegistry[skillId];
         if (!skill) return;
 
-        // 核心修复：统一使用 ModifierManager 获取已截断的倍率，解决 UI 与逻辑不一致问题
-        const casterDummy = { side: 'player', isHero: true, type: heroData.id };
-        const mpMult = modifierManager.getModifiedValue(casterDummy, 'mana_cost_multiplier', 1.0);
-
         const actualCD = (skill.getActualCooldown(heroData) / 1000).toFixed(1);
-        const actualCost = Math.floor(skill.cost * mpMult);
+        const actualCost = skill.getActualManaCost(heroData);
 
         this.showTooltip({
             name: skill.name,
