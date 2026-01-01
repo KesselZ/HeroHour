@@ -400,6 +400,9 @@ function applyHeroTraits(heroId) {
     // 3.5 重新初始化奇穴管理器，根据选中的英雄生成对应的奇穴树
     talentManager.init(worldManager.heroData);
 
+    // 触发英雄初始化完成事件，通知 UI 进行预加载
+    window.dispatchEvent(new CustomEvent('hero-initialized'));
+
     // 4. 初始化资源状态 (补满血蓝)
     worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
     worldManager.heroData.mpCurrent = worldManager.heroData.mpMax;

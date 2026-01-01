@@ -118,7 +118,7 @@ export const TALENT_UNITS = {
         name: '奔雷枪术', icon: 'talent_tiance_tu',
         description: '雷霆之势，【突】的<span class="skill-term-highlight">调息时间</span>永久降低至 <span class="skill-num-highlight">1</span> 秒。',
         requires: ['node_core'],
-        effects: [{ type: 'modifier', target: 'hero', key: 'tu_cooldown_override', value: 1000, method: 'add' }]
+        effects: [{ type: 'modifier', target: 'hero', key: 'skill_tu_cooldown_override', value: 1000, method: 'add' }]
     },
 
     'tiance_bleeding_edge': {
@@ -134,7 +134,7 @@ export const TALENT_UNITS = {
         description: '轻剑之极致。梦泉虎跑<span class="skill-term-highlight">持续时间</span>延长 <span class="skill-num-highlight">3</span> 秒；且虎跑期间，平湖断月的<span class="skill-term-highlight">调息时间</span>降低<span class="skill-num-highlight">三成</span>。',
         requires: ['node_core'],
         effects: [
-            { type: 'modifier', target: 'hero', key: 'cangjian_mengquan_duration_add', value: 3000, method: 'add' },
+            { type: 'modifier', target: 'hero', key: 'skill_mengquan_duration_offset', value: 3000, method: 'add' },
             { type: 'modifier', target: 'hero', key: 'cangjian_fengming_enabled', value: 1, method: 'add' }
         ]
     },
@@ -298,24 +298,28 @@ export const TALENT_GROUPS = {
     // 【财富】经营与资源获取
     'group_economy': {
         name: '商道·金戈',
+        tag: '财富',
         major: 'unit_income_base', // 每座城池+200产出
         minors: ['unit_wood_save', 'unit_loot_bonus', 'unit_trade_monopoly', 'unit_leadership_epic'] // 加入统御史诗
     },
     // 【征战】军队规模与阵地战
     'group_military': {
         name: '将道·铁骑',
+        tag: '征战',
         major: 'unit_elite_cost', // 精锐减费
         minors: ['unit_recruit_save', 'unit_army_def', 'unit_martyrdom', 'unit_army_hp_epic'] // 加入士兵生命史诗
     },
     // 【游历】大世界移动与发育
     'group_exploration': {
         name: '侠道·神行',
+        tag: '游历',
         major: 'unit_world_speed_boost', // 轻功+开图
         minors: ['unit_season_mp_regen', 'unit_kill_gold', 'unit_mp_epic', 'unit_battle_start_buff']
     },
     // 【属性】全属性基础强化
     'group_attributes': {
         name: '根骨·造化',
+        tag: '造化',
         major: 'unit_all_stats_boost', // 全属性提升
         minors: [
             'unit_power_base', 'unit_spells_base', 'unit_leadership_base', 
@@ -328,26 +332,30 @@ export const TALENT_GROUPS = {
     // 【天策·羽林】主打英雄自身的普攻横扫形态与近战爆发
     'group_tiance_commander': {
         name: '羽林枪法',
+        tag: '羽林',
         major: 'tiance_yulin_spear', // 横扫千军 (核心形态)
         minors: ['unit_power_base', 'unit_power_epic', 'tiance_cavalry_upgrade'] // 围绕主属性与形态补充
     },
     // 【天策·破军】主打高频率的招式衔接与流血伤害
     'group_tiance_martial': {
         name: '傲血战意',
+        tag: '破军',
         major: 'tiance_bleeding_edge', // 龙牙破军 (招式流血核心)
         minors: ['tiance_benlei_spear', 'unit_haste_base', 'unit_spells_epic'] // 围绕调息与功法加成
     },
     // 【藏剑·问水】主打轻剑身法与普攻强化
     'group_cangjian_light': {
         name: '问水决·灵动',
+        tag: '轻剑',
         major: 'cangjian_fengming', // 凤鸣 (核心：梦泉虎跑强化)
         minors: ['cangjian_heavy_burst', 'unit_power_base', 'unit_power_epic'] // 莺鸣柳浪 + 身法
     },
     // 【藏剑·山居】主打重剑爆发与生存
     'group_cangjian_heavy': {
         name: '山居剑意·厚重',
+        tag: '重剑',
         major: 'cangjian_kill_shield', // 映波锁澜 (核心：重剑杀敌获盾)
-        minors: ['cangjian_jump_whirlwind', 'unit_haste_base', 'unit_spells_base'] // 层云 + 调息 + 功法
+        minors: ['cangjian_jump_whirlwind', 'unit_haste_base', 'unit_spells_base'] // 层云 + 调息 +功法
     },
 
     // --- 纯阳专属组 ---
@@ -355,12 +363,14 @@ export const TALENT_GROUPS = {
     // 【纯阳·气宗】主打气场增益、内力恢复与范围控制
     'group_chunyang_array': {
         name: '太虚剑意·气场',
+        tag: '气场',
         major: 'chunyang_array_duration', 
         minors: ['chunyang_array_radius', 'chunyang_huasanqing_permanent', 'chunyang_array_mana_regen', 'unit_spells_epic']
     },
     // 【纯阳·剑宗】主打普通攻击强化、气剑穿透与三清化神爆发
     'group_chunyang_sword': {
         name: '紫霞功·心剑',
+        tag: '剑气',
         major: 'chunyang_sword_penetration',
         minors: ['chunyang_sword_damage_boost', 'chunyang_sanqing_huashen_permanent', 'chunyang_sanqing_huashen_mastery', 'unit_power_epic']
     }
@@ -372,16 +382,15 @@ export const HERO_TREE_CONFIG = {
         core: { name: '天策府', icon: 'core_tiance', description: '长枪所指，守我大唐河山。', effects: [{ type: 'stat', stat: 'power', value: 10 }] },
         groups: [
             'group_tiance_commander', 'group_tiance_martial', // 独特：带兵、流血
-            'group_military', 'group_economy', 'group_exploration', 'group_combat', 'group_attributes' // 通用
+            'group_military', 'group_economy', 'group_exploration', 'group_attributes' // 通用
         ]
     },
     'liwangsheng': {
         core: { 
             name: '纯阳宫', icon: 'core_liwangsheng', 
-            description: '太极生两仪，剑气荡乾坤。<span class="skill-term-highlight">释放招式</span>后，提升 <span class="skill-num-highlight">20%</span> <span class="skill-term-highlight">功法</span>，持续 3 秒，可刷新。', 
+            description: '太极生两仪，剑气荡乾坤。', 
             effects: [
-                { type: 'stat', stat: 'spells', value: 15 },
-                { type: 'modifier', target: 'hero', key: 'combo_chain_enabled', value: 1, method: 'add' }
+                { type: 'stat', stat: 'spells', value: 15 }
             ] 
         },
         groups: [
@@ -391,10 +400,17 @@ export const HERO_TREE_CONFIG = {
         ]
     },
     'yeying': {
-        core: { name: '藏剑山庄', icon: 'core_yeying', description: '秀水灵山隐剑锋，君子如风名满城。', effects: [{ type: 'stat', stat: 'power', value: 12 }] },
+        core: { 
+            name: '藏剑山庄', icon: 'core_yeying', 
+            description: '秀水灵山隐剑锋，君子如风名满城。<span class="skill-term-highlight">释放招式</span>后，提升 <span class="skill-num-highlight">20%</span> <span class="skill-term-highlight">功法</span>，持续 3 秒，可刷新。', 
+            effects: [
+                { type: 'stat', stat: 'power', value: 12 },
+                { type: 'modifier', target: 'hero', key: 'combo_chain_enabled', value: 1, method: 'add' }
+            ] 
+        },
         groups: [
             'group_cangjian_light', 'group_cangjian_heavy', // 独特：问水、山居
-            'group_military', 'group_economy', 'group_exploration', 'group_combat', 'group_attributes' // 通用
+            'group_military', 'group_economy', 'group_exploration', 'group_attributes' // 通用
         ]
     }
 };
@@ -411,6 +427,7 @@ export function getHeroTalentTree(heroId) {
     const config = HERO_TREE_CONFIG[heroId] || HERO_TREE_CONFIG['liwangsheng'];
     const nodes = {};
     const links = [];
+    const tags = []; // 存储组描述大字
 
     // 辅助函数：处理节点的动态文本
     const processUnit = (unit) => {
@@ -442,6 +459,10 @@ export function getHeroTalentTree(heroId) {
     const groupCount = config.groups.length;
     config.groups.forEach((groupId, groupIdx) => {
         const group = TALENT_GROUPS[groupId];
+        if (!group) {
+            console.warn(`Talent group ${groupId} not found in TALENT_GROUPS`);
+            return;
+        }
         const groupAngle = (groupIdx / groupCount) * Math.PI * 2; // 组在圆周上的角度
         
         // --- 大天赋节点 ---
@@ -459,6 +480,7 @@ export function getHeroTalentTree(heroId) {
             maxLevel: 1,
             requires: [coreId],
             type: 'major',
+            groupId: groupId, // 新增：标记所属组
             groupName: group.name
         };
         links.push({ source: coreId, target: majorId });
@@ -516,11 +538,26 @@ export function getHeroTalentTree(heroId) {
                 },
                 maxLevel: isBaseStat ? 3 : 1,
                 requires: [majorId],
-                type: 'minor'
+                type: 'minor',
+                groupId: groupId // 新增：标记所属组
             };
             links.push({ source: majorId, target: minorId });
         });
+
+        // 3. 添加组描述大字 (放置在组的最远处)
+        if (group.tag) {
+            const tagDist = 820; // 放置在比小奇穴更远的地方
+            tags.push({
+                text: group.tag,
+                groupId: groupId, // 携带组ID以便计算亮度
+                pos: {
+                    x: Math.cos(groupAngle) * tagDist,
+                    y: Math.sin(groupAngle) * tagDist
+                },
+                angle: groupAngle
+            });
+        }
     });
 
-    return { nodes, links };
+    return { nodes, links, tags };
 }

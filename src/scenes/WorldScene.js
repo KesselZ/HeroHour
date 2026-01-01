@@ -205,6 +205,9 @@ export class WorldScene {
             this.moveSpeed = heroDetails.qinggong * 0.6;
             console.log(`%c[属性同步] 奇穴已更新，当前大世界移速: ${this.moveSpeed.toFixed(3)}`, "color: #5b8a8a");
             
+            // 同步更新 HUD (隐藏或更新提醒气泡)
+            this.updateHeroHUD();
+
             // 核心修复：奇穴更新后，如果城镇面板开着，也要刷新它，否则费用显示不更新
             if (this.activeCityId) {
                 this.refreshTownUI(this.activeCityId);
@@ -229,6 +232,7 @@ export class WorldScene {
         const hpBar = document.getElementById('hud-hero-hp-bar');
         const mpBar = document.getElementById('hud-hero-mp-bar');
         const levelBadge = document.getElementById('hud-hero-level');
+        const talentHint = document.getElementById('talent-hint');
         
         const heroData = worldManager.heroData;
         
@@ -249,6 +253,16 @@ export class WorldScene {
         if (mpBar) {
             const mpPct = (heroData.mpCurrent / heroData.mpMax) * 100;
             mpBar.style.width = `${mpPct}%`;
+        }
+
+        // 核心逻辑：一旦有剩余点数，显示气泡提醒
+        if (talentHint) {
+            const points = heroData.talentPoints || 0;
+            if (points > 0) {
+                talentHint.classList.remove('hidden');
+            } else {
+                talentHint.classList.add('hidden');
+            }
         }
     }
 

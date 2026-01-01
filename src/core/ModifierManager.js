@@ -143,9 +143,12 @@ class ModifierManager {
      * 遵循标准的 RPG 数值模型：Final = (Base * Product(More) * (1 + Sum(Inc))) + Sum(Flat)
      */
     getModifiedValue(unit, statName, baseValue) {
-        // --- 1. 处理具有逻辑依赖的派生属性 ---
+        // --- 1. 处理具有逻辑依赖的派生属性 (聚合桶逻辑) ---
+        
+        // 1.1 冷却与消耗
         if (statName === 'cooldown_multiplier' || statName === 'mana_cost_multiplier') {
-            const hasteVal = this.getModifiedValue(unit, 'haste', 0);
+            const baseHaste = unit.baseStats ? unit.baseStats.haste : (unit.stats ? unit.stats.haste : 0);
+            const hasteVal = this.getModifiedValue(unit, 'haste', baseHaste);
             const hasteMultiplier = 1 - hasteVal;
 
             let extraMultiplier = 1.0;
@@ -156,6 +159,32 @@ class ModifierManager {
                 else extraOffset += mod.offset;
             }
             return Math.max(0.1, baseValue * hasteMultiplier * extraMultiplier + extraOffset);
+        }
+
+        // 1.2 最终技能倍率聚合 (聚合功法桶、技能增伤桶、最终乘区)
+        if (statName === 'final_skill_multiplier') {
+            const baseSpells = unit.baseStats ? unit.baseStats.spells : (unit.stats ? unit.stats.spells : 0);
+            const skillPower = this.getModifiedValue(unit, 'skill_power', baseSpells);
+            const skillBonus = this.getModifiedValue(unit, 'skill_damage_bonus', 1.0);
+            const moreDamage = this.getModifiedValue(unit, 'more_damage', 1.0);
+            return baseValue * skillPower * skillBonus * moreDamage;
+        }
+
+        // 1.3 最终外功技能倍率聚合 (聚合主属性桶、技能增伤桶、最终乘区)
+        if (statName === 'final_power_skill_multiplier') {
+            const primaryMult = this.getModifiedValue(unit, 'primary_attack_mult', 1.0);
+            const skillBonus = this.getModifiedValue(unit, 'skill_damage_bonus', 1.0);
+            const moreDamage = this.getModifiedValue(unit, 'more_damage', 1.0);
+            return baseValue * primaryMult * skillBonus * moreDamage;
+        }
+
+        // 1.4 普攻最终伤害聚合
+        if (statName === 'final_attack_damage') {
+            const baseFlat = this.getModifiedValue(unit, 'attackDamage', baseValue);
+            const primaryMult = this.getModifiedValue(unit, 'primary_attack_mult', 1.0);
+            const attackBonus = this.getModifiedValue(unit, 'attack_damage_bonus', 1.0);
+            const moreDamage = this.getModifiedValue(unit, 'more_damage', 1.0);
+            return baseFlat * primaryMult * attackBonus * moreDamage;
         }
 
         // --- 2. 属性名映射 ---

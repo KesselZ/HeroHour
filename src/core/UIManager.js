@@ -2,7 +2,7 @@ import { spriteFactory } from './SpriteFactory.js';
 import { SkillRegistry, SectSkills } from './SkillRegistry.js';
 import { worldManager } from './WorldManager.js';
 import { modifierManager } from './ModifierManager.js';
-import { TALENT_UNITS, HERO_TREE_CONFIG, getHeroTalentTree } from './TalentRegistry.js';
+import { TALENT_UNITS, TALENT_GROUPS, HERO_TREE_CONFIG, getHeroTalentTree } from './TalentRegistry.js';
 import { talentManager } from './TalentManager.js';
 import { timeManager } from './TimeManager.js';
 import { SECT_INTRO } from '../data/HowToPlayContent.js';
@@ -175,6 +175,11 @@ class UIManager {
         const uiLayer = document.getElementById('ui-layer');
         const gameCanvas = document.getElementById('game-canvas');
 
+        // 监听英雄数据初始化/更新事件，提前进行皮肤设置和图谱渲染
+        window.addEventListener('hero-initialized', () => {
+            this.prepareTalentPanel();
+        });
+
         // 拖拽状态变量
         this.talentDrag = {
             isDragging: false,
@@ -198,27 +203,25 @@ class UIManager {
                 // 2. 暂停大世界时间流动
                 timeManager.pause();
                 
-                // 3. 稍微缩短延迟，确保新面板在旧画面彻底消失前就入场，形成重叠感
+                // 3. 立即显示天赋面板 (去掉 setTimeout 延迟，实现同步动画)
+                // 此时面板已经由于 prepareTalentPanel 渲染好了
+                talentPanel.classList.remove('hidden');
+                talentPanel.classList.add('distort-enter');
+                
+                // 记录进入动画开始，稍后彻底隐藏底层 (匹配 0.2s 的退出时长)
                 setTimeout(() => {
-                    talentPanel.classList.remove('hidden');
-                    talentPanel.classList.add('distort-enter');
-                    
-                    // 彻底隐藏底层防止干扰 (不移除动画类，而是用 visibility 配合强制隐藏)
                     uiLayer.style.visibility = 'hidden';
                     gameCanvas.style.visibility = 'hidden';
                     
-                    // 重置拖拽偏移
-                    this.resetTalentView();
-                    
-                    // 更新点数
+                    // 重置点数显示
                     const pointsVal = document.getElementById('talent-points-val');
                     if (pointsVal) {
                         pointsVal.innerText = worldManager.heroData.talentPoints || 0;
                     }
+                }, 200);
 
-                    // 渲染奇穴图
-                    this.renderTalentGraph();
-                }, 550);
+                // 重置视图位置
+                this.resetTalentView();
             };
         }
 
@@ -274,20 +277,47 @@ class UIManager {
             if (this.talentDrag.isDragging) {
                 this.talentDrag.isDragging = false;
                 talentPanel.style.cursor = 'default';
+                
+                // 松手后检查是否需要回弹 (平滑回到阈值内)
+                this.elasticSnapBack();
             }
         });
 
         // --- 滚轮缩放监听 ---
         talentPanel.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            const newScale = Math.max(0.5, Math.min(2.0, this.talentDrag.scale + delta));
+            // 减小缩放步长，让缩放更平滑
+            const delta = e.deltaY > 0 ? -0.05 : 0.05;
+            const newScale = Math.max(0.4, Math.min(1.8, this.talentDrag.scale + delta));
             
             if (newScale !== this.talentDrag.scale) {
                 this.talentDrag.scale = newScale;
                 this.updateTalentView();
             }
         }, { passive: false });
+    }
+
+    /**
+     * 提前准备天赋面板：设置皮肤、预渲染图谱
+     * 职责：消除打开时的卡顿和颜色闪烁
+     */
+    prepareTalentPanel() {
+        const talentPanel = document.getElementById('talent-panel');
+        if (!talentPanel || !worldManager.heroData) return;
+
+        const heroId = worldManager.heroData.id;
+        const heroInfo = worldManager.availableHeroes[heroId];
+        
+        // 1. 立即设置门派皮肤
+        talentPanel.classList.remove('sect-chunyang', 'sect-tiance', 'sect-cangjian');
+        if (heroInfo && heroInfo.sect) {
+            talentPanel.classList.add(`sect-${heroInfo.sect}`);
+        }
+
+        // 2. 预渲染奇穴图谱 (后台计算和 DOM 生成)
+        this.renderTalentGraph();
+        
+        console.log(`%c[UI] %c奇穴系统已为门派【${heroInfo?.name}】预加载完毕`, "color: #44ccff", "color: #fff");
     }
 
     /**
@@ -300,14 +330,55 @@ class UIManager {
         const panelWidth = talentPanel.offsetWidth || window.innerWidth;
         const panelHeight = talentPanel.offsetHeight || window.innerHeight;
 
-        // 由于 offsetX/offsetY = 1000 是中心点在容器中的坐标
-        // 我们需要让这个 (1000, 1000) 点显示在屏幕中心 (panelWidth/2, panelHeight/2)
-        // 变换公式：offset = 屏幕中心 - 容器中心坐标
-        this.talentDrag.offsetX = (panelWidth / 2) - 1000;
-        this.talentDrag.offsetY = (panelHeight / 2) - 1000;
+        // 中心点现在是 2500 (画布 5000px 的中点)
+        this.talentDrag.offsetX = (panelWidth / 2) - 2500;
+        this.talentDrag.offsetY = (panelHeight / 2) - 2500;
         this.talentDrag.scale = 1.0;
 
         this.updateTalentView();
+    }
+
+    /**
+     * 实现弹性回弹效果
+     */
+    elasticSnapBack() {
+        const talentPanel = document.getElementById('talent-panel');
+        const panelWidth = talentPanel?.offsetWidth || window.innerWidth;
+        const panelHeight = talentPanel?.offsetHeight || window.innerHeight;
+        
+        const idealX = (panelWidth / 2) - 2500;
+        const idealY = (panelHeight / 2) - 2500;
+        const threshold = 800; // 允许自由移动的半径
+
+        let targetX = this.talentDrag.offsetX;
+        let targetY = this.talentDrag.offsetY;
+
+        // 如果超出阈值，计算回弹目标
+        const diffX = targetX - idealX;
+        if (Math.abs(diffX) > threshold) {
+            targetX = idealX + (diffX > 0 ? threshold : -threshold);
+        }
+
+        const diffY = targetY - idealY;
+        if (Math.abs(diffY) > threshold) {
+            targetY = idealY + (diffY > 0 ? threshold : -threshold);
+        }
+
+        if (targetX !== this.talentDrag.offsetX || targetY !== this.talentDrag.offsetY) {
+            // 使用 CSS 动画实现平滑回弹
+            const container = document.getElementById('talent-container');
+            if (container) {
+                container.style.transition = 'transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)';
+                this.talentDrag.offsetX = targetX;
+                this.talentDrag.offsetY = targetY;
+                this.updateTalentView();
+                
+                // 动画结束后移除 transition 防止拖拽卡顿
+                setTimeout(() => {
+                    container.style.transition = 'transform 0.05s linear';
+                }, 600);
+            }
+        }
     }
 
     /**
@@ -316,11 +387,41 @@ class UIManager {
     updateTalentView() {
         const container = document.getElementById('talent-container');
         const starryBg = document.querySelector('.talent-starry-bg');
+        const talentPanel = document.getElementById('talent-panel');
         
         if (container) {
+            // --- 软边界逻辑实现 ---
+            const panelWidth = talentPanel?.offsetWidth || window.innerWidth;
+            const panelHeight = talentPanel?.offsetHeight || window.innerHeight;
+            
+            // 理想中心偏移 (让 (2500, 2500) 居中)
+            const idealX = (panelWidth / 2) - 2500;
+            const idealY = (panelHeight / 2) - 2500;
+            
+            // 允许自由移动的阈值
+            const threshold = 800;
+            let finalX = this.talentDrag.offsetX;
+            let finalY = this.talentDrag.offsetY;
+            
+            const diffX = finalX - idealX;
+            if (Math.abs(diffX) > threshold) {
+                const over = Math.abs(diffX) - threshold;
+                // 阻力公式：超出部分按平方根衰减，模拟“拉力”感
+                const resistance = Math.sqrt(over) * 15;
+                finalX = idealX + (diffX > 0 ? (threshold + resistance) : -(threshold + resistance));
+            }
+            
+            const diffY = finalY - idealY;
+            if (Math.abs(diffY) > threshold) {
+                const over = Math.abs(diffY) - threshold;
+                const resistance = Math.sqrt(over) * 15;
+                finalY = idealY + (diffY > 0 ? (threshold + resistance) : -(threshold + resistance));
+            }
+
             // 奇穴位点跟随移动并缩放
-            container.style.transform = `translate(${this.talentDrag.offsetX}px, ${this.talentDrag.offsetY}px) scale(${this.talentDrag.scale})`;
+            container.style.transform = `translate(${finalX}px, ${finalY}px) scale(${this.talentDrag.scale})`;
         }
+// ... (rest unchanged)
         
         if (starryBg) {
             // 背景星空视差移动并伴随微弱缩放
@@ -340,14 +441,14 @@ class UIManager {
         const svg = document.getElementById('talent-links-svg');
         if (!container || !svg) return;
 
-        container.querySelectorAll('.talent-node').forEach(n => n.remove());
+        container.querySelectorAll('.talent-node, .talent-group-tag').forEach(n => n.remove());
         svg.innerHTML = '';
 
         // 获取当前英雄生成的树
         const tree = talentManager.currentTree;
         if (!tree) return;
 
-        const { nodes, links } = tree;
+        const { nodes, links, tags } = tree;
 
         // 1. 绘制经脉连线
         links.forEach(link => {
@@ -357,8 +458,8 @@ class UIManager {
 
             // 升级：使用 SVG Path 绘制带有张力的贝塞尔曲线 (Quadratic Bezier)
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const offsetX = 1000; 
-            const offsetY = 1000; 
+            const offsetX = 2500; 
+            const offsetY = 2500; 
             
             const x1 = source.pos.x + offsetX;
             const y1 = source.pos.y + offsetY;
@@ -415,8 +516,8 @@ class UIManager {
                 displayName = heroInfo ? heroInfo.primaryStat : '力道';
             }
 
-            node.style.left = `${nodeData.pos.x + 1000}px`; 
-            node.style.top = `${nodeData.pos.y + 1000}px`;
+            node.style.left = `${nodeData.pos.x + 2500}px`; 
+            node.style.top = `${nodeData.pos.y + 2500}px`;
 
             const iconStyle = spriteFactory.getIconStyle(nodeData.icon);
             node.innerHTML = `
@@ -451,6 +552,48 @@ class UIManager {
 
             container.appendChild(node);
         }
+
+        // 3. 绘制组描述大字
+        if (tags) {
+            tags.forEach(tag => {
+                const tagEl = document.createElement('div');
+                tagEl.className = 'talent-group-tag';
+                tagEl.innerText = tag.text;
+                tagEl.style.left = `${tag.pos.x + 2500}px`;
+                tagEl.style.top = `${tag.pos.y + 2500}px`;
+                
+                // --- 动态亮度逻辑 ---
+                // 计算该分支的激活进度
+                let totalInGroup = 0;
+                let activeInGroup = 0;
+                for (const nodeId in nodes) {
+                    if (nodes[nodeId].groupId === tag.groupId) {
+                        totalInGroup++;
+                        if ((talentManager.activeTalents[nodeId] || 0) > 0) {
+                            activeInGroup++;
+                        }
+                    }
+                }
+
+                const progress = totalInGroup > 0 ? activeInGroup / totalInGroup : 0;
+                
+                // 大幅提升亮度上限：基础透明度 0.05，最高点亮到 0.5
+                const opacity = 0.05 + progress * 0.45;
+                tagEl.style.color = `rgba(255, 255, 255, ${opacity})`;
+                
+                // 增强发光感：最高 50px 半径，0.6 透明度的强光
+                if (progress > 0) {
+                    const glowRadius = progress * 50;
+                    const glowOpacity = progress * 0.6;
+                    tagEl.style.textShadow = `0 0 ${glowRadius}px rgba(255, 255, 255, ${glowOpacity})`;
+                }
+                
+                // 让文字保持正向显示
+                tagEl.style.transform = `translate(-50%, -50%)`;
+                
+                container.appendChild(tagEl);
+            });
+        }
     }
 
     /**
@@ -459,8 +602,8 @@ class UIManager {
     updateSvgDimensions(svg) {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         const paths = svg.querySelectorAll('path');
-        if (paths.length === 0) return;
-
+        
+        // 考虑连线
         paths.forEach(path => {
             const x1 = parseFloat(path.dataset.x1);
             const y1 = parseFloat(path.dataset.y1);
@@ -475,8 +618,19 @@ class UIManager {
             maxY = Math.max(maxY, y1, y2, cy);
         });
 
+        // 考虑标签 (Tags 往往在更远处)
+        const tags = document.querySelectorAll('.talent-group-tag');
+        tags.forEach(tag => {
+            const x = parseFloat(tag.style.left);
+            const y = parseFloat(tag.style.top);
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+        });
+
         // 增加边距缓冲
-        const padding = 100;
+        const padding = 200; // 增加缓冲，因为标签很大
         const width = maxX + padding;
         const height = maxY + padding;
 

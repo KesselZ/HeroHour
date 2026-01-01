@@ -482,25 +482,29 @@ export const SkillRegistry = {
             {
                 type: 'buff_aoe',
                 side: 'player',
+                tag: 'mengquan',
                 applySkillPowerToMultiplier: true, // 只有攻击频率吃系数，放在第一位以确保 {bonus} 对应它
                 params: {
                     stat: ['attackSpeed'],
                     multiplier: [1.5], 
                     duration: 5000,
-                    tag: 'mengquan',
                     vfxName: 'butterfly_particles' // 使用新设计的蝴蝶追随粒子
-                }
+                },
+                // 数据驱动：声明联动逻辑
+                linkedModifiers: [
+                    { requireTalent: 'cangjian_fengming', stat: 'skill_pinghu_cooldown_multiplier', multiplier: 0.7 }
+                ]
             },
             { 
                 type: 'buff_aoe', 
                 side: 'player', 
+                tag: 'mengquan',
                 applySkillPowerToMultiplier: false, // 基础移动、击退、减伤不吃系数
                 params: { 
                     stat: ['moveSpeed', 'knockback', 'damageReduction'], 
                     multiplier: [1.5, 1.5, 1.0], 
                     offset: [0, 0, 0.65], // 65% 减伤
-                    duration: 5000,
-                    tag: 'mengquan' 
+                    duration: 5000
                 } 
             }
         ]

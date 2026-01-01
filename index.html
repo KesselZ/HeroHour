@@ -45,6 +45,11 @@
                     </div>
 
                     <div class="hud-card hud-card-hero" id="hero-mini-card">
+                        <!-- 新增：天赋提醒 -->
+                        <div id="talent-hint" class="talent-hint-v1 hidden">
+                            <span class="hint-icon">✧</span>
+                            <span class="hint-text">星魄待悟</span>
+                        </div>
                         <div class="hud-portrait" id="world-hero-portrait">
                             <div class="hud-level-badge" id="hud-hero-level">Lv.1</div>
                         </div>
@@ -315,11 +320,21 @@
         <!-- 奇穴系统面板 (沉浸式全屏) -->
         <div id="talent-panel" class="hidden talent-panel-immersive">
             <div class="talent-starry-bg"></div>
-            <div class="talent-immersive-header">
-                <div class="talent-title-text">奇穴系统</div>
-                <div class="talent-points-display">可用奇穴点数: <span id="talent-points-val">0</span></div>
-                <button id="close-talent-panel" class="close-immersive-btn" title="返回江湖">×</button>
+            
+            <!-- 极简沉浸式 UI -->
+            <div class="talent-ui-overlay">
+                <div class="talent-points-clean">
+                    <div class="points-icon">✧</div>
+                    <div class="points-num" id="talent-points-val">0</div>
+                    <div class="points-label">星魄</div>
+                </div>
+
+                <button id="close-talent-panel" class="close-talent-minimal">
+                    <span class="close-icon">✕</span>
+                    <span class="close-text">离 开</span>
+                </button>
             </div>
+
             <div class="talent-star-chart">
                 <div id="talent-container" class="talent-node-container">
                     <svg id="talent-links-svg" class="talent-links-svg"></svg>

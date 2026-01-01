@@ -93,13 +93,15 @@ class City {
      * 初始化城市的初始产出修正
      */
     _initBaseProduction() {
-        // 初始季度收入：500 金钱，200 木材
+        // 核心对齐：为了让初始总收入(基础+初始建筑)等于 500金/200木
+        // 初始建筑 Lv.1 议政厅提供 200金, Lv.1 市场提供 100金和 50木
+        // 因此基础产出设为：200金，150木
         modifierManager.addModifier({
             id: `city_${this.id}_base_gold`,
             side: this.side,
             targetUnit: this,
             stat: 'gold_income',
-            offset: 500,
+            offset: 200,
             source: 'city_base'
         });
         modifierManager.addModifier({
@@ -107,7 +109,7 @@ class City {
             side: this.side,
             targetUnit: this,
             stat: 'wood_income',
-            offset: 200,
+            offset: 150,
             source: 'city_base'
         });
     }
@@ -327,7 +329,8 @@ export class WorldManager {
         REVEAL_MAP: true,          // 自动揭开全图迷雾
         SHOW_INFLUENCE: true,      // 在小地图显示势力范围 (影响力热力图)
         SHOW_POIS: true,           // 显示所有资源点/兴趣点标记
-        LICHENGEN_GOD_MODE: true   // 李承恩起始获得全兵种各 2 个 + 无限统御
+        LICHENGEN_GOD_MODE: true,  // 李承恩起始获得全兵种各 2 个 + 无限统御
+        START_RESOURCES: true      // 初始金钱 10000，木头 5000
     };
 
     constructor() {
@@ -353,9 +356,11 @@ export class WorldManager {
         this.factions = {}; // 记录所有势力数据 { factionId: { heroId, cities: [], army: {} } }
 
         // 1. 基础资源 (初始资源调低，增加探索动力)
+        // 调试模式下大幅提升初始资源
+        const isCheat = WorldManager.DEBUG.ENABLED && WorldManager.DEBUG.START_RESOURCES;
         this.resources = {
-            gold: 1000,
-            wood: 500
+            gold: isCheat ? 10000 : 1000,
+            wood: isCheat ? 5000 : 500
         };
 
         // 2. 英雄数据 (持久化状态)
@@ -368,7 +373,7 @@ export class WorldManager {
             hpCurrent: 500,
             mpMax: 160,
             mpCurrent: 160,
-            talentPoints: 3, // 初始赠送3点奇穴点数
+            talentPoints: isCheat ? 99 : 3, // 初始赠送3点奇穴点数 (Debug模式99点)
             talents: {},     // 新增：已激活奇穴 { id: level }
             pendingLevelUps: 0, // 新增：记录待在大世界播放的升级特效次数
             skills: [],
@@ -2229,7 +2234,10 @@ export class WorldManager {
 
         // 3. 同步更新 heroData 冗余字段 (仅用于 UI 简单显示)
         data.hpMax = Math.ceil(modifierManager.getModifiedValue(dummy, 'hp', cb.hpBase));
-        data.mpMax = 160 + (data.level - 1) * 6;
+        
+        // 核心修复：内力上限应受奇穴/天赋加成 (原本硬编码了 160)
+        const baseMp = 160 + (data.level - 1) * 6;
+        data.mpMax = Math.ceil(modifierManager.getModifiedValue(dummy, 'mp', baseMp));
         
         // 确保 stats 中的冗余字段反映的是 ModifierManager 的最终输出
         data.stats.finalSpells = modifierManager.getModifiedValue(dummy, 'skill_power', realSpells);

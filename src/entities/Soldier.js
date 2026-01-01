@@ -208,18 +208,9 @@ export class BaseUnit extends THREE.Group {
     }
 
     get attackDamage() {
-        const baseFlat = modifierManager.getModifiedValue(this, 'attackDamage', this._baseAttackDamage);
-        
-        // 桶 1: 主属性倍率 (Power/Root)
-        const primaryMult = modifierManager.getModifiedValue(this, 'primary_attack_mult', 1.0);
-        
-        // 桶 2: 普攻增伤 (加算 Inc 区)
-        const attackBonus = modifierManager.getModifiedValue(this, 'attack_damage_bonus', 1.0);
-        
-        // 桶 3: 最终乘区 (乘算 More 区)
-        const moreDamage = modifierManager.getModifiedValue(this, 'more_damage', 1.0);
-        
-        return baseFlat * primaryMult * attackBonus * moreDamage;
+        // --- 核心重构：直接请求 ModifierManager 聚合后的最终伤害 ---
+        // 这一步包含了 baseFlat * primaryMult * attackBonus * moreDamage 的所有逻辑
+        return modifierManager.getModifiedValue(this, 'final_attack_damage', this._baseAttackDamage);
     }
 
     get attackCooldownTime() {
@@ -1228,6 +1219,9 @@ export class HeroUnit extends BaseUnit {
 
         this.isHero = true;
         this.level = heroData.level;
+        
+        // --- 核心修复：将大世界的基础属性同步到战斗实例，用于 ModifierManager 计算 ---
+        this.baseStats = heroData.stats ? { ...heroData.stats } : { spells: 0, haste: 0, power: 0 };
 
         // --- 优雅的血量同步逻辑：百分比映射 ---
         // 1. 获取该英雄在大世界的基础最大血量 (即蓝图值)

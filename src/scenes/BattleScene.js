@@ -674,11 +674,12 @@ export class BattleScene {
                 btn.id = `skill-${skillId}`;
                 const iconStyle = spriteFactory.getIconStyle(skill.icon);
                 
-                const casterDummy = { side: 'player', isHero: true, type: heroData.id };
-                const mpMult = modifierManager.getModifiedValue(casterDummy, 'mana_cost_multiplier', 1.0);
+                // 核心修复：优先使用实时的 heroUnit (包含战斗中的 Buff)
+                const caster = this.heroUnit || { side: 'player', isHero: true, type: heroData.id };
+                const mpMult = modifierManager.getModifiedValue(caster, 'mana_cost_multiplier', 1.0);
                 
                 const actualCost = Math.floor(skill.cost * mpMult);
-                const actualCD = skill.getActualCooldown(heroData);
+                const actualCD = skill.getActualCooldown(caster);
                 
                 btn.innerHTML = `
                     <div class="skill-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
@@ -688,7 +689,8 @@ export class BattleScene {
                 `;
 
                 btn.onmouseenter = () => {
-                    uiManager.showSkillTooltip(skillId, heroData);
+                    // 核心修复：传入 heroUnit 实例，确保 Tooltip 能显示实时的属性增强（如化三清后的功法提升）
+                    uiManager.showSkillTooltip(skillId, this.heroUnit || heroData);
                 };
 
                 btn.onmouseleave = () => uiManager.hideTooltip();
@@ -720,6 +722,9 @@ export class BattleScene {
 
     onSkillBtnClick(skillId) {
         if (!this.isActive) return;
+        // 核心修复：英雄死亡后无法点击技能按钮
+        if (this.heroUnit && this.heroUnit.isDead) return;
+
         const skill = SkillRegistry[skillId];
         if (!skill) return;
         if (!skill.isReady(this.worldManager.heroData)) return;
@@ -734,6 +739,12 @@ export class BattleScene {
 
     handleSkillTargeting(event) {
         if (!this.isActive || !this.activeSkill) return;
+
+        // 核心修复：英雄死亡时立即取消选区状态
+        if (this.heroUnit && this.heroUnit.isDead) {
+            this.cancelActiveSkill();
+            return;
+        }
 
         // 核心优化：按下右键 (button 2) 立即取消，不再等待松手
         if (event.button === 2) {
@@ -768,6 +779,12 @@ export class BattleScene {
     }
 
     executeSkill(skillId, targetPos = null) {
+        // 核心修复：防止死亡后通过任何途径触发技能执行
+        if (this.heroUnit && this.heroUnit.isDead) {
+            this.cancelActiveSkill();
+            return;
+        }
+
         const skill = SkillRegistry[skillId];
         if (!skill) return;
         const success = skill.execute(this, this.heroUnit, targetPos);
@@ -1256,6 +1273,27 @@ export class BattleScene {
                     }
                 });
             });
+
+            // 4. 通用联动协议处理 (Data-Driven Linkage)
+            // 不再需要为特定技能写 if (tag === 'xxx')，而是根据配置中的 linkedModifiers 自动执行
+            if (options.linkedModifiers) {
+                options.linkedModifiers.forEach(lm => {
+                    const isEnabled = lm.requireTalent ? 
+                                     (modifierManager.getModifiedValue(unit, lm.requireTalent, 0) > 0) : true;
+                    if (isEnabled) {
+                        modifierManager.addModifier({
+                            id: `link_${tag || 'anon'}_${lm.stat}_${unit.side}_${unit.index}`,
+                            stat: lm.stat,
+                            multiplier: lm.multiplier !== undefined ? lm.multiplier : 1.0,
+                            offset: lm.offset || 0,
+                            targetUnit: unit,
+                            source: 'skill',
+                            startTime: Date.now(),
+                            duration: duration
+                        });
+                    }
+                });
+            }
         });
     }
 
