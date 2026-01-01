@@ -325,12 +325,13 @@ export class WorldManager {
      * 职责：统一管理所有测试相关的 Hack 开关，保证生产环境一键切换
      */
     static DEBUG = {
-        ENABLED: true,             // 总开关：开启后激活下方子功能
-        REVEAL_MAP: true,          // 自动揭开全图迷雾
-        SHOW_INFLUENCE: true,      // 在小地图显示势力范围 (影响力热力图)
-        SHOW_POIS: true,           // 显示所有资源点/兴趣点标记
-        LICHENGEN_GOD_MODE: true,  // 李承恩起始获得全兵种各 2 个 + 无限统御
-        START_RESOURCES: true      // 初始金钱 10000，木头 5000
+        ENABLED: false,            // 总开关：开启后激活下方子功能
+        REVEAL_MAP: false,         // 自动揭开全图迷雾
+        SHOW_INFLUENCE: false,     // 在小地图显示势力范围 (影响力热力图)
+        SHOW_POIS: false,          // 显示所有资源点/兴趣点标记
+        LICHENGEN_GOD_MODE: false, // 李承恩起始获得全兵种各 2 个 + 无限统御
+        START_RESOURCES: false,    // 初始金钱 10000，木头 5000
+        SHOW_MOTION_DEBUG: false   // 运动调试日志：显示主角位移与动画增量
     };
 
     constructor() {
@@ -363,28 +364,28 @@ export class WorldManager {
             wood: isCheat ? 5000 : 500
         };
 
-        // 2. 英雄数据 (持久化状态)
+        // 2. 英雄数据 (持久化状态 - 初始值仅作为结构定义)
         this.heroData = {
-            id: 'liwangsheng', // 默认，初始化时会被覆盖
+            id: 'liwangsheng', 
             level: 1,
             xp: 0,
-            xpMax: 120, // 下一级所需经验 (使用新公式：L=0时为120)
-            hpMax: 500,
-            hpCurrent: 500,
-            mpMax: 160,
-            mpCurrent: 160,
-            talentPoints: isCheat ? 99 : 3, // 初始赠送3点奇穴点数 (Debug模式99点)
-            talents: {},     // 新增：已激活奇穴 { id: level }
-            pendingLevelUps: 0, // 新增：记录待在大世界播放的升级特效次数
+            xpMax: 120,
+            hpMax: 0,
+            hpCurrent: 0,
+            mpMax: 0,
+            mpCurrent: 0,
+            talentPoints: isCheat ? 99 : 3,
+            talents: {},
+            pendingLevelUps: 0,
             skills: [],
             stats: {
-                morale: 40,           // 统帅：军队 (同时影响士兵攻击和血量)
-                power: 50,            // 武力：英雄体魄与伤害
-                spells: 100,          // 功法：招式强度
-                qinggong: 11.8,       // 轻功 (决定大世界移速，并影响局内速度)
-                battleSpeed: 11.8,    // 英雄局内基础移速
+                morale: 0,
+                power: 0,
+                spells: 0,
+                qinggong: 0,
+                battleSpeed: 0,
                 haste: 0,
-                leadership: 20,       // 带兵容量上限
+                leadership: 0,
             }
         };
 
@@ -2094,7 +2095,7 @@ export class WorldManager {
             const cb = identity.combatBase;
 
             stats.hp = cb.hpBase;
-            stats.mp = 160; 
+            stats.mp = this._getHeroBaseStat(type, 'mpBase', 80); 
             stats.atk = cb.atk;
             // 核心修复：英雄进入战斗后的基础移速单位应与普通士兵 (4.0 左右) 匹配，使用英雄自身的局内移速
             stats.speed = this.heroData.stats.battleSpeed || 4.0; 
@@ -2175,6 +2176,25 @@ export class WorldManager {
     }
 
     /**
+     * 获取英雄的基础属性配置 (唯一真理源)
+     * 解决多重定义问题，支持 Debug 模式覆盖
+     */
+    _getHeroBaseStat(heroId, statName, defaultValue) {
+        const isCheat = WorldManager.DEBUG.ENABLED && WorldManager.DEBUG.START_RESOURCES;
+        
+        // 专门处理蓝量的 Cheat 逻辑 (如果处于 Cheat 模式，且请求的是基础蓝量)
+        if (statName === 'mpBase' && isCheat) return 999;
+        
+        // 如果数据表中有该项，则返回数据表中的值
+        const identity = this.getHeroIdentity(heroId);
+        if (identity && identity.combatBase && identity.combatBase[statName] !== undefined) {
+            return identity.combatBase[statName];
+        }
+        
+        return defaultValue;
+    }
+
+    /**
      * 刷新英雄的所有全局修正器 (包含成长、统帅加成等)
      * 职责：将英雄的当前状态 (Level, Power, Morale) 同步到 ModifierManager
      */
@@ -2235,8 +2255,10 @@ export class WorldManager {
         // 3. 同步更新 heroData 冗余字段 (仅用于 UI 简单显示)
         data.hpMax = Math.ceil(modifierManager.getModifiedValue(dummy, 'hp', cb.hpBase));
         
-        // 核心修复：内力上限应受奇穴/天赋加成 (原本硬编码了 160)
-        const baseMp = 160 + (data.level - 1) * 6;
+        // 核心修复：内力上限应受数据表 mpBase 和 mpScaling 控制
+        const baseMpStart = this._getHeroBaseStat(data.id, 'mpBase', 80);
+        const scalingMp = this._getHeroBaseStat(data.id, 'mpScaling', 6);
+        const baseMp = baseMpStart + (data.level - 1) * scalingMp;
         data.mpMax = Math.ceil(modifierManager.getModifiedValue(dummy, 'mp', baseMp));
         
         // 确保 stats 中的冗余字段反映的是 ModifierManager 的最终输出

@@ -433,15 +433,45 @@ img {
 }
 .hud-card-hero {
     min-width: 70px;
-    position: relative; /* 核心：确保子元素提醒气泡定位正确 */
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s, box-shadow 0.3s;
+    z-index: 10; /* 保证低于气泡的 100 */
+}
+
+.hud-card-hero:hover {
+    transform: translateY(-6px); /* 增大位移幅度 */
+    filter: brightness(1.1);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+}
+
+.hero-hud-unit-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
 }
 
 /* --- 天赋提醒样式 --- */
+.talent-hint-wrapper {
+    position: relative;
+    margin-bottom: 2px;
+    width: 110px;
+    height: 38px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 100; /* 保持在高层级 */
+    pointer-events: auto;
+    transition: transform 0.2s; /* 专门负责缩放 */
+}
+
+/* 悬停气泡时：缩放作用在包装层，不会中断内部气泡的浮动动画 */
+.talent-hint-wrapper:hover {
+    transform: scale(1.1);
+}
+
 .talent-hint-v1 {
-    position: absolute;
-    top: -42px; /* 调整高度以避开头像 */
-    left: 50%;
-    transform: translateX(-50%);
     background: rgba(166, 139, 68, 0.95);
     color: white;
     padding: 4px 15px;
@@ -455,8 +485,13 @@ img {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     border: 1px solid var(--jx3-gold-light);
     pointer-events: none;
-    z-index: 100;
     animation: floatHint 2s infinite ease-in-out;
+    transition: filter 0.2s;
+}
+
+.talent-hint-wrapper:hover .talent-hint-v1 {
+    filter: brightness(1.2);
+    /* 移除这里的 transform: scale，改由父级处理 */
 }
 
 .talent-hint-v1::after {
@@ -477,8 +512,8 @@ img {
 }
 
 @keyframes floatHint {
-    0%, 100% { transform: translate(-50%, 0); filter: brightness(1); }
-    50% { transform: translate(-50%, -6px); filter: brightness(1.2); }
+    0%, 100% { transform: translateY(0); filter: brightness(1); }
+    50% { transform: translateY(-6px); filter: brightness(1.2); }
 }
 
 .hud-info {
@@ -2678,8 +2713,38 @@ canvas { image-rendering: pixelated; }
     display: flex;
     align-items: flex-end; /* 让按钮对齐技能栏底部 */
     gap: 20px; /* 技能栏与逃跑按钮的间距 */
-    pointer-events: none; /* 穿透容器本身 */
     z-index: 1000;
+    transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    pointer-events: none; /* 穿透容器本身，只响应子元素 */
+}
+
+/* 增加一个隐形的探测区域，当鼠标靠近底部时面板升起 */
+.battle-bottom-ui::before {
+    content: '';
+    position: absolute;
+    top: -80px; /* 向上探测 80px */
+    left: -20px;
+    right: -20px;
+    bottom: -30px;
+    pointer-events: auto; /* 开启探测 */
+    z-index: -1;
+}
+
+/* 默认收缩状态 (只露个头) */
+.battle-bottom-ui.autohide {
+    transform: translate(-50%, calc(100% - 20px));
+}
+
+/* 激活状态：鼠标悬停、或者强制显示 */
+.battle-bottom-ui.autohide:hover,
+.battle-bottom-ui.autohide.force-visible {
+    transform: translate(-50%, 0);
+}
+
+/* 瞄准模式或强制收缩：用于释放位置技能时，必须收缩防止挡住地面 */
+.battle-bottom-ui.autohide.is-targeting,
+.battle-bottom-ui.autohide.force-collapse {
+    transform: translate(-50%, calc(100% - 20px)) !important;
 }
 
 .battle-bottom-ui > * {
@@ -2852,6 +2917,53 @@ canvas { image-rendering: pixelated; }
     display: flex;
     gap: 25px; /* 增加组间距 */
     align-items: flex-start;
+    min-height: 86px; /* 强制对齐技能组高度: header(14) + gap(12) + btn(60) = 86px */
+    justify-content: center;
+}
+
+/* 暂无技能提示 */
+.no-skills-msg {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--jx3-celadon-dark);
+    opacity: 0.6;
+    height: 86px; /* 高度与技能行完全一致 */
+    box-sizing: border-box;
+    font-style: italic;
+    letter-spacing: 2px;
+}
+
+.no-skills-icon {
+    width: 32px;
+    height: 32px;
+    border: 2px dashed var(--jx3-celadon);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+/* 侠客面板暂无技能 */
+.hero-no-skills {
+    width: 100%;
+    text-align: center;
+    height: 52px; /* 与单个技能槽高度完全一致 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--jx3-ink);
+    opacity: 0.5;
+    font-size: 0.9rem;
+    font-style: italic;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    border: 1px dashed rgba(0, 0, 0, 0.1);
 }
 
 .skill-group-wrap {

@@ -206,6 +206,15 @@ export class BattleScene {
     cancelActiveSkill() {
         if (!this.activeSkill) return;
         console.log("%c[技能系统] %c已取消当前招式准备", "color: #aaa", "color: #fff");
+        
+        // 【新功能】如果是从瞄准状态取消，让面板弹回来
+        const bottomUI = document.getElementById('battle-bottom-ui');
+        if (bottomUI && bottomUI.classList.contains('is-targeting')) {
+            bottomUI.classList.add('force-visible');
+            // 2秒后移除强制显示，恢复正常的自动感应
+            setTimeout(() => bottomUI.classList.remove('force-visible'), 2000);
+        }
+
         this.activeSkill = null;
         this.hideSkillIndicator();
         uiManager.hideActionHint();
@@ -622,7 +631,10 @@ export class BattleScene {
         const bottomUI = document.getElementById('battle-bottom-ui');
         const filterContainer = document.getElementById('skill-category-filters');
         
-        if (bottomUI) bottomUI.classList.remove('hidden');
+        if (bottomUI) {
+            bottomUI.classList.remove('hidden');
+            bottomUI.classList.add('autohide'); // 启用自动收缩
+        }
         
         // 核心重构：隐藏过滤器，改为全显示并分组
         if (filterContainer) filterContainer.style.display = 'none';
@@ -639,6 +651,16 @@ export class BattleScene {
         skillSlots.innerHTML = '';
         const heroData = this.worldManager.heroData;
         const heroSkills = heroData.skills;
+
+        if (!heroSkills || heroSkills.length === 0) {
+            skillSlots.innerHTML = `
+                <div class="no-skills-msg">
+                    <div class="no-skills-icon">?</div>
+                    <span>暂无习得技能</span>
+                </div>
+            `;
+            return;
+        }
 
         // 1. 按类别对技能进行分组
         const groupedSkills = {};
@@ -799,6 +821,7 @@ export class BattleScene {
             this.startSkillCDAnimation(skillId, actualCD);
         }
         this.activeSkill = null;
+        this.hideSkillIndicator(); // 确保释放后隐藏指示器，同时也恢复 UI 展开（如果鼠标在的话）
     }
 
     startSkillCDAnimation(skillId, cooldown, initialElapsed = 0) {
@@ -832,6 +855,10 @@ export class BattleScene {
         this.hideSkillIndicator();
         const skill = SkillRegistry[skillId];
         if (!skill) return;
+
+        // 【新功能】进入瞄准模式时，强制收缩技能面板，防止挡住战场选点
+        const bottomUI = document.getElementById('battle-bottom-ui');
+        if (bottomUI) bottomUI.classList.add('is-targeting');
 
         // 核心：使用 getActualRadius 获取最终半径（尊重 CoC 修正器）
         const heroData = this.worldManager.heroData;
@@ -870,6 +897,10 @@ export class BattleScene {
     }
 
     hideSkillIndicator() {
+        // 【新功能】退出瞄准模式，允许 UI 重新收缩
+        const bottomUI = document.getElementById('battle-bottom-ui');
+        if (bottomUI) bottomUI.classList.remove('is-targeting');
+
         if (this.skillIndicator) {
             this.scene.remove(this.skillIndicator);
             this.skillIndicator.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
@@ -1366,6 +1397,9 @@ export class BattleScene {
     update(deltaTime) {
         // 驱动 ModifierManager 的自动计时系统 (Point 4)
         modifierManager.update(deltaTime);
+
+        // 驱动 UIManager 实时刷新 (所见即所得)
+        uiManager.update();
 
         this.camera.position.set(0, 15, 18); 
         this.camera.lookAt(0, 0, 0);

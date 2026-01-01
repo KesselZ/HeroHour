@@ -67,6 +67,9 @@ export class BaseUnit extends THREE.Group {
         // 走路音效控制 (改为固定时间频率)
         this.footstepTimer = 0;
         this.footstepInterval = 650; // 每 650ms 响一次
+        this.moveAnimTime = 0; // 初始设为 0
+        this.lastPosition = new THREE.Vector3(); // 用于驱动位移动画
+        this.debugLogTimer = 0; // 调试日志计时器
 
         this._martyrdomTriggered = false; // 哀兵必胜触发标记
 
@@ -491,6 +494,9 @@ export class BaseUnit extends THREE.Group {
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
 
+        this.lastPosition.copy(this.position); // 记录位移前的位置
+        this.isActuallyMoving = false; // 每帧重置移动状态
+
         // --- 核心修复：坐忘无我（仅在拥有特定 Modifier 时生效，非底层机制） ---
         if (this.isHero && this.side === 'player') {
             const arrayRegen = modifierManager.getModifiedValue(this, 'chunyang_array_mp_regen_enabled', 0);
@@ -519,6 +525,7 @@ export class BaseUnit extends THREE.Group {
             // 逃跑速度为基础战斗移速的 50%
             const fleeSpeed = this.baseMoveSpeed * 0.5;
             this.position.x -= fleeSpeed * deltaTime;
+            this.isActuallyMoving = true;
             this.updateFacing(); // 确保面向左边
             this.applySeparation(allies, enemies, deltaTime);
             
@@ -527,6 +534,7 @@ export class BaseUnit extends THREE.Group {
                 window.battle.playVFX('slow', { unit: this });
                 window.battle.playVFX('flee', { unit: this });
             }
+            this.updateProceduralAnimation(deltaTime);
             return;
         }
 
@@ -534,8 +542,10 @@ export class BaseUnit extends THREE.Group {
         if (this.isVictoryMarch) {
             const moveDir = this.side === 'player' ? 1 : -1;
             this.position.x += moveDir * this.moveSpeed * deltaTime;
+            this.isActuallyMoving = true;
             this.setSpriteFacing(this.side === 'player' ? 'right' : 'left');
             this.applySeparation(allies, enemies, deltaTime);
+            this.updateProceduralAnimation(deltaTime);
             return;
         }
 
@@ -555,6 +565,7 @@ export class BaseUnit extends THREE.Group {
             }
             // 处理碰撞挤压
             this.applySeparation(allies, enemies, deltaTime);
+            this.updateProceduralAnimation(deltaTime);
             return;
         } 
 
@@ -568,6 +579,7 @@ export class BaseUnit extends THREE.Group {
             // 如果冲力还很大，暂时打断 AI 寻路 (硬直感)
             if (this.knockbackVelocity.length() > 0.05) {
                 this.applySeparation(allies, enemies, deltaTime); // 击退过程中也要处理碰撞
+                this.updateProceduralAnimation(deltaTime);
                 return; 
             }
         }
@@ -577,6 +589,7 @@ export class BaseUnit extends THREE.Group {
             this.updateWhirlwind(enemies);
             // 旋风斩期间可以缓慢移动或静止，这里保持原地旋转并处理碰撞
             this.applySeparation(allies, enemies, deltaTime);
+            this.updateProceduralAnimation(deltaTime);
             return; 
         }
 
@@ -591,6 +604,7 @@ export class BaseUnit extends THREE.Group {
 
             if (distance > this.attackRange) {
                 this.moveTowardsTarget(deltaTime);
+                this.isActuallyMoving = true;
             } else {
                 this.footstepTimer = 0; // 停止移动时归零
                 this.performAttack(enemies, allies);
@@ -605,6 +619,9 @@ export class BaseUnit extends THREE.Group {
                 this.updateInfluenceRing(this.position.distanceTo(nearestEnemy.position));
             }
         }
+
+        // 最后统一调用程序化动画更新 (包括闲置呼吸)
+        this.updateProceduralAnimation(deltaTime);
     }
 
     /**
@@ -623,6 +640,82 @@ export class BaseUnit extends THREE.Group {
 
         const isTargetToLeft = this.target.position.x < this.position.x;
         this.setSpriteFacing(isTargetToLeft ? 'left' : 'right');
+    }
+
+    /**
+     * 更新程序化动画 (动感行走与呼吸)
+     */
+    updateProceduralAnimation(deltaTime) {
+        if (this.isDead || !this.unitSprite) return;
+
+        // 如果正在攻击冲刺，则不套用行走动画（防止位移冲突）
+        if (this.lungeState.active) return;
+
+        const texture = this.unitSprite.material.map;
+        if (!texture) return;
+
+        // 计算这一帧真实的物理位移 (Distance-based Animation)
+        const distanceMoved = this.position.distanceTo(this.lastPosition);
+        const isPhysicallyMoving = distanceMoved > 0.00001; // 极大降低阈值，适配精细的战斗坐标系
+
+        if (isPhysicallyMoving) {
+            // 【战场行走调参指南】
+            // 1. stepDistance: 步长。越大跳得越慢。
+            //    - 基准: 李承恩(英雄)秒速约 4.5 -> 步频 5.0 步/秒 (触发天花板，表现为"全力冲刺")
+            //    - 基准: 天策骑兵秒速约 3.0 -> 步频 3.3 步/秒 (线性区，表现为"快速奔跑")
+            //    - 基准: 普通步兵秒速约 1.5 -> 步频 1.6 步/秒 (线性区，表现为"稳健行军")
+            const stepDistance = 0.9;        
+            const maxStepsPerSecond = 4.0;   // 2. 天花板: 封顶 4 步/秒。
+            
+            const deltaAnim = (distanceMoved / stepDistance) * Math.PI;
+            // 核心：强制适配 deltaTime。如果大于 1 视为毫秒，否则视为秒
+            const dtSec = (deltaTime > 1) ? (deltaTime / 1000) : deltaTime;
+            const maxDelta = (maxStepsPerSecond * Math.PI) * dtSec;
+            
+            const finalDelta = Math.min(deltaAnim, maxDelta);
+            this.moveAnimTime += finalDelta;
+
+            // --- 战斗调试日志：受 WorldManager.DEBUG.SHOW_MOTION_DEBUG 控制，仅限玩家英雄 ---
+            const debug = worldManager.constructor.DEBUG; 
+            if (debug.ENABLED && debug.SHOW_MOTION_DEBUG && this.isHero && this.side === 'player') {
+                this.debugLogTimer += dtSec;
+                if (this.debugLogTimer > 0.5) {
+                    const speedPerSec = (distanceMoved / dtSec).toFixed(3);
+                    const isCapped = deltaAnim > maxDelta ? "%c[已达天花板]" : "";
+                    console.log(`%c[战斗调试] %c秒速: ${speedPerSec} | 帧位移: ${distanceMoved.toFixed(5)} | 动画增量: ${finalDelta.toFixed(3)} ${isCapped}`, 
+                        "color: #ffaa00; font-weight: bold", "color: #fff", isCapped ? "color: #ff4444" : "");
+                    this.debugLogTimer = 0;
+                }
+            }
+            
+            const bob = Math.abs(Math.sin(this.moveAnimTime));
+            this.unitSprite.position.y = bob * 0.15; // 跳跃高度
+
+            const stretch = 1 + bob * 0.1;
+            const squash = 1 - bob * 0.05;
+            
+            // 倾斜逻辑：根据当前面向决定倾斜方向
+            const isFlipped = texture.repeat.x < 0;
+            const tilt = isFlipped ? 0.08 : -0.08; 
+            this.unitSprite.rotation.z = THREE.MathUtils.lerp(this.unitSprite.rotation.z, tilt, 0.1);
+
+            this.unitSprite.scale.set(
+                this.visualScale * squash,
+                this.visualScale * stretch,
+                1
+            );
+        } else {
+            // --- 呼吸/闲置动画 ---
+            this.unitSprite.position.y = THREE.MathUtils.lerp(this.unitSprite.position.y, 0, 0.2);
+            this.unitSprite.rotation.z = THREE.MathUtils.lerp(this.unitSprite.rotation.z, 0, 0.2);
+
+            const breath = Math.sin(Date.now() * 0.003 + (this.index * 0.5)) * 0.02; 
+            this.unitSprite.scale.set(
+                this.visualScale * (1 - breath),
+                this.visualScale * (1 + breath),
+                1
+            );
+        }
     }
 
     /**

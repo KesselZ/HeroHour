@@ -4,7 +4,7 @@ import { WorldScene } from './scenes/WorldScene.js'; // 引入大世界场景
 import { spriteFactory } from './core/SpriteFactory.js';
 import { setSeed } from './core/Random.js';
 import { modifierManager } from './core/ModifierManager.js';
-import { worldManager } from './core/WorldManager.js';
+import { WorldManager, worldManager } from './core/WorldManager.js';
 import { SkillRegistry } from './core/SkillRegistry.js';
 import { talentManager } from './core/TalentManager.js';
 import { uiManager } from './core/UIManager.js';
@@ -389,10 +389,16 @@ function applyHeroTraits(heroId) {
     // 1.5 初始化兵力 (支持调试模式)
     worldManager.initHeroArmy(heroId);
     
-    // 2. 设定初始技能 (这些也可以数据化，目前暂留)
-    if (heroId === 'liwangsheng') worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing', 'sanqing_huashen'];
-    if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'];
-    if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'quanningyue', 'yingmingliu', 'fenglaiwushan'];
+    // 2. 设定初始技能 (仅在 Debug 模式下全学会)
+    const isCheat = WorldManager.DEBUG.ENABLED && WorldManager.DEBUG.START_RESOURCES;
+    if (isCheat) {
+        if (heroId === 'liwangsheng') worldManager.heroData.skills = ['sword_rain', 'divine_sword_rain', 'zhenshanhe', 'shengtaiji', 'tunriyue', 'sixiang', 'liangyi', 'wanshi', 'huasanqing', 'sanqing_huashen'];
+        if (heroId === 'lichengen') worldManager.heroData.skills = ['battle_shout', 'renchicheng', 'shourushan', 'zhanbafang', 'xiaoruhu', 'pochongwei', 'tu'];
+        if (heroId === 'yeying') worldManager.heroData.skills = ['hegui', 'fengcha', 'songshe', 'mengquan', 'pinghu', 'quanningyue', 'yingmingliu', 'fenglaiwushan'];
+    } else {
+        // 非 Debug 模式下，初始技能为空（需通过等级或奇穴获得）
+        worldManager.heroData.skills = [];
+    }
 
     // 3. 执行同步与修正注册 (这里会根据 identity 动态计算 hpMax 和 mpMax)
     worldManager.refreshHeroStats();

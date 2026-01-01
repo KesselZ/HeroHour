@@ -44,7 +44,15 @@ export class WorldScene {
 
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
-        this.onPointerMove = this.onPointerMove.bind(this); // 核心修复：绑定指针移动事件
+        this.onPointerMove = this.onPointerMove.bind(this); 
+
+        // 动感行走动画状态
+        this.moveAnimTime = 0;
+        this.baseScale = 1.4;
+        this.playerGroup = null;
+        this.playerShadow = null;
+        this.lastPlayerPos = new THREE.Vector3(); // 用于驱动位移动画
+        this.debugLogTimer = 0; // 用于限流输出日志
     }
 
     /**
@@ -80,8 +88,8 @@ export class WorldScene {
         this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.005); // 淡淡的远景雾效
         
         // 初始位置设定
-        this.camera.position.set(this.playerHero.position.x, 15, this.playerHero.position.z + 12);
-        this.camera.lookAt(this.playerHero.position);
+        this.camera.position.set(this.playerGroup.position.x, 15, this.playerGroup.position.z + 12);
+        this.camera.lookAt(this.playerGroup.position);
 
         this.initUI();
         
@@ -350,25 +358,30 @@ export class WorldScene {
         
         const skillsContainer = document.getElementById('hero-panel-skills');
         skillsContainer.innerHTML = '';
-        data.skills.forEach(skillId => {
-            const skill = SkillRegistry[skillId];
-            if (!skill) return;
 
-            const slot = document.createElement('div');
-            slot.className = 'hero-skill-slot';
-            
-            const iconStyle = spriteFactory.getIconStyle(skill.icon);
-            slot.innerHTML = `
-                <div class="skill-icon-small" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
-            `;
+        if (!data.skills || data.skills.length === 0) {
+            skillsContainer.innerHTML = `<div class="hero-no-skills">暂无习得技能</div>`;
+        } else {
+            data.skills.forEach(skillId => {
+                const skill = SkillRegistry[skillId];
+                if (!skill) return;
 
-            slot.onmouseenter = () => {
-                uiManager.showSkillTooltip(skillId, data);
-            };
-            slot.onmouseleave = () => uiManager.hideTooltip();
+                const slot = document.createElement('div');
+                slot.className = 'hero-skill-slot';
+                
+                const iconStyle = spriteFactory.getIconStyle(skill.icon);
+                slot.innerHTML = `
+                    <div class="skill-icon-small" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                `;
 
-            skillsContainer.appendChild(slot);
-        });
+                slot.onmouseenter = () => {
+                    uiManager.showSkillTooltip(skillId, data);
+                };
+                slot.onmouseleave = () => uiManager.hideTooltip();
+
+                skillsContainer.appendChild(slot);
+            });
+        }
 
         panel.classList.remove('hero-panel-v3');
         panel.classList.add('hero-panel-v4');
@@ -471,8 +484,8 @@ export class WorldScene {
 
         // --- 核心修复：位置“懒同步” ---
         // 在打开面板前，将 3D 世界的实时位置同步给逻辑层，确保 isPlayerAtCity 判定准确
-        if (this.playerHero) {
-            worldManager.savePlayerPos(this.playerHero.position.x, this.playerHero.position.z);
+        if (this.playerGroup) {
+            worldManager.savePlayerPos(this.playerGroup.position.x, this.playerGroup.position.z);
         }
 
         this.activeCityId = cityId; 
@@ -881,10 +894,31 @@ export class WorldScene {
     }
 
     createPlayer() {
-        this.playerHero = spriteFactory.createUnitSprite(this.heroId, 0.1);
+        // 1. 创建玩家容器组，统一管理位置
+        this.playerGroup = new THREE.Group();
         const pos = worldManager.mapState.playerPos;
-        this.playerHero.position.set(pos.x, 0, pos.z);
-        this.scene.add(this.playerHero);
+        this.playerGroup.position.set(pos.x, 0, pos.z);
+
+        // 2. 创建脚下影子
+        const shadowGeom = new THREE.CircleGeometry(0.35, 16);
+        const shadowMat = new THREE.MeshBasicMaterial({ 
+            color: 0x000000, 
+            transparent: true, 
+            opacity: 0.3 
+        });
+        this.playerShadow = new THREE.Mesh(shadowGeom, shadowMat);
+        this.playerShadow.rotation.x = -Math.PI / 2;
+        this.playerShadow.position.y = 0.05; // 略高于地面
+        this.playerGroup.add(this.playerShadow);
+
+        // 3. 创建主角精灵并存入容器
+        this.playerHero = spriteFactory.createUnitSprite(this.heroId, 0); // 锚点设为底部 (0)
+        const config = spriteFactory.unitConfig[this.heroId];
+        this.baseScale = config.scale || 1.4;
+        this.playerHero.scale.set(this.baseScale, this.baseScale, 1);
+        this.playerGroup.add(this.playerHero);
+
+        this.scene.add(this.playerGroup);
     }
 
     setupLights() {
@@ -924,8 +958,8 @@ export class WorldScene {
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('pointermove', this.onPointerMove); // 核心修复：移除指针监听
         
-        if (this.playerHero) {
-            worldManager.savePlayerPos(this.playerHero.position.x, this.playerHero.position.z);
+        if (this.playerGroup) {
+            worldManager.savePlayerPos(this.playerGroup.position.x, this.playerGroup.position.z);
         }
 
         const hud = document.getElementById('world-ui');
@@ -940,11 +974,16 @@ export class WorldScene {
     onKeyUp(e) { this.keys[e.key.toLowerCase()] = false; }
 
     update(deltaTime) {
-        if (!this.isActive || !this.playerHero) return;
+        if (!this.isActive || !this.playerGroup) return;
+
+        this.lastPlayerPos.copy(this.playerGroup.position); // 记录位移前位置
+
+        // 驱动 UIManager 实时刷新 (所见即所得)
+        uiManager.update();
 
         // --- 核心：检测待播放的升级反馈 ---
         if (worldManager.heroData.pendingLevelUps > 0) {
-            this.vfxLibrary.createLevelUpVFX(this.playerHero.position);
+            this.vfxLibrary.createLevelUpVFX(this.playerGroup.position);
             // 播放专属的升级音效
             audioManager.play('source_levelup', { volume: 0.8 });
             worldManager.heroData.pendingLevelUps--;
@@ -976,24 +1015,82 @@ export class WorldScene {
             if (this.keys['a'] || this.keys['arrowleft']) moveDir.x -= 1;
             if (this.keys['d'] || this.keys['arrowright']) moveDir.x += 1;
 
+            const texture = this.playerHero.material.map;
+            const config = spriteFactory.unitConfig[this.heroId];
+
             if (moveDir.lengthSq() > 0) {
                 moveDir.normalize();
                 // 核心修改：位移 = 速度 * deltaTime，脱离帧率限制
                 const moveStep = this.moveSpeed * deltaTime;
-                const nextPos = this.playerHero.position.clone().addScaledVector(moveDir, moveStep);
+                const nextPos = this.playerGroup.position.clone().addScaledVector(moveDir, moveStep);
                 
                 if (mapGenerator.isPassable(nextPos.x, nextPos.z)) {
-                    this.playerHero.position.copy(nextPos);
+                    this.playerGroup.position.copy(nextPos);
                 } else {
-                    const nextPosX = this.playerHero.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
+                    const nextPosX = this.playerGroup.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
                     if (mapGenerator.isPassable(nextPosX.x, nextPosX.z)) {
-                        this.playerHero.position.copy(nextPosX);
+                        this.playerGroup.position.copy(nextPosX);
                     }
-                    const nextPosZ = this.playerHero.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
+                    const nextPosZ = this.playerGroup.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
                     if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z)) {
-                        this.playerHero.position.copy(nextPosZ);
+                        this.playerGroup.position.copy(nextPosZ);
                     }
                 }
+            }
+
+            // --- 动感行走动画逻辑 (Distance-based 优雅微调版) ---
+            const distanceMoved = this.playerGroup.position.distanceTo(this.lastPlayerPos);
+            const isPhysicallyMoving = distanceMoved > 0.001;
+
+            if (isPhysicallyMoving) {
+                // 【动感行走调参指南】
+                // 1. stepDistance: 步长。越大迈步越大，频率越低。
+                //    - 基准: 主角(李承恩)秒速约 8.5。
+                //    - 设定 3.5 表示每秒产生 8.5/3.5 = 2.4 步，刚好处于天花板边缘。
+                const stepDistance = 3.5;      
+                const maxStepsPerSecond = 2.5; // 2. 天花板: 每秒最多跳几下。防止瞬移抽搐。
+                
+                const deltaAnim = (distanceMoved / stepDistance) * Math.PI;
+                const maxDelta = (maxStepsPerSecond * Math.PI) * deltaTime;
+                const finalDelta = Math.min(deltaAnim, maxDelta);
+                this.moveAnimTime += finalDelta;
+
+                // --- 调试日志：受 WorldManager.DEBUG.SHOW_MOTION_DEBUG 控制 ---
+                const debug = WorldManager.DEBUG;
+                if (debug.ENABLED && debug.SHOW_MOTION_DEBUG) {
+                    this.debugLogTimer += deltaTime;
+                    if (this.debugLogTimer > 0.5) {
+                        const speedPerSec = (distanceMoved / deltaTime).toFixed(3);
+                        const isCapped = deltaAnim > maxDelta ? "%c[已达天花板]" : "";
+                        console.log(`%c[运动调试] %c秒速: ${speedPerSec} | 帧位移: ${distanceMoved.toFixed(4)} | 动画增量: ${finalDelta.toFixed(3)} ${isCapped}`, 
+                            "color: #00ffcc; font-weight: bold", "color: #fff", isCapped ? "color: #ff4444" : "");
+                        this.debugLogTimer = 0;
+                    }
+                }
+                
+                // 1. 垂直跳动 (Bobbing) - 降低高度使其更稳重
+                const bob = Math.abs(Math.sin(this.moveAnimTime)); 
+                this.playerHero.position.y = bob * 0.12; // 向上跳跃高度
+
+                // 2. 挤压伸展 (Squash & Stretch) - 更加细微
+                const stretch = 1 + bob * 0.06;
+                const squash = 1 - bob * 0.03;
+                
+                // 3. 影子随跳动缩小 - 更加克制
+                const shadowScale = 1 - bob * 0.2;
+                this.playerShadow.scale.set(shadowScale, shadowScale, 1);
+                this.playerShadow.material.opacity = 0.3 * (1 - bob * 0.2);
+
+                // 4. 倾斜 (Tilting) - 减小倾斜度
+                const tilt = moveDir.x * -0.08; 
+                this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, tilt, 0.1);
+
+                // 统一应用缩放
+                this.playerHero.scale.set(
+                    this.baseScale * squash,
+                    this.baseScale * stretch,
+                    1
+                );
 
                 // 脚步声逻辑 (起步即响，固定频率)
                 if (this.footstepTimer === 0) {
@@ -1009,11 +1106,9 @@ export class WorldScene {
                 }
                 
                 if (moveDir.x !== 0) {
-                    const config = spriteFactory.unitConfig[this.heroId];
                     const defaultFacing = config.defaultFacing || 'right';
                     const isMovingLeft = moveDir.x < 0;
                     let shouldFlip = isMovingLeft ? (defaultFacing === 'right') : (defaultFacing === 'left');
-                    const texture = this.playerHero.material.map;
                     const standardRepeatX = 1 / 4; 
                     const flippedRepeatX = -1 / 4;
                     const targetRepeatX = shouldFlip ? flippedRepeatX : standardRepeatX;
@@ -1025,6 +1120,25 @@ export class WorldScene {
                 this.checkInteractions();
             } else {
                 this.footstepTimer = 0; // 停止移动时归零
+                this.moveAnimTime = 0;
+                
+                // 停止移动时平滑恢复
+                this.playerHero.position.y = THREE.MathUtils.lerp(this.playerHero.position.y, 0, 0.2);
+                this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, 0, 0.2);
+                this.playerShadow.scale.set(
+                    THREE.MathUtils.lerp(this.playerShadow.scale.x, 1, 0.2),
+                    THREE.MathUtils.lerp(this.playerShadow.scale.y, 1, 0.2),
+                    1
+                );
+                this.playerShadow.material.opacity = THREE.MathUtils.lerp(this.playerShadow.material.opacity, 0.3, 0.2);
+
+                // 呼吸效果
+                const breath = Math.sin(Date.now() * 0.003) * 0.02;
+                this.playerHero.scale.set(
+                    this.baseScale * (1 - breath),
+                    this.baseScale * (1 + breath),
+                    1
+                );
             }
         }
 
@@ -1032,9 +1146,9 @@ export class WorldScene {
         this.updateExploration(); // 更新探索迷雾数据
         this.updateMinimap();
 
-        const targetCamPos = this.playerHero.position.clone().add(new THREE.Vector3(0, 15, 12));
+        const targetCamPos = this.playerGroup.position.clone().add(new THREE.Vector3(0, 15, 12));
         this.camera.position.lerp(targetCamPos, 0.1);
-        this.camera.lookAt(this.playerHero.position);
+        this.camera.lookAt(this.playerGroup.position);
     }
 
     spawnFloatingText(type, amount) {
@@ -1136,64 +1250,77 @@ export class WorldScene {
         // 清空现有内容
         container.innerHTML = '';
 
+        // 获取模板
+        const cityTpl = document.getElementById('tpl-hud-city');
+        const heroTpl = document.getElementById('tpl-hud-hero');
+
         // 1. 获取所有属于玩家的城市
         const playerCities = Object.values(worldManager.cities).filter(c => c.owner === 'player');
 
         // 2. 为每个城市创建一个卡片
         playerCities.forEach(city => {
-            const cityCard = document.createElement('div');
-            cityCard.className = 'hud-card hud-card-city';
+            if (!cityTpl) return;
+            const clone = cityTpl.content.cloneNode(true);
+            const cityCard = clone.querySelector('.hud-card');
             cityCard.id = `card-city-${city.id}`;
             
             const iconStyle = spriteFactory.getIconStyle(city.getIconKey());
-            
-            cityCard.innerHTML = `
-                <div class="hud-portrait" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
-                <div class="hud-info">
-                    <span class="hud-name">${city.name}</span>
-                    <span class="hud-sub">${city.id === 'main_city_1' ? '大本营' : '占领据点'}</span>
-                </div>
-            `;
+            const portrait = cityCard.querySelector('.hud-portrait');
+            Object.assign(portrait.style, iconStyle);
+
+            cityCard.querySelector('.hud-name').innerText = city.name;
+            cityCard.querySelector('.hud-sub').innerText = city.id === 'main_city_1' ? '大本营' : '占领据点';
 
             cityCard.onclick = () => {
                 audioManager.play('ui_click', { volume: 0.6 });
                 this.openTownManagement(city.id);
             };
 
-            container.appendChild(cityCard);
+            container.appendChild(clone);
         });
 
         // 3. 添加英雄卡片 (始终在最后)
-        const heroData = worldManager.heroData;
-        const heroIconStyle = spriteFactory.getIconStyle(heroData.id);
-        
-        const heroCard = document.createElement('div');
-        heroCard.className = 'hud-card hud-card-hero';
-        heroCard.id = 'hero-mini-card';
-        
-        heroCard.innerHTML = `
-            <div class="hud-portrait" id="world-hero-portrait" style="background-image: ${heroIconStyle.backgroundImage}; background-position: ${heroIconStyle.backgroundPosition}; background-size: ${heroIconStyle.backgroundSize};">
-                <div class="hud-level-badge" id="hud-hero-level">${heroData.level}</div>
-            </div>
-            <div class="hud-info">
-                <div class="hud-mini-bars">
-                    <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp" style="width: ${(heroData.hpCurrent/heroData.hpMax)*100}%"></div></div>
-                    <div class="mini-bar-bg"><div id="hud-hero-mp-bar" class="mini-bar-fill mp" style="width: ${(heroData.mpCurrent/heroData.mpMax)*100}%"></div></div>
-                </div>
-            </div>
-        `;
+        if (heroTpl) {
+            const clone = heroTpl.content.cloneNode(true);
+            const heroCard = clone.querySelector('.hud-card-hero');
+            const talentHint = clone.querySelector('#talent-hint');
+            const heroData = worldManager.heroData;
+            const heroIconStyle = spriteFactory.getIconStyle(heroData.id);
 
-        heroCard.onclick = () => {
-            audioManager.play('ui_click', { volume: 0.6 });
-            this.openHeroStats();
-        };
+            const portrait = heroCard.querySelector('.hud-portrait');
+            Object.assign(portrait.style, heroIconStyle);
 
-        container.appendChild(heroCard);
+            heroCard.querySelector('#hud-hero-level').innerText = heroData.level;
+            
+            // 设置初始条状态
+            const hpBar = heroCard.querySelector('#hud-hero-hp-bar');
+            const mpBar = heroCard.querySelector('#hud-hero-mp-bar');
+            if (hpBar) hpBar.style.width = `${(heroData.hpCurrent / heroData.hpMax) * 100}%`;
+            if (mpBar) mpBar.style.width = `${(heroData.mpCurrent / heroData.mpMax) * 100}%`;
+
+            heroCard.onclick = () => {
+                audioManager.play('ui_click', { volume: 0.6 });
+                this.openHeroStats();
+            };
+
+            // 绑定天赋提醒点击事件
+            if (talentHint) {
+                talentHint.onclick = (e) => {
+                    // 此时已经不需要 stopPropagation，因为它们不再是嵌套关系
+                    uiManager.toggleTalentPanel(true);
+                };
+            }
+
+            container.appendChild(clone);
+        }
+
+        // 刷新后同步更新英雄 HUD 状态 (例如天赋提醒)
+        this.updateHeroHUD();
     }
 
     checkInteractions() {
         const toRemove = [];
-        const playerPos = this.playerHero.position;
+        const playerPos = this.playerGroup.position;
         const ms = worldManager.mapState;
 
         this.interactables.forEach((item, index) => {
@@ -1277,15 +1404,15 @@ export class WorldScene {
      * 更新探索区域
      */
     updateExploration() {
-        if (!this.playerHero) return;
+        if (!this.playerGroup) return;
         
         const ms = worldManager.mapState;
         const size = mapGenerator.size;
         const halfSize = size / 2;
         
         // 获取玩家在 0-400 坐标系下的位置
-        const px = Math.round(this.playerHero.position.x + halfSize);
-        const pz = Math.round(this.playerHero.position.z + halfSize);
+        const px = Math.round(this.playerGroup.position.x + halfSize);
+        const pz = Math.round(this.playerGroup.position.z + halfSize);
         
         // 核心改动：奇穴效果 - 慧眼识珠 (迷雾半径增加)
         // 优雅实现：传入基础半径 33，中转站根据百分比加成(如+50%)自动返还最终半径(如49)
@@ -1310,7 +1437,7 @@ export class WorldScene {
      * 每帧更新小地图动态标记
      */
     updateMinimap() {
-        if (!this.minimapCtx || !this.playerHero) return;
+        if (!this.minimapCtx || !this.playerGroup) return;
 
         const debug = WorldManager.DEBUG;
         const size = mapGenerator.size;
@@ -1467,7 +1594,7 @@ export class WorldScene {
         });
 
         // 6. 绘制玩家位置 (白色点)
-        const playerPos = worldToMinimap(this.playerHero.position.x, this.playerHero.position.z);
+        const playerPos = worldToMinimap(this.playerGroup.position.x, this.playerGroup.position.z);
         if (playerPos.x >= 0 && playerPos.x <= displaySize && playerPos.y >= 0 && playerPos.y <= displaySize) {
             ctx.fillStyle = 'white';
             ctx.strokeStyle = 'black';

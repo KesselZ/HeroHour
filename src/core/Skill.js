@@ -204,6 +204,7 @@ export class Skill {
 
         let foundDuration = null;
         let isDurationDynamic = false;
+        let foundIsVFX = true;
 
         const processActions = (actions) => {
             actions.forEach(action => {
@@ -224,16 +225,21 @@ export class Skill {
                     desc = desc.split('{count}').join(isDyn ? hl(val) : normal(val));
                 }
                 if (res.scaledDuration !== undefined) {
-                    if (foundDuration === null || (action.type !== 'vfx' && (action.duration || 0) > 1000)) {
-                        // --- 核心修复：防止双重缩放 ---
-                        // res.scaledDuration 已经应用过 skillPower 缩放了
-                        // 这里我们只需要应用“气场类”的 getActualDuration 修正，基数应为原始值
-                        const baseDuration = action.duration || (action.params && action.params.duration) || 0;
-                        const actualDur = this.getActualDuration(heroData, baseDuration);
+                    const isVFX = action.type === 'vfx';
+                    // --- 核心修复：智能识别主逻辑时长 ---
+                    // 1. 优先选择非 VFX 动作的时长（如 Buff、气场等）
+                    // 2. 在同类动作（同为 VFX 或同为逻辑动作）中，选择最长的那个
+                    const shouldUpdate = foundDuration === null || 
+                                         (!isVFX && (foundIsVFX || res.scaledDuration > foundDuration)) ||
+                                         (isVFX && foundIsVFX && res.scaledDuration > foundDuration);
+
+                    if (shouldUpdate) {
+                        const rawDuration = action.duration || (action.params && action.params.duration) || 0;
+                        const actualDur = this.getActualDuration(heroData, rawDuration);
                         
-                        // 最终时长 = 基础经过协议修正后的值 * 功法倍率
                         foundDuration = action.applySkillPowerToDuration ? (actualDur * skillPower) : actualDur;
                         isDurationDynamic = res.isDurationDynamic;
+                        foundIsVFX = isVFX;
                     }
                 }
                 if (action.type === 'status_aoe' && action.duration) {

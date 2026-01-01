@@ -214,7 +214,7 @@ export const SkillRegistry = {
             { type: 'vfx', name: 'pulse', params: { color: 0xff0000, duration: 1000, radius: 15 } },
             { type: 'buff_aoe', side: 'player', params: { 
                 stat: 'tigerHeart', 
-                duration: 4000, 
+                duration: 5000, 
                 applySkillPowerToDuration: true,
                 color: 0xff3333,
                 vfxName: 'rising_particles'

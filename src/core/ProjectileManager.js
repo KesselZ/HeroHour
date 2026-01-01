@@ -162,7 +162,8 @@ class Projectile extends THREE.Group {
         this.target = target;
         this.speed = speed;
         this.damage = damage;
-        this.penetration = penetration; // 穿透次数
+        this.penetration = penetration; // 穿透次数 (作为消耗计数)
+        this.isPiercing = penetration > 0; // 核心修复：记录是否为穿透性质，不随碰撞消耗
         this.hitUnits = new Set(); // 记录已击中的单位
         this.isHeroSource = isHeroSource;
         this.isDone = false;
@@ -181,6 +182,11 @@ class Projectile extends THREE.Group {
             this.scale.setScalar(scale);
         }
         this.position.copy(startPos);
+
+        // 必须在 position 设置好之后立即修正初始朝向
+        if (this.direction) {
+            this.lookAt(this.position.clone().add(this.direction));
+        }
     }
 
     initVisual(type, color) {
@@ -199,12 +205,13 @@ class Projectile extends THREE.Group {
         let targetPos = null;
 
         // 1. 确定运动方向与坐标更新
-        if (this.penetration > 0 && this.direction) {
-            // 穿透弹道：保持直线飞行
+        if (this.isPiercing && this.direction) {
+            // 穿透弹道：保持直线飞行，直到寿命结束或穿透次数扣完
             moveDir = this.direction;
             const step = this.speed;
             this.position.addScaledVector(moveDir, step);
             this.distanceTraveled += step;
+            this.lookAt(this.position.clone().add(moveDir));
         } else {
             // 追踪类弹道 (普通或抛物线)
             if (!this.target || this.target.isDead) {
@@ -280,8 +287,8 @@ class Projectile extends THREE.Group {
         const enemySide = this.target ? this.target.side : (this.isHeroSource ? 'enemy' : 'player');
         const units = (enemySide === 'enemy') ? battle.enemyUnits : battle.playerUnits;
 
-        if (this.penetration > 0) {
-            // 穿透逻辑
+        if (this.isPiercing) {
+            // 穿透逻辑：使用 isPiercing 判定运动模式
             for (const unit of units) {
                 if (unit.isDead || this.hitUnits.has(unit)) continue;
                 const unitPos = unit.position.clone().add(new THREE.Vector3(0, 0.3, 0));
@@ -311,7 +318,7 @@ class Projectile extends THREE.Group {
         
         // 处理爆炸/范围伤害
         if (this.explosionRadius > 0 && battle) {
-            // 播放爆炸特效
+            // ... 爆炸逻辑不变 ...
             if (this.explosionVFX) {
                 battle.playVFX(this.explosionVFX, { 
                     pos: hitPos, 
@@ -320,8 +327,6 @@ class Projectile extends THREE.Group {
                     duration: 500 
                 });
             }
-
-            // 范围伤害判定
             const enemySide = this.target ? this.target.side : (this.isHeroSource ? 'enemy' : 'player');
             const targets = battle.getUnitsInArea(hitPos, { shape: 'circle', radius: this.explosionRadius }, enemySide);
             battle.applyDamageToUnits(targets, this.damage, this.isHeroSource);
@@ -330,13 +335,17 @@ class Projectile extends THREE.Group {
             unit.takeDamage(this.damage, this.isHeroSource);
         }
 
-        this.hitUnits.add(unit);
+        if (unit) this.hitUnits.add(unit);
 
-        if (this.penetration > 0) {
+        // --- 核心修复：穿透计数的销毁逻辑 ---
+        if (this.isPiercing) {
+            // 穿透模式下：每命中一个 unit 减一次。只有减到负数（即超过了最大命中数）才消失
             this.penetration--;
-            // 注意：只有穿透次数用尽时才销毁
-            if (this.penetration < 0) this.isDone = true;
+            if (this.penetration < 0) {
+                this.isDone = true;
+            }
         } else {
+            // 非穿透模式：撞到就消失
             this.isDone = true;
         }
     }

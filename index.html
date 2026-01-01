@@ -351,6 +351,41 @@
         </div>
     </div> <!-- End of app -->
 
+    <!-- UI 模板区域 -->
+    <template id="tpl-hud-city">
+        <div class="hud-card hud-card-city">
+            <div class="hud-portrait"></div>
+            <div class="hud-info">
+                <span class="hud-name"></span>
+                <span class="hud-sub"></span>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-hud-hero">
+        <div class="hero-hud-unit-group">
+            <!-- 天赋气泡：独立按钮层 -->
+            <div id="talent-hint" class="talent-hint-wrapper hidden">
+                <div class="talent-hint-v1">
+                    <span class="hint-icon">✧</span>
+                    <span class="hint-text">星魄待悟</span>
+                </div>
+            </div>
+            <!-- 英雄卡片：独立按钮层 -->
+            <div class="hud-card hud-card-hero" id="hero-mini-card">
+                <div class="hud-portrait" id="world-hero-portrait">
+                    <div class="hud-level-badge" id="hud-hero-level"></div>
+                </div>
+                <div class="hud-info">
+                    <div class="hud-mini-bars">
+                        <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp"></div></div>
+                        <div class="mini-bar-bg"><div id="hud-hero-mp-bar" class="mini-bar-fill mp"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>

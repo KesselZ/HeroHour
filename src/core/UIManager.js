@@ -192,71 +192,21 @@ class UIManager {
             scale: 1.0 // 新增：缩放倍率
         };
 
-        if (openTalentBtn && talentPanel && uiLayer && gameCanvas) {
+        if (openTalentBtn) {
             openTalentBtn.onclick = () => {
-                audioManager.play('ui_click');
-                
-                // 1. 触发【全画面】扭曲缩小效果
-                uiLayer.classList.add('ui-layer-distort-out');
-                gameCanvas.classList.add('ui-layer-distort-out');
-
-                // 2. 暂停大世界时间流动
-                timeManager.pause();
-                
-                // 3. 立即显示天赋面板 (去掉 setTimeout 延迟，实现同步动画)
-                // 此时面板已经由于 prepareTalentPanel 渲染好了
-                talentPanel.classList.remove('hidden');
-                talentPanel.classList.add('distort-enter');
-                
-                // 记录进入动画开始，稍后彻底隐藏底层 (匹配 0.2s 的退出时长)
-                setTimeout(() => {
-                    uiLayer.style.visibility = 'hidden';
-                    gameCanvas.style.visibility = 'hidden';
-                    
-                    // 重置点数显示
-                    const pointsVal = document.getElementById('talent-points-val');
-                    if (pointsVal) {
-                        pointsVal.innerText = worldManager.heroData.talentPoints || 0;
-                    }
-                }, 200);
-
-                // 重置视图位置
-                this.resetTalentView();
+                this.toggleTalentPanel(true);
             };
         }
 
-        if (closeTalentBtn && talentPanel && uiLayer && gameCanvas) {
+        if (closeTalentBtn) {
             closeTalentBtn.onclick = () => {
-                audioManager.play('ui_click');
-                
-                // 1. 先准备好底层的状态
-                uiLayer.classList.remove('ui-layer-distort-out');
-                gameCanvas.classList.remove('ui-layer-distort-out');
-
-                // 2. 恢复时间流动
-                timeManager.resume();
-                
-                // 3. 隐藏奇穴面板
-                talentPanel.classList.add('hidden');
-                talentPanel.classList.remove('distort-enter');
-                
-                // 3. 恢复底层可见性，同时触发进入动画
-                uiLayer.style.visibility = 'visible';
-                gameCanvas.style.visibility = 'visible';
-                
-                uiLayer.classList.add('ui-layer-distort-in');
-                gameCanvas.classList.add('ui-layer-distort-in');
-                
-                // 4. 动画结束后清理类名
-                setTimeout(() => {
-                    uiLayer.classList.remove('ui-layer-distort-in');
-                    gameCanvas.classList.remove('ui-layer-distort-in');
-                }, 600);
+                this.toggleTalentPanel(false);
             };
         }
 
         // --- 拖拽交互监听 ---
-        talentPanel.addEventListener('mousedown', (e) => {
+        if (talentPanel) {
+            talentPanel.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return; // 仅左键
             this.talentDrag.isDragging = true;
             this.talentDrag.startX = e.clientX - this.talentDrag.offsetX;
@@ -295,6 +245,73 @@ class UIManager {
                 this.updateTalentView();
             }
         }, { passive: false });
+        }
+    }
+
+    /**
+     * 切换奇穴面板显示状态
+     * @param {boolean} show 是否显示
+     */
+    toggleTalentPanel(show) {
+        const talentPanel = document.getElementById('talent-panel');
+        const uiLayer = document.getElementById('ui-layer');
+        const gameCanvas = document.getElementById('game-canvas');
+
+        if (!talentPanel || !uiLayer || !gameCanvas) return;
+
+        audioManager.play('ui_click');
+
+        if (show) {
+            // 1. 触发【全画面】扭曲缩小效果
+            uiLayer.classList.add('ui-layer-distort-out');
+            gameCanvas.classList.add('ui-layer-distort-out');
+
+            // 2. 暂停大世界时间流动
+            timeManager.pause();
+            
+            // 3. 立即显示天赋面板
+            talentPanel.classList.remove('hidden');
+            talentPanel.classList.add('distort-enter');
+            
+            // 记录进入动画开始，稍后彻底隐藏底层 (匹配 0.2s 的退出时长)
+            setTimeout(() => {
+                uiLayer.style.visibility = 'hidden';
+                gameCanvas.style.visibility = 'hidden';
+                
+                // 重置点数显示
+                const pointsVal = document.getElementById('talent-points-val');
+                if (pointsVal) {
+                    pointsVal.innerText = worldManager.heroData.talentPoints || 0;
+                }
+            }, 200);
+
+            // 重置视图位置
+            this.resetTalentView();
+        } else {
+            // 1. 先准备好底层的状态
+            uiLayer.classList.remove('ui-layer-distort-out');
+            gameCanvas.classList.remove('ui-layer-distort-out');
+
+            // 2. 恢复时间流动
+            timeManager.resume();
+            
+            // 3. 隐藏奇穴面板
+            talentPanel.classList.add('hidden');
+            talentPanel.classList.remove('distort-enter');
+            
+            // 3. 恢复底层可见性，同时触发进入动画
+            uiLayer.style.visibility = 'visible';
+            gameCanvas.style.visibility = 'visible';
+            
+            uiLayer.classList.add('ui-layer-distort-in');
+            gameCanvas.classList.add('ui-layer-distort-in');
+            
+            // 4. 动画结束后清理类名
+            setTimeout(() => {
+                uiLayer.classList.remove('ui-layer-distort-in');
+                gameCanvas.classList.remove('ui-layer-distort-in');
+            }, 600);
+        }
     }
 
     /**
@@ -780,6 +797,17 @@ class UIManager {
      */
     hideTooltip() {
         if (this.tooltip) this.tooltip.classList.add('hidden');
+        this.lastSkillTooltip = null; // 清除记录
+    }
+
+    /**
+     * 实时更新：如果当前正显示技能提示，则刷新其数值（实现所见即所得）
+     */
+    update() {
+        if (this.lastSkillTooltip && !this.tooltip.classList.contains('hidden')) {
+            const { skillId, heroData } = this.lastSkillTooltip;
+            this.showSkillTooltip(skillId, heroData);
+        }
     }
 
     /**
@@ -790,6 +818,9 @@ class UIManager {
     showSkillTooltip(skillId, heroData) {
         const skill = SkillRegistry[skillId];
         if (!skill) return;
+
+        // 记录当前正在查看的技能，用于实时刷新
+        this.lastSkillTooltip = { skillId, heroData };
 
         const actualCD = (skill.getActualCooldown(heroData) / 1000).toFixed(1);
         const actualCost = skill.getActualManaCost(heroData);
