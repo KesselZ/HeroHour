@@ -11,6 +11,7 @@ class ResourcePreloader {
         this.isPreloading = false;
         this.onProgress = null;
         this.onComplete = null;
+        this.currentLoadingFile = null; // 当前正在加载的文件
     }
 
     /**
@@ -227,20 +228,21 @@ class ResourcePreloader {
      */
     async preloadImage(path) {
         if (this.loadedImages.has(path)) {
-            this.updateProgress();
+            this.updateProgress(path);
             return;
         }
 
+        this.currentLoadingFile = path;
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
                 this.loadedImages.add(path);
-                this.updateProgress();
+                this.updateProgress(path);
                 resolve();
             };
             img.onerror = () => {
                 console.warn(`图片加载失败: ${path}`);
-                this.updateProgress();
+                this.updateProgress(path);
                 resolve(); // 不阻断其他资源加载
             };
             img.src = path;
@@ -252,20 +254,21 @@ class ResourcePreloader {
      */
     async preloadAudio(path) {
         if (this.loadedAudios.has(path)) {
-            this.updateProgress();
+            this.updateProgress(path);
             return;
         }
 
+        this.currentLoadingFile = path;
         return new Promise((resolve, reject) => {
             const audio = new Audio();
             audio.oncanplaythrough = () => {
                 this.loadedAudios.add(path);
-                this.updateProgress();
+                this.updateProgress(path);
                 resolve();
             };
             audio.onerror = () => {
                 console.warn(`音频加载失败: ${path}`);
-                this.updateProgress();
+                this.updateProgress(path);
                 resolve(); // 不阻断其他资源加载
             };
             audio.preload = 'auto';
@@ -276,11 +279,12 @@ class ResourcePreloader {
     /**
      * 更新加载进度
      */
-    updateProgress() {
+    updateProgress(fileName = null) {
         this.loadedCount++;
         if (this.onProgress) {
-            this.onProgress(this.loadedCount, this.totalResources);
+            this.onProgress(this.loadedCount, this.totalResources, fileName || this.currentLoadingFile);
         }
+        this.currentLoadingFile = null; // 重置当前文件
     }
 
     /**

@@ -382,12 +382,15 @@ window.addEventListener('load', () => {
     // 延迟一小段时间再开始预加载，避免阻塞初始渲染
     setTimeout(() => {
         resourcePreloader.preloadAll(
-            (loaded, total) => {
+            (loaded, total, currentFile) => {
                 // 更新加载界面进度
                 const progress = Math.round((loaded / total) * 100);
                 if (progressFill) progressFill.style.width = `${progress}%`;
                 if (loadingText) loadingText.textContent = `${progress}%`;
-                console.log(`资源预加载进度: ${loaded}/${total} (${progress}%)`);
+
+                // 显示详细的加载信息
+                const fileName = currentFile ? currentFile.split('/').pop() : '未知文件';
+                console.log(`资源预加载进度: ${loaded}/${total} (${progress}%) - ${fileName}`);
             },
             () => {
                 console.log('%c[资源预加载] 全局预加载完成，用户体验将大幅提升', 'color: #4CAF50; font-weight: bold');
