@@ -13,7 +13,7 @@ const BUILDING_REGISTRY = {
     'town_hall': { name: '议政厅', category: 'economy', maxLevel: 3, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。', costGrowth: { type: 'linear', increment: { gold: 500, wood: 100 } } },
     'market': { name: '市场', category: 'economy', maxLevel: 3, icon: 'merchant_guild', cost: { gold: 300, wood: 50 }, description: '互通有无：提高城镇的金钱与木材产出效率。', costGrowth: { type: 'linear', increment: { gold: 200, wood: 50 } } },
     'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '每级增加全军 10% 的阅历获取速度。', costGrowth: { type: 'linear', increment: { gold: 400, wood: 200 } } },
-    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 3, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '提升该城镇 20% 的金钱产出。', costGrowth: { type: 'exponential', factor: 1.5 } },
+    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 2, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '提升该城镇 20% 的金钱产出。', costGrowth: { type: 'exponential', factor: 1.5 } },
     'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '增加城镇木材产出，并降低全军招募成本 5%。', costGrowth: { type: 'linear', increment: { gold: 500, wood: 300 } } },
     
     // 军事建筑：根据兵种强度（招募成本与统御占用）重新平衡
@@ -34,18 +34,18 @@ const BUILDING_REGISTRY = {
 
     // 纯阳：招式研习 (层层递进解锁)
     'sect_chunyang_basic': { name: '两仪馆', category: 'magic', maxLevel: 2, icon: 'sect_chunyang_v3', cost: { gold: 400, wood: 200 }, description: '纯阳基础：感悟纯阳【初级】招式。', costGrowth: { type: 'constant' } },
-    'sect_chunyang_advanced': { name: '太极殿', category: 'magic', maxLevel: 5, icon: 'sect_chunyang_v3', cost: { gold: 1000, wood: 500 }, description: '纯阳进阶：感悟纯阳【高级】招式。', requirements: [{ id: 'sect_chunyang_basic', level: 1 }], costGrowth: { type: 'constant' } },
-    'sect_chunyang_ultimate': { name: '纯阳宫', category: 'magic', maxLevel: 1, icon: 'sect_chunyang_v3', cost: { gold: 2500, wood: 1200 }, description: '纯阳绝学：感悟纯阳【绝技】招式。', requirements: [{ id: 'sect_chunyang_advanced', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_chunyang_advanced': { name: '太极殿', category: 'magic', maxLevel: 5, icon: 'sect_chunyang_v3', cost: { gold: 800, wood: 500 }, description: '纯阳进阶：感悟纯阳【高级】招式。', requirements: [{ id: 'sect_chunyang_basic', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_chunyang_ultimate': { name: '纯阳宫', category: 'magic', maxLevel: 1, icon: 'sect_chunyang_v3', cost: { gold: 1500, wood: 1200 }, description: '纯阳绝学：感悟纯阳【绝技】招式。', requirements: [{ id: 'sect_chunyang_advanced', level: 1 }], costGrowth: { type: 'constant' } },
 
     // 天策：招式研习
     'sect_tiance_basic': { name: '演武场', category: 'magic', maxLevel: 2, icon: 'dummy_training', cost: { gold: 400, wood: 200 }, description: '天策基础：感悟天策【初级】招式。', costGrowth: { type: 'constant' } },
-    'sect_tiance_advanced': { name: '凌烟阁', category: 'magic', maxLevel: 5, icon: 'dummy_training', cost: { gold: 1000, wood: 500 }, description: '天策进阶：感悟天策【高级】招式。', requirements: [{ id: 'sect_tiance_basic', level: 1 }], costGrowth: { type: 'constant' } },
-    'sect_tiance_ultimate': { name: '天策府', category: 'magic', maxLevel: 1, icon: 'dummy_training', cost: { gold: 2500, wood: 1200 }, description: '天策绝学：感悟天策【绝技】招式。', requirements: [{ id: 'sect_tiance_advanced', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_tiance_advanced': { name: '凌烟阁', category: 'magic', maxLevel: 5, icon: 'dummy_training', cost: { gold: 800, wood: 500 }, description: '天策进阶：感悟天策【高级】招式。', requirements: [{ id: 'sect_tiance_basic', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_tiance_ultimate': { name: '天策府', category: 'magic', maxLevel: 1, icon: 'dummy_training', cost: { gold: 1500, wood: 1200 }, description: '天策绝学：感悟天策【绝技】招式。', requirements: [{ id: 'sect_tiance_advanced', level: 1 }], costGrowth: { type: 'constant' } },
 
     // 藏剑：招式研习
     'sect_cangjian_basic': { name: '问水亭', category: 'magic', maxLevel: 2, icon: 'sect_cangjian_v3', cost: { gold: 400, wood: 200 }, description: '藏剑基础：感悟藏剑【初级】招式。', costGrowth: { type: 'constant' } },
-    'sect_cangjian_advanced': { name: '山外山', category: 'magic', maxLevel: 5, icon: 'sect_cangjian_v3', cost: { gold: 1000, wood: 500 }, description: '藏剑进阶：感悟藏剑【高级】招式。', requirements: [{ id: 'sect_cangjian_basic', level: 1 }], costGrowth: { type: 'constant' } },
-    'sect_cangjian_ultimate': { name: '藏剑庐', category: 'magic', maxLevel: 1, icon: 'sect_cangjian_v3', cost: { gold: 2500, wood: 1200 }, description: '藏剑绝学：感悟藏剑【绝技】招式。', requirements: [{ id: 'sect_cangjian_advanced', level: 1 }], costGrowth: { type: 'constant' } }
+    'sect_cangjian_advanced': { name: '山外山', category: 'magic', maxLevel: 5, icon: 'sect_cangjian_v3', cost: { gold: 800, wood: 500 }, description: '藏剑进阶：感悟藏剑【高级】招式。', requirements: [{ id: 'sect_cangjian_basic', level: 1 }], costGrowth: { type: 'constant' } },
+    'sect_cangjian_ultimate': { name: '藏剑庐', category: 'magic', maxLevel: 1, icon: 'sect_cangjian_v3', cost: { gold: 1500, wood: 1200 }, description: '藏剑绝学：感悟藏剑【绝技】招式。', requirements: [{ id: 'sect_cangjian_advanced', level: 1 }], costGrowth: { type: 'constant' } }
 };
 
 /**
@@ -325,13 +325,14 @@ export class WorldManager {
      * 职责：统一管理所有测试相关的 Hack 开关，保证生产环境一键切换
      */
     static DEBUG = {
-        ENABLED: true,             // 总开关：开启后激活下方子功能
-        REVEAL_MAP: true,          // 自动揭开全图迷雾
-        SHOW_INFLUENCE: true,      // 在小地图显示势力范围 (影响力热力图)
-        SHOW_POIS: true,           // 显示所有资源点/兴趣点标记
-        LICHENGEN_GOD_MODE: true,  // 李承恩起始获得全兵种各 2 个 + 无限统御
-        START_RESOURCES: true,     // 初始金钱 10000，木头 5000
-        SHOW_MOTION_DEBUG: false   // 运动调试日志：显示主角位移与动画增量
+        // 智能开关：开发模式 (npm run dev) 下自动开启，生产模式 (npm run build) 下自动关闭
+        ENABLED: import.meta.env.DEV,
+        REVEAL_MAP: import.meta.env.DEV,         // 自动揭开全图迷雾
+        SHOW_INFLUENCE: import.meta.env.DEV,     // 在小地图显示势力范围 (影响力热力图)
+        SHOW_POIS: import.meta.env.DEV,          // 显示所有资源点/兴趣点标记
+        LICHENGEN_GOD_MODE: import.meta.env.DEV, // 李承恩起始获得全兵种各 2 个 + 无限统御
+        START_RESOURCES: import.meta.env.DEV,    // 初始金钱 10000，木头 5000
+        SHOW_MOTION_DEBUG: false                 // 运动调试日志：默认依然关闭，除非手动开启
     };
 
     constructor() {
@@ -1523,11 +1524,15 @@ export class WorldManager {
      */
     syncBuildingsToModifiers() {
         modifierManager.removeModifiersBySource('building');
+        modifierManager.removeModifiersBySource('city_base'); // 核心新增：确保基础产出也能在 clear 后恢复
 
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
             const side = city.owner;
             if (side !== 'player') continue; // 目前主要处理玩家建筑
+
+            // --- 0. 基础产出同步 ---
+            city._initBaseProduction();
 
             for (const [id, level] of Object.entries(city.buildingLevels)) {
                 if (level <= 0) continue;
@@ -1816,8 +1821,8 @@ export class WorldManager {
         if (options.pool) {
             candidateIds = options.pool;
         } else if (options.ignoreSect) {
-            // 忽略门派：直接使用全局全池
-            candidateIds = Object.keys(SkillRegistry);
+            // 忽略门派：直接使用全局全池，但排除辅助函数
+            candidateIds = Object.keys(SkillRegistry).filter(id => typeof SkillRegistry[id] !== 'function');
         } else if (options.sect) {
             // 门派池
             candidateIds = SectSkills[options.sect] || [];
@@ -1837,7 +1842,7 @@ export class WorldManager {
 
         // 3. 智能回退机制：如果不是强制门派且没有特定等级要求，且备选池已空，则尝试全局池
         if (availablePool.length === 0 && !options.forceSect && !options.level) {
-            candidateIds = Object.keys(SkillRegistry);
+            candidateIds = Object.keys(SkillRegistry).filter(id => typeof SkillRegistry[id] !== 'function');
             availablePool = candidateIds.filter(id => !heroData.skills.includes(id));
         }
 

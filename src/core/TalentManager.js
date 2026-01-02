@@ -1,9 +1,9 @@
 import { TALENT_UNITS, HERO_TREE_CONFIG, getHeroTalentTree } from './TalentRegistry.js';
 import { modifierManager } from './ModifierManager.js';
+import { SkillRegistry } from './SkillRegistry.js';
 
 /**
  * TalentManager: 奇穴系统逻辑管理器
- * 处理点数分配、前置检查及加成应用
  */
 class TalentManager {
     constructor() {
@@ -58,6 +58,15 @@ class TalentManager {
                 if (reqLevel < (reqNode ? reqNode.maxLevel : 1)) {
                     return { canUpgrade: false, reason: `需先修满前置奇穴：${reqNode ? reqNode.name : reqId}` };
                 }
+            }
+        }
+
+        // 新增：技能前置检查 (必须先学会对应招式)
+        if (node.requireSkill) {
+            const hasSkill = this.heroData && this.heroData.skills && this.heroData.skills.includes(node.requireSkill);
+            if (!hasSkill) {
+                const skillName = SkillRegistry[node.requireSkill]?.name || node.requireSkill;
+                return { canUpgrade: false, reason: `尚未领悟核心招式：${skillName}` };
             }
         }
 

@@ -106,6 +106,7 @@ export const TALENT_UNITS = {
         name: '铁骑召来', icon: 'talent_tiance_cavalry',
         description: '集结令的感召力增强，现在会召唤<span class="skill-term-highlight">天策骑兵</span>而非步兵。',
         requires: ['node_core'],
+        requireSkill: 'summon_militia',
         effects: [{ type: 'modifier', target: 'hero', key: 'tiance_summon_upgrade', value: 1, method: 'add' }]
     },
     'tiance_yulin_spear': {
