@@ -19,6 +19,13 @@ class UIManager {
         this.tooltipEffect = this.tooltip?.querySelector('.tooltip-effect');
         this.tooltipDesc = this.tooltip?.querySelector('.tooltip-desc');
 
+        // 设备识别
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                        (window.innerWidth <= 1024 && window.innerHeight <= 600);
+        if (this.isMobile) {
+            document.body.classList.add('is-mobile');
+        }
+
         this.initTooltipEvents();
         this.initSkillGalleryEvents();
         this.initTalentEvents();
@@ -26,6 +33,22 @@ class UIManager {
         this.initBattleEscapeEvents();
         
         this.gameStartWindowShown = false; // 记录开局窗口是否已显示
+    }
+
+    /**
+     * 设置大世界 HUD 的可见性 (主要用于手机端打开面板时隐藏背景干扰)
+     */
+    setHUDVisibility(visible) {
+        const worldUI = document.getElementById('world-ui');
+        const minimap = document.querySelector('.minimap-container');
+        if (worldUI) {
+            if (visible) worldUI.classList.remove('hidden');
+            else worldUI.classList.add('hidden');
+        }
+        if (minimap) {
+            if (visible) minimap.classList.remove('hidden');
+            else minimap.classList.add('hidden');
+        }
     }
 
     initBattleEscapeEvents() {
@@ -113,18 +136,12 @@ class UIManager {
         this.actionHint.className = 'pixel-font hidden';
         document.body.appendChild(this.actionHint);
 
+        // 记录当前活跃的 Tooltip 触发源
+        this.activeTooltipSource = null;
+
         window.addEventListener('mousemove', (e) => {
             if (this.tooltip && !this.tooltip.classList.contains('hidden')) {
-                const x = e.clientX + 15;
-                const y = e.clientY + 15;
-                const tooltipWidth = this.tooltip.offsetWidth;
-                const tooltipHeight = this.tooltip.offsetHeight;
-                
-                const finalX = (x + tooltipWidth > window.innerWidth) ? (e.clientX - tooltipWidth - 15) : x;
-                const finalY = (y + tooltipHeight > window.innerHeight) ? (e.clientY - tooltipHeight - 15) : y;
-                
-                this.tooltip.style.left = `${finalX}px`;
-                this.tooltip.style.top = `${finalY}px`;
+                this.updateTooltipPosition(e.clientX, e.clientY);
             }
 
             // 更新 Action Hint 位置 (始终跟随鼠标，贴合右下方)
@@ -132,6 +149,112 @@ class UIManager {
                 this.actionHint.style.left = `${e.clientX + 10}px`;
                 this.actionHint.style.top = `${e.clientY + 10}px`;
             }
+        });
+
+        // 全局点击/触摸隐藏逻辑：点击非 Tooltip 且非触发源的地方时隐藏
+        const hideHandler = (e) => {
+            if (!this.tooltip || this.tooltip.classList.contains('hidden')) return;
+            
+            // 如果点击的是 Tooltip 本身，或者点击的是当前的触发源，则不隐藏
+            if (this.tooltip.contains(e.target) || (this.activeTooltipSource && this.activeTooltipSource.contains(e.target))) {
+                return;
+            }
+            
+            this.hideTooltip();
+        };
+
+        window.addEventListener('mousedown', hideHandler);
+        window.addEventListener('touchstart', hideHandler, { passive: true });
+    }
+
+    /**
+     * 更新 Tooltip 位置
+     */
+    updateTooltipPosition(clientX, clientY) {
+        if (!this.tooltip || this.isMobile) return;
+        const x = clientX + 15;
+        const y = clientY + 15;
+        const tooltipWidth = this.tooltip.offsetWidth;
+        const tooltipHeight = this.tooltip.offsetHeight;
+        
+        const finalX = (x + tooltipWidth > window.innerWidth) ? (clientX - tooltipWidth - 15) : x;
+        const finalY = (y + tooltipHeight > window.innerHeight) ? (clientY - tooltipHeight - 15) : y;
+        
+        this.tooltip.style.left = `${finalX}px`;
+        this.tooltip.style.top = `${finalY}px`;
+    }
+
+    /**
+     * 优雅的 Tooltip 绑定器：自动处理 PC 悬浮与手机长按
+     * @param {HTMLElement} element 目标 DOM 元素
+     * @param {Function|Object} dataGetter 返回提示数据的函数或直接的数据对象
+     */
+    bindTooltip(element, dataGetter) {
+        if (!element) return;
+
+        let longPressTimer = null;
+        let isLongPressActive = false;
+        let startPos = { x: 0, y: 0 };
+
+        const getData = () => (typeof dataGetter === 'function' ? dataGetter() : dataGetter);
+
+        // --- PC 端：悬浮逻辑 ---
+        element.onmouseenter = (e) => {
+            if (window.matchMedia("(pointer: coarse)").matches) return; // 触摸屏跳过悬浮
+            const data = getData();
+            if (data) {
+                this.activeTooltipSource = element;
+                this.showTooltip(data);
+                this.updateTooltipPosition(e.clientX, e.clientY);
+            }
+        };
+
+        element.onmouseleave = () => {
+            if (this.activeTooltipSource === element) {
+                this.hideTooltip();
+            }
+        };
+
+        // --- 手机端：长按逻辑 ---
+        element.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            startPos = { x: touch.clientX, y: touch.clientY };
+            isLongPressActive = false;
+
+            // 启动 500ms 长按计时
+            longPressTimer = setTimeout(() => {
+                const data = getData();
+                if (data) {
+                    isLongPressActive = true;
+                    this.activeTooltipSource = element;
+                    this.showTooltip(data);
+                    // 手机端显示在手指上方一点
+                    this.updateTooltipPosition(touch.clientX, touch.clientY - 40);
+                    // 触发震动反馈（如果支持）
+                    if (navigator.vibrate) navigator.vibrate(20);
+                }
+            }, 500);
+        }, { passive: true });
+
+        element.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const dist = Math.sqrt(Math.pow(touch.clientX - startPos.x, 2) + Math.pow(touch.clientY - startPos.y, 2));
+            
+            // 如果手指移动超过 10 像素，取消长按计时
+            if (dist > 10) {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            }
+        }, { passive: true });
+
+        element.addEventListener('touchend', () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            // 注意：长按触发后不立即消失，点击其他地方才消失
         });
     }
 
@@ -153,6 +276,9 @@ class UIManager {
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (closeSkillLearnBtn && skillLearnPanel) {
             closeSkillLearnBtn.onclick = () => {
+                // --- 手机端适配：关闭面板时恢复 HUD ---
+                if (this.isMobile) this.setHUDVisibility(true);
+
                 audioManager.play('ui_click');
                 skillLearnPanel.classList.add('hidden');
             };
@@ -269,6 +395,9 @@ class UIManager {
         audioManager.play('ui_click');
 
         if (show) {
+            // --- 手机端适配：打开面板时隐藏 HUD ---
+            if (this.isMobile) this.setHUDVisibility(false);
+
             // --- 互斥逻辑：打开奇穴面板时，关闭其他所有 UI 面板 ---
             const panelsToHide = ['hero-stats-panel', 'town-management-panel', 'skill-learn-panel', 'how-to-play-panel', 'game-start-window'];
             panelsToHide.forEach(id => {
@@ -302,6 +431,22 @@ class UIManager {
             // 重置视图位置
             this.resetTalentView();
         } else {
+            // --- 手机端适配：关闭面板时恢复 HUD (仅当没有其他大面板时) ---
+            if (this.isMobile) {
+                const heroPanel = document.getElementById('hero-stats-panel');
+                const townPanel = document.getElementById('town-management-panel');
+                const skillPanel = document.getElementById('skill-learn-panel');
+                const htpPanel = document.getElementById('how-to-play-panel');
+                if (
+                    (!heroPanel || heroPanel.classList.contains('hidden')) &&
+                    (!townPanel || townPanel.classList.contains('hidden')) &&
+                    (!skillPanel || skillPanel.classList.contains('hidden')) &&
+                    (!htpPanel || htpPanel.classList.contains('hidden'))
+                ) {
+                    this.setHUDVisibility(true);
+                }
+            }
+
             // 1. 先准备好底层的状态
             uiLayer.classList.remove('ui-layer-distort-out');
             gameCanvas.classList.remove('ui-layer-distort-out');
@@ -557,16 +702,14 @@ class UIManager {
                 <div class="talent-node-name">${displayName}</div>
             `;
 
-            node.onmouseenter = () => {
-                this.showTooltip({
-                    name: displayName,
-                    level: `当前等级: ${currentLevel}/${nodeData.maxLevel}`,
-                    description: `<div style="margin-bottom: 8px;">${nodeData.description}</div>`,
-                    status: currentLevel < nodeData.maxLevel ? `升级需求: 1 奇穴点数` : '已修至最高重',
-                    color: currentLevel < nodeData.maxLevel ? 'var(--jx3-gold)' : '#ccc'
-                });
-            };
-            node.onmouseleave = () => this.hideTooltip();
+            // 使用优雅的 Tooltip 绑定器
+            this.bindTooltip(node, () => ({
+                name: displayName,
+                level: `当前等级: ${currentLevel}/${nodeData.maxLevel}`,
+                description: `<div style="margin-bottom: 8px;">${nodeData.description}</div>`,
+                status: currentLevel < nodeData.maxLevel ? `升级需求: 1 奇穴点数` : '已修至最高重',
+                color: currentLevel < nodeData.maxLevel ? 'var(--jx3-gold)' : '#ccc'
+            }));
 
             node.onclick = () => {
                 if (talentManager.upgradeTalent(id)) {
@@ -730,20 +873,20 @@ class UIManager {
                 <div class="skill-learn-name">${skill.name}</div>
             `;
 
-            item.onmouseenter = () => {
+            // 使用优雅的 Tooltip 绑定器
+            this.bindTooltip(item, () => {
                 // 强制使用原始数值（不计入调息/缩减）
                 const actualCost = skill.cost;
                 const actualCD = (skill.cooldown / 1000).toFixed(1);
                 
-                this.showTooltip({
+                return {
                     name: skill.name,
                     level: skill.level,
                     mpCost: `消耗: ${actualCost} 内力`,
                     cdText: `冷却: ${actualCD}s`,
                     description: skill.getDescription({ stats: baseStats })
-                });
-            };
-            item.onmouseleave = () => this.hideTooltip();
+                };
+            });
 
             container.appendChild(item);
         });

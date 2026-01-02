@@ -241,6 +241,9 @@ if (skillGalleryBtn) {
             if (p) p.classList.add('hidden');
         });
 
+        // --- 手机端适配：打开面板时隐藏 HUD ---
+        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (skillLearnPanel) {
             skillLearnPanel.classList.remove('hidden');
@@ -262,6 +265,9 @@ if (howToPlayBtn) {
             if (p) p.classList.add('hidden');
         });
 
+        // --- 手机端适配：打开面板时隐藏 HUD ---
+        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+
         const panel = document.getElementById('how-to-play-panel');
         const textContainer = document.getElementById('how-to-play-text');
         const closeBtn = document.getElementById('close-how-to-play');
@@ -278,10 +284,24 @@ if (howToPlayBtn) {
             panel.classList.remove('hidden');
 
             if (closeBtn) {
-                closeBtn.onclick = () => {
-                    audioManager.play('ui_click');
-                    panel.classList.add('hidden');
-                };
+            closeBtn.onclick = () => {
+                audioManager.play('ui_click');
+                panel.classList.add('hidden');
+
+                // --- 手机端适配：仅在没有其他全屏面板打开时恢复 HUD ---
+                if (uiManager.isMobile) {
+                    const heroPanel = document.getElementById('hero-stats-panel');
+                    const townPanel = document.getElementById('town-management-panel');
+                    const talentPanel = document.getElementById('talent-panel');
+                    if (
+                        (!heroPanel || heroPanel.classList.contains('hidden')) &&
+                        (!townPanel || townPanel.classList.contains('hidden')) &&
+                        (!talentPanel || talentPanel.classList.contains('hidden'))
+                    ) {
+                        uiManager.setHUDVisibility(true);
+                    }
+                }
+            };
             }
         }
     });

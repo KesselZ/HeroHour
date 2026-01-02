@@ -187,6 +187,21 @@ class ModifierManager {
             return baseFlat * primaryMult * attackBonus * moreDamage;
         }
 
+        // --- 1.5 攻速安全收敛 (核心改动) ---
+        if (statName === 'attackSpeed') {
+            // 无论 mod.type 是什么，统一转为百分比加成，防止指数级爆炸
+            let incSum = 0; 
+            let flatSum = 0;
+            for (const mod of this.globalModifiers) {
+                if (!this._isMatch(mod, unit, 'attackSpeed')) continue;
+                if (mod.multiplier !== undefined) incSum += (mod.multiplier - 1);
+                flatSum += mod.offset || 0;
+            }
+            // 限制最高提速至 2.0 倍，最低不低于 0.1 倍
+            const finalSpeedMult = Math.min(2.0, (baseValue + flatSum) * (1 + incSum));
+            return Math.max(0.1, finalSpeedMult);
+        }
+
         // --- 2. 属性名映射 ---
         const targetStat = this._getActualStatMapping(statName);
         

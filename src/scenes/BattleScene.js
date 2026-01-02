@@ -139,6 +139,12 @@ export class BattleScene {
         this.previewSprite = null;
         this.hoveredEnemy = null; // 记录当前悬浮的敌人，用于 Tooltip 性能优化
 
+        // 手机端长按交互支持
+        this.longPressTimer = null;
+        this.longPressTarget = null;
+        this.isLongPressTriggered = false;
+        this.touchStartPos = new THREE.Vector2();
+
         // 英雄引用
         this.heroUnit = null;
         this.activeSkill = null; // 当前正在准备释放的技能 (针对 location 类型)
@@ -286,19 +292,19 @@ export class BattleScene {
             slot.appendChild(count);
             container.appendChild(slot);
 
-            // 3. 绑定事件监听 (维持原逻辑)
-            slot.onmouseenter = () => {
+            // 3. 绑定 Tooltip 绑定器
+            uiManager.bindTooltip(slot, () => {
                 const stats = worldManager.getUnitDetails(type, 'player');
                 const cost = worldManager.unitCosts[type]?.cost || 0;
-                uiManager.showTooltip({
+                return {
                     name: stats.name,
                     level: `气血:${stats.hp} | 伤害:${stats.dps} | 占用:${cost}`,
                     description: stats.description || '精锐的大唐将士。',
                     color: '#d4af37' // 友军金色
-                });
-            };
-            slot.onmouseleave = () => uiManager.hideTooltip();
+                };
+            });
 
+            // 4. 绑定点击选择逻辑
             slot.onclick = (e) => {
                 // 移除其他选中状态
                 document.querySelectorAll('.unit-slot').forEach(s => s.classList.remove('selected'));
@@ -395,32 +401,69 @@ export class BattleScene {
 
         let remainingPoints = totalPoints;
         const armyList = [];
-        let attempts = 0;
-        while (remainingPoints >= 2 && attempts < 100) {
-            const Cls = selectedClasses[Math.floor(Math.random() * selectedClasses.length)];
+
+        // --- 核心重构：预算均分算法 (Equal Budget Partitioning) ---
+        // 1. 计算每种单位的基准份额
+        const sharePerType = Math.floor(totalPoints / selectedClasses.length);
+        
+        // 2. 第一阶段：每种单位按份额“保底”购买
+        selectedClasses.forEach(Cls => {
             const tempUnit = new Cls('enemy', 0, this.projectileManager);
-            if (remainingPoints >= tempUnit.cost) {
+            const cost = tempUnit.cost;
+            const count = Math.floor(sharePerType / cost);
+            
+            for (let i = 0; i < count; i++) {
                 armyList.push(Cls);
-                remainingPoints -= tempUnit.cost;
             }
+            remainingPoints -= (count * cost);
+
+            // 清理临时对象
             tempUnit.traverse(child => {
                 if (child.geometry) child.geometry.dispose();
                 if (child.material) child.material.dispose();
             });
-            attempts++;
+        });
+
+        // 3. 第二阶段：余钱“向下寻宝” (由贵到便宜购买，确保预算充分利用)
+        // 获取单位 cost 并按降序排列
+        const classWithCost = selectedClasses.map(Cls => {
+            const temp = new Cls('enemy', 0, this.projectileManager);
+            const cost = temp.cost;
+            temp.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+            return { Cls, cost };
+        }).sort((a, b) => b.cost - a.cost);
+
+        for (const item of classWithCost) {
+            while (remainingPoints >= item.cost) {
+                armyList.push(item.Cls);
+                remainingPoints -= item.cost;
+            }
         }
 
+        // 4. 摆放单位 (使用数据驱动的区域逻辑)
         armyList.forEach((Cls, idx) => {
             const unit = new Cls('enemy', idx, this.projectileManager);
+            const blueprint = this.worldManager.getUnitBlueprint(unit.type);
+            const allowedZones = blueprint.allowedZones || ['front']; 
+            
+            const selectedZone = allowedZones[Math.floor(Math.random() * allowedZones.length)];
+            
             let zoneX; 
-            const type = unit.type;
-
-            if (['melee', 'cangyun', 'tiance', 'cangjian', 'wild_boar', 'wolf', 'tiger', 'bear', 'bandit', 'rebel_soldier', 'rebel_axeman', 'heavy_knight', 'tianyi_guard', 'tianyi_venom_zombie', 'tianyi_abomination', 'shence_infantry', 'shence_shieldguard', 'shence_iron_pagoda', 'red_cult_swordsman', 'red_cult_executioner', 'red_cult_acolyte', 'red_cult_enforcer'].includes(type)) {
-                zoneX = 2 + Math.random() * 8;  // 前排 (X: 2-10)
-            } else if (['ranged', 'archer', 'chunyang', 'bandit_archer', 'shadow_ninja', 'assassin_monk', 'tianyi_crossbowman', 'tianyi_apothecary', 'tianyi_shadow_guard', 'shence_crossbowman', 'shence_cavalry', 'shence_overseer', 'shence_assassin', 'red_cult_archer', 'red_cult_assassin'].includes(type)) {
-                zoneX = 12 + Math.random() * 8; // 中排 (X: 12-20)
-            } else {
-                zoneX = 22 + Math.random() * 6; // 后排 (X: 22-28)
+            switch (selectedZone) {
+                case 'front':
+                    zoneX = 2 + Math.random() * 8;   // 前排 (X: 2-10)
+                    break;
+                case 'middle':
+                    zoneX = 12 + Math.random() * 8;  // 中排 (X: 12-20)
+                    break;
+                case 'back':
+                    zoneX = 22 + Math.random() * 6;  // 后排 (X: 22-28)
+                    break;
+                default:
+                    zoneX = 2 + Math.random() * 8;
             }
 
             const zPos = (Math.random() - 0.5) * 18;
@@ -435,50 +478,99 @@ export class BattleScene {
     }
 
     onPointerDown(event) {
-        if (!this.isDeployment || !this.selectedType) return;
-        if (event.button !== 0) return; // 仅限左键部署
+        if (!this.isActive && !this.isDeployment) return;
         if (event.target.closest('#deployment-ui') || event.target.closest('.wuxia-btn')) return;
+
+        // --- 手机端长按逻辑启动 ---
+        const isTouch = event.pointerType === 'touch';
+        if (isTouch) {
+            this.touchStartPos.set(event.clientX, event.clientY);
+            this.isLongPressTriggered = false;
+
+            // 检测是否点中了敌军
+            this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            const enemyMeshes = this.enemyUnits.map(u => u.unitSprite).filter(s => s);
+            const enemyIntersects = this.raycaster.intersectObjects(enemyMeshes, true);
+
+            if (enemyIntersects.length > 0) {
+                const hitSprite = enemyIntersects[0].object;
+                const enemyHit = this.enemyUnits.find(u => u.unitSprite === hitSprite);
+                if (enemyHit) {
+                    this.longPressTarget = enemyHit;
+                    this.longPressTimer = setTimeout(() => {
+                        const stats = worldManager.getUnitDetails(enemyHit.type, 'enemy');
+                        const cost = worldManager.unitCosts[enemyHit.type]?.cost || 0;
+                        uiManager.showTooltip({
+                            name: stats.name,
+                            level: `气血:${stats.hp} | 伤害:${stats.dps} | 占用:${cost}`,
+                            description: stats.description || '敌方精锐部队。',
+                            color: '#ff4444' // 敌对红色
+                        });
+                        this.isLongPressTriggered = true;
+                        if (navigator.vibrate) navigator.vibrate(20);
+                    }, 500);
+                }
+            }
+        }
+
         this.isPointerDown = true;
-        this.handlePlacement(event);
+        
+        // 如果是部署模式且左键点击，则处理位置
+        if (this.isDeployment && event.button === 0 && (!isTouch || !this.longPressTarget)) {
+            this.handlePlacement(event);
+        }
     }
 
     onPointerMove(event) {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
+        // 如果移动距离过大，取消长按计时
+        if (this.longPressTimer) {
+            const dist = Math.sqrt(Math.pow(event.clientX - this.touchStartPos.x, 2) + Math.pow(event.clientY - this.touchStartPos.y, 2));
+            if (dist > 15) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+        }
+
         if (!this.isDeployment) return;
 
         this.raycaster.setFromCamera(this.mouse, this.camera);
 
-        // --- 核心新增：备战阶段探测敌军属性 ---
+        // --- 核心新增：备战阶段探测敌军属性 (PC 悬停) ---
         let enemyHit = null;
-        const enemyMeshes = this.enemyUnits.map(u => u.unitSprite).filter(s => s);
-        const enemyIntersects = this.raycaster.intersectObjects(enemyMeshes, true);
-        
-        if (enemyIntersects.length > 0) {
-            const hitSprite = enemyIntersects[0].object;
-            enemyHit = this.enemyUnits.find(u => u.unitSprite === hitSprite);
-        }
-
-        if (enemyHit) {
-            if (this.hoveredEnemy !== enemyHit) {
-                this.hoveredEnemy = enemyHit;
-                const stats = worldManager.getUnitDetails(enemyHit.type, 'enemy');
-                const cost = worldManager.unitCosts[enemyHit.type]?.cost || 0;
-                
-                uiManager.showTooltip({
-                    name: stats.name,
-                    level: `气血:${stats.hp} | 伤害:${stats.dps} | 占用:${cost}`,
-                    description: stats.description || '敌方精锐部队。',
-                    color: '#ff4444' // 敌对红色
-                });
+        if (event.pointerType !== 'touch') {
+            const enemyMeshes = this.enemyUnits.map(u => u.unitSprite).filter(s => s);
+            const enemyIntersects = this.raycaster.intersectObjects(enemyMeshes, true);
+            
+            if (enemyIntersects.length > 0) {
+                const hitSprite = enemyIntersects[0].object;
+                enemyHit = this.enemyUnits.find(u => u.unitSprite === hitSprite);
             }
-            if (this.previewSprite) this.previewSprite.visible = false;
-            return; 
-        } else {
-            if (this.hoveredEnemy) {
-                this.hoveredEnemy = null;
-                uiManager.hideTooltip();
+
+            if (enemyHit) {
+                if (this.hoveredEnemy !== enemyHit) {
+                    this.hoveredEnemy = enemyHit;
+                    const stats = worldManager.getUnitDetails(enemyHit.type, 'enemy');
+                    const cost = worldManager.unitCosts[enemyHit.type]?.cost || 0;
+                    
+                    uiManager.showTooltip({
+                        name: stats.name,
+                        level: `气血:${stats.hp} | 伤害:${stats.dps} | 占用:${cost}`,
+                        description: stats.description || '敌方精锐部队。',
+                        color: '#ff4444' // 敌对红色
+                    });
+                }
+                if (this.previewSprite) this.previewSprite.visible = false;
+                return; 
+            } else {
+                if (this.hoveredEnemy) {
+                    this.hoveredEnemy = null;
+                    uiManager.hideTooltip();
+                }
             }
         }
 
@@ -495,14 +587,19 @@ export class BattleScene {
                     if (child.material) child.material.color.setHex(color);
                 });
             }
-            if (this.isPointerDown) this.handlePlacement(event);
+            if (this.isPointerDown && !this.isLongPressTriggered) this.handlePlacement(event);
         } else if (this.previewSprite) {
             this.previewSprite.visible = false;
         }
     }
 
     onPointerUp() {
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
         this.isPointerDown = false;
+        this.longPressTarget = null;
     }
 
     handlePlacement(event) {
@@ -710,12 +807,27 @@ export class BattleScene {
                     <div class="skill-name-tag">${skill.name}</div>
                 `;
 
-                btn.onmouseenter = () => {
-                    // 核心修复：传入 heroUnit 实例，确保 Tooltip 能显示实时的属性增强（如化三清后的功法提升）
-                    uiManager.showSkillTooltip(skillId, this.heroUnit || heroData);
-                };
+                // 使用优雅的 Tooltip 绑定器
+                uiManager.bindTooltip(btn, () => {
+                    const skill = SkillRegistry[skillId];
+                    if (!skill) return null;
+                    const heroData = this.worldManager.heroData;
+                    const caster = this.heroUnit || { side: 'player', isHero: true, type: heroData.id };
+                    
+                    const mpMult = modifierManager.getModifiedValue(caster, 'mana_cost_multiplier', 1.0);
+                    const cost = Math.floor(skill.cost * mpMult);
+                    const cd = (skill.getActualCooldown(caster) / 1000).toFixed(1);
+                    
+                    return {
+                        name: skill.name,
+                        level: skill.level,
+                        mpCost: `消耗: ${cost} 内力`,
+                        cdText: `冷却: ${cd}s`,
+                        description: skill.getDescription(this.heroUnit || heroData),
+                        type: 'skill'
+                    };
+                });
 
-                btn.onmouseleave = () => uiManager.hideTooltip();
                 btn.onclick = (e) => { e.stopPropagation(); this.onSkillBtnClick(skillId); };
                 list.appendChild(btn);
 

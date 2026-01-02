@@ -153,14 +153,41 @@ export class EnemyGroupObject extends WorldObject {
         worldManager.mapState.pendingBattleEnemyId = this.id;
         
         // 克隆配置并应用随时间增长的战力缩放
+        const scaledPoints = Math.floor((this.config.totalPoints || 0) * timeManager.getPowerMultiplier());
         const scaledConfig = {
             ...this.config,
-            totalPoints: Math.floor((this.config.totalPoints || 0) * timeManager.getPowerMultiplier())
+            totalPoints: scaledPoints
         };
 
+        const playerPower = worldManager.getPlayerTotalPower();
+        const ratio = playerPower / scaledPoints;
+
+        // 如果难度为“简单” (ratio > 1.5)，弹出跳过确认
+        if (ratio > 1.5) {
+            worldScene.showSkipBattleDialog(scaledConfig, scaledPoints, 
+                // 取消：正常开战
+                () => {
+                    this._startBattle(worldScene, scaledConfig);
+                },
+                // 确认：直接结算
+                () => {
+                    const result = worldManager.simulateSimpleBattle(scaledConfig, scaledPoints);
+                    worldScene.showSimpleSettlement(result);
+                }
+            );
+            return false;
+        }
+
+        return this._startBattle(worldScene, scaledConfig);
+    }
+
+    /**
+     * 内部方法：执行正常的开战流程
+     */
+    _startBattle(worldScene, scaledConfig) {
         window.dispatchEvent(new CustomEvent('start-battle', { detail: scaledConfig }));
         worldScene.stop();
-        return false; // 不直接移除，战斗结束后再处理
+        return false;
     }
 
     getTooltipData() {

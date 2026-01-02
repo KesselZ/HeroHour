@@ -14,19 +14,29 @@ for (const id in UNIT_STATS_DATA) {
     if (baseUnit.modes) {
         for (const modeId in baseUnit.modes) {
             const mode = baseUnit.modes[modeId];
+            // 修复：对于有modes的单位，基础atk是真实的伤害值，modes中的atk是相对系数
+            // 纯阳弟子基础atk=12，远程mode atk=12表示相对于基础的系数 (12/12=1)
+            // 实际伤害应该是 baseUnit.atk * (mode.atk / baseUnit.modes[Object.keys(baseUnit.modes)[0]].atk)
+            const firstModeId = Object.keys(baseUnit.modes)[0];
+            const baseModeAtk = baseUnit.modes[firstModeId].atk;
+            const effectiveAtk = baseUnit.atk * (mode.atk / baseModeAtk);
+
             UNIT_STATS[modeId] = {
                 ...baseUnit,
                 ...mode,
+                atk: effectiveAtk, // 使用计算出的实际伤害值
                 name: mode.name || baseUnit.name,
                 cost: pricing.cost,
-                gold: pricing.gold
+                gold: pricing.gold,
+                zones: (mode.allowedZones || baseUnit.allowedZones || []).join(',')
             };
         }
     } else {
         UNIT_STATS[id] = {
             ...baseUnit,
             cost: pricing.cost,
-            gold: pricing.gold
+            gold: pricing.gold,
+            zones: (baseUnit.allowedZones || []).join(',')
         };
     }
 }
@@ -63,7 +73,7 @@ function runBalanceCheck() {
     const k = 2.0 / baseline.score; 
 
     console.log(`\n=== 士兵单位属性平衡 analysis 报告 (经济效率增强版 v5) ===`);
-    const header = `${padRight("单位名称", 14)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Range".padEnd(5)} | ${"Targets".padEnd(8)} | ${"Cost".padEnd(4)} | ${"Gold".padEnd(5)} | ${"理论战力".padEnd(6)} | ${"统御平衡".padEnd(8)} | ${"经济效率"}`;
+    const header = `${padRight("单位名称", 14)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Range".padEnd(5)} | ${"Zones".padEnd(10)} | ${"Cost".padEnd(4)} | ${"Gold".padEnd(5)} | ${"理论战力".padEnd(6)} | ${"统御平衡".padEnd(8)} | ${"经济效率"}`;
     console.log(`-`.repeat(header.length + 10));
     console.log(header);
     console.log(`-`.repeat(header.length + 10));
@@ -92,13 +102,13 @@ function runBalanceCheck() {
         const hpStr = (unit.hp || 0).toString().padEnd(4);
         const dpsStr = dps.toFixed(1).toString().padEnd(7);
         const rangeStr = (unit.range || 0).toString().padEnd(5);
-        const targetsStr = targets.toFixed(1).toString().padEnd(8);
+        const zonesStr = (unit.zones || "N/A").padEnd(10);
         const costStr = (unit.cost || 0).toString().padEnd(4);
         const goldStr = (unit.gold || 0).toString().padEnd(5);
         const powerStr = theoreticalPower.toFixed(2).padEnd(6);
 
         // 颜色代码不计入宽度，所以手动对齐
-        console.log(`${nameStr} | ${hpStr} | ${dpsStr} | ${rangeStr} | ${targetsStr} | ${costStr} | ${goldStr} | ${powerStr} | ${balanceStr.padEnd(balance > 115 || balance < 85 ? 17 : 8)} | ${geStr}`);
+        console.log(`${nameStr} | ${hpStr} | ${dpsStr} | ${rangeStr} | ${zonesStr} | ${costStr} | ${goldStr} | ${powerStr} | ${balanceStr.padEnd(balance > 115 || balance < 85 ? 17 : 8)} | ${geStr}`);
     }
 }
 

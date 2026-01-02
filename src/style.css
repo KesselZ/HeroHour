@@ -9,6 +9,16 @@
     --jx3-gold: #a68b44;          /* 哑光金 */
     --jx3-border: #8b7355;        /* 棕褐色边框 */
     --transition-snappy: 0.15s cubic-bezier(0.2, 0, 0.2, 1);
+    
+    /* 响应式基准变量 */
+    --ui-scale: 1;
+    --panel-max-height: 96vh;
+    --panel-max-width: 96vw;
+}
+
+/* 手机端全局缩放与样式覆盖 */
+body.is-mobile {
+    --ui-scale: 0.85; /* 整体缩小 15% 以适配小屏幕 */
 }
 
 body, html {
@@ -2715,6 +2725,11 @@ img {
 
 /* 通用隐藏与 Canvas */
 .hidden { display: none !important; }
+.hud-hidden { 
+    opacity: 0 !important; 
+    pointer-events: none !important; 
+    transition: opacity 0.2s ease;
+}
 canvas { image-rendering: pixelated; }
 
 /* --- 大世界飘字动画 --- */
@@ -3277,4 +3292,365 @@ canvas { image-rendering: pixelated; }
     letter-spacing: 20px;
     text-shadow: 0 0 20px rgba(91, 138, 138, 0.05);
     user-select: none;
+}
+
+/* =======================================================
+   手机端 (Landscape) 专项适配
+   目标设备：iPhone 14 Pro Max (932 * 430)
+   策略：利用 body.is-mobile 类名进行完全隔离的样式重写
+   ======================================================= */
+
+body.is-mobile {
+    /* --- 1. HUD 隐藏支持 --- */
+    #world-ui.hidden, .minimap-container.hidden, .hidden {
+        display: none !important;
+    }
+
+    /* --- 2. 核心：在不改变纵向堆叠结构的前提下，极致压缩内部元素 --- */
+    
+    /* 通用面板容器压缩 */
+    .menu-container {
+        min-width: 0 !important;
+        width: 96vw !important;
+        height: 98vh !important; /* 强制占据几乎全屏高度 */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 15px 20px 5px 20px !important;
+        border-width: 4px !important;
+    }
+
+    .menu-decoration-top, .menu-decoration-bottom {
+        height: 15px !important; /* 进一步扁平化 */
+        font-size: 0.65rem !important;
+        letter-spacing: 5px !important;
+        line-height: 15px !important;
+    }
+
+    .close-btn-v3 {
+        top: 2px !important;
+        right: 8px !important;
+        width: 24px !important;
+        height: 24px !important;
+        font-size: 16px !important;
+    }
+
+    /* 侠客属性面板压缩 (保持纵向结构) */
+    .hero-panel-v4 {
+        width: 90vw !important;
+        height: 98vh !important;
+        max-height: 410px !important; /* 强制不超过手机高度 */
+    }
+
+    .hero-panel-header {
+        height: 30px !important;
+        margin-bottom: 2px !important;
+    }
+
+    .panel-title {
+        font-size: 0.9rem !important;
+    }
+
+    .hero-panel-main {
+        display: flex !important;
+        flex-direction: column !important; /* 保持纵向堆叠 */
+        gap: 4px !important; /* 极小间距 */
+        padding: 5px 15px 25px 15px !important;
+    }
+
+    .hero-core-info {
+        gap: 6px !important;
+    }
+
+    .hero-avatar-area {
+        padding: 4px !important;
+        gap: 8px !important;
+    }
+
+    .hero-big-portrait {
+        width: 55px !important; /* 缩小头像 */
+        height: 55px !important;
+    }
+
+    .hero-identity h2 { font-size: 1rem !important; margin: 0 !important; }
+    .hero-identity p { font-size: 0.65rem !important; margin: 0 !important; }
+
+    .hero-bars-area {
+        gap: 3px !important;
+    }
+
+    .stat-bar-bg {
+        height: 8px !important; /* 细化进度条 */
+    }
+
+    .bar-label {
+        font-size: 0.6rem !important;
+        line-height: 1 !important;
+    }
+
+    .stat-value {
+        font-size: 0.6rem !important;
+        top: -12px !important;
+    }
+
+    .talent-btn-v4 {
+        margin-top: 2px !important;
+        padding: 2px 0 !important;
+        font-size: 0.7rem !important;
+        min-height: 0 !important;
+    }
+
+    .hero-attributes-section {
+        margin-top: 2px !important;
+        padding: 4px 8px !important;
+    }
+
+    .attributes-header {
+        font-size: 0.75rem !important;
+        margin-bottom: 2px !important;
+    }
+
+    .attributes-grid-v4 {
+        grid-template-columns: repeat(3, 1fr) !important; /* 3列节省空间 */
+        gap: 4px !important;
+    }
+
+    .attr-box {
+        padding: 3px 2px !important;
+    }
+
+    .attr-box .attr-label {
+        font-size: 0.6rem !important;
+        margin-bottom: 1px !important;
+    }
+
+    .attr-box .attr-val {
+        font-size: 0.8rem !important;
+    }
+
+    .hero-skills-section-v4 {
+        margin-top: 2px !important;
+    }
+
+    .hero-skills-list-v4 {
+        gap: 5px !important;
+    }
+
+    .hero-skills-list-v4 .hero-skill-slot {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    .hero-skills-list-v4 .skill-icon-small {
+        width: 28px !important;
+        height: 28px !important;
+    }
+
+    /* 城镇管理面板压缩 */
+    .town-panel-v3 {
+        width: 95vw !important;
+        height: 98vh !important;
+        padding: 25px 10px 10px 10px !important;
+    }
+
+    .town-header-top-v3 {
+        margin-bottom: 2px !important;
+    }
+
+    .town-title-v3 {
+        font-size: 1rem !important;
+    }
+
+    .town-main-content {
+        grid-template-columns: 1fr 160px !important;
+        gap: 5px !important;
+        height: 140px !important;
+    }
+
+    .building-card {
+        flex: 0 0 80px !important;
+        padding: 3px !important;
+    }
+
+    .building-icon {
+        width: 20px !important;
+        height: 20px !important;
+    }
+
+    .building-name {
+        font-size: 0.65rem !important;
+    }
+
+    .town-army-section {
+        margin-top: 2px !important;
+        padding: 2px !important;
+    }
+
+    .army-slots-v3 {
+        height: 55px !important;
+    }
+
+    .unit-slot {
+        min-width: 40px !important;
+        padding: 1px !important;
+    }
+
+    .slot-icon {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* 4. 全局 Tooltip 适配：居中固定显示，防手指遮挡 */
+    .tooltip-container {
+        position: fixed;
+        left: 50% !important;
+        top: 10px !important;
+        transform: translateX(-50%);
+        width: 85vw;
+        max-width: 500px;
+        z-index: 10005;
+        background: rgba(0, 0, 0, 0.95);
+        border-width: 2px;
+        box-shadow: 0 0 40px rgba(0,0,0,0.9);
+        padding: 8px 12px;
+        font-size: 0.75rem !important;
+    }
+
+    /* 5. 主菜单适配 */
+    #main-menu {
+        padding: 10px 20px 5px 20px !important;
+        gap: 5px !important;
+    }
+    .game-title {
+        font-size: 1.2rem !important;
+        margin: 2px 0 8px 0 !important;
+        letter-spacing: 4px !important;
+    }
+    .wuxia-btn {
+        padding: 5px 15px !important;
+        font-size: 0.8rem !important;
+        min-height: 28px !important;
+    }
+
+    /* 6. 角色选择适配 */
+    #char-select-menu {
+        padding: 10px 20px 5px 20px !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 98vh !important;
+    }
+    #char-select-menu .menu-title {
+        font-size: 1.1rem !important;
+        margin-bottom: 5px !important;
+    }
+    .character-cards {
+        gap: 8px !important;
+        margin-bottom: 8px !important;
+        flex: 1;
+        align-items: center;
+    }
+    .char-card {
+        width: 130px !important;
+        padding: 6px 4px !important;
+        max-height: 250px !important;
+    }
+    .char-portrait {
+        width: 45px !important;
+        height: 45px !important;
+        margin-bottom: 4px !important;
+    }
+    .char-name {
+        font-size: 0.85rem !important;
+        margin: 2px 0 !important;
+    }
+    .char-title {
+        font-size: 0.65rem !important;
+        margin: 2px 0 !important;
+    }
+    .char-traits {
+        padding-top: 4px !important;
+    }
+    .trait-desc {
+        font-size: 0.65rem !important;
+        line-height: 1.2 !important;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    #confirm-char-btn {
+        margin-top: 0 !important;
+        padding: 6px 0 !important;
+        font-size: 0.9rem !important;
+    }
+
+    /* 7. 战斗 UI 适配 */
+    .battle-bottom-ui {
+        bottom: 5px !important;
+        width: 100vw;
+        justify-content: center;
+    }
+    .skill-bar-container {
+        min-width: 0;
+        width: 85vw;
+        padding: 6px 10px !important;
+    }
+    .battle-mp-status {
+        width: 100%;
+        margin-bottom: 2px !important;
+        padding-bottom: 2px !important;
+    }
+    .skill-btn {
+        width: 44px !important;
+        height: 44px !important;
+    }
+    .battle-escape-btn {
+        width: 46px !important;
+        height: 46px !important;
+        font-size: 1rem !important;
+    }
+
+    /* 8. 大世界 HUD 适配 */
+    .resource-bar {
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        top: 5px !important;
+    }
+    .hud-bottom-left {
+        bottom: 5px !important;
+        left: 5px !important;
+        transform: scale(0.75); /* 手机端缩小比例 */
+        transform-origin: left bottom;
+        pointer-events: none;
+    }
+    .hud-card {
+        pointer-events: auto !important; /* 确保缩放后依然可点 */
+    }
+    .minimap-container {
+        bottom: 5px !important;
+        right: 5px !important;
+        width: 100px !important;
+        height: 100px !important;
+        transform: scale(0.9);
+        transform-origin: right bottom;
+    }
+
+    /* 9. 招式图谱适配 */
+    .skill-learn-v3 {
+        width: 95vw !important;
+        height: 95vh !important;
+        margin-left: -47.5vw !important;
+        margin-top: -47.5vh !important;
+    }
+
+    .skill-grid-v3 {
+        grid-template-columns: repeat(5, 1fr) !important; /* 5列更紧凑 */
+        gap: 6px !important;
+    }
+
+    .learn-item {
+        min-height: 60px !important;
+    }
 }

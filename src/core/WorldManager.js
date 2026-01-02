@@ -512,9 +512,9 @@ export class WorldManager {
             // --- 天一教势力组 (基于 enemy4.png) ---
             'tianyi_scouts': {
                 name: '天一教巡逻队',
-                overworldIcon: 'tianyi_guard', 
-                unitPool: ['tianyi_guard', 'tianyi_crossbowman', 'tianyi_venom_zombie'], 
-                basePoints: 55,        
+                overworldIcon: 'tianyi_guard',
+                unitPool: ['tianyi_guard', 'tianyi_crossbowman', 'tianyi_venom_zombie', 'tianyi_apothecary'],
+                basePoints: 55,
                 baseWeight: 1, // 大幅降低基础权重，使其仅在势力范围内出没
                 description: '天一教在野外的基础巡逻队，由教卫和毒尸组成。'
             },
@@ -546,9 +546,9 @@ export class WorldManager {
             // --- 神策军势力组 (基于 enemy3.png) ---
             'shence_patrol': {
                 name: '神策军巡逻队',
-                overworldIcon: 'shence_infantry', 
-                unitPool: ['shence_infantry', 'shence_crossbowman', 'shence_shieldguard'], 
-                basePoints: 75,        
+                overworldIcon: 'shence_infantry',
+                unitPool: ['shence_infantry', 'shence_crossbowman', 'shence_shieldguard', 'shence_bannerman'],
+                basePoints: 75,
                 baseWeight: 1,
                 description: '神策军的基础巡逻力量，守卫严密，不容侵犯。'
             },
@@ -580,9 +580,9 @@ export class WorldManager {
             // --- 红衣教势力组 (基于 enemy5.png) ---
             'red_cult_zealots': {
                 name: '红衣教狂热者',
-                overworldIcon: 'red_cult_acolyte', 
-                unitPool: ['red_cult_acolyte', 'red_cult_enforcer', 'red_cult_archer'], 
-                basePoints: 60,        
+                overworldIcon: 'red_cult_acolyte',
+                unitPool: ['red_cult_acolyte', 'red_cult_enforcer', 'red_cult_archer', 'red_cult_priestess'],
+                basePoints: 60,
                 baseWeight: 1,
                 description: '红衣教的基础部队，由武者带领狂热信徒组成。'
             },
@@ -1867,6 +1867,106 @@ export class WorldManager {
 
         window.dispatchEvent(new CustomEvent('hero-stats-changed'));
         return selected;
+    }
+
+    /**
+     * 模拟简单战斗的结算逻辑
+     * @param {Object} enemyConfig 敌人配置
+     * @param {number} scaledPoints 敌人战力
+     * @returns {Object} { isVictory: true, settlementChanges, xpGained, xpBefore, xpMaxBefore, levelBefore, xpAfter, xpMaxAfter, levelAfter }
+     */
+    simulateSimpleBattle(enemyConfig, scaledPoints) {
+        const playerPower = this.getPlayerTotalPower();
+        const ratio = playerPower / (scaledPoints || 1);
+
+        // 1. 计算总兵力
+        let totalCount = 0;
+        const armyList = []; // [{type, count, cost}]
+        for (const type in this.heroArmy) {
+            const count = this.heroArmy[type];
+            if (count > 0) {
+                totalCount += count;
+                const cost = (UNIT_COSTS[type] ? UNIT_COSTS[type].gold : 100);
+                armyList.push({ type, count, cost });
+            }
+        }
+
+        // 2. 计算浮动损失 (8% 到 0%)
+        // 线性浮动逻辑：比值为 1.5 (判定简单的门槛) 时损失 8%，比值达到 5.0 (绝对压制) 时损失 0%
+        const minRatio = 1.5;
+        const maxRatio = 5.0;
+        const maxLossRate = 0.08;
+        
+        const t = Math.max(0, Math.min(1, (ratio - minRatio) / (maxRatio - minRatio)));
+        const lossRate = maxLossRate * (1 - t);
+
+        let targetLoss = Math.ceil(totalCount * lossRate);
+        const armyChanges = {};
+        const settlementChanges = []; // [{type, loss, gain}]
+        
+        // 按价格从低到高排序
+        armyList.sort((a, b) => a.cost - b.cost);
+
+        const survivalRate = modifierManager.getModifiedValue({ side: 'player' }, 'survival_rate', 0);
+
+        for (const item of armyList) {
+            if (targetLoss <= 0) break;
+
+            const lossAmount = Math.min(item.count, targetLoss);
+            targetLoss -= lossAmount;
+
+            // 医疗救回逻辑
+            let saved = 0;
+            for (let i = 0; i < lossAmount; i++) {
+                if (Math.random() < survivalRate) {
+                    saved++;
+                }
+            }
+
+            const finalLoss = lossAmount - saved;
+            
+            if (lossAmount > 0) {
+                settlementChanges.push({
+                    type: item.type,
+                    loss: -lossAmount,
+                    gain: saved
+                });
+            }
+
+            if (finalLoss > 0) {
+                armyChanges[item.type] = -finalLoss;
+            }
+        }
+
+        // 3. 更新兵力
+        this.updateHeroArmy(armyChanges);
+
+        // 4. 计算阅历 (参考 BattleScene.js 逻辑)
+        const xpGained = Math.floor(scaledPoints * 4 * (1.0 + timeManager.getGlobalProgress() * 0.05));
+        
+        const data = this.heroData;
+        const xpBefore = data.xp;
+        const xpMaxBefore = data.xpMax;
+        const levelBefore = data.level;
+        
+        this.gainXP(xpGained);
+
+        const xpAfter = data.xp;
+        const xpMaxAfter = data.xpMax;
+        const levelAfter = data.level;
+
+        return {
+            isVictory: true,
+            settlementChanges,
+            xpGained,
+            xpBefore,
+            xpMaxBefore,
+            levelBefore,
+            xpAfter,
+            xpMaxAfter,
+            levelAfter,
+            enemyConfig
+        };
     }
 
     updateHUD() {

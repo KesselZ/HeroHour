@@ -1738,7 +1738,8 @@ export class Archer extends BaseUnit {
                     target: this.target,
                     speed: 0.3, // 箭矢速度快
                     damage: this.attackDamage,
-                    type: 'arrow'
+                    type: 'arrow',
+                    color: 0x8B4513 // 褐色箭矢
                 });
             }
         }
@@ -1892,12 +1893,13 @@ export class BanditArcher extends BaseUnit {
 
             audioManager.play('attack_arrow', { volume: 0.3 });
 
-            this.projectileManager?.spawn({ 
-                startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 
-                target: this.target, 
-                speed: 0.25, 
-                damage: this.attackDamage, 
-                type: 'arrow' 
+            this.projectileManager?.spawn({
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
+                target: this.target,
+                speed: 0.25,
+                damage: this.attackDamage,
+                type: 'arrow',
+                color: 0x8B4513 // 褐色箭矢
             });
         }
     }
@@ -2463,6 +2465,7 @@ export class RedCultFireMage extends BaseUnit {
                     speed: 0.2,
                     damage: this.attackDamage,
                     type: 'fireball',
+                    color: 0xff4400, // 火球颜色
                     scale: 0.5, // 尺寸缩小 50%
                     explosionRadius: 2.5,
                     explosionColor: 0xff4400,
@@ -2603,10 +2606,11 @@ export class CYSwordArray extends BaseUnit {
         if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
             this.lastAttackTime = now;
             
+            const stats = worldManager.getUnitBlueprint('cy_sword_array');
             this.executeBurstAttack({
-                count: 2,
+                count: stats.burstCount || 1,
                 interval: 200,
-                damage: this.attackDamage / 2,
+                damage: this.attackDamage,
                 projectileType: 'air_sword',
                 projectileColor: 0x88ffff,
                 projectilePenetration: 2,
@@ -2638,15 +2642,30 @@ export class CYZixiaDisciple extends BaseUnit {
         const now = Date.now();
         if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
             this.lastAttackTime = now;
-            
+            this.onAttackAnimation();
+            audioManager.play('attack_air_sword', { volume: 0.4, pitchVar: 0.1 });
+
             const stats = worldManager.getUnitBlueprint('cy_zixia_disciple');
-            this.executeBurstAttack({
-                count: stats.burstCount || 3,
-                interval: 150,
-                damage: this.attackDamage,
-                projectileType: 'air_sword',
-                soundName: 'attack_air_sword'
-            });
+            const burst = stats.burstCount || 1;
+
+            // 基于 burstCount 动态生成发射位置和循环
+            for (let i = 0; i < burst; i++) {
+                setTimeout(() => {
+                    if (this.isDead || !this.target || this.target.isDead) return;
+                    this.projectileManager?.spawn({
+                        startPos: this.position.clone().add(new THREE.Vector3((i - (burst - 1) / 2) * 0.4, 1.0, 0)),
+                        target: this.target,
+                        speed: 0.15,
+                        damage: this.attackDamage,
+                        type: 'air_sword',
+                        scale: 2.5,
+                        color: 0x00eeff, // 李忘生青色变体
+                        explosionRadius: 2.0,
+                        explosionColor: 0x0088dd, // 深青蓝色
+                        explosionVFX: 'fire_explosion'
+                    });
+                }, i * 200);
+            }
         }
     }
 }
@@ -2675,7 +2694,7 @@ export class CYTaixuDisciple extends BaseUnit {
             this.lastAttackTime = now;
             this.onAttackAnimation();
             audioManager.play('attack_melee', { volume: 0.5, force: true });
-            
+
             // 范围横扫
             this.executeAOE(enemies, {
                 radius: this.attackRange,
@@ -2683,9 +2702,9 @@ export class CYTaixuDisciple extends BaseUnit {
                 damage: this.attackDamage,
                 knockbackForce: 0.05
             });
-            
+
             if (window.battle && window.battle.playVFX) {
-                window.battle.playVFX('tiance_sweep', { unit: this, radius: this.attackRange, color: 0x00ffff, duration: 200 });
+                window.battle.playVFX('advanced_sweep', { unit: this, radius: this.attackRange, color: 0x00ffff, duration: 300 });
             }
         }
     }
@@ -3048,13 +3067,15 @@ export class TCCrossbow extends BaseUnit {
             this.onAttackAnimation();
             audioManager.play('attack_arrow', { volume: 0.4 });
 
-            this.projectileManager?.spawn({ 
-                startPos: this.position.clone().add(new THREE.Vector3(0, 0.8, 0)), 
-                target: this.target, 
-                speed: 0.25, 
-                damage: this.attackDamage, 
+            this.projectileManager?.spawn({
+                startPos: this.position.clone().add(new THREE.Vector3(0, 0.8, 0)),
+                target: this.target,
+                speed: 0.25,
+                damage: this.attackDamage,
                 type: 'arrow',
-                scale: 1.2
+                color: 0x654321, // 深褐色劲弩
+                scale: 1.2,
+                penetration: 2
             });
         }
     }
@@ -3214,12 +3235,13 @@ export class TCMountedCrossbow extends BaseUnit {
             this.onAttackAnimation();
             audioManager.play('attack_arrow', { volume: 0.3 });
 
-            this.projectileManager?.spawn({ 
-                startPos: this.position.clone().add(new THREE.Vector3(0, 1.0, 0)), 
-                target: this.target, 
-                speed: 0.22, 
-                damage: this.attackDamage, 
+            this.projectileManager?.spawn({
+                startPos: this.position.clone().add(new THREE.Vector3(0, 1.0, 0)),
+                target: this.target,
+                speed: 0.22,
+                damage: this.attackDamage,
                 type: 'arrow',
+                color: 0xff4400, // 火焰红色
                 penetration: 3 // 新增：3次穿透属性
             });
         }
@@ -3251,7 +3273,12 @@ export class TCHeavyCavalry extends BaseUnit {
             this.lastAttackTime = now;
             this.onAttackAnimation();
             audioManager.play('attack_melee', { volume: 0.6 });
-            
+
+            // 强力冲锋横扫特效
+            if (window.battle && window.battle.playVFX) {
+                window.battle.playVFX('advanced_sweep', { unit: this, radius: 2.2, color: 0xff6600, duration: 300 });
+            }
+
             // 强力冲锋横扫：伤害范围内所有目标
             this.executeAOE(enemies, {
                 radius: 2.2,

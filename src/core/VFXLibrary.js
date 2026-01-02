@@ -197,12 +197,12 @@ export class VFXLibrary {
         
         const texture = new THREE.CanvasTexture(canvas);
         const fillGeo = new THREE.CircleGeometry(radius, 64); // 改用圆形几何体，物理切除方角
-        const fillMat = this._createMaterial({ 
-            map: texture, 
-            transparent: true, 
+        const fillMat = this._createMaterial({
+            map: texture,
+            transparent: true,
             opacity: 0.4,
             depthWrite: false,
-            blending: THREE.AdditiveBlending 
+            blending: THREE.AdditiveBlending
         });
         const fill = new THREE.Mesh(fillGeo, fillMat);
         fill.rotation.x = -Math.PI / 2;
@@ -281,11 +281,11 @@ export class VFXLibrary {
         
         // 1. 核心白光脉冲 (瞬间爆发感)
         const flashGeo = new THREE.SphereGeometry(radius * 0.5, 16, 16);
-        const flashMat = this._createMaterial({ 
-            color: 0xffffff, 
-            transparent: true, 
+        const flashMat = this._createMaterial({
+            color: 0xffffff,
+            transparent: true,
             opacity: 1.0,
-            blending: THREE.AdditiveBlending 
+            blending: THREE.AdditiveBlending
         });
         const flash = new THREE.Mesh(flashGeo, flashMat);
         flash.position.copy(groundPos);
@@ -293,9 +293,9 @@ export class VFXLibrary {
 
         // 2. 扩散的火环 (波纹感) - 现在完全贴合地面
         const ringGeo = new THREE.RingGeometry(0.1, radius, 32);
-        const ringMat = this._createMaterial({ 
-            color: color, 
-            transparent: true, 
+        const ringMat = this._createMaterial({
+            color: color,
+            transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide,
             depthWrite: false,
@@ -352,10 +352,12 @@ export class VFXLibrary {
             updateFn: (p, prg) => {
                 p.position.add(p.userData.vel);
                 p.rotation.set(p.rotation.x + 0.1, p.rotation.y + 0.1, p.rotation.z + 0.1);
-                // 颜色演变：火红 -> 暗红 -> 灰黑
+                // 颜色演变：基于传入颜色 -> 暗色调 -> 灰黑
                 const c = p.material.color;
+                const baseColor = new THREE.Color(color);
+                const darkColor = baseColor.clone().multiplyScalar(0.3); // 暗色版本
                 if (prg < 0.5) {
-                    c.lerp(new THREE.Color(0xff4400), 0.1);
+                    c.lerp(darkColor, 0.1);
                 } else {
                     c.lerp(new THREE.Color(0x333333), 0.1);
                 }
@@ -603,11 +605,11 @@ export class VFXLibrary {
 
         const texture = new THREE.CanvasTexture(canvas);
         const geo = new THREE.PlaneGeometry(radius * 2.1, radius * 2.1); // 尺寸更贴合半径
-        const mat = this._createMaterial({ 
-            map: texture, 
-            transparent: true, 
-            opacity: 0.8, 
-            side: THREE.DoubleSide, 
+        const mat = this._createMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending
         });
@@ -1315,6 +1317,123 @@ export class VFXLibrary {
             }
         };
         anim();
+    }
+
+    /**
+     * 创建点击地面时的即时像素反馈 (Scheme C)
+     */
+    createClickRippleVFX(pos) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        // 使用哑光金 (Matte Gold)
+        ctx.fillStyle = 'rgba(197, 160, 89, 0.8)';
+        ctx.beginPath();
+        ctx.arc(16, 16, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        
+        const mat = new THREE.MeshBasicMaterial({ 
+            map: texture, 
+            transparent: true, 
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        const geo = new THREE.PlaneGeometry(0.8, 0.8);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.copy(pos);
+        mesh.position.y = 0.1;
+        mesh.renderOrder = 1000;
+        this.scene.add(mesh);
+
+        const startTime = Date.now();
+        const duration = 400;
+        const anim = () => {
+            const elapsed = Date.now() - startTime;
+            const prg = elapsed / duration;
+            if (prg < 1) {
+                mesh.scale.set(1 + prg * 2, 1 + prg * 2, 1);
+                mat.opacity = 0.8 * (1 - prg);
+                requestAnimationFrame(anim);
+            } else {
+                if (mesh.parent) this.scene.remove(mesh);
+                geo.dispose();
+                mat.dispose();
+                texture.dispose();
+            }
+        };
+        anim();
+    }
+
+    /**
+     * 创建路径目标点的常驻标记 (Scheme C)
+     */
+    createPathMarkerVFX(pos, color = '#5b8a8a') {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        
+        // 绘制一个像素风格的十字/箭头光标
+        // 中心使用传入的职业颜色，外框恢复为黑色 (#000000)
+        ctx.fillStyle = color;
+        ctx.fillRect(12, 0, 8, 32); 
+        ctx.fillRect(0, 12, 32, 8);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(12, 0, 8, 32);
+        ctx.strokeRect(0, 12, 32, 8);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        
+        const mat = new THREE.SpriteMaterial({ 
+            map: texture, 
+            transparent: true, 
+            depthTest: false 
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(0.6, 0.6, 1);
+        sprite.position.copy(pos);
+        sprite.renderOrder = 1001;
+        this.scene.add(sprite);
+
+        const startTime = Date.now();
+        const bounceAnim = () => {
+            if (!sprite.parent) {
+                texture.dispose();
+                mat.dispose();
+                return;
+            }
+            const elapsed = Date.now() - startTime;
+            sprite.position.y = pos.y + 0.8 + Math.abs(Math.sin(elapsed * 0.006)) * 0.5;
+            requestAnimationFrame(bounceAnim);
+        };
+        bounceAnim();
+
+        return sprite;
+    }
+
+    /**
+     * 创建一个路径点 (面包屑)
+     */
+    createPathPointVFX(pos) {
+        const geo = new THREE.PlaneGeometry(0.2, 0.2);
+        const mat = new THREE.MeshBasicMaterial({ 
+            color: 0xc5a059, // 哑光金
+            transparent: true, 
+            opacity: 0.7,
+            depthTest: false 
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.copy(pos);
+        mesh.position.y = 0.1;
+        mesh.renderOrder = 999;
+        this.scene.add(mesh);
+        return mesh;
     }
 }
 

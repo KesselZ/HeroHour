@@ -7,6 +7,7 @@ import { timeManager } from '../core/TimeManager.js';
 import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
 import { createWorldObject } from '../entities/WorldObjects.js';
 import { VFXLibrary } from '../core/VFXLibrary.js'; // 核心引入
+import { Pathfinder } from '../core/Pathfinder.js';
 
 /**
  * 大世界场景类
@@ -45,6 +46,16 @@ export class WorldScene {
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
         this.onPointerMove = this.onPointerMove.bind(this); 
+        this.onPointerDown = this.onPointerDown.bind(this);
+        this.onPointerUp = this.onPointerUp.bind(this);
+        this.onContextMenu = this.onContextMenu.bind(this);
+
+        // 寻路与点击移动
+        this.pathfinder = null;
+        this.currentPath = [];
+        this.moveTargetMarker = null;
+        this.pathLine = null;
+        this.pathPoints = []; // 存储路径点视觉对象 (面包屑)
 
         // 动感行走动画状态
         this.moveAnimTime = 0;
@@ -53,6 +64,12 @@ export class WorldScene {
         this.playerShadow = null;
         this.lastPlayerPos = new THREE.Vector3(); // 用于驱动位移动画
         this.debugLogTimer = 0; // 用于限流输出日志
+
+        // 手机端长按交互支持
+        this.longPressTimer = null;
+        this.longPressTarget = null;
+        this.isLongPressTriggered = false;
+        this.touchStartPos = new THREE.Vector2();
     }
 
     /**
@@ -76,6 +93,9 @@ export class WorldScene {
         // 2. 从数据中心获取地图状态 (如果是新地图会在此生成)
         const mapState = worldManager.getOrGenerateWorld(mapGenerator);
         const mapData = mapState.grid;
+
+        // 初始化寻路器
+        this.pathfinder = new Pathfinder(mapData, mapGenerator.size);
 
         // 3. 渲染视觉表现
         this.setupLights();
@@ -193,6 +213,20 @@ export class WorldScene {
             closeHeroBtn.onclick = () => {
                 audioManager.play('ui_click', { volume: 0.4 });
                 document.getElementById('hero-stats-panel').classList.add('hidden');
+
+                // --- 手机端适配：仅在没有其他全屏面板打开时恢复 HUD ---
+                if (uiManager.isMobile) {
+                    const townPanel = document.getElementById('town-management-panel');
+                    const talentPanel = document.getElementById('talent-panel');
+                    const skillPanel = document.getElementById('skill-learn-panel');
+                    if (
+                        (!townPanel || townPanel.classList.contains('hidden')) &&
+                        (!talentPanel || talentPanel.classList.contains('hidden')) &&
+                        (!skillPanel || skillPanel.classList.contains('hidden'))
+                    ) {
+                        uiManager.setHUDVisibility(true);
+                    }
+                }
             };
         }
 
@@ -290,6 +324,9 @@ export class WorldScene {
         const htpPanel = document.getElementById('how-to-play-panel');
         if (htpPanel) htpPanel.classList.add('hidden');
         
+        // --- 手机端适配：打开面板时隐藏 HUD ---
+        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+
         const panel = document.getElementById('hero-stats-panel');
         if (panel) {
             panel.classList.remove('hero-panel-v3');
@@ -402,12 +439,24 @@ export class WorldScene {
                     <div class="skill-icon-small" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
                 `;
 
-                slot.onmouseenter = () => {
-                    uiManager.showSkillTooltip(skillId, data);
+            // 使用优雅的 Tooltip 绑定器
+            uiManager.bindTooltip(slot, () => {
+                const skill = SkillRegistry[skillId];
+                if (!skill) return null;
+                const actualCD = (skill.getActualCooldown(data) / 1000).toFixed(1);
+                const actualCost = skill.getActualManaCost(data);
+                
+                return {
+                    name: skill.name,
+                    level: skill.level,
+                    mpCost: `消耗: ${actualCost} 内力`,
+                    cdText: `冷却: ${actualCD}s`,
+                    description: skill.getDescription(data),
+                    type: 'skill'
                 };
-                slot.onmouseleave = () => uiManager.hideTooltip();
+            });
 
-                skillsContainer.appendChild(slot);
+            skillsContainer.appendChild(slot);
             });
         }
     }
@@ -415,13 +464,41 @@ export class WorldScene {
     bindAttrTooltip(id, name, desc) {
         const el = document.getElementById(id);
         if (el) {
-            el.onmouseenter = () => uiManager.showTooltip({ name, description: desc });
-            el.onmouseleave = () => uiManager.hideTooltip();
+            uiManager.bindTooltip(el, { name, description: desc });
         }
+    }
+
+    onPointerUp(e) {
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+
+        // --- 核心修复：如果点击的不是画布，则不触发移动指令 ---
+        if (e.target.tagName !== 'CANVAS') {
+            this.longPressTarget = null;
+            return;
+        }
+
+        // 如果是触摸且没有触发长按，则执行移动指令
+        if (e.pointerType === 'touch' && !this.isLongPressTriggered && e.button === 0) {
+            this._handleMoveCommand(e.clientX, e.clientY);
+        }
+        
+        this.longPressTarget = null;
     }
 
     onPointerMove(e) {
         if (!this.isActive) return;
+
+        // 如果移动距离过大，取消长按计时
+        if (this.longPressTimer) {
+            const dist = Math.sqrt(Math.pow(e.clientX - this.touchStartPos.x, 2) + Math.pow(e.clientY - this.touchStartPos.y, 2));
+            if (dist > 15) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+        }
         
         // 1. 更新鼠标归一化坐标用于 Raycaster
         this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -507,6 +584,9 @@ export class WorldScene {
         const htpPanel = document.getElementById('how-to-play-panel');
         if (htpPanel) htpPanel.classList.add('hidden');
 
+        // --- 手机端适配：在所有面板状态更新后，确定最终的 HUD 可见性 ---
+        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+
         const panel = document.getElementById('town-management-panel');
         const cityData = worldManager.cities[cityId];
         
@@ -549,7 +629,7 @@ export class WorldScene {
         const incomeContainer = document.querySelector('.town-income-v3');
         if (incomeContainer) {
             incomeContainer.style.cursor = 'help';
-            incomeContainer.onmouseenter = () => {
+            uiManager.bindTooltip(incomeContainer, () => {
                 const breakdown = prodData.breakdown;
                 let desc = `<div style="color: var(--jx3-celadon); margin-bottom: 4px;">各城池贡献:</div>`;
                 breakdown.cities.forEach(c => {
@@ -575,13 +655,12 @@ export class WorldScene {
                     }
                 }
                 
-                uiManager.showTooltip({
+                return {
                     name: "本季度总收益明细",
                     level: "所有城池与矿产合计",
                     description: desc
-                });
-            };
-            incomeContainer.onmouseleave = () => uiManager.hideTooltip();
+                };
+            });
         }
 
         // 更新统御力显示
@@ -634,14 +713,13 @@ export class WorldScene {
                     <span class="building-cost">${costText}</span>
                 `;
                 
-                card.onmouseenter = () => {
+                uiManager.bindTooltip(card, () => {
                     const tooltipData = { ...build };
                     if (isLocked) {
                         tooltipData.description = `<div style="color: #ff4444; margin-bottom: 8px; font-weight: bold;">[锁定] ${build.unlockStatus.reason}</div>` + (build.description || '');
                     }
-                    uiManager.showTooltip(tooltipData);
-                };
-                card.onmouseleave = () => uiManager.hideTooltip();
+                    return tooltipData;
+                });
 
                 card.onclick = () => {
                     if (isLocked) {
@@ -766,13 +844,12 @@ export class WorldScene {
         // 遵照要求：UI 上依然统一显示为“伤害”，不再显示“秒伤”等现代术语
         const label = '伤害'; 
         
-        element.onmouseenter = () => uiManager.showTooltip({
+        uiManager.bindTooltip(element, {
             name: stats.name,
             level: `气血:${stats.hp} | ${label}:${stats.dps} | 占用:${cost}`,
             description: stats.description,
             color: '#d4af37' // 武侠金色
         });
-        element.onmouseleave = () => uiManager.hideTooltip();
     }
 
     createArmySlot(type, count, onClick) {
@@ -867,10 +944,10 @@ export class WorldScene {
             flatShading: true
         });
 
-        const ground = new THREE.Mesh(geometry, material);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        this.scene.add(ground);
+        this.ground = new THREE.Mesh(geometry, material);
+        this.ground.rotation.x = -Math.PI / 2;
+        this.ground.receiveShadow = true;
+        this.scene.add(this.ground);
 
         const grid = new THREE.GridHelper(size, size / 10, 0x445544, 0x223322);
         grid.position.y = 0.1;
@@ -966,6 +1043,9 @@ export class WorldScene {
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('pointermove', this.onPointerMove); // 核心修复：注册指针监听
+        window.addEventListener('pointerdown', this.onPointerDown);
+        window.addEventListener('pointerup', this.onPointerUp);
+        window.addEventListener('contextmenu', this.onContextMenu);
         
         const hud = document.getElementById('world-ui');
         if (hud) {
@@ -981,13 +1061,164 @@ export class WorldScene {
         timeManager.updateUI();
     }
 
+    /**
+     * 打开跳过战斗确认弹窗
+     */
+    showSkipBattleDialog(enemyConfig, scaledPoints, onCancel, onConfirm) {
+        const modal = document.getElementById('skip-battle-modal');
+        const confirmBtn = document.getElementById('confirm-skip-btn');
+        const cancelBtn = document.getElementById('cancel-skip-btn');
+
+        if (!modal || !confirmBtn || !cancelBtn) return;
+
+        modal.classList.remove('hidden');
+
+        confirmBtn.onclick = () => {
+            audioManager.play('ui_click');
+            modal.classList.add('hidden');
+            if (onConfirm) onConfirm();
+        };
+
+        cancelBtn.onclick = () => {
+            audioManager.play('ui_click');
+            modal.classList.add('hidden');
+            if (onCancel) onCancel();
+        };
+    }
+
+    /**
+     * 显示模拟战斗的结算界面
+     */
+    showSimpleSettlement(result) {
+        const { isVictory, settlementChanges, xpGained, xpBefore, xpMaxBefore, levelBefore, xpAfter, xpMaxAfter, levelAfter, enemyConfig } = result;
+        
+        const panel = document.getElementById('battle-settlement');
+        if (!panel) return;
+
+        // 停止大世界背景音乐，播放胜利音效
+        audioManager.play('battle_victory');
+
+        document.getElementById('settlement-title').innerText = isVictory ? "战斗胜利" : "战斗失败";
+        document.getElementById('settlement-title').style.color = isVictory ? "var(--jx3-celadon-dark)" : "#cc0000";
+
+        // --- 阅历结算展示 ---
+        const xpSection = document.getElementById('settlement-xp-section');
+        if (isVictory && xpGained > 0) {
+            if (xpSection) xpSection.style.display = 'flex';
+            const xpVal = document.getElementById('settlement-xp-val');
+            const xpBar = document.getElementById('settlement-xp-bar');
+            const xpLevelVal = document.getElementById('settlement-level-val');
+            
+            if (xpVal) xpVal.innerText = `+${xpGained}`;
+            if (xpLevelVal) xpLevelVal.innerText = `Lv.${levelBefore}`;
+
+            if (xpBar) {
+                const isLevelUp = levelAfter > levelBefore;
+                const startPct = (xpBefore / xpMaxBefore) * 100;
+                const endPct = (xpAfter / xpMaxAfter) * 100;
+                
+                xpBar.style.transition = 'none';
+                xpBar.style.width = `${startPct}%`;
+                xpBar.offsetHeight; // 强制重绘
+
+                if (!isLevelUp) {
+                    requestAnimationFrame(() => {
+                        xpBar.style.transition = 'width 1.5s cubic-bezier(0.22, 1, 0.36, 1)';
+                        xpBar.style.width = `${endPct}%`;
+                    });
+                } else {
+                    requestAnimationFrame(() => {
+                        xpBar.style.transition = 'width 0.8s ease-in';
+                        xpBar.style.width = '100%';
+                        setTimeout(() => {
+                            xpBar.style.transition = 'none';
+                            xpBar.style.width = '0%';
+                            if (xpLevelVal) xpLevelVal.innerText = `Lv.${levelAfter}`;
+                            xpBar.offsetHeight;
+                            setTimeout(() => {
+                                xpBar.style.transition = 'width 1.0s cubic-bezier(0.22, 1, 0.36, 1)';
+                                xpBar.style.width = `${endPct}%`;
+                            }, 50);
+                        }, 850);
+                    });
+                }
+            }
+        } else {
+            if (xpSection) xpSection.style.display = 'none';
+        }
+
+        const list = document.getElementById('settlement-losses-list');
+        list.innerHTML = '';
+        
+        if (settlementChanges.length === 0) { 
+            const emptyHint = document.createElement('div');
+            emptyHint.className = 'loss-empty-hint';
+            emptyHint.innerText = '没有士兵损失。';
+            list.appendChild(emptyHint);
+        } else {
+            settlementChanges.forEach(change => {
+                const { type, loss, gain } = change;
+                const iconStyle = spriteFactory.getIconStyle(type);
+                const item = document.createElement('div');
+                item.className = 'loss-item';
+                
+                let countsHtml = `<div class="loss-count">${loss}</div>`;
+                if (gain > 0) countsHtml += `<div class="gain-count">+${gain}</div>`;
+                
+                item.innerHTML = `
+                    <div class="slot-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
+                    <div style="display: flex; align-items: center; gap: 10px; margin: 2px 0;">
+                        ${countsHtml}
+                    </div>
+                    <div class="loss-name">${worldManager.getUnitDisplayName(type)}</div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // 隐藏大世界 HUD
+        const worldUI = document.getElementById('world-ui');
+        if (worldUI) worldUI.classList.add('hidden');
+
+        panel.classList.remove('hidden');
+
+        const returnBtn = document.getElementById('return-to-world-btn');
+        if (returnBtn) {
+            returnBtn.onclick = () => {
+                panel.classList.add('hidden');
+                if (worldUI) worldUI.classList.remove('hidden');
+
+                // 处理敌人移除逻辑
+                const enemyId = worldManager.mapState.pendingBattleEnemyId;
+                if (enemyId) {
+                    const obj = this.interactables.find(o => o.id === enemyId);
+                    if (obj) {
+                        obj.removeFromScene(this.scene);
+                        this.interactables = this.interactables.filter(o => o.id !== enemyId);
+                    }
+                    worldManager.removeEntity(enemyId);
+                }
+                worldManager.mapState.pendingBattleEnemyId = null;
+                
+                // 恢复大世界背景音乐
+                audioManager.playBGM('/audio/bgm/如寄.mp3');
+            };
+        }
+    }
+
     stop() {
         this.isActive = false;
         timeManager.pause(); // 暂停时间流逝
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('pointermove', this.onPointerMove); // 核心修复：移除指针监听
+        window.removeEventListener('pointerdown', this.onPointerDown);
+        window.removeEventListener('pointerup', this.onPointerUp);
+        window.removeEventListener('contextmenu', this.onContextMenu);
         
+        this.clearPathVisuals();
+        this.currentPath = [];
+
         if (this.playerGroup) {
             worldManager.savePlayerPos(this.playerGroup.position.x, this.playerGroup.position.z);
         }
@@ -1000,37 +1231,238 @@ export class WorldScene {
         if (minimap) minimap.classList.add('hidden');
     }
 
-    onKeyDown(e) { this.keys[e.key.toLowerCase()] = true; }
+    onKeyDown(e) { 
+        this.keys[e.key.toLowerCase()] = true; 
+        // 键盘移动时，立即取消自动寻路
+        if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase())) {
+            this.currentPath = [];
+            this.clearPathVisuals();
+        }
+    }
     onKeyUp(e) { this.keys[e.key.toLowerCase()] = false; }
 
-    update(deltaTime) {
-        if (!this.isActive || !this.playerGroup) return;
+    /**
+     * 阻止右键菜单弹出，确保右键移动顺畅
+     */
+    onContextMenu(e) {
+        if (this.isActive) {
+            e.preventDefault();
+        }
+    }
 
-        this.lastPlayerPos.copy(this.playerGroup.position); // 记录位移前位置
+    onPointerDown(e) {
+        if (!this.isActive) return;
+        
+        // 仅在点击游戏画布时触发移动，防止点击 UI 时主角也跟着走
+        if (e.target.tagName !== 'CANVAS') return;
 
-        // 驱动 UIManager 实时刷新 (所见即所得)
-        uiManager.update();
+        // 更新坐标，确保点击位置准确 (特别是在未移动直接点击的情况下)
+        this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
-        // --- 核心：检测待播放的升级反馈 ---
-        if (worldManager.heroData.pendingLevelUps > 0) {
-            this.vfxLibrary.createLevelUpVFX(this.playerGroup.position);
-            // 播放专属的升级音效
-            audioManager.play('source_levelup', { volume: 0.8 });
-            worldManager.heroData.pendingLevelUps--;
-            console.log("%c[升级反馈] 已在大世界触发视觉特效", "color: #ffd700; font-weight: bold");
+        // --- 手机端长按逻辑启动 ---
+        const isTouch = e.pointerType === 'touch';
+        if (isTouch) {
+            this.touchStartPos.set(e.clientX, e.clientY);
+            this.isLongPressTriggered = false;
+            
+            // 检测是否点中了交互物体
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            const objectsToIntersect = this.interactables
+                .filter(item => item.mesh)
+                .map(item => item.mesh);
+            const intersects = this.raycaster.intersectObjects(objectsToIntersect, true);
+
+            if (intersects.length > 0) {
+                const hitMesh = intersects[0].object;
+                const hitObj = this.interactables.find(item => {
+                    if (item.mesh === hitMesh) return true;
+                    let found = false;
+                    item.mesh.traverse(child => { if (child === hitMesh) found = true; });
+                    return found;
+                });
+
+                if (hitObj) {
+                    this.longPressTarget = hitObj;
+                    this.longPressTimer = setTimeout(() => {
+                        const tooltipData = hitObj.getTooltipData();
+                        if (tooltipData) {
+                            uiManager.showTooltip(tooltipData);
+                            this.isLongPressTriggered = true;
+                            if (navigator.vibrate) navigator.vibrate(20); // 震动反馈
+                        }
+                    }, 500);
+                }
+            }
         }
 
+        // 仅处理右键 (button 2) 或 触摸屏点击
+        const isRightClick = e.button === 2;
+        
+        if (!isRightClick && !isTouch) return;
+
+        // 如果是触摸屏左键点击 (button 0)，我们需要等待 touchend 确认不是长按
+        if (isTouch && e.button === 0) return;
+
+        this._handleMoveCommand(e.clientX, e.clientY);
+    }
+
+    _handleMoveCommand(clientX, clientY) {
+        // 更新坐标
+        this.mouse.x = (clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+        // 1. 获取点击的世界位置
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        
+        if (!this.ground) {
+            console.error("Ground mesh not found for raycasting");
+            return;
+        }
+
+        const intersects = this.raycaster.intersectObject(this.ground);
+        
+        if (intersects.length > 0) {
+            const targetPos = intersects[0].point;
+            
+            // 2. 执行寻路
+            const size = mapGenerator.size;
+            const halfSize = size / 2;
+            
+            const startGrid = {
+                x: Math.round(this.playerGroup.position.x + halfSize),
+                z: Math.round(this.playerGroup.position.z + halfSize)
+            };
+            
+            const endGrid = {
+                x: Math.round(targetPos.x + halfSize),
+                z: Math.round(targetPos.z + halfSize)
+            };
+
+            // 限制寻路距离，防止长距离计算卡顿
+            const dist = Math.sqrt(Math.pow(startGrid.x - endGrid.x, 2) + Math.pow(startGrid.z - endGrid.z, 2));
+            if (dist > 150) {
+                worldManager.showNotification("目标太远了，请分段移动。");
+                return;
+            }
+
+            const path = this.pathfinder.findPath(startGrid, endGrid);
+            
+            if (path && path.length > 0) {
+                // 转换回世界坐标
+                this.currentPath = path.map(node => ({
+                    x: node.x - halfSize,
+                    z: node.z - halfSize
+                }));
+                
+                // 3. 更新视觉反馈
+                this.vfxLibrary.createClickRippleVFX(targetPos);
+                this.updatePathVisuals(this.currentPath);
+                
+                // 播放一个清脆的提示音
+                audioManager.play('ui_click', { volume: 0.3, pitchVar: 0.4 });
+            } else {
+                // 寻路失败，可能是点到了障碍物
+                this.vfxLibrary.createParticleSystem({
+                    pos: targetPos,
+                    color: 0xff4444,
+                    duration: 500,
+                    density: 0.5,
+                    updateFn: (p, prg) => { p.scale.setScalar(0.2 * (1-prg)); p.material.opacity = 0.5 * (1-prg); }
+                });
+            }
+        }
+    }
+
+    updatePathVisuals(path) {
+        this.clearPathVisuals();
+
+        if (path.length > 0) {
+            // 1. 获取当前角色的职业颜色
+            const heroColor = worldManager.availableHeroes[worldManager.heroData.id]?.color || '#5b8a8a';
+
+            // 2. 创建目标点标记 (使用职业颜色)
+            const target = path[path.length - 1];
+            this.moveTargetMarker = this.vfxLibrary.createPathMarkerVFX(
+                new THREE.Vector3(target.x, 0, target.z), 
+                heroColor
+            );
+
+            // 3. 创建路径点 (面包屑)
+            // 增加点密度：将步长从 3 减小到 1
+            const step = 1; 
+            for (let i = 0; i < path.length; i += step) {
+                const node = path[i];
+                const pos = new THREE.Vector3(node.x, 0, node.z);
+                
+                // 距离玩家太近的点不显示
+                if (this.playerGroup.position.distanceTo(pos) < 1.0) continue;
+                
+                const point = this.vfxLibrary.createPathPointVFX(pos);
+                this.pathPoints.push({
+                    mesh: point,
+                    nodeIndex: i
+                });
+            }
+        }
+    }
+
+    clearPathVisuals() {
+        if (this.moveTargetMarker) {
+            if (this.moveTargetMarker.parent) {
+                this.scene.remove(this.moveTargetMarker);
+            }
+            this.moveTargetMarker = null;
+        }
+
+        // 清理所有路径点 (面包屑)
+        if (this.pathPoints && this.pathPoints.length > 0) {
+            this.pathPoints.forEach(p => {
+                if (p.mesh.parent) this.scene.remove(p.mesh);
+                p.mesh.geometry.dispose();
+                p.mesh.material.dispose();
+            });
+            this.pathPoints = [];
+        }
+
+        if (this.pathLine) {
+            this.scene.remove(this.pathLine);
+            this.pathLine.geometry.dispose();
+            this.pathLine.material.dispose();
+            this.pathLine = null;
+        }
+    }
+
+    /**
+     * [辅助] 更新环境视觉效果
+     */
+    _updateEnvironment(deltaTime) {
         if (this.waterTex) {
             this.waterTex.offset.x += 0.005 * deltaTime;
             this.waterTex.offset.y += 0.002 * deltaTime;
         }
-
         const seasonChanged = timeManager.update();
         if (seasonChanged) {
             worldManager.processResourceProduction();
         }
+    }
 
-        // --- 核心限制：仅开局告示显示或奇穴面板打开时禁止移动 ---
+    /**
+     * [辅助] 检测并播放升级反馈
+     */
+    _updateLevelUpFeedback() {
+        if (worldManager.heroData.pendingLevelUps > 0) {
+            this.vfxLibrary.createLevelUpVFX(this.playerGroup.position);
+            audioManager.play('source_levelup', { volume: 0.8 });
+            worldManager.heroData.pendingLevelUps--;
+            console.log("%c[升级反馈] 已在大世界触发视觉特效", "color: #ffd700; font-weight: bold");
+        }
+    }
+
+    /**
+     * [核心] 处理输入与位移逻辑 (解耦寻路与键盘)
+     */
+    _processInputAndMovement(deltaTime) {
         const startWindow = document.getElementById('game-start-window');
         const talentPanel = document.getElementById('talent-panel');
         const isStartWindowOpen = startWindow && !startWindow.classList.contains('hidden');
@@ -1038,142 +1470,200 @@ export class WorldScene {
 
         if (isStartWindowOpen || isTalentPanelOpen) {
             this.footstepTimer = 0;
-        } else {
-            const moveDir = new THREE.Vector3(0, 0, 0);
+            this._updateWalkingAnimation(deltaTime, new THREE.Vector3(), false);
+            return;
+        }
+
+        let moveDir = new THREE.Vector3(0, 0, 0);
+        let isMoving = false;
+
+        // 1. 键盘移动指令 (优先级最高，且会中断寻路)
+        const hasKeyboardInput = this.keys['w'] || this.keys['s'] || this.keys['a'] || this.keys['d'] || 
+                                this.keys['arrowup'] || this.keys['arrowdown'] || this.keys['arrowleft'] || this.keys['arrowright'];
+
+        if (hasKeyboardInput) {
+            this.currentPath = []; // 键盘输入立即打断寻路
+            this.clearPathVisuals();
+            
             if (this.keys['w'] || this.keys['arrowup']) moveDir.z -= 1;
             if (this.keys['s'] || this.keys['arrowdown']) moveDir.z += 1;
             if (this.keys['a'] || this.keys['arrowleft']) moveDir.x -= 1;
             if (this.keys['d'] || this.keys['arrowright']) moveDir.x += 1;
-
-            const texture = this.playerHero.material.map;
-            const config = spriteFactory.unitConfig[this.heroId];
-
+            
             if (moveDir.lengthSq() > 0) {
                 moveDir.normalize();
-                // 核心修改：位移 = 速度 * deltaTime，脱离帧率限制
-                const moveStep = this.moveSpeed * deltaTime;
-                const nextPos = this.playerGroup.position.clone().addScaledVector(moveDir, moveStep);
-                
-                if (mapGenerator.isPassable(nextPos.x, nextPos.z)) {
-                    this.playerGroup.position.copy(nextPos);
-                } else {
-                    const nextPosX = this.playerGroup.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
-                    if (mapGenerator.isPassable(nextPosX.x, nextPosX.z)) {
-                        this.playerGroup.position.copy(nextPosX);
-                    }
-                    const nextPosZ = this.playerGroup.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
-                    if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z)) {
-                        this.playerGroup.position.copy(nextPosZ);
-                    }
-                }
+                isMoving = true;
             }
+        } 
+        // 2. 自动寻路指令
+        else if (this.currentPath.length > 0) {
+            isMoving = true;
+            const target = this.currentPath[0];
+            const dx = target.x - this.playerGroup.position.x;
+            const dz = target.z - this.playerGroup.position.z;
+            const distSq = dx * dx + dz * dz;
 
-            // --- 动感行走动画逻辑 (Distance-based 优雅微调版) ---
-            const distanceMoved = this.playerGroup.position.distanceTo(this.lastPlayerPos);
-            const isPhysicallyMoving = distanceMoved > 0.001;
-
-            if (isPhysicallyMoving) {
-                // 【动感行走调参指南】
-                // 1. stepDistance: 步长。越大迈步越大，频率越低。
-                //    - 基准: 主角(李承恩)秒速约 8.5。
-                //    - 设定 3.5 表示每秒产生 8.5/3.5 = 2.4 步，刚好处于天花板边缘。
-                const stepDistance = 3.5;      
-                const maxStepsPerSecond = 2.5; // 2. 天花板: 每秒最多跳几下。防止瞬移抽搐。
+            // 核心修复：提前 0.15 米就开始切换下一节点，防止到达点时的物理顿挫
+            if (distSq < 0.15) {
+                this.currentPath.shift();
                 
-                const deltaAnim = (distanceMoved / stepDistance) * Math.PI;
-                const maxDelta = (maxStepsPerSecond * Math.PI) * deltaTime;
-                const finalDelta = Math.min(deltaAnim, maxDelta);
-                this.moveAnimTime += finalDelta;
-
-                // --- 调试日志：受 WorldManager.DEBUG.SHOW_MOTION_DEBUG 控制 ---
-                const debug = WorldManager.DEBUG;
-                if (debug.ENABLED && debug.SHOW_MOTION_DEBUG) {
-                    this.debugLogTimer += deltaTime;
-                    if (this.debugLogTimer > 0.5) {
-                        const speedPerSec = (distanceMoved / deltaTime).toFixed(3);
-                        const isCapped = deltaAnim > maxDelta ? "%c[已达天花板]" : "";
-                        console.log(`%c[运动调试] %c秒速: ${speedPerSec} | 帧位移: ${distanceMoved.toFixed(4)} | 动画增量: ${finalDelta.toFixed(3)} ${isCapped}`, 
-                            "color: #00ffcc; font-weight: bold", "color: #fff", isCapped ? "color: #ff4444" : "");
-                        this.debugLogTimer = 0;
+                // 移除已经经过的路径点 (面包屑)
+                if (this.pathPoints.length > 0) {
+                    const firstPoint = this.pathPoints[0];
+                    const distToPoint = this.playerGroup.position.distanceTo(firstPoint.mesh.position);
+                    // 如果第一个点距离玩家很近，或者玩家已经越过了它，就移除
+                    if (distToPoint < 0.8) {
+                        const p = this.pathPoints.shift();
+                        if (p.mesh.parent) this.scene.remove(p.mesh);
+                        p.mesh.geometry.dispose();
+                        p.mesh.material.dispose();
                     }
                 }
-                
-                // 1. 垂直跳动 (Bobbing) - 降低高度使其更稳重
-                const bob = Math.abs(Math.sin(this.moveAnimTime)); 
-                this.playerHero.position.y = bob * 0.12; // 向上跳跃高度
 
-                // 2. 挤压伸展 (Squash & Stretch) - 更加细微
-                const stretch = 1 + bob * 0.06;
-                const squash = 1 - bob * 0.03;
-                
-                // 3. 影子随跳动缩小 - 更加克制
-                const shadowScale = 1 - bob * 0.2;
-                this.playerShadow.scale.set(shadowScale, shadowScale, 1);
-                this.playerShadow.material.opacity = 0.3 * (1 - bob * 0.2);
-
-                // 4. 倾斜 (Tilting) - 减小倾斜度
-                const tilt = moveDir.x * -0.08; 
-                this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, tilt, 0.1);
-
-                // 统一应用缩放
-                this.playerHero.scale.set(
-                    this.baseScale * squash,
-                    this.baseScale * stretch,
-                    1
-                );
-
-                // 脚步声逻辑 (起步即响，固定频率)
-                if (this.footstepTimer === 0) {
-                    audioManager.play('footstep_grass', { 
-                        volume: 0.6, 
-                        pitchVar: 0.2 
-                    });
+                if (this.currentPath.length === 0) {
+                    this.clearPathVisuals();
+                    isMoving = false; // 到达终点
+                } else {
+                    // 立即指向下一个节点，保证 moveDir 连贯
+                    const next = this.currentPath[0];
+                    moveDir.set(next.x - this.playerGroup.position.x, 0, next.z - this.playerGroup.position.z).normalize();
                 }
-
-                this.footstepTimer += deltaTime * 1000;
-                if (this.footstepTimer >= this.footstepInterval) {
-                    this.footstepTimer = 0;
-                }
-                
-                if (moveDir.x !== 0) {
-                    const defaultFacing = config.defaultFacing || 'right';
-                    const isMovingLeft = moveDir.x < 0;
-                    let shouldFlip = isMovingLeft ? (defaultFacing === 'right') : (defaultFacing === 'left');
-                    const standardRepeatX = 1 / 4; 
-                    const flippedRepeatX = -1 / 4;
-                    const targetRepeatX = shouldFlip ? flippedRepeatX : standardRepeatX;
-                    if (texture.repeat.x !== targetRepeatX) {
-                        texture.repeat.x = targetRepeatX;
-                        texture.offset.x = shouldFlip ? (config.col / 4) : ((config.col - 1) / 4);
-                    }
-                }
-                this.checkInteractions();
             } else {
-                this.footstepTimer = 0; // 停止移动时归零
-                this.moveAnimTime = 0;
-                
-                // 停止移动时平滑恢复
-                this.playerHero.position.y = THREE.MathUtils.lerp(this.playerHero.position.y, 0, 0.2);
-                this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, 0, 0.2);
-                this.playerShadow.scale.set(
-                    THREE.MathUtils.lerp(this.playerShadow.scale.x, 1, 0.2),
-                    THREE.MathUtils.lerp(this.playerShadow.scale.y, 1, 0.2),
-                    1
-                );
-                this.playerShadow.material.opacity = THREE.MathUtils.lerp(this.playerShadow.material.opacity, 0.3, 0.2);
-
-                // 呼吸效果
-                const breath = Math.sin(Date.now() * 0.003) * 0.02;
-                this.playerHero.scale.set(
-                    this.baseScale * (1 - breath),
-                    this.baseScale * (1 + breath),
-                    1
-                );
+                moveDir.set(dx, 0, dz).normalize();
             }
         }
 
-        // --- 更新小地图 ---
-        this.updateExploration(); // 更新探索迷雾数据
+        // 3. 执行物理位移与碰撞
+        if (isMoving && moveDir.lengthSq() > 0) {
+            const moveStep = this.moveSpeed * deltaTime;
+            const nextPos = this.playerGroup.position.clone().addScaledVector(moveDir, moveStep);
+            const isAuto = this.currentPath.length > 0;
+            const colRadius = isAuto ? 0.3 : 0.7;
+
+            if (mapGenerator.isPassable(nextPos.x, nextPos.z, colRadius)) {
+                this.playerGroup.position.copy(nextPos);
+            } else if (!isAuto) {
+                // 侧滑逻辑仅对键盘开放，寻路应保持精确性
+                this._applySlidingMovement(moveDir, moveStep, colRadius);
+            } else {
+                // 自动寻路中如果卡住了，由于 A* 已经保证了路径合法性，我们强制前进一小步防止抽搐
+                this.playerGroup.position.copy(nextPos);
+            }
+            this.checkInteractions();
+        }
+
+        // 4. 更新视觉表现 (动画与音效)
+        this._updateWalkingAnimation(deltaTime, moveDir, isMoving);
+    }
+
+    /**
+     * [辅助] 键盘侧滑碰撞处理
+     */
+    _applySlidingMovement(moveDir, moveStep, radius) {
+        const nextPosX = this.playerGroup.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
+        if (mapGenerator.isPassable(nextPosX.x, nextPosX.z, radius)) {
+            this.playerGroup.position.copy(nextPosX);
+        }
+        const nextPosZ = this.playerGroup.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
+        if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z, radius)) {
+            this.playerGroup.position.copy(nextPosZ);
+        }
+    }
+
+    /**
+     * [视觉] 行走动画与足音系统
+     */
+    _updateWalkingAnimation(deltaTime, moveDir, isMoving) {
+        const texture = this.playerHero.material.map;
+        const config = spriteFactory.unitConfig[this.heroId];
+
+        if (isMoving) {
+            const distanceMoved = this.playerGroup.position.distanceTo(this.lastPlayerPos);
+            
+            // 动感行走调参
+            const stepDistance = 3.5;      
+            const maxStepsPerSecond = 2.5; 
+            const deltaAnim = (distanceMoved / stepDistance) * Math.PI;
+            const maxDelta = (maxStepsPerSecond * Math.PI) * deltaTime;
+            const finalDelta = Math.min(deltaAnim, maxDelta);
+            this.moveAnimTime += finalDelta;
+
+            // 1. 垂直跳动 (Bobbing)
+            const bob = Math.abs(Math.sin(this.moveAnimTime)); 
+            this.playerHero.position.y = bob * 0.12;
+
+            // 2. 挤压伸展 (Squash & Stretch)
+            const stretch = 1 + bob * 0.06;
+            const squash = 1 - bob * 0.03;
+            
+            // 3. 影子表现
+            const shadowScale = 1 - bob * 0.2;
+            this.playerShadow.scale.set(shadowScale, shadowScale, 1);
+            this.playerShadow.material.opacity = 0.3 * (1 - bob * 0.2);
+
+            // 4. 倾斜 (Tilting)
+            const tilt = moveDir.x * -0.08; 
+            this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, tilt, 0.1);
+
+            // 5. 缩放应用
+            this.playerHero.scale.set(this.baseScale * squash, this.baseScale * stretch, 1);
+
+            // 6. 足音逻辑 (跟随移动状态)
+            if (this.footstepTimer === 0) {
+                audioManager.play('footstep_grass', { volume: 0.6, pitchVar: 0.2 });
+            }
+            this.footstepTimer += deltaTime * 1000;
+            if (this.footstepTimer >= this.footstepInterval) {
+                this.footstepTimer = 0;
+            }
+            
+            // 7. 翻转逻辑
+            if (moveDir.x !== 0) {
+                const defaultFacing = config.defaultFacing || 'right';
+                const isMovingLeft = moveDir.x < 0;
+                let shouldFlip = isMovingLeft ? (defaultFacing === 'right') : (defaultFacing === 'left');
+                const standardRepeatX = 1 / 4; 
+                const flippedRepeatX = -1 / 4;
+                const targetRepeatX = shouldFlip ? flippedRepeatX : standardRepeatX;
+                if (texture.repeat.x !== targetRepeatX) {
+                    texture.repeat.x = targetRepeatX;
+                    texture.offset.x = shouldFlip ? (config.col / 4) : ((config.col - 1) / 4);
+                }
+            }
+        } else {
+            // 停止移动时的恢复逻辑
+            this.footstepTimer = 0;
+            this.moveAnimTime = 0;
+            this.playerHero.position.y = THREE.MathUtils.lerp(this.playerHero.position.y, 0, 0.2);
+            this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, 0, 0.2);
+            this.playerShadow.scale.set(
+                THREE.MathUtils.lerp(this.playerShadow.scale.x, 1, 0.2),
+                THREE.MathUtils.lerp(this.playerShadow.scale.y, 1, 0.2),
+                1
+            );
+            this.playerShadow.material.opacity = THREE.MathUtils.lerp(this.playerShadow.material.opacity, 0.3, 0.2);
+
+            // 呼吸效果
+            const breath = Math.sin(Date.now() * 0.003) * 0.02;
+            this.playerHero.scale.set(this.baseScale * (1 - breath), this.baseScale * (1 + breath), 1);
+        }
+    }
+
+    update(deltaTime) {
+        if (!this.isActive || !this.playerGroup) return;
+
+        this.lastPlayerPos.copy(this.playerGroup.position); // 记录位移前位置
+
+        // 1. 驱动辅助系统
+        uiManager.update();
+        this._updateLevelUpFeedback();
+        this._updateEnvironment(deltaTime);
+
+        // 2. 核心位移与寻路逻辑
+        this._processInputAndMovement(deltaTime);
+
+        // 3. 更新视觉同步 (相机、小地图、探索)
+        this.updateExploration(); 
         this.updateMinimap();
 
         const targetCamPos = this.playerGroup.position.clone().add(new THREE.Vector3(0, 15, 12));
@@ -1301,8 +1791,10 @@ export class WorldScene {
             cityCard.querySelector('.hud-name').innerText = city.name;
             cityCard.querySelector('.hud-sub').innerText = city.id === 'main_city_1' ? '大本营' : '占领据点';
 
-            cityCard.onclick = () => {
+            cityCard.onpointerup = (e) => {
+                e.stopPropagation(); // 防止触发底层的 pointerup
                 audioManager.play('ui_click', { volume: 0.6 });
+                console.log("[HUD] Opening city:", city.id);
                 this.openTownManagement(city.id);
             };
 
@@ -1328,15 +1820,16 @@ export class WorldScene {
             if (hpBar) hpBar.style.width = `${(heroData.hpCurrent / heroData.hpMax) * 100}%`;
             if (mpBar) mpBar.style.width = `${(heroData.mpCurrent / heroData.mpMax) * 100}%`;
 
-            heroCard.onclick = () => {
+            heroCard.onpointerup = (e) => {
+                e.stopPropagation();
                 audioManager.play('ui_click', { volume: 0.6 });
                 this.openHeroStats();
             };
 
             // 绑定天赋提醒点击事件
             if (talentHint) {
-                talentHint.onclick = (e) => {
-                    // 此时已经不需要 stopPropagation，因为它们不再是嵌套关系
+                talentHint.onpointerup = (e) => {
+                    e.stopPropagation();
                     uiManager.toggleTalentPanel(true);
                 };
             }
@@ -1384,6 +1877,20 @@ export class WorldScene {
         const panel = document.getElementById('town-management-panel');
         if (panel) panel.classList.add('hidden');
         this.activeCityId = null;
+
+        // --- 手机端适配：仅在没有其他全屏面板打开时恢复 HUD ---
+        if (uiManager.isMobile) {
+            const heroPanel = document.getElementById('hero-stats-panel');
+            const talentPanel = document.getElementById('talent-panel');
+            const skillPanel = document.getElementById('skill-learn-panel');
+            if (
+                (!heroPanel || heroPanel.classList.contains('hidden')) &&
+                (!talentPanel || talentPanel.classList.contains('hidden')) &&
+                (!skillPanel || skillPanel.classList.contains('hidden'))
+            ) {
+                uiManager.setHUDVisibility(true);
+            }
+        }
     }
 
     /**
