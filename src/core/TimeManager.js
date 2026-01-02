@@ -77,10 +77,10 @@ class TimeManager {
      * 更新全局难度修正器
      */
     updateDifficultyModifiers() {
-        const progress = this.getGlobalProgress();
-        // 核心重构：伤害 4% 增长，生命值 6% 增长
-        const damageMult = Math.min(3.0, 1.0 + progress * 0.04);
-        const hpHoldMult = Math.min(4.0, 1.0 + progress * 0.06); // 上调生命值上限至 4 倍
+        const progress = Math.min(20, this.getGlobalProgress()); // 难度最高锁定在20分钟(20季度)时
+        // 平衡性调整：伤害每季度+4%，HP每季度+6%，最高锁定在20分钟时的倍数
+        const damageMult = 1.0 + progress * 0.04;
+        const hpHoldMult = 1.0 + progress * 0.06;
         
         // 注入 HP 修正
         modifierManager.addModifier({
@@ -128,18 +128,20 @@ class TimeManager {
 
     /**
      * 获取战力缩放系数（影响大世界怪物的 totalPoints）
-     * 每季度增加 4%，最高 3 倍
+     * 每季度增加 4%，最高锁定在20分钟(20季度)时的倍数
      */
-    getPowerMultiplier() {
-        return Math.min(3.0, 1.0 + this.getGlobalProgress() * 0.04);
+    vgetPowerMultiplier() {
+        const progress = Math.min(20, this.getGlobalProgress());
+        return 1.0 + progress * 0.04;
     }
 
     /**
      * 获取数值缩放系数（影响怪物的 HP 和 Damage）
-     * 每季度增加 4%，最高 3 倍
+     * 每季度增加 4%，最高锁定在20分钟(20季度)时的倍数
      */
     getStatMultiplier() {
-        return Math.min(3.0, 1.0 + this.getGlobalProgress() * 0.04);
+        const progress = Math.min(20, this.getGlobalProgress());
+        return 1.0 + progress * 0.04;
     }
 }
 
