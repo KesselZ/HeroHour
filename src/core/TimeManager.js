@@ -130,7 +130,7 @@ class TimeManager {
      * 获取战力缩放系数（影响大世界怪物的 totalPoints）
      * 每季度增加 4%，最高锁定在20分钟(20季度)时的倍数
      */
-    vgetPowerMultiplier() {
+    getPowerMultiplier() {
         const progress = Math.min(20, this.getGlobalProgress());
         return 1.0 + progress * 0.04;
     }
