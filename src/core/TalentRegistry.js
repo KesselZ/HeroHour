@@ -248,9 +248,15 @@ export const TALENT_UNITS = {
     },
     'unit_mp_base': {
         name: '内力',
-        icon: 'talent_mp', 
-        description: '<span class="skill-term-highlight">最大内力</span>提升 <span class="skill-num-highlight">80</span> 点', 
-        effects: [{ type: 'stat', stat: 'mp', value: 80, perLevel: true, method: 'add' }] 
+        icon: 'talent_mp',
+        description: '<span class="skill-term-highlight">最大内力</span>提升 <span class="skill-num-highlight">80</span> 点',
+        effects: [{ type: 'stat', stat: 'mp', value: 80, perLevel: true, method: 'add' }]
+    },
+    'unit_morale_base': {
+        name: '军队统御',
+        icon: 'talent_army_hp',
+        description: '<span class="skill-term-highlight">军队</span>提升 <span class="skill-num-highlight">12</span> 点',
+        effects: [{ type: 'stat', stat: 'morale', value: 12, perLevel: true, method: 'add' }]
     },
 
     // --- 史诗级基础属性 (作为各流派后期奖励，MaxLevel: 1) ---
@@ -307,7 +313,7 @@ export const TALENT_GROUPS = {
         name: '将道·铁骑',
         tag: '征战',
         major: 'unit_elite_cost', // 精锐减费
-        minors: ['unit_recruit_save', 'unit_army_def', 'unit_martyrdom', 'unit_army_hp_epic'] // 加入士兵生命史诗
+        minors: ['unit_recruit_save', 'unit_army_def', 'unit_martyrdom', 'unit_morale_base', 'unit_army_hp_epic'] // 加入军队统御和士兵生命史诗
     },
     // 【游历】大世界移动与发育
     'group_exploration': {
@@ -526,7 +532,7 @@ export function getHeroTalentTree(heroId) {
 
             const minorDist = baseMinorDist + (layerIdx * staggerStep) + edgePush; 
 
-            const isBaseStat = ['unit_power_base', 'unit_spells_base', 'unit_leadership_base', 'unit_army_hp', 'unit_haste_base', 'unit_mp_base'].includes(minorUnitId);
+            const isBaseStat = ['unit_power_base', 'unit_spells_base', 'unit_leadership_base', 'unit_army_hp', 'unit_haste_base', 'unit_mp_base', 'unit_morale_base'].includes(minorUnitId);
             const processedMinor = processUnit(TALENT_UNITS[minorUnitId]);
 
             nodes[minorId] = {

@@ -71,11 +71,11 @@ export const SkillRegistry = {
         cost: 45,
         cooldown: 10000,
         audio: 'skill_shout_extra',
-        targeting: { type: 'instant', shape: 'circle', radius: 12 },
+        targeting: { type: 'instant', shape: 'circle', radius: 150 },
         description: '激发起全军斗志，所有友军普通攻击伤害提升 {bonus}%，持续 {duration} 秒',
         actions: [
-            { type: 'vfx', name: 'pulse', params: { color: 0xffaa00, duration: 800, radius: 10 } },
-            { type: 'buff_aoe', side: 'player', params: { stat: 'attack_damage_bonus', multiplier: 1.2, duration: 4000, color: 0xffaa00, radius: 12 } }
+            { type: 'vfx', name: 'pulse', params: { color: 0xffaa00, duration: 800, radius: 150 } },
+            { type: 'buff_aoe', side: 'player', params: { stat: 'attack_damage_bonus', multiplier: 1.2, duration: 3000, color: 0xffaa00, radius: 150 } }
         ]
     }),
     'summon_militia': new Skill('summon_militia', {
@@ -162,7 +162,7 @@ export const SkillRegistry = {
         category: '虎牙令',
         icon: 'skill_shourushan',
         cost: 60,
-        cooldown: 30000,
+        cooldown: 15000,
         audio: 'skill_armor',
         targeting: { type: 'instant' },
         description: '钢铁意志：获得 80% 减伤效果，持续 {duration} 秒',
@@ -191,7 +191,7 @@ export const SkillRegistry = {
         category: '奔雷枪法',
         icon: 'skill_zhanbafang',
         cost: 30,
-        cooldown: 8000,
+        cooldown: 5000,
         audio: 'skill_zhanbafang',
         targeting: { type: 'instant', shape: 'circle', radius: 2.8 },
         description: '长枪横扫：快速旋转两圈，造成每段 {tickDamage} 点范围伤害',
@@ -208,13 +208,13 @@ export const SkillRegistry = {
         cost: 50,
         cooldown: 25000,
         audio: 'skill_xiaoruhu',
-        targeting: { type: 'instant', shape: 'circle', radius: 30 },
+        targeting: { type: 'instant', shape: 'circle', radius: 150 },
         description: '全军困兽犹斗：友军血量最低降至 1 点，持续 {duration} 秒',
         actions: [
-            { type: 'vfx', name: 'pulse', params: { color: 0xff0000, duration: 1000, radius: 15 } },
-            { type: 'buff_aoe', side: 'player', params: { 
-                stat: 'tigerHeart', 
-                duration: 5000, 
+            { type: 'vfx', name: 'pulse', params: { color: 0xff0000, duration: 1000, radius: 150 } },
+            { type: 'buff_aoe', side: 'player', params: {
+                stat: 'tigerHeart',
+                duration: 2500,
                 applySkillPowerToDuration: true,
                 color: 0xff3333,
                 vfxName: 'rising_particles'
@@ -227,7 +227,7 @@ export const SkillRegistry = {
         category: '奔雷枪法',
         icon: 'skill_pochongwei',
         cost: 45,
-        cooldown: 18000,
+        cooldown: 12000,
         audio: 'skill_jiantan',
         targeting: { type: 'instant', shape: 'circle', radius: 3 },
         description: '重踏地面：对周围敌人造成 {damage} 点伤害并眩晕 {stunDuration} 秒',

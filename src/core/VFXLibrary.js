@@ -380,7 +380,7 @@ export class VFXLibrary {
                 const anim = () => {
                     const prg = (Date.now() - start) / (duration * 0.8);
                     if (prg < 1) {
-                        const s = 1 + prg * (radius * 10); 
+                        const s = 1 + prg * radius;
                         ring.scale.set(s, s, 1);
                         mat.opacity = 0.8 * (1 - prg);
                         requestAnimationFrame(anim);

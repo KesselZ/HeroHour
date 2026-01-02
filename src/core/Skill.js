@@ -237,14 +237,16 @@ export class Skill {
                         const rawDuration = action.duration || (action.params && action.params.duration) || 0;
                         const actualDur = this.getActualDuration(heroData, rawDuration);
                         
-                        foundDuration = action.applySkillPowerToDuration ? (actualDur * skillPower) : actualDur;
+                        // 核心修复：应基于 res.isDurationDynamic 判断是否应用缩放，而不是只看 action 顶层
+                        foundDuration = res.isDurationDynamic ? (actualDur * skillPower) : actualDur;
                         isDurationDynamic = res.isDurationDynamic;
                         foundIsVFX = isVFX;
                     }
                 }
                 if (action.type === 'status_aoe' && action.duration) {
-                    const isDyn = action.applySkillPowerToDuration === true;
-                    const val = (isDyn ? (action.duration * skillPower) : action.duration) / 1000;
+                    const actualDur = this.getActualDuration(heroData, action.duration);
+                    const isDyn = action.applySkillPowerToDuration === true || (action.params && action.params.applySkillPowerToDuration === true);
+                    const val = (isDyn ? (actualDur * skillPower) : actualDur) / 1000;
                     desc = desc.split('{stunDuration}').join(isDyn ? hl(val.toFixed(1)) : normal(val.toFixed(1)));
                 }
                 if (action.interval || (action.params && action.params.interval)) {

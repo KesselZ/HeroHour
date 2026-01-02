@@ -325,12 +325,12 @@ export class WorldManager {
      * 职责：统一管理所有测试相关的 Hack 开关，保证生产环境一键切换
      */
     static DEBUG = {
-        ENABLED: false,            // 总开关：开启后激活下方子功能
-        REVEAL_MAP: false,         // 自动揭开全图迷雾
-        SHOW_INFLUENCE: false,     // 在小地图显示势力范围 (影响力热力图)
-        SHOW_POIS: false,          // 显示所有资源点/兴趣点标记
-        LICHENGEN_GOD_MODE: false, // 李承恩起始获得全兵种各 2 个 + 无限统御
-        START_RESOURCES: false,    // 初始金钱 10000，木头 5000
+        ENABLED: true,             // 总开关：开启后激活下方子功能
+        REVEAL_MAP: true,          // 自动揭开全图迷雾
+        SHOW_INFLUENCE: true,      // 在小地图显示势力范围 (影响力热力图)
+        SHOW_POIS: true,           // 显示所有资源点/兴趣点标记
+        LICHENGEN_GOD_MODE: true,  // 李承恩起始获得全兵种各 2 个 + 无限统御
+        START_RESOURCES: true,     // 初始金钱 10000，木头 5000
         SHOW_MOTION_DEBUG: false   // 运动调试日志：显示主角位移与动画增量
     };
 

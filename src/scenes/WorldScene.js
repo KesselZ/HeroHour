@@ -203,6 +203,9 @@ export class WorldScene {
             // 核心修复：属性变化时同步更新大世界移动速度
             const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
             this.moveSpeed = heroDetails.qinggong * 0.6;
+
+            // 核心修复：如果属性面板打开，实时刷新它
+            this.updateHeroStatsUI();
         };
         window.addEventListener('hero-stats-changed', this._onHeroStatsChanged);
 
@@ -215,6 +218,9 @@ export class WorldScene {
             
             // 同步更新 HUD (隐藏或更新提醒气泡)
             this.updateHeroHUD();
+
+            // 核心修复：如果属性面板打开，实时刷新它
+            this.updateHeroStatsUI();
 
             // 核心修复：奇穴更新后，如果城镇面板开着，也要刷新它，否则费用显示不更新
             if (this.activeCityId) {
@@ -281,6 +287,24 @@ export class WorldScene {
         if (skillLearnPanel) skillLearnPanel.classList.add('hidden');
         
         const panel = document.getElementById('hero-stats-panel');
+        if (panel) {
+            panel.classList.remove('hero-panel-v3');
+            panel.classList.add('hero-panel-v4');
+            panel.classList.remove('hidden');
+        }
+
+        // 核心逻辑：刷新英雄属性面板数据
+        this.updateHeroStatsUI();
+    }
+
+    /**
+     * 核心逻辑：刷新英雄属性面板数据 (不包含互斥关闭逻辑)
+     */
+    updateHeroStatsUI() {
+        const panel = document.getElementById('hero-stats-panel');
+        // 关键防护：如果面板没打开，则不需要浪费性能更新 DOM
+        if (!panel || panel.classList.contains('hidden')) return;
+
         const data = worldManager.heroData;
         const heroInfo = worldManager.availableHeroes[data.id];
         
@@ -382,10 +406,6 @@ export class WorldScene {
                 skillsContainer.appendChild(slot);
             });
         }
-
-        panel.classList.remove('hero-panel-v3');
-        panel.classList.add('hero-panel-v4');
-        panel.classList.remove('hidden');
     }
 
     bindAttrTooltip(id, name, desc) {
