@@ -4,6 +4,7 @@ import { SkillRegistry } from './SkillRegistry.js';
 
 /**
  * TalentManager: 奇穴系统逻辑管理器
+ * 处理点数分配、前置检查及加成应用
  */
 class TalentManager {
     constructor() {
@@ -61,12 +62,20 @@ class TalentManager {
             }
         }
 
-        // 新增：技能前置检查 (必须先学会对应招式)
-        if (node.requireSkill) {
-            const hasSkill = this.heroData && this.heroData.skills && this.heroData.skills.includes(node.requireSkill);
+        // --- 新增：前置技能检查 ---
+        if (node.requiredSkill) {
+            const heroSkills = this.heroData ? (this.heroData.skills || []) : [];
+            const requiredSkills = Array.isArray(node.requiredSkill) ? node.requiredSkill : [node.requiredSkill];
+            
+            // 检查逻辑：如果是数组，默认学会其中之一即可 (符合"使用A或B"的描述)
+            const hasSkill = requiredSkills.some(sid => heroSkills.includes(sid));
+            
             if (!hasSkill) {
-                const skillName = SkillRegistry[node.requireSkill]?.name || node.requireSkill;
-                return { canUpgrade: false, reason: `尚未领悟核心招式：${skillName}` };
+                const skillNames = requiredSkills.map(sid => {
+                    const skill = SkillRegistry[sid];
+                    return skill ? `【${skill.name}】` : sid;
+                }).join(' 或 ');
+                return { canUpgrade: false, reason: `需先领悟招式：${skillNames}` };
             }
         }
 

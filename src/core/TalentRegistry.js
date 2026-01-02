@@ -106,7 +106,7 @@ export const TALENT_UNITS = {
         name: '铁骑召来', icon: 'talent_tiance_cavalry',
         description: '集结令的感召力增强，现在会召唤<span class="skill-term-highlight">天策骑兵</span>而非步兵。',
         requires: ['node_core'],
-        requireSkill: 'summon_militia',
+        requiredSkill: 'summon_militia',
         effects: [{ type: 'modifier', target: 'hero', key: 'tiance_summon_upgrade', value: 1, method: 'add' }]
     },
     'tiance_yulin_spear': {
@@ -119,6 +119,7 @@ export const TALENT_UNITS = {
         name: '奔雷枪术', icon: 'talent_tiance_tu',
         description: '雷霆之势，【突】的<span class="skill-term-highlight">调息时间</span>永久降低至 <span class="skill-num-highlight">1</span> 秒。',
         requires: ['node_core'],
+        requiredSkill: 'tu',
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_tu_cooldown_override', value: 1000, method: 'add' }]
     },
 
@@ -134,6 +135,7 @@ export const TALENT_UNITS = {
         name: '凤鸣', icon: 'talent_cangjian_fengming',
         description: '轻剑之极致。梦泉虎跑<span class="skill-term-highlight">持续时间</span>延长 <span class="skill-num-highlight">3</span> 秒；且虎跑期间，平湖断月的<span class="skill-term-highlight">调息时间</span>降低<span class="skill-num-highlight">三成</span>。',
         requires: ['node_core'],
+        requiredSkill: 'mengquan',
         effects: [
             { type: 'modifier', target: 'hero', key: 'skill_mengquan_duration_offset', value: 3000, method: 'add' },
             { type: 'modifier', target: 'hero', key: 'cangjian_fengming_enabled', value: 1, method: 'add' }
@@ -155,6 +157,7 @@ export const TALENT_UNITS = {
         name: '层云', icon: 'talent_cangjian_jump',
         description: '大巧不工。使用鹤归孤山或松舍问霞落地 <span class="skill-num-highlight">0.5</span> 秒后，会自动触发一次额外的旋风斩，造成 <span class="skill-num-highlight">35</span> 点基础范围伤害（受功法加成）。',
         requires: ['node_core'],
+        requiredSkill: ['hegui', 'songshe'],
         effects: [{ type: 'modifier', target: 'hero', key: 'cangjian_jump_whirlwind_enabled', value: 1, method: 'add' }]
     },
 
@@ -175,6 +178,7 @@ export const TALENT_UNITS = {
         name: '化三清·恒', icon: 'talent_chunyang_huasanqing',
         description: '悟彻三清，气劲恒常。【化三清】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
         requires: ['node_core'],
+        requiredSkill: 'huasanqing',
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_huasanqing_duration_override', value: 999000, method: 'add' }]
     },
     'chunyang_array_mana_regen': {
@@ -187,12 +191,14 @@ export const TALENT_UNITS = {
         name: '三清化神·恒', icon: 'talent_chunyang_huasanqing',
         description: '玄门化神，剑气长存。【三清化神】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
         requires: ['node_core'],
+        requiredSkill: 'sanqing_huashen',
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_duration_override', value: 999000, method: 'add' }]
     },
     'chunyang_sanqing_huashen_mastery': {
         name: '三清化神·极', icon: 'talent_chunyang_huasanqing',
         description: '三清造化，神技自成。【三清化神】的<span class="skill-term-highlight">内力消耗</span>降低为 <span class="skill-num-highlight">0</span>，且发射<span class="skill-term-highlight">间隔</span>缩短 <span class="skill-num-highlight">1</span> 秒。',
         requires: ['chunyang_sanqing_huashen_permanent'],
+        requiredSkill: 'sanqing_huashen',
         effects: [
             { type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_mana_cost_multiplier', value: 0, method: 'mult' },
             { type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_interval_offset', value: -1000, method: 'add' }
