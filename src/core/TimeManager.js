@@ -77,14 +77,17 @@ class TimeManager {
      * 更新全局难度修正器
      */
     updateDifficultyModifiers() {
-        const statMult = this.getStatMultiplier();
+        const progress = this.getGlobalProgress();
+        // 核心重构：伤害 4% 增长，生命值 6% 增长
+        const damageMult = Math.min(3.0, 1.0 + progress * 0.04);
+        const hpHoldMult = Math.min(4.0, 1.0 + progress * 0.06); // 上调生命值上限至 4 倍
         
         // 注入 HP 修正
         modifierManager.addModifier({
             id: 'difficulty_hp',
             side: 'enemy',
             stat: 'hp',
-            multiplier: statMult
+            multiplier: hpHoldMult
         });
 
         // 注入伤害修正
@@ -92,10 +95,10 @@ class TimeManager {
             id: 'difficulty_damage',
             side: 'enemy',
             stat: 'attackDamage',
-            multiplier: statMult
+            multiplier: damageMult
         });
         
-        console.log(`%c[难度缩放] %c当前敌军属性系数: x${statMult.toFixed(2)}`, 'color: #ff4444; font-weight: bold', 'color: #fff');
+        console.log(`%c[难度缩放] %c敌军属性系数: 生命 x${hpHoldMult.toFixed(2)}, 伤害 x${damageMult.toFixed(2)}`, 'color: #ff4444; font-weight: bold', 'color: #fff');
     }
 
     updateUI() {

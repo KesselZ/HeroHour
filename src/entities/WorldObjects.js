@@ -242,10 +242,10 @@ export class CityObject extends WorldObject {
             // 攻城战配置：极高战力，且兵种池固定为该门派
             const siegeConfig = {
                 name: `${cityData.name} 守军`,
-                // 根据主城类型动态获取兵种池，如果没有则兜底
-                unitPool: faction?.heroId === 'liwangsheng' ? ['chunyang', 'ranged'] : ['tiance', 'melee'],
-                // 统一攻城战难度：全部使用 200 基础战力，并随时间系数缩放
-                totalPoints: Math.floor(200 * timeManager.getPowerMultiplier()), 
+                // 核心重构：根据主城所属英雄，配置该门派的全系兵种池
+                unitPool: this._getSectUnitPool(faction?.heroId),
+                // 统一攻城战难度：基础战力由 200 上调至 250，并随时间系数缩放
+                totalPoints: Math.floor(250 * timeManager.getPowerMultiplier()), 
                 isCitySiege: true, // 标记为攻城战
                 cityId: this.id
             };
@@ -254,6 +254,29 @@ export class CityObject extends WorldObject {
             worldScene.stop();
         }
         return false;
+    }
+
+    /**
+     * 获取对应门派的全系兵种池
+     * @param {string} heroId 英雄ID
+     */
+    _getSectUnitPool(heroId) {
+        const pools = {
+            'liwangsheng': [
+                'chunyang', 'cy_twin_blade', 'cy_sword_array', 
+                'cy_zixia_disciple', 'cy_taixu_disciple'
+            ],
+            'lichengen': [
+                'tiance', 'tc_crossbow', 'tc_banner', 'tc_dual_blade', 
+                'tc_halberdier', 'tc_shield_vanguard', 'tc_mounted_crossbow', 
+                'tc_heavy_cavalry'
+            ],
+            'yeying': [
+                'cangjian', 'cj_retainer', 'cj_wenshui', 'cj_shanju', 
+                'cj_xinjian', 'cj_golden_guard', 'cj_elder'
+            ]
+        };
+        return pools[heroId] || ['melee', 'ranged']; // 兜底返回基础兵种
     }
 
     onExitRange(worldScene) {

@@ -93,9 +93,9 @@ class City {
      * 初始化城市的初始产出修正
      */
     _initBaseProduction() {
-        // 核心对齐：为了让初始总收入(基础+初始建筑)等于 500金/200木
+        // 核心对齐：上调初始总收入 (基础 + 初始建筑) 为 500金 / 300木
         // 初始建筑 Lv.1 议政厅提供 200金, Lv.1 市场提供 100金和 50木
-        // 因此基础产出设为：200金，150木
+        // 因此基础产出设为：200金，250木 (总计 500/300)
         modifierManager.addModifier({
             id: `city_${this.id}_base_gold`,
             side: this.side,
@@ -109,7 +109,7 @@ class City {
             side: this.side,
             targetUnit: this,
             stat: 'wood_income',
-            offset: 150,
+            offset: 250,
             source: 'city_base'
         });
     }
@@ -951,7 +951,7 @@ export class WorldManager {
         if (this.spendGold(finalCost)) {
             // 优雅的自动判定：如果人在现场且统御足够，直接入队
             const canTakeNow = this.isPlayerAtCity(cityId) && 
-                               (this.getHeroCurrentLeadership() + unitLeadershipCost <= this.heroData.stats.leadership);
+                               (this.getHeroCurrentLeadership() + unitLeadershipCost <= this.getHeroMaxLeadership());
 
             if (canTakeNow) {
                 this.heroArmy[type] = (this.heroArmy[type] || 0) + 1;
@@ -986,7 +986,7 @@ export class WorldManager {
         let leadershipGained = 0;
         
         const currentLeadership = this.getHeroCurrentLeadership();
-        const maxLeadership = this.heroData.stats.leadership;
+        const maxLeadership = this.getHeroMaxLeadership();
         let remainingLeadership = maxLeadership - currentLeadership;
 
         // 获取所有有余量且有成本的兵种
@@ -2162,6 +2162,14 @@ export class WorldManager {
     }
 
     /**
+     * 获取英雄当前最大统御上限 (包含天赋、装备等修正)
+     */
+    getHeroMaxLeadership() {
+        const dummy = this.getPlayerHeroDummy();
+        return Math.floor(modifierManager.getModifiedValue(dummy, 'leadership', this.heroData.stats.leadership));
+    }
+
+    /**
      * 计算英雄当前队伍的总领导力消耗 (带兵量)
      */
     getHeroCurrentLeadership() {
@@ -2264,6 +2272,7 @@ export class WorldManager {
         // 确保 stats 中的冗余字段反映的是 ModifierManager 的最终输出
         data.stats.finalSpells = modifierManager.getModifiedValue(dummy, 'skill_power', realSpells);
         data.stats.finalHaste = modifierManager.getModifiedValue(dummy, 'haste', 0);
+        data.stats.finalLeadership = this.getHeroMaxLeadership();
         
         // 4. 重新加载英雄固有天赋
         modifierManager.removeModifiersBySource('trait');
@@ -2300,7 +2309,7 @@ export class WorldManager {
         const totalCostToAdd = amount * unitCost;
         
         const currentLeadership = this.getHeroCurrentLeadership();
-        const maxLeadership = this.heroData.stats.leadership;
+        const maxLeadership = this.getHeroMaxLeadership();
 
         if (currentLeadership + totalCostToAdd > maxLeadership) {
             this.showNotification(`统御容量不足！当前占用: ${currentLeadership}/${maxLeadership}，该操作需额外占用 ${totalCostToAdd} 点数`);

@@ -558,7 +558,7 @@ export class WorldScene {
         const heroLeadershipLabel = document.querySelector('.hero-army .army-label');
         if (heroLeadershipLabel) {
             const current = worldManager.getHeroCurrentLeadership();
-            const max = worldManager.heroData.stats.leadership;
+            const max = worldManager.getHeroMaxLeadership();
             heroLeadershipLabel.innerHTML = `我的队伍 <span style="color: ${current > max * 0.8 ? '#ff4444' : 'var(--jx3-celadon)'}">(${current}/${max})</span>`;
         }
 
