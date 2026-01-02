@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { resourcePreloader } from './ResourcePreloader.js';
 
 /**
  * 核心资源注册表
@@ -384,34 +385,52 @@ class SpriteFactory {
 
     /**
      * 预加载资源注册表中的所有贴图集
+     * 现在会检查全局预加载器是否已经加载过资源
      */
     async load() {
         const paths = Object.values(ASSET_REGISTRY.SHEETS);
         const promises = paths.map(path => {
             if (this.cache.has(path)) return Promise.resolve(this.cache.get(path));
-            
-            return new Promise((resolve, reject) => {
-                this.textureLoader.load(path, 
-                    (texture) => {
-                        texture.magFilter = THREE.NearestFilter;
-                        texture.minFilter = THREE.NearestFilter;
-                        texture.colorSpace = THREE.SRGBColorSpace;
-                        this.cache.set(path, texture);
-                        resolve(texture);
-                    },
-                    undefined,
-                    (err) => {
-                        console.error(`贴图加载失败: ${path}`, err);
-                        reject(err);
-                    }
-                );
-            });
+
+            // 检查全局预加载器是否已经加载过这个资源
+            if (resourcePreloader.isImageLoaded(path)) {
+                // 如果已经预加载过，直接创建纹理
+                return new Promise((resolve) => {
+                    this.textureLoader.load(path,
+                        (texture) => {
+                            texture.magFilter = THREE.NearestFilter;
+                            texture.minFilter = THREE.NearestFilter;
+                            texture.colorSpace = THREE.SRGBColorSpace;
+                            this.cache.set(path, texture);
+                            resolve(texture);
+                        }
+                    );
+                });
+            } else {
+                // 正常加载流程
+                return new Promise((resolve, reject) => {
+                    this.textureLoader.load(path,
+                        (texture) => {
+                            texture.magFilter = THREE.NearestFilter;
+                            texture.minFilter = THREE.NearestFilter;
+                            texture.colorSpace = THREE.SRGBColorSpace;
+                            this.cache.set(path, texture);
+                            resolve(texture);
+                        },
+                        undefined,
+                        (err) => {
+                            console.error(`贴图加载失败: ${path}`, err);
+                            reject(err);
+                        }
+                    );
+                });
+            }
         });
 
         try {
             await Promise.all(promises);
             this.isLoaded = true;
-            console.log('%c[资源加载] %c所有贴图加载完成', 'color: #5b8a8a; font-weight: bold', 'color: #fff');
+            console.log('%c[资源加载] %c所有贴图加载完成 (来自全局预加载)', 'color: #5b8a8a; font-weight: bold', 'color: #4CAF50');
         } catch (error) {
             console.error('资源预加载过程中出错:', error);
         }

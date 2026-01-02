@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "generate-resources": "node scripts/generate-resource-list.js",
+    "dev": "npm run generate-resources && vite",
+    "build": "npm run generate-resources && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

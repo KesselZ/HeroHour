@@ -139,9 +139,13 @@ export class Skill {
         if (skillOverride > 0) return skillOverride;
         const categoryOverride = modifierManager.getModifiedValue(unit, `category_${this.category}_duration_override`, 0);
         if (categoryOverride > 0) return categoryOverride;
-        const offset = modifierManager.getModifiedValue(unit, `skill_${this.id}_duration_offset`, 0) + 
-                       modifierManager.getModifiedValue(unit, `category_${this.category}_duration_offset`, 0);
-        const multiplier = modifierManager.getModifiedValue(unit, `skill_${this.id}_duration_multiplier`, 1.0) * 
+
+        // 优雅修复：镇山河技能特殊处理，不受气场持续时间延长天赋影响
+        const categoryOffset = this.id === 'zhenshanhe' ? 0 :
+                               modifierManager.getModifiedValue(unit, `category_${this.category}_duration_offset`, 0);
+
+        const offset = modifierManager.getModifiedValue(unit, `skill_${this.id}_duration_offset`, 0) + categoryOffset;
+        const multiplier = modifierManager.getModifiedValue(unit, `skill_${this.id}_duration_multiplier`, 1.0) *
                            modifierManager.getModifiedValue(unit, `category_${this.category}_duration_multiplier`, 1.0);
         return (baseDuration + offset) * multiplier;
     }
@@ -464,8 +468,13 @@ export class Skill {
 
             case 'projectile':
                 const projTargets = battleScene.getUnitsInArea(center, { type: 'instant', radius: 20 }, 'enemy');
+                
+                // 核心重构：优雅地剥离“技能动作属性”与“子弹视觉属性”，解决命名冲突
+                const { type: actionType, projType, visualType, ...projectileParams } = action;
+                
                 battleScene.spawnProjectiles({
-                    ...action,
+                    ...projectileParams,
+                    type: projType || visualType || 'arrow', // 显式映射视觉类型到底层的 type 字段
                     damage: res.finalDamage,
                     isHeroSource: caster.isHero,
                     startPos: caster.position.clone().add(new THREE.Vector3(0, 0.5, 0)),

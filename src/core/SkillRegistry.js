@@ -104,19 +104,19 @@ export const SkillRegistry = {
         targeting: { type: 'location', shape: 'circle', range: 18, radius: 4.5 },
         description: '【气场】产生无敌气场，保护范围内友军免受伤害，持续 {duration} 秒',
         actions: [
-            { type: 'vfx', name: 'dome', params: { color: 0x88ccff, duration: 3000, radius: 4.5, applySkillPowerToDuration: true } },
-            { 
-                type: 'tick_effect', 
-                duration: 3000, 
-                interval: 500, 
+            { type: 'vfx', name: 'dome', params: { color: 0x88ccff, duration: 2000, radius: 4.5, applySkillPowerToDuration: true } },
+            {
+                type: 'tick_effect',
+                duration: 2000,
+                interval: 500,
                 side: 'player',
                 applySkillPowerToDuration: true,
-                onTickBuff: { 
-                    stat: 'invincible', 
-                    duration: 800, 
+                onTickBuff: {
+                    stat: 'invincible',
+                    duration: 800,
                     color: 0x88ccff,
                     tag: 'zhenshanhe'
-                } 
+                }
             }
         ]
     }),
@@ -324,6 +324,7 @@ export const SkillRegistry = {
                 interval: 150, 
                 damage: 35, 
                 projType: 'air_sword',
+                color: 0x00ffff,
                 autoTarget: true,
                 targetMode: 'nearest', // 四象轮回：盯着最近的打，适合集火
                 scale: 1.5 // 技能射出的剑比普攻大 50%
@@ -347,6 +348,7 @@ export const SkillRegistry = {
                 interval: 80, 
                 damage: 45, 
                 projType: 'air_sword',
+                color: 0x00ffff,
                 autoTarget: true,
                 targetMode: 'spread', // 两仪化形：智能散布，每人分几剑，华丽清场
                 scale: 1.8 // 进阶技能的剑气更粗壮
@@ -370,6 +372,7 @@ export const SkillRegistry = {
                 interval: 100, 
                 damage: 30.8, 
                 projType: 'air_sword',
+                color: 0x00ffff,
                 autoTarget: true,
                 targetMode: 'random',
                 scale: 2.5 // 绝技的剑气具有毁灭性的压迫感，最大！

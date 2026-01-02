@@ -1,3 +1,5 @@
+import { resourcePreloader } from './ResourcePreloader.js';
+
 /**
  * AudioManager: 全局声音管理器
  * 支持音效池、随机播放、概率触发、并发控制和 BGM 淡入淡出。
@@ -144,6 +146,12 @@ class AudioManager {
         // 4. 播放逻辑
         try {
             const audio = new Audio(file);
+
+            // 如果资源已经被预加载，音频应该已经可以立即播放
+            if (resourcePreloader.isAudioLoaded(file)) {
+                audio.preload = 'auto'; // 确保预加载状态
+            }
+
             const baseVolume = (options.volume ?? 1.0) * this.sfxVolume;
             audio.volume = baseVolume;
 

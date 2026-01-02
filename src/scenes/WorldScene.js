@@ -285,6 +285,10 @@ export class WorldScene {
         this.closeTownManagement();
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (skillLearnPanel) skillLearnPanel.classList.add('hidden');
+        const startWindow = document.getElementById('game-start-window');
+        if (startWindow) startWindow.classList.add('hidden');
+        const htpPanel = document.getElementById('how-to-play-panel');
+        if (htpPanel) htpPanel.classList.add('hidden');
         
         const panel = document.getElementById('hero-stats-panel');
         if (panel) {
@@ -434,12 +438,14 @@ export class WorldScene {
         const heroPanel = document.getElementById('hero-stats-panel');
         const townPanel = document.getElementById('town-management-panel');
         const skillLearnPanel = document.getElementById('skill-learn-panel');
+        const talentPanel = document.getElementById('talent-panel');
         const startWindow = document.getElementById('game-start-window');
         const htpPanel = document.getElementById('how-to-play-panel');
-        
-        const isUIOpen = (heroPanel && !heroPanel.classList.contains('hidden')) || 
+
+        const isUIOpen = (heroPanel && !heroPanel.classList.contains('hidden')) ||
                          (townPanel && !townPanel.classList.contains('hidden')) ||
                          (skillLearnPanel && !skillLearnPanel.classList.contains('hidden')) ||
+                         (talentPanel && !talentPanel.classList.contains('hidden')) ||
                          (startWindow && !startWindow.classList.contains('hidden')) ||
                          (htpPanel && !htpPanel.classList.contains('hidden'));
 
@@ -496,6 +502,10 @@ export class WorldScene {
         document.getElementById('hero-stats-panel').classList.add('hidden');
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (skillLearnPanel) skillLearnPanel.classList.add('hidden');
+        const startWindow = document.getElementById('game-start-window');
+        if (startWindow) startWindow.classList.add('hidden');
+        const htpPanel = document.getElementById('how-to-play-panel');
+        if (htpPanel) htpPanel.classList.add('hidden');
 
         const panel = document.getElementById('town-management-panel');
         const cityData = worldManager.cities[cityId];

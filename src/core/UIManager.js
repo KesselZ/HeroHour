@@ -78,6 +78,13 @@ class UIManager {
     showGameStartWindow(enemies) {
         if (this.gameStartWindowShown) return; // 如果已经显示过，则不再重复显示
 
+        // --- 互斥逻辑：显示江湖告示时，关闭其他面板 ---
+        const panelsToHide = ['hero-stats-panel', 'town-management-panel', 'skill-learn-panel', 'how-to-play-panel'];
+        panelsToHide.forEach(id => {
+            const panel = document.getElementById(id);
+            if (panel) panel.classList.add('hidden');
+        });
+
         const window = document.getElementById('game-start-window');
         const container = document.getElementById('game-start-enemies');
         if (!window || !container) return;
@@ -262,6 +269,13 @@ class UIManager {
         audioManager.play('ui_click');
 
         if (show) {
+            // --- 互斥逻辑：打开奇穴面板时，关闭其他所有 UI 面板 ---
+            const panelsToHide = ['hero-stats-panel', 'town-management-panel', 'skill-learn-panel', 'how-to-play-panel', 'game-start-window'];
+            panelsToHide.forEach(id => {
+                const p = document.getElementById(id);
+                if (p) p.classList.add('hidden');
+            });
+
             // 1. 触发【全画面】扭曲缩小效果
             uiLayer.classList.add('ui-layer-distort-out');
             gameCanvas.classList.add('ui-layer-distort-out');

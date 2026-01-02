@@ -10,6 +10,7 @@ import { talentManager } from './core/TalentManager.js';
 import { uiManager } from './core/UIManager.js';
 import { audioManager } from './core/AudioManager.js';
 import { timeManager } from './core/TimeManager.js';
+import { resourcePreloader } from './core/ResourcePreloader.js';
 
 import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
@@ -234,10 +235,11 @@ if (skillGalleryBtn) {
         audioManager.play('ui_click');
         
         // --- 互斥逻辑：打开招式图谱时，关闭其他面板 ---
-        const townPanel = document.getElementById('town-management-panel');
-        const heroPanel = document.getElementById('hero-stats-panel');
-        if (townPanel) townPanel.classList.add('hidden');
-        if (heroPanel) heroPanel.classList.add('hidden');
+        const panelsToHide = ['town-management-panel', 'hero-stats-panel', 'game-start-window', 'how-to-play-panel'];
+        panelsToHide.forEach(id => {
+            const p = document.getElementById(id);
+            if (p) p.classList.add('hidden');
+        });
 
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (skillLearnPanel) {
@@ -254,12 +256,11 @@ if (howToPlayBtn) {
         audioManager.play('ui_click');
 
         // --- 互斥逻辑：打开指南时，关闭其他面板 ---
-        const townPanel = document.getElementById('town-management-panel');
-        const heroPanel = document.getElementById('hero-stats-panel');
-        const skillPanel = document.getElementById('skill-learn-panel');
-        if (townPanel) townPanel.classList.add('hidden');
-        if (heroPanel) heroPanel.classList.add('hidden');
-        if (skillPanel) skillPanel.classList.add('hidden');
+        const panelsToHide = ['town-management-panel', 'hero-stats-panel', 'skill-learn-panel', 'game-start-window'];
+        panelsToHide.forEach(id => {
+            const p = document.getElementById(id);
+            if (p) p.classList.add('hidden');
+        });
 
         const panel = document.getElementById('how-to-play-panel');
         const textContainer = document.getElementById('how-to-play-text');
@@ -347,6 +348,39 @@ confirmCharBtn.addEventListener('click', async () => {
 
 // 初始进入菜单时播放菜单 BGM
 audioManager.playBGM('/audio/bgm_menu.mp3');
+
+// 在页面加载完成后开始预加载所有资源
+window.addEventListener('load', () => {
+    const loadingScreen = document.getElementById('loading-screen');
+    const progressFill = document.getElementById('loading-progress-fill');
+    const loadingText = document.getElementById('loading-text');
+    const uiLayer = document.getElementById('ui-layer');
+
+    // 显示加载界面
+    if (loadingScreen) loadingScreen.classList.remove('hidden');
+
+    // 延迟一小段时间再开始预加载，避免阻塞初始渲染
+    setTimeout(() => {
+        resourcePreloader.preloadAll(
+            (loaded, total) => {
+                // 更新加载界面进度
+                const progress = Math.round((loaded / total) * 100);
+                if (progressFill) progressFill.style.width = `${progress}%`;
+                if (loadingText) loadingText.textContent = `${progress}%`;
+                console.log(`资源预加载进度: ${loaded}/${total} (${progress}%)`);
+            },
+            () => {
+                console.log('%c[资源预加载] 全局预加载完成，用户体验将大幅提升', 'color: #4CAF50; font-weight: bold');
+
+                // 隐藏加载界面，显示主界面
+                setTimeout(() => {
+                    if (loadingScreen) loadingScreen.classList.add('hidden');
+                    if (uiLayer) uiLayer.classList.remove('hidden');
+                }, 500); // 短暂延迟，让用户看到100%
+            }
+        );
+    }, 100);
+});
 
 // 监听大世界发出的开战请求
 window.addEventListener('start-battle', (e) => {
