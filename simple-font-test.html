@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>字体对比测试</title>
+    <style>
+        .test { margin: 20px; padding: 15px; border: 2px solid #ccc; font-size: 16px; }
+        .serif-test { font-family: "Microsoft YaHei", "SimSun", serif; background: #f0f0f0; }
+        .sans-test { font-family: "Microsoft YaHei", sans-serif; background: #fff; }
+    </style>
+</head>
+<body>
+    <h1>macOS字体实际渲染测试</h1>
+    
+    <div class="test serif-test">
+        <h3>上方提示气泡字体 (已修改):</h3>
+        <p>font-family: "Microsoft YaHei", sans-serif</p>
+        <p>天宝三年·夏</p>
+        <p>系统会使用: PingFang SC (苹方)</p>
+    </div>
+    
+    <div class="test sans-test">
+        <h3>大部分文字字体:</h3>
+        <p>font-family: "Microsoft YaHei", sans-serif</p>
+        <p>星魄待悟</p>
+        <p>系统会使用: PingFang SC (苹方)</p>
+    </div>
+    
+    <div class="test" style="font-family: serif;">
+        <h3>纯serif字体:</h3>
+        <p>系统默认serif字体</p>
+    </div>
+    
+    <div class="test" style="font-family: sans-serif;">
+        <h3>纯sans-serif字体:</h3>
+        <p>系统默认sans-serif字体 (PingFang SC)</p>
+    </div>
+</body>
+</html>

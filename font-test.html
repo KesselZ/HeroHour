@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>字体测试</title>
+    <style>
+        body { font-family: "Microsoft YaHei", "SimSun", serif; }
+        .sans { font-family: "Microsoft YaHei", sans-serif; }
+        .test-text { font-size: 18px; margin: 10px; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h2>字体栈测试 (macOS)</h2>
+    
+    <div class="test-text">
+        <strong>serif字体栈:</strong> "Microsoft YaHei", "SimSun", serif<br>
+        天宝三年·夏 (上方提示气泡风格)<br>
+        这是一段测试文字
+    </div>
+    
+    <div class="test-text sans">
+        <strong>sans-serif字体栈:</strong> "Microsoft YaHei", sans-serif<br>
+        星魄待悟 (大部分文字风格)<br>
+        这是一段测试文字
+    </div>
+    
+    <div class="test-text" style="font-family: serif;">
+        <strong>纯serif:</strong> 系统默认serif字体<br>
+        这是一段测试文字
+    </div>
+    
+    <div class="test-text" style="font-family: sans-serif;">
+        <strong>纯sans-serif:</strong> 系统默认sans-serif字体<br>
+        这是一段测试文字
+    </div>
+    
+    <script>
+        // 检查字体是否可用
+        document.addEventListener('DOMContentLoaded', function() {
+            const tests = [
+                { name: 'Microsoft YaHei', font: 'Microsoft YaHei' },
+                { name: 'SimSun', font: 'SimSun' },
+                { name: '宋体', font: '宋体' },
+                { name: 'PingFang SC', font: 'PingFang SC' }
+            ];
+            
+            console.log('字体可用性测试:');
+            tests.forEach(test => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.font = '16px ' + test.font + ', monospace';
+                const width1 = ctx.measureText('mmmmmmmmmm').width;
+                ctx.font = '16px monospace';
+                const width2 = ctx.measureText('mmmmmmmmmm').width;
+                console.log(test.name + ': ' + (width1 !== width2 ? '可用' : '不可用'));
+            });
+        });
+    </script>
+</body>
+</html>

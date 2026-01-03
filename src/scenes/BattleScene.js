@@ -1231,7 +1231,11 @@ export class BattleScene {
             }
 
             // 下一个周期
-            setTimeout(executeCycle, interval);
+            // 核心重构：让发射间隔吃攻速加成，将其视为一种特殊的普通攻击
+            const speedMult = modifierManager.getModifiedValue(caster, 'attackSpeed', 1.0);
+            const dynamicInterval = interval / speedMult;
+            
+            setTimeout(executeCycle, dynamicInterval);
         };
 
         // 立即开始第一个周期

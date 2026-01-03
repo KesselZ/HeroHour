@@ -150,6 +150,33 @@ class TalentManager {
 
         window.dispatchEvent(new CustomEvent('talents-updated'));
     }
+
+    /**
+     * 获取存档数据
+     */
+    getSaveData() {
+        return {
+            activeTalents: { ...this.activeTalents }
+        };
+    }
+
+    /**
+     * 加载存档数据
+     */
+    loadSaveData(data) {
+        if (!data) return;
+        
+        this.activeTalents = { ...data.activeTalents };
+        
+        // 核心修复：加载存档时，如果 heroData 已就绪，必须同步更新天赋树，防止跨角色加载 Bug
+        if (this.heroData) {
+            this.heroData.talents = this.activeTalents;
+            this.currentTree = getHeroTalentTree(this.heroData.id);
+            this.applyAllTalentEffects();
+        }
+        
+        console.log("%c[系统] TalentManager 数据恢复完毕", "color: #4CAF50; font-weight: bold");
+    }
 }
 
 export const talentManager = new TalentManager();

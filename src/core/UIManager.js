@@ -822,14 +822,8 @@ class UIManager {
      * 显示全局通知
      */
     showNotification(text) {
-        const container = document.getElementById('notification-container');
-        if (!container) return;
-        const note = document.createElement('div');
-        note.className = 'notification-item';
-        note.innerText = text;
-        container.appendChild(note);
-        setTimeout(() => note.classList.add('fade-out'), 2000);
-        setTimeout(() => note.remove(), 2500);
+        // 统一调用 WorldManager 的通知系统
+        worldManager.showNotification(text);
     }
 
 

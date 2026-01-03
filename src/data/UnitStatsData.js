@@ -20,8 +20,8 @@ export const UNIT_STATS_DATA = {
         allowedZones: ['middle'],
         description: '御剑而行，能在大后方提供精准的剑气支援。',
         modes: {
-            'chunyang_remote': { name: '纯阳(气)', atk: 10, range: 12.0, burstCount: 3, targets: 1.0 },
-            'chunyang_melee': { name: '纯阳(剑)', atk: 18, range: 1.5, burstCount: 1, targets: 2.5 }
+            'chunyang_remote': { name: '纯阳(气)', atk: 8.5, range: 12.0, burstCount: 3, targets: 1.0 },
+            'chunyang_melee': { name: '纯阳(剑)', atk: 15.3, range: 1.5, burstCount: 1, targets: 2.5 }
         }
     },
     'cangjian': { name: '藏剑弟子', hp: 200, atk: 6.0, range: 1.5, rangeType: 'AOE', speed: 4.7, attackSpeed: 2000, burstCount: 3, targets: 4.0, allowedZones: ['front'], description: '藏剑名剑，重剑无锋，旋风斩具有毁灭性的群体伤害。' },
@@ -141,9 +141,9 @@ export const UNIT_STATS_DATA = {
  */
 export const HERO_IDENTITY = {
     'liwangsheng': {
-        primaryStat: '根骨', 
+        primaryStat: '根骨',
         initialStats: { power: 7, spells: 12, morale: 6, qinggong: 11.8, battleSpeed: 6.0, leadership: 20 },
-        combatBase: { atk: 9, hpBase: 200, hpScaling: 5, mpBase: 80, mpScaling: 6, atkScaling: 0.02 }, 
+        combatBase: { atk: 13, hpBase: 200, hpScaling: 5, mpBase: 80, mpScaling: 6, atkScaling: 0.02 }, 
         traits: [
             { id: 'liwangsheng_sect_hp', unitType: 'chunyang', stat: 'hp', multiplier: 1.2, description: '门派领袖：纯阳弟子气血提高 20%' },
             { id: 'liwangsheng_sect_dmg', unitType: 'chunyang', stat: 'attackDamage', multiplier: 1.2, description: '门派领袖：纯阳弟子伤害提高 20%' }

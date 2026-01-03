@@ -20,18 +20,29 @@ export class MapGenerator {
         this.scale = 0.02; // 进一步降低基础频率，追求更长的地貌线条
         this.grid = [];
         this.heightMap = []; // 新增：记录原始噪声高度
+        this.offsetX = 0;
+        this.offsetY = 0;
     }
 
     /**
      * 生成地图
      */
-    generate(size = 400) {
+    generate(size = 400, forcedOffsets = null) {
         this.size = size;
         this.grid = [];
         this.heightMap = [];
         
-        const offsetX = Math.random() * 5000;
-        const offsetY = Math.random() * 5000;
+        // 如果提供了强制偏移量（通常用于加载存档），则使用它，否则随机生成
+        if (forcedOffsets) {
+            this.offsetX = forcedOffsets.x;
+            this.offsetY = forcedOffsets.y;
+        } else {
+            this.offsetX = Math.random() * 5000;
+            this.offsetY = Math.random() * 5000;
+        }
+
+        const offsetX = this.offsetX;
+        const offsetY = this.offsetY;
 
         const baseFreq = 0.0125; 
         const border = 50; // 边缘山脉屏障的宽度

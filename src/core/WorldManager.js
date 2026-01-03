@@ -3,6 +3,7 @@ import { SkillRegistry } from './SkillRegistry.js';
 import { audioManager } from './AudioManager.js';
 import { talentManager } from './TalentManager.js';
 import { timeManager } from './TimeManager.js';
+import { rng, setSeed } from './Random.js';
 import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
 
 /**
@@ -17,15 +18,15 @@ const BUILDING_REGISTRY = {
     'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '增加城镇木材产出，并降低全军招募成本 5%。', costGrowth: { type: 'linear', increment: { gold: 500, wood: 300 } } },
     
     // 军事建筑：根据兵种强度（招募成本与统御占用）重新平衡
-    'barracks': { name: '兵营', category: 'military', maxLevel: 5, icon: 'melee', cost: { gold: 400, wood: 150 }, description: '解锁近战兵种，随后每级增加全军近战兵种 10% 生命。', costGrowth: { type: 'linear', increment: { gold: 150, wood: 50 } } },
-    'archery_range': { name: '靶场', category: 'military', maxLevel: 5, icon: 'archer', cost: { gold: 500, wood: 250 }, description: '解锁远程兵种，随后每级增加全军远程兵种 10% 伤害。', requirements: [{ id: 'barracks', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 200, wood: 100 } } },
+    'barracks': { name: '兵营', category: 'military', maxLevel: 5, icon: 'melee', cost: { gold: 400, wood: 150 }, description: '解锁天策弟子与长歌弟子，随后每级增加全军天策弟子 10% 伤害与生命。', costGrowth: { type: 'linear', increment: { gold: 150, wood: 50 } } },
+    'archery_range': { name: '靶场', category: 'military', maxLevel: 5, icon: 'archer', cost: { gold: 500, wood: 250 }, description: '解锁唐门射手，随后每级增加全军长歌弟子与唐门射手 10% 伤害与生命。', requirements: [{ id: 'barracks', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 200, wood: 100 } } },
     
     // 高级兵种建筑：价格按强度阶梯式上升
-    'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '解锁万花兵种，随后每级增加全军万花系 10% 气血与疗效。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 300, wood: 150 } } },
-    'martial_shrine': { name: '苍云讲武堂', category: 'military', maxLevel: 5, icon: 'cangyun', cost: { gold: 700, wood: 350 }, description: '解锁苍云兵种，随后每级增加全军苍云系 10% 生命与防御。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 300, wood: 150 } } },
-    'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 600, wood: 300 }, description: '解锁纯阳兵种，随后每级增加全军纯阳系 10% 属性。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 250, wood: 125 } } },
-    'stable': { name: '天策马厩', category: 'military', maxLevel: 5, icon: 'tiance', cost: { gold: 1100, wood: 600 }, description: '解锁天策兵种，随后每级增加全军天策系 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 500, wood: 300 } } },
-    'sword_forge': { name: '藏剑剑庐', category: 'military', maxLevel: 5, icon: 'cangjian', cost: { gold: 800, wood: 400 }, description: '解锁藏剑兵种，随后每级增加全军藏剑系 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 400, wood: 200 } } },
+    'medical_pavilion': { name: '万花医馆', category: 'military', maxLevel: 5, icon: 'healer', cost: { gold: 700, wood: 350 }, description: '解锁万花弟子，随后每级增加全军万花弟子 10% 疗效与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 300, wood: 150 } } },
+    'martial_shrine': { name: '苍云讲武堂', category: 'military', maxLevel: 5, icon: 'cangyun', cost: { gold: 700, wood: 350 }, description: '解锁苍云将士，随后每级增加全军苍云将士 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 300, wood: 150 } } },
+    'mage_guild': { name: '纯阳道场', category: 'military', maxLevel: 5, icon: 'chunyang', cost: { gold: 600, wood: 300 }, description: '解锁纯阳弟子，随后每级增加全军纯阳弟子 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 250, wood: 125 } } },
+    'stable': { name: '天策马厩', category: 'military', maxLevel: 5, icon: 'tiance', cost: { gold: 1100, wood: 600 }, description: '解锁天策骑兵，随后每级增加全军天策骑兵 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 500, wood: 300 } } },
+    'sword_forge': { name: '藏剑剑庐', category: 'military', maxLevel: 5, icon: 'cangjian', cost: { gold: 800, wood: 400 }, description: '解锁藏剑弟子，随后每级增加全军藏剑弟子 10% 伤害与生命。', requirements: [{ id: 'archery_range', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 400, wood: 200 } } },
     
     // 特殊建筑：移除不必要的条件，平衡价格
     'spell_altar': { name: '功法祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1500, wood: 800 }, description: '博采众长：每级随机感悟全江湖招式。', costGrowth: { type: 'exponential', factor: 1.8 } },
@@ -407,7 +408,9 @@ export class WorldManager {
             exploredMap: null,  // 新增：小地图探索迷雾数据 (Uint8Array)
             interactionLocks: new Set(), // 新增：全局交互锁，确保战斗回来后状态保留
             pendingBattleEnemyId: null,   // 新增：正在进行的战斗目标 ID
-            influenceCenters: [] // 新增：势力影响力中心 [{type, faction, x, z, strength}]
+            influenceCenters: [], // 新增：势力影响力中心 [{type, faction, x, z, strength}]
+            terrainOffsets: { x: 0, y: 0 }, // 新增：记录地形生成的随机偏移量，用于存档恢复
+            seed: 0             // 新增：地形随机种子
         };
 
         // 5. 占领建筑状态 (已整合进 entities，保留此数组用于快速结算收益)
@@ -570,9 +573,9 @@ export class WorldManager {
             },
             'shence_imperial_guards': {
                 name: '神策禁卫禁军',
-                overworldIcon: 'shence_iron_pagoda', 
-                unitPool: ['shence_iron_pagoda', 'shence_overseer', 'shence_cavalry', 'shence_bannerman'], 
-                basePoints: 250,        
+                overworldIcon: 'shence_iron_pagoda',
+                unitPool: ['shence_iron_pagoda', 'shence_overseer', 'shence_cavalry', 'shence_bannerman'],
+                basePoints: 150,
                 baseWeight: 0.1,
                 description: '神策军中最强悍的力量，重型铁甲与指挥官的完美配合。'
             },
@@ -604,9 +607,9 @@ export class WorldManager {
             },
             'red_cult_conflagration': {
                 name: '红衣教焚世军',
-                overworldIcon: 'red_cult_high_priestess', 
-                unitPool: ['red_cult_high_priestess', 'red_cult_firemage', 'red_cult_executioner', 'red_cult_assassin'], 
-                basePoints: 220,        
+                overworldIcon: 'red_cult_high_priestess',
+                unitPool: ['red_cult_high_priestess', 'red_cult_firemage', 'red_cult_executioner', 'red_cult_assassin'],
+                basePoints: 150,
                 baseWeight: 0.1,
                 description: '红衣教最狂暴的部队，所到之处皆为焦土。'
             },
@@ -1050,7 +1053,17 @@ export class WorldManager {
      * @param {Object} generator 地图生成器实例 (由 Scene 传入)
      */
     getOrGenerateWorld(generator) {
+        // 核心修复：如果已经有生成的网格数据，直接返回
+        if (this.mapState.isGenerated && this.mapState.grid && this.mapState.grid.length > 0) {
+            return this.mapState;
+        }
+
+        // 如果标记为已生成但网格为空（说明是刚从存档载入），则使用保存的偏移量重新生成地形
+        // 这样既能保证地形与存档一致，又节省了存储空间
         if (this.mapState.isGenerated) {
+            console.log("%c[系统] 正在从存档数据恢复江湖地形...", "color: #5b8a8a; font-weight: bold");
+            this.mapState.grid = generator.generate(this.mapState.size, this.mapState.terrainOffsets);
+            this.mapState.heightMap = generator.heightMap;
             return this.mapState;
         }
 
@@ -1058,6 +1071,11 @@ export class WorldManager {
         
         const size = 400; 
         const grid = generator.generate(size);
+        
+        // 记录地形偏移量和种子，以便存档时保存
+        this.mapState.terrainOffsets = { x: generator.offsetX, y: generator.offsetY };
+        this.mapState.seed = rng.seed;
+        
         const entities = [];
         const halfSize = size / 2;
 
@@ -1294,13 +1312,13 @@ export class WorldManager {
                 const worldX = x - halfSize;
                 const worldZ = z - halfSize;
 
-                // 3. 安全区检查 (半径 3)
+                // 3. 安全区检查 (半径 4.5)
                 const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
-                let inCitySafetyZone = distToPlayer < 3;
+                let inCitySafetyZone = distToPlayer < 4.5;
                 if (!inCitySafetyZone) {
                     for (const cityId in this.cities) {
                         const city = this.cities[cityId];
-                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 3) {
+                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 4.5) {
                             inCitySafetyZone = true; break;
                         }
                     }
@@ -1469,7 +1487,7 @@ export class WorldManager {
         
         if (remainingAiCities.length === 0) {
             setTimeout(() => {
-                alert("恭喜！你已统一江湖，消灭了所有割据势力，达成最终胜利！");
+            this.showNotification("天下一统：你已消灭了所有割据势力，达成最终胜利！");
                 // 可以在这里触发更复杂的胜利 UI 或返回主菜单
             }, 1000);
         }
@@ -1501,8 +1519,9 @@ export class WorldManager {
             }
         }
 
-        // 2. 计算主将战力：固定为 15 点，不随等级增加
-        total += 15;
+        // 2. 计算主将战力：根据等级动态计算 (等级 * 3)
+        const heroLevel = this.heroData ? (this.heroData.level || 1) : 1;
+        total += heroLevel * 3;
 
         return total;
     }
@@ -1585,9 +1604,13 @@ export class WorldManager {
                 switch (id) {
                     case 'barracks':
                         modifierManager.addModifier({ id: `city_${cityId}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_melee_dmg`, side: 'player', unitType: 'melee', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
                         break;
                     case 'archery_range':
                         modifierManager.addModifier({ id: `city_${cityId}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_ranged_hp`, side: 'player', unitType: 'ranged', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_archer_dmg`, side: 'player', unitType: 'archer', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_archer_hp`, side: 'player', unitType: 'archer', stat: 'hp', multiplier: milMultiplier, source: 'building' });
                         break;
                     case 'stable':
                         modifierManager.addModifier({ id: `city_${cityId}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
@@ -1599,10 +1622,11 @@ export class WorldManager {
                         break;
                     case 'martial_shrine':
                         modifierManager.addModifier({ id: `city_${cityId}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cangyun_def`, side: 'player', unitType: 'cangyun', stat: 'damageReduction', offset: Math.max(0, (level - 1) * 0.10), source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_cangyun_dmg`, side: 'player', unitType: 'cangyun', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
                         break;
                     case 'mage_guild':
                         modifierManager.addModifier({ id: `city_${cityId}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_chunyang_hp`, side: 'player', unitType: 'chunyang', stat: 'hp', multiplier: milMultiplier, source: 'building' });
                         break;
                     case 'medical_pavilion':
                         modifierManager.addModifier({ id: `city_${cityId}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: milMultiplier, source: 'building' });
@@ -1633,21 +1657,39 @@ export class WorldManager {
 
         const notification = document.createElement('div');
         notification.className = 'game-notification';
-        notification.innerText = message;
+        notification.innerHTML = `<span class="game-notification-icon">◈</span><span>${message}</span>`;
 
         // 限制最大显示数量，防止刷屏
         if (container.children.length >= 3) {
-            container.removeChild(container.firstChild);
+            // 找到第一个没有在移除中的通知
+            const firstActive = Array.from(container.children).find(child => !child.classList.contains('removing'));
+            if (firstActive) {
+                this.removeNotification(firstActive);
+            }
         }
 
         container.appendChild(notification);
 
-        // 4秒后自动移除（与 CSS 动画时长匹配）
+        // 3.7秒后开始播放消失动画（留出 0.3s 给 transition）
+        setTimeout(() => {
+            this.removeNotification(notification);
+        }, 3700);
+    }
+
+    /**
+     * 平滑移除通知气泡
+     */
+    removeNotification(notification) {
+        if (!notification || notification.classList.contains('removing')) return;
+        
+        notification.classList.add('removing');
+        
+        // 等待 CSS transition 完成后真正从 DOM 移除
         setTimeout(() => {
             if (notification.parentNode) {
-                container.removeChild(notification);
+                notification.parentNode.removeChild(notification);
             }
-        }, 4000);
+        }, 3000); // 给足过渡时间
     }
 
     /**
@@ -2025,6 +2067,104 @@ export class WorldManager {
     }
 
     /**
+     * 获取存档数据快照
+     */
+    getSaveData() {
+        return {
+            resources: { ...this.resources },
+            heroData: JSON.parse(JSON.stringify(this.heroData)),
+            heroArmy: { ...this.heroArmy },
+            cities: Object.values(this.cities).map(city => ({
+                id: city.id,
+                name: city.name,
+                owner: city.owner,
+                type: city.type,
+                blueprintId: city.blueprintId,
+                buildingLevels: { ...city.buildingLevels },
+                availableUnits: { ...city.availableUnits },
+                x: city.x,
+                z: city.z
+            })),
+            mapState: {
+                isGenerated: this.mapState.isGenerated,
+                entities: JSON.parse(JSON.stringify(this.mapState.entities)),
+                playerPos: { ...this.mapState.playerPos },
+                terrainOffsets: { ...this.mapState.terrainOffsets },
+                seed: this.mapState.seed,
+                influenceCenters: JSON.parse(JSON.stringify(this.mapState.influenceCenters)),
+                size: this.mapState.size,
+                exploredMap: this.mapState.exploredMap ? Array.from(this.mapState.exploredMap) : null
+            },
+            factions: JSON.parse(JSON.stringify(this.factions)),
+            currentAIFactions: JSON.parse(JSON.stringify(this.currentAIFactions)),
+            capturedBuildings: JSON.parse(JSON.stringify(this.capturedBuildings))
+        };
+    }
+
+    /**
+     * 从存档数据恢复状态
+     */
+    loadSaveData(data) {
+        if (!data) return;
+
+        // 核心修复：加载存档前必须清空所有全局修正器，防止不同存档间的属性叠加
+        modifierManager.clear();
+
+        this.resources = { ...data.resources };
+        this.heroData = JSON.parse(JSON.stringify(data.heroData));
+        this.heroArmy = { ...data.heroArmy };
+        
+        // 恢复城市实例
+        this.cities = {};
+        data.cities.forEach(cData => {
+            const city = new City(cData.id, cData.name, cData.owner, cData.type, cData.blueprintId);
+            city.buildingLevels = { ...cData.buildingLevels };
+            city.availableUnits = { ...cData.availableUnits };
+            city.x = cData.x;
+            city.z = cData.z;
+            this.cities[cData.id] = city;
+        });
+
+        // 恢复地图状态
+        this.mapState.isGenerated = data.mapState.isGenerated;
+        this.mapState.grid = []; // 核心修复：加载存档时必须清空当前网格，触发地形重绘
+        this.mapState.heightMap = []; 
+        this.mapState.entities = JSON.parse(JSON.stringify(data.mapState.entities));
+        this.mapState.playerPos = { ...data.mapState.playerPos };
+        this.mapState.terrainOffsets = { ...data.mapState.terrainOffsets };
+        this.mapState.seed = data.mapState.seed;
+        this.mapState.influenceCenters = JSON.parse(JSON.stringify(data.mapState.influenceCenters));
+        this.mapState.size = data.mapState.size;
+        this.mapState.interactionLocks = new Set(); // 清空交互锁
+        
+        // 关键修复：恢复种子，确保地形 100% 还原
+        if (this.mapState.seed) {
+            setSeed(this.mapState.seed);
+        }
+        
+        if (data.mapState.exploredMap) {
+            this.mapState.exploredMap = new Uint8Array(data.mapState.exploredMap);
+        }
+
+        this.factions = JSON.parse(JSON.stringify(data.factions));
+        this.currentAIFactions = JSON.parse(JSON.stringify(data.currentAIFactions));
+        this.capturedBuildings = JSON.parse(JSON.stringify(data.capturedBuildings));
+
+        // 核心修复：重新初始化奇穴管理器，确保英雄切换后天赋树和数据同步更新
+        talentManager.init(this.heroData);
+
+        // 重新同步 ModifierManager
+        this.refreshHeroStats();
+        this.syncBuildingsToModifiers();
+        
+        // 触发 UI 全量刷新，同步当前英雄的所有外观和面板
+        window.dispatchEvent(new CustomEvent('hero-initialized'));
+        this.updateHUD();
+
+        console.log("%c[系统] WorldManager 数据恢复完毕", "color: #4CAF50; font-weight: bold");
+    }
+
+    /**
      * 增加金钱接口
      */
     addGold(amount) {
@@ -2237,11 +2377,29 @@ export class WorldManager {
         const blueprint = this.getUnitBlueprint(type);
         const dummyUnit = { side: side, type: type, isHero: this.heroData && this.heroData.id === type };
         
+        // --- 核心重构：形态属性预处理 (所见即所得) ---
+        // 逻辑：如果单位有多种形态，UI 默认展示其“首选形态”的综合数值
+        let baseAtk = blueprint.atk;
+        let baseBurst = blueprint.burstCount || 1;
+        let baseInterval = blueprint.attackSpeed || 1000;
+        let baseRange = blueprint.range;
+
+        if (blueprint.modes) {
+            const modeKeys = Object.keys(blueprint.modes);
+            const firstMode = blueprint.modes[modeKeys[0]];
+            
+            // 1. 优先应用形态内的属性覆盖
+            if (firstMode.atk !== undefined) baseAtk = firstMode.atk;
+            if (firstMode.atkMult !== undefined) baseAtk *= firstMode.atkMult; // 支持倍率缩放
+            
+            baseBurst = firstMode.burstCount || baseBurst;
+            baseInterval = firstMode.attackSpeed || baseInterval;
+            baseRange = firstMode.range || baseRange;
+        }
+
         // 1. 应用所有全局动态修正
         const finalHP = Math.ceil(modifierManager.getModifiedValue(dummyUnit, 'hp', blueprint.hp));
-        
-        // 核心修正：治疗职业也使用正数进行数值计算，避免数学公式导致的数值倒扣 Bug
-        const finalAtk = modifierManager.getModifiedValue(dummyUnit, 'attackDamage', blueprint.atk);
+        const finalAtk = modifierManager.getModifiedValue(dummyUnit, 'attackDamage', baseAtk);
         
         // 核心重构：区分局内局外速度修正
         const finalSpeed = modifierManager.getModifiedValue(dummyUnit, 'speed', blueprint.speed);
@@ -2252,22 +2410,22 @@ export class WorldManager {
             finalQinggong = modifierManager.getModifiedValue(dummyUnit, 'qinggong', this.heroData.stats.qinggong);
         }
 
-        // 核心修正：应用全局攻速加成 (注意：攻速加成是频率提升，对应间隔缩短)
+        // 核心修正：应用全局攻速加成
         const speedMult = modifierManager.getModifiedValue(dummyUnit, 'attackSpeed', 1.0);
-        const finalInterval = blueprint.attackSpeed / speedMult;
+        const finalInterval = baseInterval / speedMult;
         
         // 2. DPS 换算
-        const burstCount = blueprint.burstCount || 1;
-        const dps = Math.ceil((finalAtk * burstCount / finalInterval) * 1000);
+        const dps = Math.ceil((finalAtk * baseBurst / finalInterval) * 1000);
 
         return {
             ...blueprint,
             hp: finalHP,
             atk: Math.ceil(finalAtk),
+            range: baseRange,
             speed: finalSpeed,
-            qinggong: finalQinggong || finalSpeed, // 如果不是英雄，则 fallback 到普通速度
+            qinggong: finalQinggong || finalSpeed,
             dps: dps,
-            cost: this.getUnitCost(type) // 确保这里也带上最新的 cost
+            cost: this.getUnitCost(type)
         };
     }
 

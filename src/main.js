@@ -11,6 +11,7 @@ import { uiManager } from './core/UIManager.js';
 import { audioManager } from './core/AudioManager.js';
 import { timeManager } from './core/TimeManager.js';
 import { resourcePreloader } from './core/ResourcePreloader.js';
+import { saveManager } from './core/SaveManager.js';
 
 import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
@@ -65,6 +66,8 @@ window.addEventListener('keydown', (e) => {
             'town-management-panel',
             'skill-learn-panel',
             'how-to-play-panel',
+            'load-save-panel',
+            'save-game-panel',
             'game-start-window'
         ];
         
@@ -116,6 +119,73 @@ const resumeBtn = document.getElementById('resume-game-btn');
 if (resumeBtn) {
     resumeBtn.addEventListener('click', () => {
         togglePause();
+    });
+}
+
+// 统一的面板关闭逻辑（针对带有 mobile HUD 适配的面板）
+function closePanelWithHUD(panelId) {
+    const panel = document.getElementById(panelId);
+    if (panel) {
+        panel.classList.add('hidden');
+        audioManager.play('ui_click');
+
+        // --- 手机端适配：仅在没有其他全屏面板打开时恢复 HUD ---
+        if (uiManager.isMobile) {
+            const panelsToCheck = [
+                'hero-stats-panel', 
+                'town-management-panel', 
+                'talent-panel', 
+                'skill-learn-panel', 
+                'how-to-play-panel',
+                'load-save-panel',
+                'save-game-panel'
+            ];
+            const anyVisible = panelsToCheck.some(id => {
+                const p = document.getElementById(id);
+                return p && !p.classList.contains('hidden');
+            });
+            if (!anyVisible) {
+                uiManager.setHUDVisibility(true);
+            }
+        }
+    }
+}
+
+// 绑定保存和载入按钮（暂停菜单内）
+const pauseSaveBtn = document.getElementById('pause-save-btn');
+const pauseLoadBtn = document.getElementById('pause-load-btn');
+
+if (pauseSaveBtn) {
+    pauseSaveBtn.addEventListener('click', () => {
+        audioManager.play('ui_click');
+        const savePanel = document.getElementById('save-game-panel');
+        if (savePanel) {
+            savePanel.classList.remove('hidden');
+            renderSaveSlots('save-game-list-container', 'save'); // 渲染保存列表
+            if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+            
+            const closeBtn = document.getElementById('close-save-game');
+            if (closeBtn) {
+                closeBtn.onclick = () => closePanelWithHUD('save-game-panel');
+            }
+        }
+    });
+}
+
+if (pauseLoadBtn) {
+    pauseLoadBtn.addEventListener('click', () => {
+        audioManager.play('ui_click');
+        const loadPanel = document.getElementById('load-save-panel');
+        if (loadPanel) {
+            loadPanel.classList.remove('hidden');
+            renderSaveSlots('save-list-container', 'load'); // 渲染载入列表
+            if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+
+            const closeBtn = document.getElementById('close-load-save');
+            if (closeBtn) {
+                closeBtn.onclick = () => closePanelWithHUD('load-save-panel');
+            }
+        }
     });
 }
 
@@ -202,6 +272,7 @@ const loadingText = document.getElementById('loading-text');
 const uiLayer = document.getElementById('ui-layer');
 
 const startBtn = document.querySelector('#start-btn');
+const loadSaveBtn = document.querySelector('#load-save-btn'); // 加载存档按钮
 const skillGalleryBtn = document.querySelector('#open-skill-learn-btn'); // 招式图谱按钮
 const howToPlayBtn = document.querySelector('#how-to-play-btn'); // 江湖指南按钮
 const mainMenu = document.querySelector('#main-menu');
@@ -248,7 +319,7 @@ if (skillGalleryBtn) {
         audioManager.play('ui_click');
         
         // --- 互斥逻辑：打开招式图谱时，关闭其他面板 ---
-        const panelsToHide = ['town-management-panel', 'hero-stats-panel', 'game-start-window', 'how-to-play-panel'];
+        const panelsToHide = ['town-management-panel', 'hero-stats-panel', 'game-start-window', 'how-to-play-panel', 'load-save-panel', 'save-game-panel'];
         panelsToHide.forEach(id => {
             const p = document.getElementById(id);
             if (p) p.classList.add('hidden');
@@ -266,13 +337,132 @@ if (skillGalleryBtn) {
     });
 }
 
+// 点击“加载存档”
+if (loadSaveBtn) {
+    loadSaveBtn.addEventListener('click', () => {
+        audioManager.play('ui_click');
+
+        // --- 互斥逻辑：打开存档面板时，关闭其他面板 ---
+        const panelsToHide = ['town-management-panel', 'hero-stats-panel', 'game-start-window', 'how-to-play-panel', 'skill-learn-panel', 'save-game-panel'];
+        panelsToHide.forEach(id => {
+            const p = document.getElementById(id);
+            if (p) p.classList.add('hidden');
+        });
+
+        // --- 手机端适配：打开面板时隐藏 HUD ---
+        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+
+        const panel = document.getElementById('load-save-panel');
+        if (panel) {
+            panel.classList.remove('hidden');
+            renderSaveSlots('save-list-container', 'load');
+            
+            const closeBtn = document.getElementById('close-load-save');
+            if (closeBtn) {
+                closeBtn.onclick = () => closePanelWithHUD('load-save-panel');
+            }
+        }
+    });
+}
+
+/**
+ * 渲染存档列表并绑定逻辑
+ * @param {string} containerId 
+ * @param {string} mode 'save' | 'load'
+ */
+function renderSaveSlots(containerId, mode) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.innerHTML = '';
+    const allMeta = saveManager.getAllMetadata();
+
+    allMeta.forEach((meta, index) => {
+        const slotId = index + 1;
+        const item = document.createElement('div');
+        item.className = `save-item ${!meta && mode === 'load' ? 'empty' : ''}`;
+        
+        if (meta) {
+            const iconStyle = spriteFactory.getIconStyle(meta.heroId || 'liwangsheng');
+            item.innerHTML = `
+                <div class="save-portrait" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                <div class="save-info">
+                    <div class="save-name">${meta.heroName} <span class="save-lv">Lv.${meta.heroLevel}</span></div>
+                    <div class="save-details">
+                        <span>${meta.dateStr}</span>
+                        <span class="save-res">💰${meta.gold}</span>
+                        <span class="save-time">${saveManager.formatTimestamp(meta.timestamp)}</span>
+                    </div>
+                </div>
+                ${mode === 'save' ? '<div class="save-action-badge override">覆盖</div>' : ''}
+            `;
+        } else {
+            item.innerHTML = `
+                <div class="save-portrait empty"></div>
+                <div class="save-info">
+                    <div class="save-name" style="color: rgba(255,255,255,0.3)">空存档位</div>
+                    <div class="save-details">尚无江湖传闻</div>
+                </div>
+                ${mode === 'save' ? '<div class="save-action-badge create">建立</div>' : ''}
+            `;
+        }
+
+        item.onclick = () => {
+            audioManager.play('ui_click');
+            if (mode === 'save') {
+                // 核心修复：在保存前，必须先将 3D 世界的主角位置同步到逻辑层 (WorldManager)
+                if (currentState === GameState.WORLD && worldInstance && worldInstance.playerGroup) {
+                    worldManager.savePlayerPos(
+                        worldInstance.playerGroup.position.x, 
+                        worldInstance.playerGroup.position.z
+                    );
+                }
+
+                if (saveManager.save(slotId)) {
+                    uiManager.showNotification(`位置 ${slotId} 存档成功`);
+                    renderSaveSlots(containerId, mode); // 刷新
+                }
+            } else {
+                if (meta) {
+                    if (saveManager.load(slotId)) {
+                        uiManager.showNotification("江湖快马载入中...");
+                        
+                        // 关闭所有可能的 UI 面板和主菜单
+                        const panels = ['load-save-panel', 'save-game-panel', 'pause-menu', 'main-menu', 'character-select', 'difficulty-select'];
+                        panels.forEach(id => {
+                            const p = document.getElementById(id);
+                            if (p) p.classList.add('hidden');
+                        });
+                        
+                        if (currentState === GameState.MENU && menuBg) {
+                            menuBg.classList.add('hidden');
+                        }
+
+                        enterGameState(GameState.LOADING);
+                        
+                        setTimeout(async () => {
+                            await spriteFactory.load();
+                            selectedHero = worldManager.heroData.id;
+                            enterGameState(GameState.WORLD);
+                            isPaused = false;
+                            timeManager.resume();
+                        }, 800);
+                    }
+                }
+            }
+        };
+
+        container.appendChild(item);
+    });
+}
+
 // 点击“江湖指南”
 if (howToPlayBtn) {
     howToPlayBtn.addEventListener('click', () => {
         audioManager.play('ui_click');
 
         // --- 互斥逻辑：打开指南时，关闭其他面板 ---
-        const panelsToHide = ['town-management-panel', 'hero-stats-panel', 'skill-learn-panel', 'game-start-window'];
+        const panelsToHide = ['town-management-panel', 'hero-stats-panel', 'skill-learn-panel', 'game-start-window', 'load-save-panel', 'save-game-panel'];
         panelsToHide.forEach(id => {
             const p = document.getElementById(id);
             if (p) p.classList.add('hidden');
@@ -390,6 +580,11 @@ confirmDiffBtn.addEventListener('click', async () => {
         return;
     }
     audioManager.play('ui_click');
+    
+    // 核心优化：确保新游戏使用完全随机的种子
+    import('./core/Random.js').then(m => {
+        m.setSeed(Math.floor(Math.random() * 1000000));
+    });
     
     diffSelectMenu.classList.add('hidden');
     if (menuBg) menuBg.classList.add('hidden');

@@ -48,6 +48,7 @@
                 <h1 class="game-title">稻香村<span>发展计划</span></h1>
                 <div class="menu-options">
                     <button id="start-btn" class="wuxia-btn">闯荡江湖</button>
+                    <button id="load-save-btn" class="wuxia-btn">加载存档</button>
                     <button id="how-to-play-btn" class="wuxia-btn">江湖指南</button>
                     <button id="open-skill-learn-btn" class="wuxia-btn">招式图谱</button>
                     <button id="exit-btn" class="wuxia-btn">退出游戏</button>
@@ -57,9 +58,20 @@
 
             <!-- 大世界 HUD -->
             <div id="world-ui" class="hidden">
-                <div class="resource-bar" style="top: 15px; left: 10px;">
-                    <div class="res-item"><span class="res-emoji">💰</span><span id="world-gold">1000</span></div>
-                    <div class="res-item"><span class="res-emoji">🪵</span><span id="world-wood">200</span></div>
+                <div class="top-hud-bar">
+                    <div class="resource-bar">
+                        <div class="res-item"><span class="res-emoji">💰</span><span id="world-gold">10500</span></div>
+                        <div class="res-item"><span class="res-emoji">🪵</span><span id="world-wood">5300</span></div>
+                    </div>
+                    
+                    <div class="top-hud-divider"></div>
+
+                    <div class="world-date-display-container">
+                        <div class="world-date-display">天宝 三年 · 夏</div>
+                        <div class="time-progress-outer">
+                            <div class="time-progress-circle"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 大世界 HUD：左下角状态区 -->
@@ -88,13 +100,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="world-date-display-container">
-                    <div class="time-progress-outer">
-                        <div class="time-progress-circle"></div>
-                    </div>
-                    <div class="world-date-display">天宝 三年 · 春</div>
                 </div>
             </div>
 
@@ -229,6 +234,66 @@
                 <div class="menu-decoration-top">江湖指南</div>
                 <button id="close-how-to-play" class="close-btn-v3">×</button>
                 <div class="how-to-play-content"><div id="how-to-play-text" class="how-to-play-scroll"></div></div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 读取存档面板 -->
+            <div id="load-save-panel" class="hidden skill-learn-v3">
+                <div class="menu-decoration-top">载入江湖</div>
+                <button id="close-load-save" class="close-btn-v3">×</button>
+                <div class="skill-learn-content">
+                    <div class="load-save-list" id="save-list-container">
+                        <!-- 存档项占位 -->
+                        <div class="save-item empty">
+                            <div class="save-info">
+                                <div class="save-name">空存档位</div>
+                                <div class="save-details">尚无江湖传闻</div>
+                            </div>
+                        </div>
+                        <div class="save-item empty">
+                            <div class="save-info">
+                                <div class="save-name">空存档位</div>
+                                <div class="save-details">尚无江湖传闻</div>
+                            </div>
+                        </div>
+                        <div class="save-item empty">
+                            <div class="save-info">
+                                <div class="save-name">空存档位</div>
+                                <div class="save-details">尚无江湖传闻</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 保存存档面板 -->
+            <div id="save-game-panel" class="hidden skill-learn-v3">
+                <div class="menu-decoration-top">记叙江湖</div>
+                <button id="close-save-game" class="close-btn-v3">×</button>
+                <div class="skill-learn-content">
+                    <div class="load-save-list" id="save-game-list-container">
+                        <!-- 存档项占位 -->
+                        <div class="save-item">
+                            <div class="save-info">
+                                <div class="save-name">存档位 一</div>
+                                <div class="save-details">点击覆盖此存档</div>
+                            </div>
+                        </div>
+                        <div class="save-item">
+                            <div class="save-info">
+                                <div class="save-name">存档位 二</div>
+                                <div class="save-details">点击覆盖此存档</div>
+                            </div>
+                        </div>
+                        <div class="save-item">
+                            <div class="save-info">
+                                <div class="save-name">存档位 三</div>
+                                <div class="save-details">点击覆盖此存档</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="menu-decoration-bottom"></div>
             </div>
 
@@ -385,6 +450,8 @@
                     <h2 class="game-title">中途<span>休息</span></h2>
                     <div class="menu-options" id="pause-default-options">
                         <button id="resume-game-btn" class="wuxia-btn">继续江湖</button>
+                        <button id="pause-save-btn" class="wuxia-btn">保存存档</button>
+                        <button id="pause-load-btn" class="wuxia-btn">载入存档</button>
                         <button id="open-settings-btn" class="wuxia-btn">江湖设置</button>
                         <button id="back-to-menu-from-pause-btn" class="wuxia-btn small-btn">退出到主界面</button>
                     </div>

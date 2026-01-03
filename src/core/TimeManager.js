@@ -21,10 +21,10 @@ class TimeManager {
         this.difficultyPresets = {
             'easy': {
                 name: '简单',
-                hpScale: 0.01,      // HP 每进度增加 1%
-                damageScale: 0.01,  // 伤害每进度增加 1%
-                powerScale: 0.01,   // 战力规模每进度增加 1%
-                maxProgress: 50,    // 简单难度最高进度上限
+                hpScale: 0.007,     // HP 每进度增加 0.7%
+                damageScale: 0.007, // 伤害每进度增加 0.7%
+                powerScale: 0.007,  // 战力规模每进度增加 0.7%
+                maxProgress: 30,    // 简单难度最高进度上限
                 description: '敌军成长较慢。'
             },
             'hard': {
@@ -166,16 +166,15 @@ class TimeManager {
     updateUI() {
         const dateDisplay = document.querySelector('.world-date-display');
         if (dateDisplay) {
-            const preset = this.difficultyPresets[this.difficulty];
-            const difficultyText = `<span style="color: var(--jx3-gold); font-size: 0.8em; margin-left: 10px;">[${preset.name.split(' ')[0]}]</span>`;
-            dateDisplay.innerHTML = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}${difficultyText}`;
+            dateDisplay.innerHTML = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
         }
 
         // 更新环形进度条
         const progress = (this.currentTime / this.seasonDuration) * 100;
         const circle = document.querySelector('.time-progress-circle');
         if (circle) {
-            circle.style.background = `conic-gradient(var(--jx3-gold) ${progress}%, transparent 0)`;
+            // 背景色改为淡灰色，进度色为金色
+            circle.style.background = `conic-gradient(var(--jx3-gold) ${progress}%, #e0e0e0 0)`;
         }
     }
 
@@ -236,6 +235,33 @@ class TimeManager {
         const progress = this.getCombinedDifficultyProgress();
         const preset = this.difficultyPresets[this.difficulty];
         return 1.0 + progress * preset.hpScale; // 基础数值随综合进度增加
+    }
+
+    /**
+     * 获取存档数据
+     */
+    getSaveData() {
+        return {
+            year: this.year,
+            seasonIndex: this.seasonIndex,
+            currentTime: this.currentTime,
+            difficulty: this.difficulty
+        };
+    }
+
+    /**
+     * 加载存档数据
+     */
+    loadSaveData(data) {
+        if (!data) return;
+        this.year = data.year;
+        this.seasonIndex = data.seasonIndex;
+        this.currentTime = data.currentTime;
+        this.difficulty = data.difficulty;
+        
+        this.updateDifficultyModifiers();
+        this.updateUI();
+        console.log("%c[系统] TimeManager 数据恢复完毕", "color: #4CAF50; font-weight: bold");
     }
 }
 

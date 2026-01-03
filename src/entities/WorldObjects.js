@@ -229,7 +229,7 @@ export class CityObject extends WorldObject {
     constructor(data) {
         super(data);
         this.isInteractable = true;
-        this.interactionRadius = 3.0;
+        this.interactionRadius = 2.1; // 从 3.0 缩小 30% 至 2.1
     }
 
     createMesh() {

@@ -594,7 +594,7 @@ export const SkillRegistry = {
                 type: 'sanqing_huashen', 
                 duration: 8000, 
                 interval: 3000, 
-                damage: 10, 
+                damage: 15, 
                 swordCount: 5,
                 applyPowerToDamage: true,
                 applySkillPowerToDamage: false,

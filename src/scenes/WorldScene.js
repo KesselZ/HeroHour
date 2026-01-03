@@ -15,6 +15,7 @@ import { Pathfinder } from '../core/Pathfinder.js';
  */
 import { uiManager } from '../core/UIManager.js';
 import { audioManager } from '../core/AudioManager.js';
+import { WorldStatusManager } from '../core/WorldStatusManager.js';
 
 export class WorldScene {
     constructor(scene, camera, renderer) {
@@ -171,6 +172,94 @@ export class WorldScene {
         
         // 初始刷新一次 HUD (包含所有城市)
         this.refreshWorldHUD();
+
+        // --- 核心改动：为左上角资源栏绑定收益明细 Tooltip ---
+        const resourceBar = document.querySelector('.resource-bar');
+        if (resourceBar) {
+            resourceBar.style.cursor = 'help';
+            uiManager.bindTooltip(resourceBar, () => {
+                const prodData = worldManager.getGlobalProduction();
+                const breakdown = prodData.breakdown;
+                let desc = `<div style="color: var(--jx3-celadon); margin-bottom: 4px;">各城池贡献:</div>`;
+                breakdown.cities.forEach(c => {
+                    desc += `<div style="display: flex; justify-content: space-between; gap: 15px;">
+                        <span>${c.name}</span>
+                        <span>💰${c.gold} 🪵${c.wood}</span>
+                    </div>`;
+                });
+                
+                if (breakdown.mines.count.gold_mine > 0 || breakdown.mines.count.sawmill > 0) {
+                    desc += `<div style="color: var(--jx3-gold); margin-top: 8px; margin-bottom: 4px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px;">野外产出:</div>`;
+                    if (breakdown.mines.count.gold_mine > 0) {
+                        desc += `<div style="display: flex; justify-content: space-between;">
+                            <span>金矿 x${breakdown.mines.count.gold_mine}</span>
+                            <span>💰${breakdown.mines.gold}</span>
+                        </div>`;
+                    }
+                    if (breakdown.mines.count.sawmill > 0) {
+                        desc += `<div style="display: flex; justify-content: space-between;">
+                            <span>伐木场 x${breakdown.mines.count.sawmill}</span>
+                            <span>🪵${breakdown.mines.wood}</span>
+                        </div>`;
+                    }
+                }
+                
+                return {
+                    name: "本季度总收益明细",
+                    level: "所有城池与矿产合计",
+                    description: desc
+                };
+            });
+        }
+
+        // --- 核心改动：为右上角时间/难度栏绑定难度成长 Tooltip ---
+        const timeContainer = document.querySelector('.world-date-display-container');
+        if (timeContainer) {
+            timeContainer.style.cursor = 'help';
+            uiManager.bindTooltip(timeContainer, () => {
+                const preset = timeManager.difficultyPresets[timeManager.difficulty];
+                const hpMult = timeManager.getStatMultiplier();
+                const powerMult = timeManager.getPowerMultiplier();
+                
+                // 难度对应颜色
+                const diffColors = { 'easy': '#27ae60', 'hard': '#e67e22', 'hell': '#ff4444' };
+                const diffColor = diffColors[timeManager.difficulty] || '#ffffff';
+
+                // 使用 WorldStatusManager 获取动态描述
+                const situationDesc = WorldStatusManager.getSituationDescription(
+                    timeManager.difficulty, 
+                    timeManager.year, 
+                    timeManager.seasons[timeManager.seasonIndex]
+                );
+                
+                let desc = `
+                    <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">
+                        <span style="color: var(--jx3-celadon);">当前难度:</span> 
+                        <span style="color: ${diffColor}; font-weight: bold;">${preset.name}</span>
+                    </div>
+                    <div style="color: var(--jx3-celadon); margin-bottom: 6px;">江湖局势:</div>
+                    <div style="font-size: 0.9em; line-height: 1.5; color: var(--jx3-paper); opacity: 0.9; margin-bottom: 12px; font-style: italic;">
+                        ${situationDesc}
+                    </div>
+                    
+                    <div style="color: var(--jx3-gold); margin-bottom: 4px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">敌方战力加成:</div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                        <span>外功与内劲 (攻防):</span>
+                        <span style="color: #ff6666;">+${((hpMult - 1) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>集结规模 (兵力):</span>
+                        <span style="color: #ff6666;">+${((powerMult - 1) * 100).toFixed(1)}%</span>
+                    </div>
+                `;
+                
+                return {
+                    name: "江湖大势",
+                    level: `天宝 ${timeManager.year} 年 · ${timeManager.seasons[timeManager.seasonIndex]}`,
+                    description: desc
+                };
+            });
+        }
 
         // 按钮点击事件
         const closeBtn = document.getElementById('close-town-panel');
@@ -348,6 +437,7 @@ export class WorldScene {
 
         const data = worldManager.heroData;
         const heroInfo = worldManager.availableHeroes[data.id];
+        const dummy = worldManager.getPlayerHeroDummy();
         
         // 填充数据
         document.getElementById('hero-panel-name').innerText = (data.id === 'liwangsheng' ? '李忘生' : (data.id === 'lichengen' ? '李承恩' : '叶英'));
@@ -374,7 +464,10 @@ export class WorldScene {
 
         // 军队显示
         const moraleVal = document.getElementById('attr-morale');
-        if (moraleVal) moraleVal.innerText = data.stats.morale;
+        if (moraleVal) {
+            const realMorale = Math.floor(modifierManager.getModifiedValue(dummy, 'morale', data.stats.morale));
+            moraleVal.innerText = realMorale;
+        }
         const details = worldManager.getUnitDetails(data.id);
         document.getElementById('attr-speed').innerText = details.qinggong.toFixed(1); 
         
@@ -383,7 +476,6 @@ export class WorldScene {
         const powerName = heroInfo ? heroInfo.primaryStat : '力道';
         if (powerLabel) powerLabel.innerText = powerName;
         
-        const dummy = worldManager.getPlayerHeroDummy();
         const identity = worldManager.getHeroIdentity(data.id);
         const cb = identity.combatBase;
         
@@ -469,6 +561,8 @@ export class WorldScene {
     }
 
     onPointerUp(e) {
+        if (!this.isActive || this.isAnyMenuOpen()) return;
+
         if (this.longPressTimer) {
             clearTimeout(this.longPressTimer);
             this.longPressTimer = null;
@@ -508,25 +602,34 @@ export class WorldScene {
         this.updateHover();
     }
 
+    /**
+     * 判断当前是否有任何全屏或阻塞性 UI 面板打开
+     * 职责：统一管理 UI 状态，供移动、交互、Tooltip 等逻辑进行互斥判定
+     * 注意：town-management-panel 豁免，因为主城界面允许在城镇周围移动
+     */
+    isAnyMenuOpen() {
+        const panels = [
+            'hero-stats-panel',
+            'skill-learn-panel',
+            'talent-panel',
+            'game-start-window',
+            'how-to-play-panel',
+            'skip-battle-modal',
+            'battle-settlement',
+            'load-save-panel',
+            'save-game-panel'
+        ];
+        return panels.some(id => {
+            const el = document.getElementById(id);
+            return el && !el.classList.contains('hidden');
+        });
+    }
+
     updateHover() {
         if (!this.isActive) return;
 
         // --- 核心修复：防止 Tooltip 穿透 UI 面板 ---
-        const heroPanel = document.getElementById('hero-stats-panel');
-        const townPanel = document.getElementById('town-management-panel');
-        const skillLearnPanel = document.getElementById('skill-learn-panel');
-        const talentPanel = document.getElementById('talent-panel');
-        const startWindow = document.getElementById('game-start-window');
-        const htpPanel = document.getElementById('how-to-play-panel');
-
-        const isUIOpen = (heroPanel && !heroPanel.classList.contains('hidden')) ||
-                         (townPanel && !townPanel.classList.contains('hidden')) ||
-                         (skillLearnPanel && !skillLearnPanel.classList.contains('hidden')) ||
-                         (talentPanel && !talentPanel.classList.contains('hidden')) ||
-                         (startWindow && !startWindow.classList.contains('hidden')) ||
-                         (htpPanel && !htpPanel.classList.contains('hidden'));
-
-        if (isUIOpen) {
+        if (this.isAnyMenuOpen()) {
             if (this.hoveredObject) {
                 uiManager.hideTooltip();
                 this.hoveredObject = null;
@@ -838,17 +941,18 @@ export class WorldScene {
      * 统一绑定兵种属性悬浮窗，消除重复代码
      */
     bindUnitTooltip(element, type) {
-        const stats = worldManager.getUnitDetails(type);
-        // 核心修复：直接从 getUnitDetails 中获取 cost，它是带了天赋修正的最终值
-        const cost = stats.cost;
         // 遵照要求：UI 上依然统一显示为“伤害”，不再显示“秒伤”等现代术语
         const label = '伤害'; 
         
-        uiManager.bindTooltip(element, {
-            name: stats.name,
-            level: `气血:${stats.hp} | ${label}:${stats.dps} | 占用:${cost}`,
-            description: stats.description,
-            color: '#d4af37' // 武侠金色
+        uiManager.bindTooltip(element, () => {
+            const stats = worldManager.getUnitDetails(type);
+            const cost = stats.cost;
+            return {
+                name: stats.name,
+                level: `气血:${stats.hp} | ${label}:${stats.dps} | 占用:${cost}`,
+                description: stats.description,
+                color: '#d4af37' // 武侠金色
+            };
         });
     }
 
@@ -1071,6 +1175,11 @@ export class WorldScene {
 
         if (!modal || !confirmBtn || !cancelBtn) return;
 
+        // 立即停止当前大世界移动
+        this.currentPath = [];
+        this.clearPathVisuals();
+        this.isNavigating = false;
+
         modal.classList.remove('hidden');
 
         confirmBtn.onclick = () => {
@@ -1202,6 +1311,10 @@ export class WorldScene {
                 
                 // 恢复大世界背景音乐
                 audioManager.playBGM('/audio/bgm/如寄.mp3');
+
+                // 核心修复：回到大世界后重置寻路状态，防止意外位移
+                this.isNavigating = false;
+                this.currentPath = [];
             };
         }
     }
@@ -1215,7 +1328,7 @@ export class WorldScene {
         window.removeEventListener('pointerdown', this.onPointerDown);
         window.removeEventListener('pointerup', this.onPointerUp);
         window.removeEventListener('contextmenu', this.onContextMenu);
-        
+
         this.clearPathVisuals();
         this.currentPath = [];
 
@@ -1223,10 +1336,35 @@ export class WorldScene {
             worldManager.savePlayerPos(this.playerGroup.position.x, this.playerGroup.position.z);
         }
 
+        // --- 核心修复：进入战斗时强制关闭所有可能打开的 UI 面板 ---
+        const panelsToClose = [
+            'hero-stats-panel',
+            'town-management-panel',
+            'skill-learn-panel',
+            'talent-panel',
+            'game-start-window',
+            'how-to-play-panel',
+            'skip-battle-modal',
+            'battle-settlement',
+            'load-save-panel',
+            'save-game-panel'
+        ];
+
+        panelsToClose.forEach(id => {
+            const panel = document.getElementById(id);
+            if (panel && !panel.classList.contains('hidden')) {
+                panel.classList.add('hidden');
+                // 特殊处理城镇面板的清理逻辑
+                if (id === 'town-management-panel') {
+                    this.closeTownManagement();
+                }
+            }
+        });
+
+        // 隐藏大世界UI和小地图
         const hud = document.getElementById('world-ui');
         if (hud) hud.classList.add('hidden');
 
-        // 隐藏小地图
         const minimap = document.querySelector('.minimap-container');
         if (minimap) minimap.classList.add('hidden');
     }
@@ -1251,7 +1389,7 @@ export class WorldScene {
     }
 
     onPointerDown(e) {
-        if (!this.isActive) return;
+        if (!this.isActive || this.isAnyMenuOpen()) return;
         
         // 仅在点击游戏画布时触发移动，防止点击 UI 时主角也跟着走
         if (e.target.tagName !== 'CANVAS') return;
@@ -1463,12 +1601,7 @@ export class WorldScene {
      * [核心] 处理输入与位移逻辑 (解耦寻路与键盘)
      */
     _processInputAndMovement(deltaTime) {
-        const startWindow = document.getElementById('game-start-window');
-        const talentPanel = document.getElementById('talent-panel');
-        const isStartWindowOpen = startWindow && !startWindow.classList.contains('hidden');
-        const isTalentPanelOpen = talentPanel && !talentPanel.classList.contains('hidden');
-
-        if (isStartWindowOpen || isTalentPanelOpen) {
+        if (this.isAnyMenuOpen()) {
             this.footstepTimer = 0;
             this._updateWalkingAnimation(deltaTime, new THREE.Vector3(), false);
             return;
