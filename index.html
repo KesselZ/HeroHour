@@ -260,6 +260,49 @@
                 <div class="menu-decoration-bottom"></div>
             </div>
 
+            <!-- 难度选择界面 (New) -->
+            <div id="difficulty-select" class="menu-container hidden">
+                <div class="menu-decoration-top"></div>
+                <h2 class="game-title select-title">选择<span>江湖难度</span></h2>
+                <div class="character-cards difficulty-cards">
+                    <div class="char-card diff-card selected" data-diff="easy">
+                        <div class="diff-icon" style="font-size: 3em; margin: 10px 0;">🍃</div>
+                        <h3 class="char-name">简单</h3>
+                        <p class="char-title">EASY</p>
+                        <div class="char-traits">
+                            <div class="trait">
+                                <span class="trait-desc">敌军成长较慢。</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="char-card diff-card" data-diff="hard">
+                        <div class="diff-icon" style="font-size: 3em; margin: 10px 0;">🔥</div>
+                        <h3 class="char-name">困难</h3>
+                        <p class="char-title">HARD</p>
+                        <div class="char-traits">
+                            <div class="trait">
+                                <span class="trait-desc">敌军成长迅速。</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="char-card diff-card" data-diff="hell">
+                        <div class="diff-icon" style="font-size: 3em; margin: 10px 0;">👹</div>
+                        <h3 class="char-name">地狱</h3>
+                        <p class="char-title">HELL</p>
+                        <div class="char-traits">
+                            <div class="trait">
+                                <span class="trait-desc">敌军实力突飞猛进！</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menu-options">
+                    <button id="confirm-diff-btn" class="wuxia-btn">踏入江湖</button>
+                    <button id="back-to-char-btn" class="wuxia-btn small-btn">重选侠客</button>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
             <!-- 部署与战斗界面 -->
             <div id="deployment-ui" class="deployment-container hidden">
                 <div class="deploy-info">请派遣你的侠客 (点击图标后点击地面)</div>

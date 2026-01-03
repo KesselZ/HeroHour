@@ -15,9 +15,68 @@ class TimeManager {
         this.currentTime = 0; // 当前季度的进度 (0 到 seasonDuration)
         
         this.isPaused = false;
+
+        // 难度配置项 (DIFFICULTY PRESETS)
+        this.difficulty = 'easy'; // 默认难度
+        this.difficultyPresets = {
+            'easy': {
+                name: '简单',
+                hpScale: 0.01,      // HP 每进度增加 1%
+                damageScale: 0.01,  // 伤害每进度增加 1%
+                powerScale: 0.01,   // 战力规模每进度增加 1%
+                maxProgress: 50,    // 简单难度最高进度上限
+                description: '敌军成长较慢。'
+            },
+            'hard': {
+                name: '困难',
+                hpScale: 0.017,
+                damageScale: 0.014,
+                powerScale: 0.014,
+                maxProgress: 70,    // 困难难度最高进度上限
+                description: '敌军成长迅速。'
+            },
+            'hell': {
+                name: '地狱',
+                hpScale: 0.025,
+                damageScale: 0.02,
+                powerScale: 0.02,
+                maxProgress: 100,   // 地狱难度最高进度上限
+                description: '敌军实力突飞猛进！'
+            }
+        };
         
-        // 初始化难度系数
-        this.updateDifficultyModifiers();
+        // 核心重构：监听等级提升与初始化事件，动态调整难度
+        window.addEventListener('hero-level-up', () => {
+            console.log('%c[难度调整] %c检测到等级提升，正在重新计算敌军强度...', 'color: #ff9800; font-weight: bold', 'color: #fff');
+            this.updateDifficultyModifiers();
+        });
+
+        window.addEventListener('hero-initialized', () => {
+            this.updateDifficultyModifiers();
+        });
+
+        // 核心修复：不再在构造函数中立即调用 updateDifficultyModifiers
+        // 因为这会触发对 worldManager 的访问，而此时可能处于循环引用的 TDZ（未初始化状态）
+        // 难度系数将在 hero-initialized 事件触发时或首次 update 时进行初始化
+    }
+
+    /**
+     * 设置全局难度
+     * @param {string} level 'easy' | 'normal' | 'hard' | 'hell'
+     */
+    setDifficulty(level) {
+        if (this.difficultyPresets[level]) {
+            this.difficulty = level;
+            const preset = this.difficultyPresets[level];
+            console.log(`%c[难度设置] %c已切换至: ${preset.name}`, 'color: #ff9800; font-weight: bold', 'color: #fff');
+            
+            // 如果 worldManager 已初始化，立即更新
+            try {
+                if (typeof worldManager !== 'undefined' && worldManager) {
+                    this.updateDifficultyModifiers();
+                }
+            } catch (e) {}
+        }
     }
 
     update() {
@@ -77,10 +136,12 @@ class TimeManager {
      * 更新全局难度修正器
      */
     updateDifficultyModifiers() {
-        const progress = Math.min(20, this.getGlobalProgress()); // 难度最高锁定在20分钟(20季度)时
-        // 平衡性调整：伤害每季度+4%，HP每季度+6%，最高锁定在20分钟时的倍数
-        const damageMult = 1.0 + progress * 0.04;
-        const hpHoldMult = 1.0 + progress * 0.06;
+        const progress = this.getCombinedDifficultyProgress();
+        const preset = this.difficultyPresets[this.difficulty];
+        
+        // 难度缩放系数设计：使用当前难度的预设系数
+        const damageMult = 1.0 + progress * preset.damageScale;
+        const hpHoldMult = 1.0 + progress * preset.hpScale;
         
         // 注入 HP 修正
         modifierManager.addModifier({
@@ -98,13 +159,16 @@ class TimeManager {
             multiplier: damageMult
         });
         
+        console.log(`%c[难度缩放] %c综合进度: ${progress.toFixed(2)} | 难度: ${preset.name}`, 'color: #ff4444; font-weight: bold', 'color: #fff');
         console.log(`%c[难度缩放] %c敌军属性系数: 生命 x${hpHoldMult.toFixed(2)}, 伤害 x${damageMult.toFixed(2)}`, 'color: #ff4444; font-weight: bold', 'color: #fff');
     }
 
     updateUI() {
         const dateDisplay = document.querySelector('.world-date-display');
         if (dateDisplay) {
-            dateDisplay.innerText = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
+            const preset = this.difficultyPresets[this.difficulty];
+            const difficultyText = `<span style="color: var(--jx3-gold); font-size: 0.8em; margin-left: 10px;">[${preset.name.split(' ')[0]}]</span>`;
+            dateDisplay.innerHTML = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}${difficultyText}`;
         }
 
         // 更新环形进度条
@@ -116,7 +180,37 @@ class TimeManager {
     }
 
     getDateString() {
-        return `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
+        const preset = this.difficultyPresets[this.difficulty];
+        return `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]} [${preset.name.split(' ')[0]}]`;
+    }
+
+    /**
+     * 获取综合难度进度值 (核心重构)
+     * 结合了时间进度和玩家等级进度
+     */
+    getCombinedDifficultyProgress() {
+        // 1. 时间进度：每个季度算 2 个单位进度 (用户要求：季度 * 2)
+        const timeProgress = this.getGlobalProgress() * 2;
+        
+        // 2. 等级进度 (用户要求：等级 * 3)
+        let level = 1;
+        try {
+            // 核心修复：安全访问 worldManager，防止循环引用导致的 TDZ 错误
+            if (typeof worldManager !== 'undefined' && worldManager && worldManager.heroData) {
+                level = worldManager.heroData.level || 1;
+            }
+        } catch (e) {
+            // 如果 worldManager 尚未初始化，则默认使用 1 级
+        }
+        
+        const levelProgress = level * 3;
+        
+        // 3. 综合进度
+        const totalProgress = timeProgress + levelProgress;
+        
+        // 4. 硬上限处理：根据当前难度设定上限
+        const preset = this.difficultyPresets[this.difficulty];
+        return Math.min(preset.maxProgress, totalProgress);
     }
 
     /**
@@ -128,20 +222,20 @@ class TimeManager {
 
     /**
      * 获取战力缩放系数（影响大世界怪物的 totalPoints）
-     * 每季度增加 4%，最高锁定在20分钟(20季度)时的倍数
      */
     getPowerMultiplier() {
-        const progress = Math.min(20, this.getGlobalProgress());
-        return 1.0 + progress * 0.04;
+        const progress = this.getCombinedDifficultyProgress();
+        const preset = this.difficultyPresets[this.difficulty];
+        return 1.0 + progress * preset.powerScale; // 怪物群落规模增长基于难度预设
     }
 
     /**
      * 获取数值缩放系数（影响怪物的 HP 和 Damage）
-     * 每季度增加 4%，最高锁定在20分钟(20季度)时的倍数
      */
     getStatMultiplier() {
-        const progress = Math.min(20, this.getGlobalProgress());
-        return 1.0 + progress * 0.04;
+        const progress = this.getCombinedDifficultyProgress();
+        const preset = this.difficultyPresets[this.difficulty];
+        return 1.0 + progress * preset.hpScale; // 基础数值随综合进度增加
     }
 }
 

@@ -205,6 +205,13 @@ const confirmCharBtn = document.querySelector('#confirm-char-btn');
 const backToMenuBtn = document.querySelector('#back-to-menu-btn');
 const menuBg = document.querySelector('#menu-background');
 
+// 难度选择界面相关
+const diffSelectMenu = document.querySelector('#difficulty-select');
+const diffCards = document.querySelectorAll('.diff-card');
+const confirmDiffBtn = document.querySelector('#confirm-diff-btn');
+const backToCharBtn = document.querySelector('#back-to-char-btn');
+let selectedDifficulty = 'easy';
+
 // 初始化 UI 图标 (使用统一 API 替换 CSS 硬编码)
 function initUIIcons() {
     // 1. 初始化角色选择界面的肖像
@@ -343,12 +350,38 @@ charCards.forEach(card => {
     });
 });
 
-// 确认选择，开始加载
-confirmCharBtn.addEventListener('click', async () => {
+// 确认选择角色，进入难度选择
+confirmCharBtn.addEventListener('click', () => {
     if (!selectedHero) return;
     audioManager.play('ui_click');
     
     charSelectMenu.classList.add('hidden');
+    diffSelectMenu.classList.remove('hidden');
+});
+
+// 选择难度卡片
+diffCards.forEach(card => {
+    card.addEventListener('click', () => {
+        audioManager.play('ui_click');
+        diffCards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedDifficulty = card.dataset.diff;
+    });
+});
+
+// 返回角色选择
+backToCharBtn.addEventListener('click', () => {
+    audioManager.play('ui_click');
+    diffSelectMenu.classList.add('hidden');
+    charSelectMenu.classList.remove('hidden');
+});
+
+// 确认难度选择，开始加载
+confirmDiffBtn.addEventListener('click', async () => {
+    if (!selectedHero || !selectedDifficulty) return;
+    audioManager.play('ui_click');
+    
+    diffSelectMenu.classList.add('hidden');
     if (menuBg) menuBg.classList.add('hidden');
     
     enterGameState(GameState.LOADING);
@@ -356,13 +389,13 @@ confirmCharBtn.addEventListener('click', async () => {
     // 加载资源
     await spriteFactory.load();
     
+    // 设置难度
+    timeManager.setDifficulty(selectedDifficulty);
+    
     // 应用英雄天赋属性
     applyHeroTraits(selectedHero);
     
-    // 设定随机种子 - 移除全局锁定，由场景自行控制
-    // setSeed(888); 
-    
-    // 核心改动：选择完角色后先进入大世界
+    // 核心改动：进入大世界
     enterGameState(GameState.WORLD);
 });
 
