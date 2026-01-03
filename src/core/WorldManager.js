@@ -1886,21 +1886,41 @@ export class WorldManager {
             const count = this.heroArmy[type];
             if (count > 0) {
                 totalCount += count;
-                const cost = (UNIT_COSTS[type] ? UNIT_COSTS[type].gold : 100);
+                // 核心重构：使用统御占用 (Leadership Cost) 而不是招募金币
+                const cost = this.getUnitCost(type);
                 armyList.push({ type, count, cost });
             }
         }
 
-        // 2. 计算浮动损失 (8% 到 0%)
-        // 线性浮动逻辑：比值为 1.5 (判定简单的门槛) 时损失 8%，比值达到 5.0 (绝对压制) 时损失 0%
+        // 2. 计算浮动损失 (最高 5%)
+        // 线性浮动逻辑：比值为 1.5 (判定简单的门槛) 时损失 5%，比值达到 5.0 (绝对压制) 时损失 0%
         const minRatio = 1.5;
         const maxRatio = 5.0;
-        const maxLossRate = 0.08;
+        const maxLossRate = 0.05;
         
         const t = Math.max(0, Math.min(1, (ratio - minRatio) / (maxRatio - minRatio)));
         const lossRate = maxLossRate * (1 - t);
 
-        let targetLoss = Math.ceil(totalCount * lossRate);
+        // 核心重构：基于“统御价值”的确定性损失逻辑 (反向取整)
+        // 1. 先计算出队伍的总统御价值和理论损失的统御量
+        let totalArmyValue = 0;
+        let minUnitCost = Infinity;
+        for (const item of armyList) {
+            totalArmyValue += item.count * item.cost;
+            if (item.cost < minUnitCost) minUnitCost = item.cost;
+        }
+
+        const theoreticalLeadershipLoss = totalArmyValue * lossRate;
+
+        // 2. 如果理论损失的统御量，连队伍里统御占用最少的兵都“扣不起”，则直接判定为零损耗
+        let targetLoss = 0;
+        if (theoreticalLeadershipLoss >= minUnitCost) {
+            // 如果够扣，则按照比例计算具体的损失人数
+            targetLoss = Math.round(totalCount * lossRate);
+        } else {
+            console.log(`%c[自动战斗] %c理论损失统御(${theoreticalLeadershipLoss.toFixed(2)}) 低于最小单位占用(${minUnitCost})，判定为无损！`, 'color: #4CAF50', 'color: #888');
+        }
+
         const armyChanges = {};
         const settlementChanges = []; // [{type, loss, gain}]
         

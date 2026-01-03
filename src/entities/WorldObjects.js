@@ -206,7 +206,7 @@ export class EnemyGroupObject extends WorldObject {
             difficulty = '普通';
             color = '#ffff00';
         } else if (ratio >= 0.8) {
-            difficulty = '挑战';
+            difficulty = '稍难';
             color = '#d4af37'; // 武侠金
         } else if (ratio >= 0.5) {
             difficulty = '困难';
