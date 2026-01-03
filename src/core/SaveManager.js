@@ -3,6 +3,8 @@ import { talentManager } from './TalentManager.js';
 import { timeManager } from './TimeManager.js';
 import { audioManager } from './AudioManager.js';
 
+import { WorldStatusManager } from './WorldStatusManager.js';
+
 /**
  * SaveManager: 负责全局存档的序列化、持久化存储与分发
  * 采用模块化快照方案，不直接操作具体业务数值
@@ -26,6 +28,7 @@ class SaveManager {
                 world: worldManager.getSaveData(),
                 talents: talentManager.getSaveData(),
                 time: timeManager.getSaveData(),
+                worldStatus: WorldStatusManager.getSaveData(),
                 settings: {
                     bgm: audioManager.bgmVolume,
                     sfx: audioManager.sfxVolume
@@ -76,6 +79,7 @@ class SaveManager {
             timeManager.loadSaveData(data.time);
             worldManager.loadSaveData(data.world);
             talentManager.loadSaveData(data.talents);
+            WorldStatusManager.loadSaveData(data.worldStatus);
 
             // 恢复设置
             if (data.settings) {

@@ -12,6 +12,7 @@ import { audioManager } from './core/AudioManager.js';
 import { timeManager } from './core/TimeManager.js';
 import { resourcePreloader } from './core/ResourcePreloader.js';
 import { saveManager } from './core/SaveManager.js';
+import { WorldStatusManager } from './core/WorldStatusManager.js';
 
 import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
@@ -82,6 +83,10 @@ window.addEventListener('keydown', (e) => {
                 if (id === 'town-management-panel' && worldInstance) {
                     worldInstance.closeTownManagement();
                 }
+                // 特殊逻辑：如果是传闻面板，同步清理红点
+                if (id === 'world-event-history-panel') {
+                    WorldStatusManager.updateNotificationDot(false);
+                }
                 panelClosed = true;
                 break; // 每次只关闭一个面板
             }
@@ -129,6 +134,11 @@ function closePanelWithHUD(panelId) {
         panel.classList.add('hidden');
         audioManager.play('ui_click');
 
+        // 特殊逻辑：如果是传闻面板，同步清理红点
+        if (panelId === 'world-event-history-panel') {
+            WorldStatusManager.updateNotificationDot(false);
+        }
+
         // --- 手机端适配：仅在没有其他全屏面板打开时恢复 HUD ---
         if (uiManager.isMobile) {
             const panelsToCheck = [
@@ -138,7 +148,8 @@ function closePanelWithHUD(panelId) {
                 'skill-learn-panel', 
                 'how-to-play-panel',
                 'load-save-panel',
-                'save-game-panel'
+                'save-game-panel',
+                'world-event-history-panel'
             ];
             const anyVisible = panelsToCheck.some(id => {
                 const p = document.getElementById(id);
@@ -150,6 +161,7 @@ function closePanelWithHUD(panelId) {
         }
     }
 }
+window.closePanelWithHUD = closePanelWithHUD; // 暴露给全局调用
 
 // 绑定保存和载入按钮（暂停菜单内）
 const pauseSaveBtn = document.getElementById('pause-save-btn');
@@ -312,6 +324,7 @@ function initUIIcons() {
 
 // 在 DOM 加载或脚本执行时初始化
 initUIIcons();
+WorldStatusManager.initUI();
 
 // 点击“招式图谱”
 if (skillGalleryBtn) {
@@ -410,12 +423,9 @@ function renderSaveSlots(containerId, mode) {
         item.onclick = () => {
             audioManager.play('ui_click');
             if (mode === 'save') {
-                // 核心修复：在保存前，必须先将 3D 世界的主角位置同步到逻辑层 (WorldManager)
-                if (currentState === GameState.WORLD && worldInstance && worldInstance.playerGroup) {
-                    worldManager.savePlayerPos(
-                        worldInstance.playerGroup.position.x, 
-                        worldInstance.playerGroup.position.z
-                    );
+                // 核心修复：在保存前，必须先将 3D 世界的所有实体位置同步到逻辑层 (WorldManager)
+                if (currentState === GameState.WORLD && worldInstance) {
+                    worldInstance.syncEntitiesToLogic();
                 }
 
                 if (saveManager.save(slotId)) {
@@ -487,24 +497,7 @@ if (howToPlayBtn) {
             panel.classList.remove('hidden');
 
             if (closeBtn) {
-            closeBtn.onclick = () => {
-                audioManager.play('ui_click');
-                panel.classList.add('hidden');
-
-                // --- 手机端适配：仅在没有其他全屏面板打开时恢复 HUD ---
-                if (uiManager.isMobile) {
-                    const heroPanel = document.getElementById('hero-stats-panel');
-                    const townPanel = document.getElementById('town-management-panel');
-                    const talentPanel = document.getElementById('talent-panel');
-                    if (
-                        (!heroPanel || heroPanel.classList.contains('hidden')) &&
-                        (!townPanel || townPanel.classList.contains('hidden')) &&
-                        (!talentPanel || talentPanel.classList.contains('hidden'))
-                    ) {
-                        uiManager.setHUDVisibility(true);
-                    }
-                }
-            };
+                closeBtn.onclick = () => window.closePanelWithHUD('how-to-play-panel');
             }
         }
     });

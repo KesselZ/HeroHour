@@ -5,6 +5,7 @@ import { talentManager } from './TalentManager.js';
 import { timeManager } from './TimeManager.js';
 import { rng, setSeed } from './Random.js';
 import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
+import { WorldStatusManager } from './WorldStatusManager.js';
 
 /**
  * 1. 建筑全量注册表：定义所有建筑的元数据
@@ -333,6 +334,7 @@ export class WorldManager {
         SHOW_POIS: import.meta.env.DEV,          // 显示所有资源点/兴趣点标记
         LICHENGEN_GOD_MODE: import.meta.env.DEV, // 李承恩起始获得全兵种各 2 个 + 无限统御
         START_RESOURCES: import.meta.env.DEV,    // 初始金钱 10000，木头 5000
+        HIGH_EVENT_FREQUENCY: false,             // 暂时强制关闭高频事件触发
         SHOW_MOTION_DEBUG: false                 // 运动调试日志：默认依然关闭，除非手动开启
     };
 
@@ -1425,6 +1427,15 @@ export class WorldManager {
         const oldHeroId = oldFaction ? oldFaction.heroId : null;
 
         city.owner = 'player';
+        
+        // --- 核心重构：使用主动事件接口，并标记该事件会改变长久局势 ---
+        WorldStatusManager.triggerActiveEvent('captured_main_city', {
+            title: '收复重镇',
+            text: `阁下指挥若定，一举收复了【${city.name}】！百姓夹道欢迎，江湖威望已达巅峰！`,
+            type: 'important',
+            affectsSituation: true // 只有这种大事才会改变 Tooltip 里的描述
+        });
+
         // 备注：学院建筑会自动随 owner 变更而动态切换显示逻辑
         
         // 更新势力的城市列表

@@ -198,10 +198,10 @@ export const ASSET_REGISTRY = {
 
         // --- 野怪系列 (基于 enemy.png 4x4 网格) ---
         // 第一行：野生动物
-        'wild_boar': { name: '野猪', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 1, scale: 1.3 },
-        'wolf':      { name: '野狼', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 2, scale: 1.3 },
-        'tiger':     { name: '猛虎', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 3, scale: 1.6 },
-        'bear':      { name: '黑熊', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 4, scale: 1.8 },
+        'wild_boar': { name: '野猪', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 1, scale: 1.3, defaultFacing: 'left' },
+        'wolf':      { name: '野狼', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 2, scale: 1.3, defaultFacing: 'left' },
+        'tiger':     { name: '猛虎', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 3, scale: 1.6, defaultFacing: 'left' },
+        'bear':      { name: '黑熊', sheet: 'ENEMY', rows: 4, cols: 4, r: 1, c: 4, scale: 1.8, defaultFacing: 'left' },
 
         // 第二行：山贼与叛军
         'bandit':        { name: '山贼刀匪', sheet: 'ENEMY', rows: 4, cols: 4, r: 2, c: 1, scale: 1.4, defaultFacing: 'left' },
@@ -331,6 +331,10 @@ class SpriteFactory {
         sprite.scale.set(s, s, 1);
         // 恢复默认：除非指定，否则使用中心锚点 (0.5)
         sprite.center.set(0.5, anchorY); 
+        
+        // 核心修复：将真实身份注入 userData，供后续翻转动画精确识别
+        sprite.userData.spriteKey = key;
+        
         return sprite;
     }
 

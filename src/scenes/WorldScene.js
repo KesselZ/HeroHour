@@ -5,7 +5,7 @@ import { WorldManager, worldManager } from '../core/WorldManager.js'; // 引入�
 import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
 import { timeManager } from '../core/TimeManager.js';
 import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
-import { createWorldObject } from '../entities/WorldObjects.js';
+import { createWorldObject, PlayerObject } from '../entities/WorldObjects.js';
 import { VFXLibrary } from '../core/VFXLibrary.js'; // 核心引入
 import { Pathfinder } from '../core/Pathfinder.js';
 
@@ -71,6 +71,11 @@ export class WorldScene {
         this.longPressTarget = null;
         this.isLongPressTriggered = false;
         this.touchStartPos = new THREE.Vector2();
+
+        this.playerObject = null; // 封装后的玩家移动对象
+
+        // --- 核心：江湖播报定时检查 ---
+        this.eventCheckTimer = 0;
     }
 
     /**
@@ -104,6 +109,14 @@ export class WorldScene {
         this.createWater(mapGenerator.size);
         this.createPlayer();
         
+        // 初始化玩家移动封装对象
+        this.playerObject = new PlayerObject({ 
+            id: 'player', 
+            baseScale: this.baseScale,
+            moveSpeed: this.moveSpeed
+        });
+        this.playerObject.setMesh(this.playerGroup);
+
         // 设置背景色，增加武侠大世界的沉浸感
         this.scene.background = new THREE.Color(0x87ceeb); // 天蓝色背景
         this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.005); // 淡淡的远景雾效
@@ -135,9 +148,9 @@ export class WorldScene {
         window.addEventListener('sect-monsters-cleared', this._onSectMonstersCleared);
 
         // --- 英雄大世界属性应用 ---
-        // 核心修正：行军速度必须读取“最终修正后”的轻功属性，确保李承恩等人的天赋生效
+        // 核心修正：行军速度直接读取“最终修正后”的轻功属性，不再使用 0.6 缩放
         const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
-        this.moveSpeed = heroDetails.qinggong * 0.6; // 使用分离后的轻功数值，0.6 是世界地图缩放系数
+        this.moveSpeed = heroDetails.qinggong; 
 
         // 4. 根据逻辑数据“摆放”物体
         this.renderWorldEntities(mapState.entities);
@@ -225,12 +238,8 @@ export class WorldScene {
                 const diffColors = { 'easy': '#27ae60', 'hard': '#e67e22', 'hell': '#ff4444' };
                 const diffColor = diffColors[timeManager.difficulty] || '#ffffff';
 
-                // 使用 WorldStatusManager 获取动态描述
-                const situationDesc = WorldStatusManager.getSituationDescription(
-                    timeManager.difficulty, 
-                    timeManager.year, 
-                    timeManager.seasons[timeManager.seasonIndex]
-                );
+                // 使用新重构的 WorldStatusManager 获取局势描述
+                const situationDesc = WorldStatusManager.getSituationDescription(timeManager.difficulty);
                 
                 let desc = `
                     <div style="margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">
@@ -325,7 +334,7 @@ export class WorldScene {
             this.updateHeroHUD();
             // 核心修复：属性变化时同步更新大世界移动速度
             const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
-            this.moveSpeed = heroDetails.qinggong * 0.6;
+            this.moveSpeed = heroDetails.qinggong;
 
             // 核心修复：如果属性面板打开，实时刷新它
             this.updateHeroStatsUI();
@@ -336,7 +345,7 @@ export class WorldScene {
         window.removeEventListener('talents-updated', this._onTalentsUpdated);
         this._onTalentsUpdated = () => {
             const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
-            this.moveSpeed = heroDetails.qinggong * 0.6;
+            this.moveSpeed = heroDetails.qinggong;
             console.log(`%c[属性同步] 奇穴已更新，当前大世界移速: ${this.moveSpeed.toFixed(3)}`, "color: #5b8a8a");
             
             // 同步更新 HUD (隐藏或更新提醒气泡)
@@ -1118,6 +1127,7 @@ export class WorldScene {
             opacity: 0.3 
         });
         this.playerShadow = new THREE.Mesh(shadowGeom, shadowMat);
+        this.playerShadow.name = 'shadow';
         this.playerShadow.rotation.x = -Math.PI / 2;
         this.playerShadow.position.y = 0.05; // 略高于地面
         this.playerGroup.add(this.playerShadow);
@@ -1322,6 +1332,10 @@ export class WorldScene {
     stop() {
         this.isActive = false;
         timeManager.pause(); // 暂停时间流逝
+        
+        // --- 核心优化：在停止场景前同步所有移动实体的最新坐标到 WorldManager ---
+        this.syncEntitiesToLogic();
+
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('pointermove', this.onPointerMove); // 核心修复：移除指针监听
@@ -1367,6 +1381,36 @@ export class WorldScene {
 
         const minimap = document.querySelector('.minimap-container');
         if (minimap) minimap.classList.add('hidden');
+    }
+
+    /**
+     * 将 3D 场景中的实体坐标同步回逻辑层数据
+     * 区分当前位置 (x, z) 和 逻辑数据中的初始位置
+     */
+    syncEntitiesToLogic() {
+        const ms = worldManager.mapState;
+        if (!ms || !ms.entities) return;
+
+        this.interactables.forEach(obj => {
+            if (!obj.mesh) return;
+            // 在实体数据中更新当前位置，但不改变原始定义的坐标（如果需要）
+            const data = ms.entities.find(e => e.id === obj.id);
+            if (data) {
+                // 关键：我们保存当前位置到 data.x/z，这样读档时它们会出现在这里
+                data.x = obj.mesh.position.x;
+                data.z = obj.mesh.position.z;
+                
+                // 如果是移动物体，我们可以额外保存其“老家”坐标，防止它原地安家
+                if (obj.spawnX !== undefined) {
+                    data.spawnX = obj.spawnX;
+                    data.spawnZ = obj.spawnZ;
+                }
+            }
+        });
+
+        if (this.playerGroup) {
+            worldManager.savePlayerPos(this.playerGroup.position.x, this.playerGroup.position.z);
+        }
     }
 
     onKeyDown(e) { 
@@ -1492,6 +1536,11 @@ export class WorldScene {
                     x: node.x - halfSize,
                     z: node.z - halfSize
                 }));
+
+                // 同步给玩家移动对象
+                if (this.playerObject) {
+                    this.playerObject.currentPath = [...this.currentPath];
+                }
                 
                 // 3. 更新视觉反馈
                 this.vfxLibrary.createClickRippleVFX(targetPos);
@@ -1582,6 +1631,15 @@ export class WorldScene {
         const seasonChanged = timeManager.update();
         if (seasonChanged) {
             worldManager.processResourceProduction();
+            // --- 核心改动：季节更替时进行逻辑事件检查 ---
+            WorldStatusManager.onSeasonChange(worldManager);
+        }
+
+        // --- 核心改动：每秒进行一次随机氛围传闻检查 ---
+        this.eventCheckTimer += deltaTime * 1000;
+        if (this.eventCheckTimer >= 1000) {
+            this.eventCheckTimer = 0;
+            WorldStatusManager.checkAtmosphericFlavor();
         }
     }
 
@@ -1598,192 +1656,64 @@ export class WorldScene {
     }
 
     /**
-     * [核心] 处理输入与位移逻辑 (解耦寻路与键盘)
+     * [核心] 处理输入与位移逻辑
      */
     _processInputAndMovement(deltaTime) {
+        if (!this.playerObject) return;
+
         if (this.isAnyMenuOpen()) {
-            this.footstepTimer = 0;
-            this._updateWalkingAnimation(deltaTime, new THREE.Vector3(), false);
+            this.playerObject.update(deltaTime, new THREE.Vector3(0, 0, 0));
             return;
         }
 
-        let moveDir = new THREE.Vector3(0, 0, 0);
-        let isMoving = false;
-
-        // 1. 键盘移动指令 (优先级最高，且会中断寻路)
+        let manualMoveDir = new THREE.Vector3(0, 0, 0);
         const hasKeyboardInput = this.keys['w'] || this.keys['s'] || this.keys['a'] || this.keys['d'] || 
                                 this.keys['arrowup'] || this.keys['arrowdown'] || this.keys['arrowleft'] || this.keys['arrowright'];
 
         if (hasKeyboardInput) {
-            this.currentPath = []; // 键盘输入立即打断寻路
             this.clearPathVisuals();
+            if (this.keys['w'] || this.keys['arrowup']) manualMoveDir.z -= 1;
+            if (this.keys['s'] || this.keys['arrowdown']) manualMoveDir.z += 1;
+            if (this.keys['a'] || this.keys['arrowleft']) manualMoveDir.x -= 1;
+            if (this.keys['d'] || this.keys['arrowright']) manualMoveDir.x += 1;
             
-            if (this.keys['w'] || this.keys['arrowup']) moveDir.z -= 1;
-            if (this.keys['s'] || this.keys['arrowdown']) moveDir.z += 1;
-            if (this.keys['a'] || this.keys['arrowleft']) moveDir.x -= 1;
-            if (this.keys['d'] || this.keys['arrowright']) moveDir.x += 1;
-            
-            if (moveDir.lengthSq() > 0) {
-                moveDir.normalize();
-                isMoving = true;
+            if (manualMoveDir.lengthSq() > 0) {
+                manualMoveDir.normalize();
             }
-        } 
-        // 2. 自动寻路指令
-        else if (this.currentPath.length > 0) {
-            isMoving = true;
-            const target = this.currentPath[0];
-            const dx = target.x - this.playerGroup.position.x;
-            const dz = target.z - this.playerGroup.position.z;
-            const distSq = dx * dx + dz * dz;
+            // 键盘输入时，清空 playerObject 的自动寻路路径
+            this.playerObject.currentPath = [];
+            this.currentPath = [];
+        }
 
-            // 核心修复：提前 0.15 米就开始切换下一节点，防止到达点时的物理顿挫
-            if (distSq < 0.15) {
+        // 执行物理位移与视觉更新
+        this.playerObject.moveSpeed = this.moveSpeed;
+        this.playerObject.manualMoveDir = manualMoveDir.lengthSq() > 0 ? manualMoveDir : null;
+        this.playerObject.update(deltaTime);
+
+        // 维护 WorldScene 的寻路面包屑视觉
+        if (this.currentPath.length > 0) {
+            // 如果 playerObject 已经到达或越过了一些点，同步清理
+            while (this.currentPath.length > this.playerObject.currentPath.length) {
                 this.currentPath.shift();
-                
-                // 移除已经经过的路径点 (面包屑)
                 if (this.pathPoints.length > 0) {
-                    const firstPoint = this.pathPoints[0];
-                    const distToPoint = this.playerGroup.position.distanceTo(firstPoint.mesh.position);
-                    // 如果第一个点距离玩家很近，或者玩家已经越过了它，就移除
-                    if (distToPoint < 0.8) {
-                        const p = this.pathPoints.shift();
-                        if (p.mesh.parent) this.scene.remove(p.mesh);
-                        p.mesh.geometry.dispose();
-                        p.mesh.material.dispose();
-                    }
-                }
-
-                if (this.currentPath.length === 0) {
-                    this.clearPathVisuals();
-                    isMoving = false; // 到达终点
-                } else {
-                    // 立即指向下一个节点，保证 moveDir 连贯
-                    const next = this.currentPath[0];
-                    moveDir.set(next.x - this.playerGroup.position.x, 0, next.z - this.playerGroup.position.z).normalize();
-                }
-            } else {
-                moveDir.set(dx, 0, dz).normalize();
-            }
-        }
-
-        // 3. 执行物理位移与碰撞
-        if (isMoving && moveDir.lengthSq() > 0) {
-            const moveStep = this.moveSpeed * deltaTime;
-            const nextPos = this.playerGroup.position.clone().addScaledVector(moveDir, moveStep);
-            const isAuto = this.currentPath.length > 0;
-            const colRadius = isAuto ? 0.3 : 0.7;
-
-            if (mapGenerator.isPassable(nextPos.x, nextPos.z, colRadius)) {
-                this.playerGroup.position.copy(nextPos);
-            } else if (!isAuto) {
-                // 侧滑逻辑仅对键盘开放，寻路应保持精确性
-                this._applySlidingMovement(moveDir, moveStep, colRadius);
-            } else {
-                // 自动寻路中如果卡住了，由于 A* 已经保证了路径合法性，我们强制前进一小步防止抽搐
-                this.playerGroup.position.copy(nextPos);
-            }
-            this.checkInteractions();
-        }
-
-        // 4. 更新视觉表现 (动画与音效)
-        this._updateWalkingAnimation(deltaTime, moveDir, isMoving);
-    }
-
-    /**
-     * [辅助] 键盘侧滑碰撞处理
-     */
-    _applySlidingMovement(moveDir, moveStep, radius) {
-        const nextPosX = this.playerGroup.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
-        if (mapGenerator.isPassable(nextPosX.x, nextPosX.z, radius)) {
-            this.playerGroup.position.copy(nextPosX);
-        }
-        const nextPosZ = this.playerGroup.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
-        if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z, radius)) {
-            this.playerGroup.position.copy(nextPosZ);
-        }
-    }
-
-    /**
-     * [视觉] 行走动画与足音系统
-     */
-    _updateWalkingAnimation(deltaTime, moveDir, isMoving) {
-        const texture = this.playerHero.material.map;
-        const config = spriteFactory.unitConfig[this.heroId];
-
-        if (isMoving) {
-            const distanceMoved = this.playerGroup.position.distanceTo(this.lastPlayerPos);
-            
-            // 动感行走调参
-            const stepDistance = 3.5;      
-            const maxStepsPerSecond = 2.5; 
-            const deltaAnim = (distanceMoved / stepDistance) * Math.PI;
-            const maxDelta = (maxStepsPerSecond * Math.PI) * deltaTime;
-            const finalDelta = Math.min(deltaAnim, maxDelta);
-            this.moveAnimTime += finalDelta;
-
-            // 1. 垂直跳动 (Bobbing)
-            const bob = Math.abs(Math.sin(this.moveAnimTime)); 
-            this.playerHero.position.y = bob * 0.12;
-
-            // 2. 挤压伸展 (Squash & Stretch)
-            const stretch = 1 + bob * 0.06;
-            const squash = 1 - bob * 0.03;
-            
-            // 3. 影子表现
-            const shadowScale = 1 - bob * 0.2;
-            this.playerShadow.scale.set(shadowScale, shadowScale, 1);
-            this.playerShadow.material.opacity = 0.3 * (1 - bob * 0.2);
-
-            // 4. 倾斜 (Tilting)
-            const tilt = moveDir.x * -0.08; 
-            this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, tilt, 0.1);
-
-            // 5. 缩放应用
-            this.playerHero.scale.set(this.baseScale * squash, this.baseScale * stretch, 1);
-
-            // 6. 足音逻辑 (跟随移动状态)
-            if (this.footstepTimer === 0) {
-                audioManager.play('footstep_grass', { volume: 0.6, pitchVar: 0.2 });
-            }
-            this.footstepTimer += deltaTime * 1000;
-            if (this.footstepTimer >= this.footstepInterval) {
-                this.footstepTimer = 0;
-            }
-            
-            // 7. 翻转逻辑
-            if (moveDir.x !== 0) {
-                const defaultFacing = config.defaultFacing || 'right';
-                const isMovingLeft = moveDir.x < 0;
-                let shouldFlip = isMovingLeft ? (defaultFacing === 'right') : (defaultFacing === 'left');
-                const standardRepeatX = 1 / 4; 
-                const flippedRepeatX = -1 / 4;
-                const targetRepeatX = shouldFlip ? flippedRepeatX : standardRepeatX;
-                if (texture.repeat.x !== targetRepeatX) {
-                    texture.repeat.x = targetRepeatX;
-                    texture.offset.x = shouldFlip ? (config.col / 4) : ((config.col - 1) / 4);
+                    const p = this.pathPoints.shift();
+                    if (p.mesh.parent) this.scene.remove(p.mesh);
+                    p.mesh.geometry.dispose();
+                    p.mesh.material.dispose();
                 }
             }
-        } else {
-            // 停止移动时的恢复逻辑
-            this.footstepTimer = 0;
-            this.moveAnimTime = 0;
-            this.playerHero.position.y = THREE.MathUtils.lerp(this.playerHero.position.y, 0, 0.2);
-            this.playerHero.rotation.z = THREE.MathUtils.lerp(this.playerHero.rotation.z, 0, 0.2);
-            this.playerShadow.scale.set(
-                THREE.MathUtils.lerp(this.playerShadow.scale.x, 1, 0.2),
-                THREE.MathUtils.lerp(this.playerShadow.scale.y, 1, 0.2),
-                1
-            );
-            this.playerShadow.material.opacity = THREE.MathUtils.lerp(this.playerShadow.material.opacity, 0.3, 0.2);
-
-            // 呼吸效果
-            const breath = Math.sin(Date.now() * 0.003) * 0.02;
-            this.playerHero.scale.set(this.baseScale * (1 - breath), this.baseScale * (1 + breath), 1);
+            if (this.currentPath.length === 0) {
+                this.clearPathVisuals();
+            }
         }
     }
 
     update(deltaTime) {
         if (!this.isActive || !this.playerGroup) return;
+
+        // 核心修复：如果正在进行战斗结算或对话（如碾压对话框），暂停大世界逻辑更新
+        // 这不仅解决了重复触发交互的问题，也让怪物在对话时停止移动
+        if (worldManager.mapState.pendingBattleEnemyId) return;
 
         this.lastPlayerPos.copy(this.playerGroup.position); // 记录位移前位置
 
@@ -1795,7 +1725,16 @@ export class WorldScene {
         // 2. 核心位移与寻路逻辑
         this._processInputAndMovement(deltaTime);
 
-        // 3. 更新视觉同步 (相机、小地图、探索)
+        // 3. 更新所有交互物体的逻辑 (例如敌人移动)
+        const playerPos = this.playerGroup.position;
+        this.interactables.forEach(obj => {
+            if (obj.update) obj.update(deltaTime, playerPos);
+        });
+
+        // 核心修复：全局交互检测（确保玩家站着不动被敌人撞到也能触发战斗）
+        this.checkInteractions();
+
+        // 4. 更新视觉同步 (相机、小地图、探索)
         this.updateExploration(); 
         this.updateMinimap();
 

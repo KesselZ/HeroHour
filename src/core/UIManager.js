@@ -276,11 +276,14 @@ class UIManager {
         const skillLearnPanel = document.getElementById('skill-learn-panel');
         if (closeSkillLearnBtn && skillLearnPanel) {
             closeSkillLearnBtn.onclick = () => {
-                // --- 手机端适配：关闭面板时恢复 HUD ---
-                if (this.isMobile) this.setHUDVisibility(true);
-
-                audioManager.play('ui_click');
-                skillLearnPanel.classList.add('hidden');
+                if (window.closePanelWithHUD) {
+                    window.closePanelWithHUD('skill-learn-panel');
+                } else {
+                    // --- 手机端适配：关闭面板时恢复 HUD ---
+                    if (this.isMobile) this.setHUDVisibility(true);
+                    audioManager.play('ui_click');
+                    skillLearnPanel.classList.add('hidden');
+                }
             };
         }
 

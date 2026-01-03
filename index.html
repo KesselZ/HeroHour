@@ -74,6 +74,17 @@
                     </div>
                 </div>
 
+                <!-- 江湖播报系统 (小鸽子图标与气泡) -->
+                <div id="world-broadcast-system" class="broadcast-container">
+                    <div id="broadcast-horn" class="broadcast-horn" title="江湖传闻">
+                        <div class="horn-icon">🕊️</div>
+                        <div id="broadcast-dot" class="broadcast-dot hidden"></div>
+                    </div>
+                    <div id="broadcast-bubble-container" class="broadcast-bubble-container">
+                        <!-- 动态生成的播报气泡将出现在这里 -->
+                    </div>
+                </div>
+
                 <!-- 大世界 HUD：左下角状态区 -->
                 <div class="hud-bottom-left" id="world-hud-bottom-left">
                     <div class="hud-card hud-card-city" id="city-mini-card">
@@ -214,10 +225,14 @@
             </div>
 
             <!-- 招式学习/指南面板 -->
-            <div id="skill-learn-panel" class="hidden skill-learn-v3">
-                <div class="menu-decoration-top">招式图谱</div>
-                <button id="close-skill-learn" class="close-btn-v3">×</button>
-                <div class="skill-learn-content">
+            <div id="skill-learn-panel" class="menu-container hidden standard-panel-v4">
+                <div class="standard-panel-header">
+                    <div class="header-ornament-left"></div>
+                    <div class="panel-title">招式图谱</div>
+                    <div class="header-ornament-right"></div>
+                    <button id="close-skill-learn" class="close-btn-v3">×</button>
+                </div>
+                <div class="standard-panel-main">
                     <div class="skill-learn-header-row">
                         <div class="skill-learn-tabs">
                             <button class="tab-btn active" data-sect="chunyang">纯阳招式</button>
@@ -225,73 +240,67 @@
                             <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
                         </div>
                     </div>
-                    <div id="skill-list-to-learn" class="skill-grid-v3"></div>
+                    <div id="skill-list-to-learn" class="skill-grid-v3 panel-content-scroll"></div>
                 </div>
                 <div class="menu-decoration-bottom"></div>
             </div>
 
-            <div id="how-to-play-panel" class="hidden skill-learn-v3">
-                <div class="menu-decoration-top">江湖指南</div>
-                <button id="close-how-to-play" class="close-btn-v3">×</button>
-                <div class="how-to-play-content"><div id="how-to-play-text" class="how-to-play-scroll"></div></div>
+            <div id="how-to-play-panel" class="menu-container hidden standard-panel-v4">
+                <div class="standard-panel-header">
+                    <div class="header-ornament-left"></div>
+                    <div class="panel-title">江湖指南</div>
+                    <div class="header-ornament-right"></div>
+                    <button id="close-how-to-play" class="close-btn-v3">×</button>
+                </div>
+                <div class="standard-panel-main">
+                    <div id="how-to-play-text" class="panel-content-scroll"></div>
+                </div>
                 <div class="menu-decoration-bottom"></div>
             </div>
 
             <!-- 读取存档面板 -->
-            <div id="load-save-panel" class="hidden skill-learn-v3">
-                <div class="menu-decoration-top">载入江湖</div>
-                <button id="close-load-save" class="close-btn-v3">×</button>
-                <div class="skill-learn-content">
-                    <div class="load-save-list" id="save-list-container">
+            <div id="load-save-panel" class="menu-container hidden standard-panel-v4">
+                <div class="standard-panel-header">
+                    <div class="header-ornament-left"></div>
+                    <div class="panel-title">载入江湖</div>
+                    <div class="header-ornament-right"></div>
+                    <button id="close-load-save" class="close-btn-v3">×</button>
+                </div>
+                <div class="standard-panel-main">
+                    <div class="load-save-list panel-content-scroll" id="save-list-container">
                         <!-- 存档项占位 -->
-                        <div class="save-item empty">
-                            <div class="save-info">
-                                <div class="save-name">空存档位</div>
-                                <div class="save-details">尚无江湖传闻</div>
-                            </div>
-                        </div>
-                        <div class="save-item empty">
-                            <div class="save-info">
-                                <div class="save-name">空存档位</div>
-                                <div class="save-details">尚无江湖传闻</div>
-                            </div>
-                        </div>
-                        <div class="save-item empty">
-                            <div class="save-info">
-                                <div class="save-name">空存档位</div>
-                                <div class="save-details">尚无江湖传闻</div>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <div class="menu-decoration-bottom"></div>
             </div>
 
             <!-- 保存存档面板 -->
-            <div id="save-game-panel" class="hidden skill-learn-v3">
-                <div class="menu-decoration-top">记叙江湖</div>
-                <button id="close-save-game" class="close-btn-v3">×</button>
-                <div class="skill-learn-content">
-                    <div class="load-save-list" id="save-game-list-container">
+            <div id="save-game-panel" class="menu-container hidden standard-panel-v4">
+                <div class="standard-panel-header">
+                    <div class="header-ornament-left"></div>
+                    <div class="panel-title">记叙江湖</div>
+                    <div class="header-ornament-right"></div>
+                    <button id="close-save-game" class="close-btn-v3">×</button>
+                </div>
+                <div class="standard-panel-main">
+                    <div class="load-save-list panel-content-scroll" id="save-game-list-container">
                         <!-- 存档项占位 -->
-                        <div class="save-item">
-                            <div class="save-info">
-                                <div class="save-name">存档位 一</div>
-                                <div class="save-details">点击覆盖此存档</div>
-                            </div>
-                        </div>
-                        <div class="save-item">
-                            <div class="save-info">
-                                <div class="save-name">存档位 二</div>
-                                <div class="save-details">点击覆盖此存档</div>
-                            </div>
-                        </div>
-                        <div class="save-item">
-                            <div class="save-info">
-                                <div class="save-name">存档位 三</div>
-                                <div class="save-details">点击覆盖此存档</div>
-                            </div>
-                        </div>
+                    </div>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 江湖传闻历史面板 -->
+            <div id="world-event-history-panel" class="menu-container hidden standard-panel-v4">
+                <div class="standard-panel-header">
+                    <div class="header-ornament-left"></div>
+                    <div class="panel-title">江湖快报</div>
+                    <div class="header-ornament-right"></div>
+                    <button id="close-event-history" class="close-btn-v3">×</button>
+                </div>
+                <div class="standard-panel-main">
+                    <div class="panel-content-scroll" id="event-history-list">
+                        <!-- 历史事件将动态填充在这里 -->
                     </div>
                 </div>
                 <div class="menu-decoration-bottom"></div>

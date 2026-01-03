@@ -776,46 +776,6 @@ img {
 .mini-bar-fill.hp { background: linear-gradient(to right, #d32f2f, #ff5252); }
 .mini-bar-fill.mp { background: linear-gradient(to right, #1976d2, #448aff); }
 
-/* 侠客信息面板 V3 */
-.hero-panel-v3 {
-    width: 650px;
-    padding: 60px 40px;
-}
-
-.hero-panel-content {
-    display: flex;
-    gap: 40px;
-    text-align: left;
-}
-
-.hero-panel-left {
-    flex: 0 0 180px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.hero-big-portrait {
-    width: 150px;
-    height: 150px;
-    border: 4px solid var(--jx3-celadon);
-    background: white;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    image-rendering: pixelated;
-    background-size: 400% 400%;
-}
-
-.hero-panel-right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding-left: 20px;
-}
-
-.hero-stats-upper {
-    margin-bottom: 5px;
-}
 
 .skill-points-display {
     margin-top: 15px;
@@ -856,44 +816,7 @@ img {
     box-shadow: 0 4px 10px rgba(166, 139, 68, 0.2);
 }
 
-/* 招式学习面板 V3 重构 */
-.skill-learn-v3 {
-    width: 820px;
-    height: 580px;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    margin-left: -410px;
-    margin-top: -290px;
-    z-index: 10010;
-    background: var(--jx3-paper);
-    border: 6px solid var(--jx3-celadon);
-    outline: 2px solid var(--jx3-gold);
-    box-shadow: 0 0 100px rgba(0,0,0,0.6);
-    padding: 40px 0; /* 避开装饰条 */
-    display: flex;
-    flex-direction: column;
-    animation: openScrollFixed 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
-    pointer-events: auto;
-}
-
-.skill-learn-content {
-    flex: 1;
-    padding: 10px 40px; /* 减小顶部间距 */
-    display: flex;
-    flex-direction: column;
-    gap: 0px; /* 消除 header 和 list 之间的间距 */
-    overflow: hidden;
-}
-
-.how-to-play-content {
-    flex: 1;
-    padding: 20px 50px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--jx3-celadon) transparent;
-}
-
+/* 江湖指南与通用滚动容器 */
 .how-to-play-scroll {
     display: flex;
     flex-direction: column;
@@ -3962,12 +3885,10 @@ body.is-mobile {
         transform-origin: right bottom;
     }
 
-    /* 9. 招式图谱适配 */
-    .skill-learn-v3 {
+    /* 9. 通用面板适配 */
+    .standard-panel-v4 {
         width: 95vw !important;
         height: 95vh !important;
-        margin-left: -47.5vw !important;
-        margin-top: -47.5vh !important;
     }
 
     .skill-grid-v3 {
@@ -3978,4 +3899,320 @@ body.is-mobile {
     .learn-item {
         min-height: 60px !important;
     }
+}
+
+/* 江湖播报系统样式 */
+.broadcast-container {
+    position: absolute;
+    bottom: 215px; /* 在小地图上方 (25px bottom + 180px height + 10px gap) */
+    right: 25px;
+    display: flex;
+    flex-direction: column-reverse; /* 气泡在图标上方弹出 */
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 1100;
+    pointer-events: none;
+}
+
+.broadcast-horn {
+    pointer-events: auto;
+    width: 48px;
+    height: 48px;
+    background: var(--jx3-paper);
+    border: 2px solid var(--jx3-celadon);
+    outline: 1.5px solid var(--jx3-gold);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    transition: var(--transition-base);
+    position: relative;
+    font-size: 1.6rem;
+    background-image: radial-gradient(circle at center, white 0%, var(--jx3-paper) 100%);
+}
+
+.broadcast-horn:hover {
+    transform: scale(1.1) rotate(-5deg);
+    outline-color: var(--jx3-gold-light);
+    box-shadow: 0 6px 20px rgba(166, 139, 68, 0.4);
+}
+
+.broadcast-horn.shake {
+    animation: hornShake 0.5s ease-in-out infinite;
+}
+
+@keyframes hornShake {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-10deg) scale(1.05); }
+    75% { transform: rotate(10deg) scale(1.05); }
+}
+
+.broadcast-dot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background: #ff4444;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(255,0,0,0.6);
+}
+
+.broadcast-bubble-container {
+    display: flex;
+    flex-direction: column-reverse; /* 新气泡在最下面 */
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.broadcast-bubble {
+    background: white;
+    border: 2px solid var(--jx3-celadon);
+    padding: 10px 16px;
+    border-radius: 12px;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+    color: var(--jx3-ink);
+    font-size: 0.95rem;
+    max-width: 280px;
+    position: relative;
+    animation: bubblePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    pointer-events: auto;
+}
+
+/* 气泡小尖角 */
+.broadcast-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    right: 20px;
+    border-width: 10px 10px 0 0;
+    border-style: solid;
+    border-color: var(--jx3-celadon) transparent transparent transparent;
+}
+
+.broadcast-bubble::before {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    right: 21px;
+    border-width: 8px 8px 0 0;
+    border-style: solid;
+    border-color: white transparent transparent transparent;
+    z-index: 1;
+}
+
+@keyframes bubblePop {
+    from { opacity: 0; transform: translateY(20px) scale(0.5); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.broadcast-bubble.fade-out {
+    animation: bubbleFadeAway 0.5s ease-in forwards;
+}
+
+@keyframes bubbleFadeAway {
+    to { opacity: 0; transform: translateY(-20px) scale(0.9); }
+}
+
+.broadcast-bubble .event-tag {
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: var(--jx3-gold);
+    background: rgba(166, 139, 68, 0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    display: inline-block;
+}
+
+.broadcast-bubble .event-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+    display: block;
+    color: var(--jx3-celadon-dark);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding-bottom: 2px;
+}
+
+.broadcast-bubble .event-text {
+    line-height: 1.4;
+    font-style: italic;
+}
+
+/* 统一标准面板 V4 (用于传闻、存档、指南等通用窗口) */
+.standard-panel-v4 {
+    width: 720px;
+    height: 560px;
+    padding: 0 !important;
+    background: var(--jx3-paper);
+    border: 6px solid var(--jx3-celadon);
+    outline: 2px solid var(--jx3-gold);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10050;
+    overflow: hidden;
+    animation: openScrollFixed 0.3s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+    border-radius: var(--radius-md);
+}
+
+.standard-panel-header {
+    height: 50px;
+    background: var(--jx3-celadon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-bottom: 2px solid var(--jx3-gold);
+    flex-shrink: 0;
+}
+
+.standard-panel-main {
+    flex: 1;
+    padding: 25px 35px 50px 35px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    background-image: linear-gradient(to bottom, rgba(255,255,255,0.2) 0%, transparent 100%);
+}
+
+/* 统一滚动条容器样式 */
+.panel-content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--jx3-celadon) transparent;
+}
+
+.panel-content-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.panel-content-scroll::-webkit-scrollbar-thumb {
+    background: var(--jx3-celadon);
+    border-radius: 3px;
+}
+
+
+/* 复用 header-ornament 样式 */
+.header-ornament-left, .header-ornament-right {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--jx3-gold-light));
+    margin: 0 15px;
+}
+
+.header-ornament-right {
+    background: linear-gradient(to left, transparent, var(--jx3-gold-light));
+}
+
+@keyframes openScrollFixed {
+    from { opacity: 0; transform: translate(-50%, -45%) scaleY(0.9); }
+    to { opacity: 1; transform: translate(-50%, -50%) scaleY(1); }
+}
+
+/* 兼容原本的样式引用 */
+.event-history-panel { display: none; } /* 废弃，由 standard-panel-v4 替代 */
+
+
+.history-item {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--jx3-celadon-light);
+    margin-bottom: 15px;
+    padding: 15px;
+    text-align: left;
+    border-radius: var(--radius-md);
+    transition: var(--transition-base);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    animation: historyItemEnter 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes historyItemEnter {
+    from { 
+        opacity: 0; 
+        transform: translateY(-20px) scale(0.95); 
+        max-height: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+        max-height: 200px;
+        margin-bottom: 15px;
+        padding-top: 15px;
+        padding-bottom: 15px;
+    }
+}
+
+
+.history-item:hover {
+    background: white;
+    border-color: var(--jx3-gold);
+    transform: translateX(5px);
+}
+
+.history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding-bottom: 6px;
+}
+
+.history-item-time {
+    font-size: 0.85rem;
+    color: var(--jx3-celadon-dark);
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.history-item-tag {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    color: white;
+}
+
+/* 三级传闻标签颜色 */
+.history-item-tag.trivia { background: #27ae60; }       /* 翠绿 - 琐闻 */
+.history-item-tag.rumor  { background: #d4a017; }       /* 赭黄 - 传言 */
+.history-item-tag.major  { background: #e74c3c; }       /* 朱红 - 要闻 */
+
+/* 兼容旧的 atmosphere 类名 */
+.history-item-tag.atmosphere { background: #27ae60; }
+
+.history-item-content {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--jx3-ink);
+}
+
+/* 气泡内的标签颜色同步 */
+.broadcast-bubble .event-tag.trivia { color: #27ae60; background: rgba(39, 174, 96, 0.1); }
+.broadcast-bubble .event-tag.rumor  { color: #b8860b; background: rgba(212, 160, 23, 0.1); }
+.broadcast-bubble .event-tag.major  { color: #c0392b; background: rgba(231, 76, 60, 0.1); }
+
+.history-item-content strong {
+    color: var(--jx3-celadon-dark);
+}
+
+.history-empty-hint {
+    color: #888;
+    font-style: italic;
+    margin-top: 100px;
+    text-align: center;
+    font-size: 1.1rem;
 }
