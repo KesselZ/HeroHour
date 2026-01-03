@@ -195,12 +195,18 @@ document.addEventListener('selectstart', (e) => e.preventDefault());
 document.addEventListener('copy', (e) => e.preventDefault());
 document.addEventListener('dragstart', (e) => e.preventDefault());
 
+// 核心 UI 元素引用
+const loadingScreen = document.getElementById('loading-screen');
+const progressFill = document.getElementById('loading-progress-fill');
+const loadingText = document.getElementById('loading-text');
+const uiLayer = document.getElementById('ui-layer');
+
 const startBtn = document.querySelector('#start-btn');
 const skillGalleryBtn = document.querySelector('#open-skill-learn-btn'); // 招式图谱按钮
 const howToPlayBtn = document.querySelector('#how-to-play-btn'); // 江湖指南按钮
 const mainMenu = document.querySelector('#main-menu');
 const charSelectMenu = document.querySelector('#character-select');
-const charCards = document.querySelectorAll('.char-card');
+const charCards = document.querySelectorAll('.hero-card');
 const confirmCharBtn = document.querySelector('#confirm-char-btn');
 const backToMenuBtn = document.querySelector('#back-to-menu-btn');
 const menuBg = document.querySelector('#menu-background');
@@ -378,7 +384,11 @@ backToCharBtn.addEventListener('click', () => {
 
 // 确认难度选择，开始加载
 confirmDiffBtn.addEventListener('click', async () => {
-    if (!selectedHero || !selectedDifficulty) return;
+    console.log('%c[主流程] %c开始进入江湖...', 'color: #ff9800; font-weight: bold', 'color: #fff');
+    if (!selectedHero || !selectedDifficulty) {
+        console.warn('[主流程] 角色或难度未选择', { selectedHero, selectedDifficulty });
+        return;
+    }
     audioManager.play('ui_click');
     
     diffSelectMenu.classList.add('hidden');
@@ -386,17 +396,21 @@ confirmDiffBtn.addEventListener('click', async () => {
     
     enterGameState(GameState.LOADING);
     
-    // 加载资源
-    await spriteFactory.load();
-    
-    // 设置难度
-    timeManager.setDifficulty(selectedDifficulty);
-    
-    // 应用英雄天赋属性
-    applyHeroTraits(selectedHero);
-    
-    // 核心改动：进入大世界
-    enterGameState(GameState.WORLD);
+    try {
+        // 加载资源
+        await spriteFactory.load();
+        
+        // 设置难度
+        timeManager.setDifficulty(selectedDifficulty);
+        
+        // 应用英雄天赋属性
+        applyHeroTraits(selectedHero);
+        
+        // 进入大世界
+        enterGameState(GameState.WORLD);
+    } catch (error) {
+        console.error('[主流程] 游戏启动失败:', error);
+    }
 });
 
 // 初始进入菜单时播放菜单 BGM
@@ -404,14 +418,6 @@ audioManager.playBGM('/audio/bgm_menu.mp3');
 
 // 在页面加载完成后开始预加载所有资源
 window.addEventListener('load', () => {
-    const loadingScreen = document.getElementById('loading-screen');
-    const progressFill = document.getElementById('loading-progress-fill');
-    const loadingText = document.getElementById('loading-text');
-    const uiLayer = document.getElementById('ui-layer');
-
-    // 显示加载界面
-    if (loadingScreen) loadingScreen.classList.remove('hidden');
-
     // 延迟一小段时间再开始预加载，避免阻塞初始渲染
     setTimeout(() => {
         resourcePreloader.preloadAll(
@@ -507,7 +513,14 @@ function applyHeroTraits(heroId) {
 function enterGameState(state, config = null) {
     currentState = state;
     
-    // 1. 彻底清理当前所有场景内容 (包括灯光、物体、背景和雾)
+    // 1. 处理 UI 层级显示
+    if (state === GameState.LOADING) {
+        if (loadingScreen) loadingScreen.classList.remove('hidden');
+    } else {
+        if (loadingScreen) loadingScreen.classList.add('hidden');
+    }
+
+    // 2. 彻底清理当前所有场景内容 (包括灯光、物体、背景和雾)
     const objectsToRemove = [];
     scene.children.forEach(child => {
         objectsToRemove.push(child);
