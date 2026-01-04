@@ -1590,6 +1590,18 @@ img {
     box-shadow: 0 0 40px rgba(166, 139, 68, 0.8);
 }
 
+/* 尚未解锁的奇穴：灰色显示 */
+.talent-node.is-locked {
+    filter: grayscale(100%) brightness(0.7);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.talent-node.is-locked:hover {
+    transform: translate(-50%, -50%) scale(1.05); /* 缩减悬停放大比例 */
+    box-shadow: none;
+}
+
 .talent-node-inner {
     width: 40px;
     height: 40px;

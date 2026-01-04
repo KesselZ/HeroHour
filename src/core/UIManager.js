@@ -687,6 +687,12 @@ class UIManager {
             const currentLevel = talentManager.activeTalents[id] || 0;
             if (currentLevel > 0) node.classList.add('active');
 
+            // --- 新增：检查解锁状态并添加 is-locked 类 ---
+            const unlockStatus = talentManager.checkUnlockStatus(id);
+            if (unlockStatus.isLocked) {
+                node.classList.add('is-locked');
+            }
+
             // 核心逻辑：动态处理主属性名称 (力道/身法)
             let displayName = nodeData.name;
             if (id.includes('minor') && nodeData.name === '主属性') {
@@ -706,13 +712,24 @@ class UIManager {
             `;
 
             // 使用优雅的 Tooltip 绑定器
-            this.bindTooltip(node, () => ({
-                name: displayName,
-                level: `当前等级: ${currentLevel}/${nodeData.maxLevel}`,
-                description: `<div style="margin-bottom: 8px;">${nodeData.description}</div>`,
-                status: currentLevel < nodeData.maxLevel ? `升级需求: 1 奇穴点数` : '已修至最高重',
-                color: currentLevel < nodeData.maxLevel ? 'var(--jx3-gold)' : '#ccc'
-            }));
+            this.bindTooltip(node, () => {
+                let statusText = currentLevel < nodeData.maxLevel ? `升级需求: 1 奇穴点数` : '已修至最高重';
+                let statusColor = currentLevel < nodeData.maxLevel ? 'var(--jx3-gold)' : '#ccc';
+                
+                // 如果被锁定，覆盖状态描述
+                if (unlockStatus.isLocked) {
+                    statusText = `<span style="color: #ff4d4d;">${unlockStatus.reason}</span>`;
+                    statusColor = '#ff4d4d';
+                }
+
+                return {
+                    name: displayName,
+                    level: `当前等级: ${currentLevel}/${nodeData.maxLevel}`,
+                    description: `<div style="margin-bottom: 8px;">${nodeData.description}</div>`,
+                    status: statusText,
+                    color: statusColor
+                };
+            });
 
             node.onclick = () => {
                 if (talentManager.upgradeTalent(id)) {
@@ -919,7 +936,7 @@ class UIManager {
                 this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
             } else if (data.status) {
                 // 状态模式
-                this.tooltipLevel.innerText = data.status;
+                this.tooltipLevel.innerHTML = data.status;
             } else if (data.level && data.maxLevel) {
                 // 通用双行模式 (例如：预计难度: 简单)
                 this.tooltipLevel.innerText = `${data.level}: ${data.maxLevel}`;

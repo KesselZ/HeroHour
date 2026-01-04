@@ -73,6 +73,10 @@ export class BaseUnit extends THREE.Group {
 
         this._martyrdomTriggered = false; // 哀兵必胜触发标记
 
+        // --- 核心新增：自动恢复属性 (每秒) ---
+        this._baseHpRegen = 0;
+        this._baseMpRegen = 0;
+
         // --- 护盾系统初始化 ---
         this.shield = 0;
         this.activeShields = []; // [{ id, amount, endTime }]
@@ -196,6 +200,14 @@ export class BaseUnit extends THREE.Group {
     
     get maxHealth() {
         return modifierManager.getModifiedValue(this, 'hp', this._baseHp);
+    }
+
+    get hpRegen() {
+        return modifierManager.getModifiedValue(this, 'hpRegen', this._baseHpRegen);
+    }
+
+    get mpRegen() {
+        return modifierManager.getModifiedValue(this, 'mpRegen', this._baseMpRegen);
     }
 
     get moveSpeed() {
@@ -497,16 +509,24 @@ export class BaseUnit extends THREE.Group {
         this.lastPosition.copy(this.position); // 记录位移前的位置
         this.isActuallyMoving = false; // 每帧重置移动状态
 
-        // --- 核心修复：坐忘无我（仅在拥有特定 Modifier 时生效，非底层机制） ---
+        // --- 核心修复：自动恢复逻辑 (HpRegen / MpRegen) ---
+        // 1. 生命恢复 (对所有单位生效，如果拥有 hpRegen Modifier)
+        const currentHpRegen = this.hpRegen;
+        if (currentHpRegen !== 0) {
+            const healAmount = currentHpRegen * deltaTime;
+            this.health = Math.min(this.maxHealth, this.health + healAmount);
+            if (this.updateHealthBar) this.updateHealthBar();
+        }
+
+        // 2. 内力恢复 (仅对英雄生效，通过属性修正器驱动)
         if (this.isHero && this.side === 'player') {
-            const arrayRegen = modifierManager.getModifiedValue(this, 'chunyang_array_mp_regen_enabled', 0);
-            if (arrayRegen > 0) {
-                // 检查是否在任意气场中
-                const isInArray = this.activeBuffs && this.activeBuffs.some(b => b.tag === 'shengtaiji' || b.tag === 'tunriyue' || b.tag === 'huasanqing');
-                if (isInArray) {
-                    const recoverAmount = arrayRegen * (deltaTime / 1000);
-                    worldManager.modifyHeroMana(recoverAmount);
+            const currentMpRegen = this.mpRegen;
+            if (currentMpRegen !== 0) {
+                const recoverAmount = currentMpRegen * deltaTime;
+                if (Math.abs(recoverAmount) > 0.001) { // 避免微小数值刷屏
+                    console.log(`%c[属性恢复] %c${this.type} 当前 mpRegen: ${currentMpRegen.toFixed(2)}, 本帧回蓝: ${recoverAmount.toFixed(4)}`, 'color: #4488ff', 'color: #fff');
                 }
+                worldManager.modifyHeroMana(recoverAmount);
             }
         }
 

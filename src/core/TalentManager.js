@@ -52,22 +52,55 @@ class TalentManager {
             return { canUpgrade: false, reason: '奇穴点数不足' };
         }
 
+        // 复用逻辑检查
+        const unlockStatus = this.checkUnlockStatus(nodeId);
+        if (unlockStatus.isLocked) {
+            return { canUpgrade: false, reason: unlockStatus.reason };
+        }
+
+        return { canUpgrade: true };
+    }
+
+    /**
+     * 检查奇穴是否满足逻辑上的解锁条件 (前置需求和互斥)
+     * 用于 UI 表现：如果是不能点出的，显示为灰色
+     */
+    checkUnlockStatus(nodeId) {
+        if (!this.currentTree) return { isLocked: true, reason: '未初始化' };
+        const node = this.currentTree.nodes[nodeId];
+        if (!node) return { isLocked: true, reason: '无效奇穴' };
+
+        // 核心节点永远解锁
+        if (node.type === 'core') return { isLocked: false };
+        
+        // 如果已经有等级，视为已解锁
+        if ((this.activeTalents[nodeId] || 0) > 0) return { isLocked: false };
+
+        // --- A. 互斥检查 (Conflicts) ---
+        if (node.conflicts && node.conflicts.length > 0) {
+            for (const conflictId of node.conflicts) {
+                if ((this.activeTalents[conflictId] || 0) > 0) {
+                    const conflictNode = this.currentTree.nodes[conflictId];
+                    return { isLocked: true, reason: `与已修习奇穴【${conflictNode ? conflictNode.name : conflictId}】互斥` };
+                }
+            }
+        }
+
+        // --- B. 前置需求检查 (Requires) ---
         if (node.requires && node.requires.length > 0) {
             for (const reqId of node.requires) {
                 const reqLevel = this.activeTalents[reqId] || 0;
                 const reqNode = this.currentTree.nodes[reqId];
                 if (reqLevel < (reqNode ? reqNode.maxLevel : 1)) {
-                    return { canUpgrade: false, reason: `需先修满前置奇穴：${reqNode ? reqNode.name : reqId}` };
+                    return { isLocked: true, reason: `需先修满前置奇穴：${reqNode ? reqNode.name : reqId}` };
                 }
             }
         }
 
-        // --- 新增：前置技能检查 ---
+        // --- C. 前置技能检查 ---
         if (node.requiredSkill) {
             const heroSkills = this.heroData ? (this.heroData.skills || []) : [];
             const requiredSkills = Array.isArray(node.requiredSkill) ? node.requiredSkill : [node.requiredSkill];
-            
-            // 检查逻辑：如果是数组，默认学会其中之一即可 (符合"使用A或B"的描述)
             const hasSkill = requiredSkills.some(sid => heroSkills.includes(sid));
             
             if (!hasSkill) {
@@ -75,11 +108,11 @@ class TalentManager {
                     const skill = SkillRegistry[sid];
                     return skill ? `【${skill.name}】` : sid;
                 }).join(' 或 ');
-                return { canUpgrade: false, reason: `需先领悟招式：${skillNames}` };
+                return { isLocked: true, reason: `需先领悟招式：${skillNames}` };
             }
         }
 
-        return { canUpgrade: true };
+        return { isLocked: false };
     }
 
     /**

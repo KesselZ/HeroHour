@@ -12,10 +12,10 @@ import { WorldStatusManager } from './WorldStatusManager.js';
  * 这种方式将数据与逻辑彻底分离，以后增加建筑只需在此处添加
  */
 const BUILDING_REGISTRY = {
-    'town_hall': { name: '议政厅', category: 'economy', maxLevel: 3, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。', costGrowth: { type: 'linear', increment: { gold: 500, wood: 100 } } },
-    'market': { name: '市场', category: 'economy', maxLevel: 3, icon: 'merchant_guild', cost: { gold: 300, wood: 50 }, description: '互通有无：提高城镇的金钱与木材产出效率。', costGrowth: { type: 'linear', increment: { gold: 200, wood: 50 } } },
-    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '每级增加全军 10% 的阅历获取速度。', costGrowth: { type: 'linear', increment: { gold: 400, wood: 200 } } },
-    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 2, icon: 'imperial_treasury', cost: { gold: 1500, wood: 300 }, description: '提升该城镇 20% 的金钱产出。', costGrowth: { type: 'exponential', factor: 1.5 } },
+    'town_hall': { name: '议政厅', category: 'economy', maxLevel: 4, icon: 'main_city', cost: { gold: 500, wood: 100 }, description: '大权统筹：提升每季度的税收金钱产出。', costGrowth: { type: 'exponential', factor: 1.8 } },
+    'market': { name: '市场', category: 'economy', maxLevel: 10, icon: 'merchant_guild', cost: { gold: 250, wood: 150 }, description: '互通有无：提高城镇的金钱与木材产出效率。', costGrowth: { type: 'linear', increment: { gold: 250, wood: 150 } } },
+    'inn': { name: '悦来客栈', category: 'economy', maxLevel: 3, icon: 'pagoda_library', cost: { gold: 800, wood: 400 }, description: '每级增加全军 10% 的阅历获取速度。', costGrowth: { type: 'exponential', factor: 1.6 } },
+    'bank': { name: '大通钱庄', category: 'economy', maxLevel: 2, icon: 'imperial_treasury', cost: { gold: 500, wood: 800 }, description: '提升该城镇 15% 的金钱产出。', costGrowth: { type: 'exponential', factor: 2.5 } },
     'trade_post': { name: '马帮驿站', category: 'economy', maxLevel: 3, icon: 'distillery_v2', cost: { gold: 1000, wood: 600 }, description: '增加城镇木材产出，并降低全军招募成本 5%。', costGrowth: { type: 'linear', increment: { gold: 500, wood: 300 } } },
     
     // 军事建筑：根据兵种强度（招募成本与统御占用）重新平衡
@@ -32,7 +32,7 @@ const BUILDING_REGISTRY = {
     // 特殊建筑：移除不必要的条件，平衡价格
     'spell_altar': { name: '功法祭坛', category: 'magic', maxLevel: 3, icon: 'spell_altar_v2', cost: { gold: 1500, wood: 800 }, description: '博采众长：每级随机感悟全江湖招式。', costGrowth: { type: 'exponential', factor: 1.8 } },
     'treasure_pavilion': { name: '藏宝阁', category: 'economy', maxLevel: 1, icon: 'treasure_pavilion_v2', cost: { gold: 3000, wood: 1500 }, description: '琳琅满目：极其罕见的珍宝汇聚之地。', costGrowth: { type: 'constant' } },
-    'clinic': { name: '医馆', category: 'magic', maxLevel: 1, icon: 'clinic_v3', cost: { gold: 1000, wood: 500 }, description: '仁心仁术：战场上死去的士兵有 20% 概率伤愈归队，减少损耗。', costGrowth: { type: 'constant' } },
+    'clinic': { name: '医馆', category: 'magic', maxLevel: 3, icon: 'clinic_v3', cost: { gold: 300, wood: 550 }, description: '仁心仁术：战场上死去的士兵每级有 10% 概率伤愈归队，减少损耗。', costGrowth: { type: 'exponential', factor: 1.8 } },
 
     // 纯阳：招式研习 (层层递进解锁)
     'sect_chunyang_basic': { name: '两仪馆', category: 'magic', maxLevel: 2, icon: 'sect_chunyang_v3', cost: { gold: 400, wood: 200 }, description: '纯阳基础：感悟纯阳【初级】招式。', costGrowth: { type: 'constant' } },
@@ -851,8 +851,8 @@ export class WorldManager {
             if (b.owner === 'player') {
                 const dummy = { side: 'player', type: b.type };
                 if (b.type === 'gold_mine') {
-                    // 基础金矿产量 150，支持全局百分比加成
-                    const mineGold = Math.floor(modifierManager.getModifiedValue(dummy, 'final_gold_income', 150));
+                    // 基础金矿产量 100，支持全局百分比加成
+                    const mineGold = Math.floor(modifierManager.getModifiedValue(dummy, 'final_gold_income', 100));
                     totalGold += mineGold;
                     breakdown.mines.gold += mineGold;
                     breakdown.mines.count.gold_mine++;
@@ -1314,13 +1314,13 @@ export class WorldManager {
                 const worldX = x - halfSize;
                 const worldZ = z - halfSize;
 
-                // 3. 安全区检查 (半径 4.5)
+                // 3. 安全区检查 (半径 10)
                 const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
-                let inCitySafetyZone = distToPlayer < 4.5;
+                let inCitySafetyZone = distToPlayer < 10;
                 if (!inCitySafetyZone) {
                     for (const cityId in this.cities) {
                         const city = this.cities[cityId];
-                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 4.5) {
+                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 10) {
                             inCitySafetyZone = true; break;
                         }
                     }
@@ -1572,24 +1572,24 @@ export class WorldManager {
                     modifierManager.addModifier({
                         id: `city_${cityId}_town_hall_gold`,
                         side: side, targetUnit: city, stat: 'gold_income',
-                        offset: level * 200, source: 'building'
+                        offset: level * 150, source: 'building'
                     });
                 } else if (id === 'market') {
                     modifierManager.addModifier({
                         id: `city_${cityId}_market_gold`,
                         side: side, targetUnit: city, stat: 'gold_income',
-                        offset: level * 100, source: 'building'
+                        offset: level * 60, source: 'building'
                     });
                     modifierManager.addModifier({
                         id: `city_${cityId}_market_wood`,
                         side: side, targetUnit: city, stat: 'wood_income',
-                        offset: level * 50, source: 'building'
+                        offset: level * 30, source: 'building'
                     });
                 } else if (id === 'bank') {
                     modifierManager.addModifier({
                         id: `city_${cityId}_bank_bonus`,
                         side: side, targetUnit: city, stat: 'gold_income',
-                        multiplier: 1.0 + (level * 0.20), source: 'building'
+                        multiplier: 1.0 + (level * 0.15), source: 'building'
                     });
                 } else if (id === 'trade_post') {
                     modifierManager.addModifier({
@@ -1644,7 +1644,7 @@ export class WorldManager {
                         modifierManager.addModifier({ id: `city_${cityId}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
                         break;
                     case 'clinic':
-                        modifierManager.addModifier({ id: `city_${cityId}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.20, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.10, source: 'building' });
                         break;
                 }
             }
@@ -2258,13 +2258,13 @@ export class WorldManager {
      * 英雄获得经验并处理升级
      */
     /**
-     * 计算指定等级升到下一级所需的总经验 (核心公式重构)
-     * 公式：xpMax = floor(120 + 80*(level-1) + 40*(level-1)^1.3)
+     * 计算指定等级升到下一级所需的总经验 (方案 A：陡峭幂函数)
+     * 公式：xpMax = floor(120 + 60*(level-1) + 50*(level-1)^1.6)
      */
     getNextLevelXP(level) {
         if (level < 1) return 120;
         const L = level - 1;
-        return Math.floor(120 + 80 * L + 40 * Math.pow(L, 1.3));
+        return Math.floor(120 + 60 * L + 50 * Math.pow(L, 1.6));
     }
 
     gainXP(amount) {
@@ -2506,7 +2506,14 @@ export class WorldManager {
      */
     modifyHeroMana(amount) {
         if (!this.heroData) return;
+        const oldMp = this.heroData.mpCurrent;
         this.heroData.mpCurrent = Math.max(0, Math.min(this.heroData.mpMax, this.heroData.mpCurrent + amount));
+        
+        // 只有当数值真的发生变化且变化较大时才记录
+        if (Math.abs(this.heroData.mpCurrent - oldMp) > 0.001) {
+            // console.log(`[ManaChange] ${oldMp.toFixed(1)} -> ${this.heroData.mpCurrent.toFixed(1)}`);
+        }
+        
         window.dispatchEvent(new CustomEvent('hero-stats-changed'));
     }
 

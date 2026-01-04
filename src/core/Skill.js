@@ -45,11 +45,16 @@ export class Skill {
         const { skillPower, totalSkillMult, totalPowerMult } = multipliers;
         const params = { ...action };
         
-        // 1. 伤害缩放
+        // 1. 伤害/治疗缩放
         const baseDmg = action.value || action.damage || action.onTickDamage || 0;
         if (baseDmg > 0) {
             const mult = action.applyPowerToDamage ? totalPowerMult : totalSkillMult;
             params.finalDamage = Math.floor(baseDmg * mult);
+        }
+
+        const baseHeal = action.onTickHeal || 0;
+        if (baseHeal > 0) {
+            params.finalHeal = Math.floor(baseHeal * totalSkillMult);
         }
 
         // 2. 持续时间缩放
@@ -299,7 +304,8 @@ export class Skill {
 
         this.actions.forEach(action => {
             const center = targetPos || caster.position;
-            this._executeAction(action, battleScene, caster, center, skillPower);
+            // 核心重构：执行动作时，自动注入技能的 category 作为 sourceCategory
+            this._executeAction(action, battleScene, caster, center, skillPower, this.category);
         });
 
         if (this.actions.some(a => a.shake)) {
@@ -343,7 +349,7 @@ export class Skill {
         return true;
     }
 
-    _executeAction(action, battleScene, caster, center, skillPower) {
+    _executeAction(action, battleScene, caster, center, skillPower, sourceCategory) {
         if (action.audio) {
             audioManager.play(action.audio, { force: true });
         }
@@ -403,6 +409,7 @@ export class Skill {
                     ...buffParams, 
                     duration: finalBuffDur, 
                     tag: action.tag, 
+                    sourceCategory, // 核心：继承类别
                     linkedModifiers: action.linkedModifiers // 透传联动协议
                 });
                 break;
@@ -426,9 +433,21 @@ export class Skill {
                     interval: tickInt,
                     targetSide: action.side || 'enemy',
                     onTick: (targets) => {
-                        // 修复：透传 action.color 到每跳伤害
-                        if (action.onTickDamage) battleScene.applyDamageToUnits(targets, res.finalDamage, center, 0, caster.isHero, action.color);
-                        if (action.onTickBuff) battleScene.applyBuffToUnits(targets, action.onTickBuff);
+                        // 1. 伤害/治疗处理 (带跳字)
+                        if (action.onTickDamage) {
+                            battleScene.applyDamageToUnits(targets, res.finalDamage, center, 0, caster.isHero, action.color);
+                        }
+                        if (action.onTickHeal) {
+                            battleScene.applyDamageToUnits(targets, -res.finalHeal, center, 0, caster.isHero, action.color || 0x44ff44);
+                        }
+
+                        // 2. Buff 处理 (继承类别)
+                        if (action.onTickBuff) {
+                            battleScene.applyBuffToUnits(targets, { 
+                                ...action.onTickBuff, 
+                                sourceCategory // 核心：继承类别
+                            });
+                        }
                     }
                 });
                 break;

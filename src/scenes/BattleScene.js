@@ -1376,7 +1376,7 @@ export class BattleScene {
     }
 
     applyBuffToUnits(units, options) {
-        const { stat, multiplier, offset, duration, color, vfxName, tag } = options;
+        const { stat, multiplier, offset, duration, color, vfxName, tag, sourceCategory } = options;
 
         units.forEach(unit => {
             // 1. 播放特效
@@ -1385,6 +1385,26 @@ export class BattleScene {
             // 2. 记录颜色反馈
             if (color && tag && unit.activeColors) {
                 unit.activeColors.set(tag, color);
+            }
+
+            // --- 核心重构：通用的气场天赋联动 (Universal Field Linkage) ---
+            // 逻辑：不再在每个技能里硬编码联动，而是只要标记了 sourceCategory === '气场'，就自动检查相关天赋
+            if (sourceCategory === '气场' && unit.isHero && unit.side === 'player') {
+                const regenVal = modifierManager.getModifiedValue(unit, 'chunyang_array_mp_regen_enabled', 0);
+                console.log(`%c[气场检测] %c目标: ${unit.type}, 来源类别: ${sourceCategory}, 天赋回蓝量: ${regenVal}`, 'color: #00ffcc', 'color: #fff');
+                
+                if (regenVal > 0) {
+                    console.log(`%c[天赋激活] %c坐忘无我生效！为 ${unit.type} 注入 ${regenVal} 点/秒回蓝`, 'color: #ffff00; font-weight: bold', 'color: #fff');
+                    modifierManager.addModifier({
+                        id: `talent_zuowang_${unit.side}_${tag || 'anon'}`,
+                        stat: 'mpRegen',
+                        offset: regenVal,
+                        targetUnit: unit,
+                        source: 'skill',
+                        startTime: Date.now(),
+                        duration: duration
+                    });
+                }
             }
 
             const stats = Array.isArray(stat) ? stat : [stat];
@@ -1525,6 +1545,9 @@ export class BattleScene {
 
         // 实时更新技能栏状态 (内力不足或主角阵亡时禁用)
         this.updateSkillUIState();
+
+        // 实时更新英雄蓝条 (对应坐忘无我等回蓝天赋)
+        this.updateMPUI();
         
         // 处理技能指示器逻辑
         if (this.activeSkill && this.skillIndicator) {

@@ -34,6 +34,7 @@ export const TALENT_UNITS = {
     'unit_trade_monopoly': {
         name: '奇货可居', icon: 'talent_monopoly',
         description: '战略物资垄断，所有<span class="skill-term-highlight">金矿和伐木场的季度产量</span>提升<span class="skill-num-highlight">五成</span>。',
+        requires: ['unit_loot_bonus'], 
         effects: [
             { type: 'modifier', target: 'gold_mine', key: 'gold_income', value: 0.5, method: 'percent' },
             { type: 'modifier', target: 'sawmill', key: 'wood_income', value: 0.5, method: 'percent' }
@@ -70,6 +71,7 @@ export const TALENT_UNITS = {
     'unit_battle_start_buff': { 
         name: '激励士气', icon: 'talent_haste', 
         description: '战斗开始时，全军获得 <span class="skill-num-highlight">8</span> 秒“振奋”效果（<span class="skill-term-highlight">移速</span>提升<span class="skill-num-highlight">二成</span>，<span class="skill-term-highlight">攻速</span>提升<span class="skill-num-highlight">12%</span>）。', 
+        requires: ['unit_army_def'],
         effects: [
             { type: 'modifier', target: 'army', key: 'battle_start_haste', value: 0.12, method: 'percent' },
             { type: 'modifier', target: 'army', key: 'battle_start_speed', value: 0.20, method: 'percent' }
@@ -165,32 +167,28 @@ export const TALENT_UNITS = {
     'chunyang_array_duration': {
         name: '不竭', icon: 'talent_chunyang_duration',
         description: '道法自然，生生不息。所有【气场】类招式的<span class="skill-term-highlight">持续时间</span>延长 <span class="skill-num-highlight">2</span> 秒。',
-        requires: ['node_core'],
         effects: [{ type: 'modifier', target: 'hero', key: 'category_气场_duration_offset', value: 2000, method: 'add' }]
     },
     'chunyang_array_radius': {
         name: '广域', icon: 'talent_chunyang_radius',
         description: '乾坤之内，皆为道场。所有【气场】类招式的<span class="skill-term-highlight">影响半径</span>提升 <span class="skill-num-highlight">30%</span>。',
-        requires: ['node_core'],
         effects: [{ type: 'modifier', target: 'hero', key: 'category_气场_radius_multiplier', value: 1.3, method: 'mult' }]
     },
     'chunyang_huasanqing_permanent': {
         name: '化三清·恒', icon: 'talent_chunyang_huasanqing',
         description: '悟彻三清，气劲恒常。【化三清】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
-        requires: ['node_core'],
         requiredSkill: 'huasanqing',
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_huasanqing_duration_override', value: 999000, method: 'add' }]
     },
     'chunyang_array_mana_regen': {
         name: '坐忘无我', icon: 'talent_mp_regen',
         description: '坐忘玄机，物我两忘。侠客在【气场】范围内时，每秒额外<span class="skill-term-highlight">恢复内力</span> <span class="skill-num-highlight">3</span> 点。',
-        requires: ['node_core'],
         effects: [{ type: 'modifier', target: 'hero', key: 'chunyang_array_mp_regen_enabled', value: 3, method: 'add' }]
     },
     'chunyang_sanqing_huashen_permanent': {
         name: '三清化神·恒', icon: 'talent_chunyang_huasanqing',
         description: '玄门化神，剑气长存。【三清化神】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
-        requires: ['node_core'],
+        requires: ['unit_power_epic'],
         requiredSkill: 'sanqing_huashen',
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_duration_override', value: 999000, method: 'add' }]
     },
@@ -206,19 +204,28 @@ export const TALENT_UNITS = {
     },
     'chunyang_sword_penetration': {
         name: '万剑归宗', icon: 'talent_power_epic',
-        description: '心剑合一，气剑纵横。普通攻击获得 <span class="skill-num-highlight">3</span> 次<span class="skill-term-highlight">穿透</span>效果，且<span class="skill-term-highlight">攻击范围</span>提高 <span class="skill-num-highlight">20%</span>。',
-        requires: ['node_core'],
+        description: '心剑合一，气剑纵横。每重提升 <span class="skill-num-highlight">1</span> 次<span class="skill-term-highlight">穿透</span>，且<span class="skill-term-highlight">攻击范围</span>提高 <span class="skill-num-highlight">10%</span>。',
+        maxLevel: 3,
+        requires: ['unit_power_epic'],
         effects: [
-            { type: 'modifier', target: 'hero', key: 'projectile_penetration', value: 3, method: 'add' },
-            { type: 'modifier', target: 'hero', key: 'attackRange', value: 0.2, method: 'percent' }
+            { type: 'modifier', target: 'hero', key: 'projectile_penetration', value: 1, perLevel: true, method: 'add' },
+            { type: 'modifier', target: 'hero', key: 'attackRange', value: 0.1, perLevel: true, method: 'percent' }
         ]
     },
     'chunyang_sword_damage_boost': {
         name: '凭虚御风', icon: 'talent_power',
-        description: '剑气如风，虚怀若谷。普通攻击造成的<span class="skill-term-highlight">伤害</span>提升 <span class="skill-num-highlight">50%</span>（独立乘区）。',
-        requires: ['node_core'],
+        description: '剑气如风，虚怀若谷。普通攻击造成的<span class="skill-term-highlight">伤害</span>提升 <span class="skill-num-highlight">20%</span>。',
+        requires: ['unit_power_epic'],
         effects: [
-            { type: 'modifier', target: 'hero', key: 'more_damage', value: 1.5, method: 'mult' }
+            { type: 'modifier', target: 'hero', key: 'more_damage', value: 1.2, method: 'mult' }
+        ]
+    },
+    'chunyang_sword_haste': {
+        name: '凭虚·疾', icon: 'talent_haste',
+        description: '剑随意动，身随气行。普通攻击的<span class="skill-term-highlight">攻击速度</span>提升 <span class="skill-num-highlight">15%</span>。',
+        requires: ['chunyang_sword_damage_boost'],
+        effects: [
+            { type: 'modifier', target: 'hero', key: 'attackSpeed', value: 0.15, method: 'percent' }
         ]
     },
 
@@ -271,38 +278,15 @@ export const TALENT_UNITS = {
         name: '神力惊世', // UI 同样会动态处理身法
         icon: 'talent_power_epic',
         description: '突破肉身极限，<span class="skill-term-highlight">基础属性</span>爆发式提升 <span class="skill-num-highlight">35</span> 点。',
-        effects: [{ type: 'stat', stat: 'power', value: 35, method: 'add' }]
+        effects: [{ type: 'stat', stat: 'power', value: 35, method: 'add' }],
+        conflicts: ['unit_spells_epic'] 
     },
     'unit_spells_epic': {
         name: '功参造化',
         icon: 'talent_spell_epic',
         description: '内功修为登峰造极，<span class="skill-term-highlight">功法</span>提升 <span class="skill-num-highlight">20</span> 点。',
-        effects: [{ type: 'stat', stat: 'spells', value: 20, method: 'add' }]
-    },
-    'unit_leadership_epic': {
-        name: '王霸之气',
-        icon: 'talent_leadership',
-        description: '名将之威，不怒而自威，<span class="skill-term-highlight">统御</span>提升 <span class="skill-num-highlight">26</span> 点。',
-        effects: [{ type: 'stat', stat: 'leadership', value: 26, method: 'add' }]
-    },
-    'unit_army_hp_epic': {
-        name: '百战铁甲',
-        icon: 'talent_army_hp',
-        description: '为全军装备百战精铁甲，<span class="skill-term-highlight">士兵生命值</span>提升 <span class="skill-num-highlight">16</span> 点。',
-        effects: [{ type: 'modifier', target: 'army', key: 'hp', value: 16, method: 'add' }]
-    },
-    'unit_haste_epic': {
-        name: '迅疾如风',
-        icon: 'talent_haste_epic',
-        description: '天下武功唯快不破，<span class="skill-term-highlight">招式调息</span>提升 <span class="skill-num-highlight">11</span> 点。',
-        requires: ['node_core'],
-        effects: [{ type: 'stat', stat: 'haste', value: 0.11, method: 'add' }]
-    },
-    'unit_mp_epic': {
-        name: '海纳百川',
-        icon: 'talent_mp',
-        description: '丹田如海，气劲无穷，<span class="skill-term-highlight">最大内力</span>提升 <span class="skill-num-highlight">105</span> 点。',
-        effects: [{ type: 'stat', stat: 'mp', value: 105, method: 'add' }]
+        effects: [{ type: 'stat', stat: 'spells', value: 20, method: 'add' }],
+        conflicts: ['unit_power_epic'] 
     }
 };
 
@@ -313,21 +297,21 @@ export const TALENT_GROUPS = {
         name: '商道·金戈',
         tag: '财富',
         major: 'unit_income_base', // 每座城池+200产出
-        minors: ['unit_wood_save', 'unit_loot_bonus', 'unit_trade_monopoly', 'unit_leadership_epic'] // 加入统御史诗
+        minors: ['unit_wood_save', 'unit_loot_bonus', 'unit_trade_monopoly', 'unit_kill_gold'] // 加入战利清缴
     },
     // 【征战】军队规模与阵地战
     'group_military': {
         name: '将道·铁骑',
         tag: '征战',
         major: 'unit_elite_cost', // 精锐减费
-        minors: ['unit_recruit_save', 'unit_army_def', 'unit_martyrdom', 'unit_morale_base', 'unit_army_hp_epic'] // 加入军队统御和士兵生命史诗
+        minors: ['unit_recruit_save', 'unit_army_def', 'unit_battle_start_buff', 'unit_martyrdom', 'unit_morale_base'] 
     },
     // 【游历】大世界移动与发育
     'group_exploration': {
         name: '侠道·神行',
         tag: '游历',
         major: 'unit_world_speed_boost', // 轻功+开图
-        minors: ['unit_season_mp_regen', 'unit_kill_gold', 'unit_mp_epic', 'unit_battle_start_buff']
+        minors: ['unit_season_mp_regen'] 
     },
     // 【属性】全属性基础强化
     'group_attributes': {
@@ -336,7 +320,7 @@ export const TALENT_GROUPS = {
         major: 'unit_all_stats_boost', // 全属性提升
         minors: [
             'unit_power_base', 'unit_spells_base', 'unit_leadership_base', 
-            'unit_mp_base', 'unit_haste_base', 'unit_spells_epic', 'unit_haste_epic'
+            'unit_mp_base', 'unit_haste_base', 'unit_spells_epic' // 移除迅疾如风
         ]
     },
 
@@ -384,8 +368,8 @@ export const TALENT_GROUPS = {
     'group_chunyang_sword': {
         name: '紫霞功·心剑',
         tag: '剑气',
-        major: 'chunyang_sword_penetration',
-        minors: ['chunyang_sword_damage_boost', 'chunyang_sanqing_huashen_permanent', 'chunyang_sanqing_huashen_mastery', 'unit_power_epic']
+        major: 'unit_power_epic', // 神力惊世为主节点
+        minors: ['chunyang_sword_damage_boost', 'chunyang_sword_haste', 'chunyang_sanqing_huashen_permanent', 'chunyang_sanqing_huashen_mastery', 'chunyang_sword_penetration']
     }
 };
 
@@ -441,6 +425,9 @@ export function getHeroTalentTree(heroId) {
     const nodes = {};
     const links = [];
     const tags = []; // 存储组描述大字
+    
+    // 映射表：unitId -> nodeId (用于解析数据驱动的依赖关系)
+    const unitToNodeMap = { 'node_core': 'node_core' };
 
     // 辅助函数：处理节点的动态文本
     const processUnit = (unit) => {
@@ -468,7 +455,7 @@ export function getHeroTalentTree(heroId) {
         type: 'core'
     };
 
-    // 2. 遍历天赋组，计算坐标并连线
+    // 2. 第一阶段：遍历天赋组，创建所有节点并分配坐标，同时填充 unitToNodeMap
     const groupCount = config.groups.length;
     config.groups.forEach((groupId, groupIdx) => {
         const group = TALENT_GROUPS[groupId];
@@ -480,41 +467,55 @@ export function getHeroTalentTree(heroId) {
         
         // --- 大天赋节点 ---
         const majorId = `node_major_${groupIdx}`;
-        const majorDist = 240; // 进一步增加，让整体布局更松弛
+        const majorDist = 240; // 布局松弛度
         const processedMajor = processUnit(TALENT_UNITS[group.major]);
 
         nodes[majorId] = {
             ...processedMajor,
             id: majorId,
+            unitId: group.major, // 保存原始单位ID
             pos: { 
                 x: Math.cos(groupAngle) * majorDist, 
                 y: Math.sin(groupAngle) * majorDist 
             },
             maxLevel: 1,
-            requires: [coreId],
             type: 'major',
-            groupId: groupId, // 新增：标记所属组
+            groupId: groupId, 
             groupName: group.name
         };
-        links.push({ source: coreId, target: majorId });
+        unitToNodeMap[group.major] = majorId;
 
         // --- 小天赋节点 ---
-        // 优化：根据子节点数量动态调整扇区，并增加基础宽度
         const nodeCount = group.minors.length;
-        // 允许扇区占用的最大比例，根据组数动态调整
         const safetyFactor = 0.85; 
         const maxSectorAngle = (Math.PI * 2 / groupCount) * safetyFactor;
-        
-        // 基础展开角度：每个节点预留约 15 度的呼吸空间
         const preferredAngleWidth = (nodeCount - 1) * (Math.PI / 12); 
         const subAngleWidth = Math.min(preferredAngleWidth, maxSectorAngle);
+
+        // --- 新增：深度计算逻辑，用于确保连线方向一致性 (从内向外) ---
+        const minorDepths = {};
+        const getMinorDepth = (uid) => {
+            if (minorDepths[uid] !== undefined) return minorDepths[uid];
+            const unitDef = TALENT_UNITS[uid];
+            if (!unitDef || !unitDef.requires) {
+                minorDepths[uid] = 0;
+                return 0;
+            }
+            let maxD = 0;
+            unitDef.requires.forEach(rid => {
+                // 只有当依赖项也在本组内时，才计算深度偏移
+                if (group.minors.includes(rid)) {
+                    maxD = Math.max(maxD, getMinorDepth(rid) + 1);
+                }
+            });
+            minorDepths[uid] = maxD;
+            return maxD;
+        };
+        group.minors.forEach(uid => getMinorDepth(uid));
 
         group.minors.forEach((minorUnitId, minorIdx) => {
             const minorId = `node_minor_${groupIdx}_${minorIdx}`;
             
-            // --- 升级：全局相位交错布局 (Global Interleaved Layout) ---
-            
-            // 1. 计算角度
             let minorAngle = groupAngle;
             if (nodeCount > 1) {
                 const startAngle = groupAngle - subAngleWidth / 2;
@@ -522,21 +523,17 @@ export function getHeroTalentTree(heroId) {
                 minorAngle = startAngle + minorIdx * angleStep;
             }
             
-            // 2. 核心算法：半径相位对冲 (Radius Phase Shifting)
-            // 相邻组(groupIdx)使用不同的基准半径偏移，确保边缘节点不在同一圆周
             const groupOffset = (groupIdx % 2) * 50; 
             const baseMinorDist = 420 + groupOffset;
+            const staggerStep = 110; // 稍微拉开间距
             
-            // 3. 错层分布
-            const layers = 3; 
-            const staggerStep = 95; 
-            const layerIdx = minorIdx % layers;
+            // --- 核心修复：基于依赖深度决定基础层级 ---
+            // 1. 基础层级由深度 (depth) 决定，确保子节点一定比父节点远
+            // 2. 同深度的节点通过 (minorIdx % 2) 进行微弱的交错 (stagger)，避免完全在圆周上对齐，保持自然感
+            const depth = minorDepths[minorUnitId] || 0;
+            const layerIdx = depth + (minorIdx % 2) * 0.5;
             
-            // 4. 边缘推力：越靠近组边缘的节点，半径额外增加，形成自然的张力感
-            const edgePush = (nodeCount > 1) 
-                ? Math.abs(minorIdx - (nodeCount-1)/2) * 25 
-                : 0;
-
+            const edgePush = (nodeCount > 1) ? Math.abs(minorIdx - (nodeCount-1)/2) * 25 : 0;
             const minorDist = baseMinorDist + (layerIdx * staggerStep) + edgePush; 
 
             const isBaseStat = ['unit_power_base', 'unit_spells_base', 'unit_leadership_base', 'unit_army_hp', 'unit_haste_base', 'unit_mp_base', 'unit_morale_base'].includes(minorUnitId);
@@ -545,29 +542,77 @@ export function getHeroTalentTree(heroId) {
             nodes[minorId] = {
                 ...processedMinor,
                 id: minorId,
+                unitId: minorUnitId, // 保存原始单位ID
                 pos: {
                     x: Math.cos(minorAngle) * minorDist,
                     y: Math.sin(minorAngle) * minorDist
                 },
-                maxLevel: isBaseStat ? 3 : 1,
-                requires: [majorId],
+                maxLevel: processedMinor.maxLevel || (isBaseStat ? 5 : 1),
                 type: 'minor',
-                groupId: groupId // 新增：标记所属组
+                groupId: groupId 
             };
-            links.push({ source: majorId, target: minorId });
+            unitToNodeMap[minorUnitId] = minorId;
         });
 
-        // 3. 添加组描述大字 (放置在组的最远处)
+        // 3. 添加组描述大字
         if (group.tag) {
-            const tagDist = 820; // 放置在比小奇穴更远的地方
+            const tagDist = 820; 
             tags.push({
                 text: group.tag,
-                groupId: groupId, // 携带组ID以便计算亮度
+                groupId: groupId, 
                 pos: {
                     x: Math.cos(groupAngle) * tagDist,
                     y: Math.sin(groupAngle) * tagDist
                 },
                 angle: groupAngle
+            });
+        }
+    });
+
+    // 3. 第二阶段：解析逻辑依赖关系 (Requires & Conflicts) 并自动生成 Links
+    // 这样做实现了数据驱动：依赖关系定义在 TALENT_UNITS 中，而非硬编码在生成逻辑中
+    Object.values(nodes).forEach(node => {
+        if (node.type === 'core') return;
+
+        const unitDef = TALENT_UNITS[node.unitId] || {};
+        
+        // --- A. 解析前置需求 (Requires) ---
+        if (unitDef.requires) {
+            // 策略优化：如果同一个 unitId 存在多个节点，优先链接到【同组】的节点
+            node.requires = unitDef.requires
+                .map(rid => {
+                    // 1. 优先在当前组内查找该 unitId 对应的 nodeId
+                    const sameGroupNodeId = Object.keys(nodes).find(nid => 
+                        nodes[nid].unitId === rid && nodes[nid].groupId === node.groupId
+                    );
+                    if (sameGroupNodeId) return sameGroupNodeId;
+                    
+                    // 2. 如果当前组没有，再全局查找（如 node_core）
+                    return unitToNodeMap[rid];
+                })
+                .filter(id => !!id);
+        } else {
+            // 否则使用默认的层级逻辑：major 连核心，minor 连本组 major
+            if (node.type === 'major') {
+                node.requires = [coreId];
+            } else if (node.type === 'minor') {
+                const groupIdx = config.groups.indexOf(node.groupId);
+                node.requires = [`node_major_${groupIdx}`];
+            }
+        }
+
+        // --- B. 解析互斥关系 (Conflicts) ---
+        if (unitDef.conflicts) {
+            node.conflicts = unitDef.conflicts
+                .map(rid => unitToNodeMap[rid])
+                .filter(id => !!id);
+        }
+
+        // --- C. 自动生成可视化连线 (Links) ---
+        // 现在连线完全由 requires 决定，实现了视觉与逻辑的高度统一
+        if (node.requires) {
+            node.requires.forEach(reqId => {
+                links.push({ source: reqId, target: node.id });
             });
         }
     });

@@ -375,7 +375,7 @@ export class EnemyGroupObject extends MovableWorldObject {
         // --- 行为状态机相关 ---
         this.spawnX = data.spawnX !== undefined ? data.spawnX : this.x;
         this.spawnZ = data.spawnZ !== undefined ? data.spawnZ : this.z;
-        this.territoryRadius = 10; // 徘徊半径
+        this.territoryRadius = 8; // 徘徊半径
         this.aggroRadius = 3;      // 静态感应半径 (降低到 3 米，玩家需要更近才被发现)
         this.leashRadius = 10;     // 动态追杀半径 (玩家跑出 10 米才拉脱)
         
