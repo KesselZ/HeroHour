@@ -694,8 +694,8 @@ function applyHeroTraits(heroId) {
     window.dispatchEvent(new CustomEvent('hero-initialized'));
 
     // 4. 初始化资源状态 (补满血蓝)
-    worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
-    worldManager.heroData.mpCurrent = worldManager.heroData.mpMax;
+    worldManager.modifyHeroHealth(worldManager.heroData.hpMax);
+    worldManager.modifyHeroMana(worldManager.heroData.mpMax);
 }
 
 function enterGameState(state, config = null) {

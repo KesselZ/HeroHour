@@ -41,7 +41,7 @@ export const SkillRegistry = {
         cost: 35,
         cooldown: 6000,
         audio: 'skill_sword_rain',
-        targeting: { type: 'location', shape: 'circle', range: 8, radius: 3 },
+        targeting: { type: 'location', shape: 'circle', range: 18, radius: 3 },
         description: '在指定区域降下剑雨，造成 {damage} 点范围伤害及击退效果',
         actions: [
             { type: 'vfx', name: 'rain', params: { color: 0x00ffff, duration: 600, density: 1.0, radius: 3 } },
@@ -56,7 +56,7 @@ export const SkillRegistry = {
         cost: 55,
         cooldown: 10000,
         audio: 'skill_sword_rain',
-        targeting: { type: 'location', shape: 'circle', range: 10, radius: 4.5 },
+        targeting: { type: 'location', shape: 'circle', range: 18, radius: 4.5 },
         description: '【进阶招式】在极广区域降下凛冽剑雨，持续 {duration} 秒，每 0.5 秒造成 {tickDamage} 点伤害',
         actions: [
             { type: 'vfx', name: 'rain', params: { color: 0x00ffff, duration: 3000, density: 2.0, speed: 0.5, radius: 4.5, applySkillPowerToDuration: true } },

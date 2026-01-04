@@ -279,7 +279,7 @@ export class Skill {
         if (!this.isReady(heroData)) return false;
 
         const actualCost = this.getActualManaCost(heroData);
-        heroData.mpCurrent -= actualCost;
+        battleScene.worldManager.modifyHeroMana(-actualCost);
         this.lastUsed = Date.now();
 
         if (this.audio) {

@@ -504,9 +504,8 @@ export class BaseUnit extends THREE.Group {
                 // 检查是否在任意气场中
                 const isInArray = this.activeBuffs && this.activeBuffs.some(b => b.tag === 'shengtaiji' || b.tag === 'tunriyue' || b.tag === 'huasanqing');
                 if (isInArray) {
-                    const heroData = worldManager.heroData;
                     const recoverAmount = arrayRegen * (deltaTime / 1000);
-                    heroData.mpCurrent = Math.min(heroData.mpMax, heroData.mpCurrent + recoverAmount);
+                    worldManager.modifyHeroMana(recoverAmount);
                 }
             }
         }
@@ -1317,13 +1316,13 @@ export class HeroUnit extends BaseUnit {
         this.baseStats = heroData.stats ? { ...heroData.stats } : { spells: 0, haste: 0, power: 0 };
 
         // --- 优雅的血量同步逻辑：百分比映射 ---
-        // 1. 获取该英雄在大世界的基础最大血量 (即蓝图值)
-        const baseMaxHP = details.hp; 
+        // 1. 获取该英雄在大世界的“真实最大血量” (包含属性加成)
+        const realMaxHP = heroData.hpMax || details.hp; 
         // 2. 获取大世界当前的实时血量 (如果没有记录，则默认为满血)
-        const worldCurrentHP = (heroData.hpCurrent !== undefined) ? heroData.hpCurrent : baseMaxHP;
+        const worldCurrentHP = (heroData.hpCurrent !== undefined) ? heroData.hpCurrent : realMaxHP;
         
         // 3. 计算血量百分比 (0.0 - 1.0)
-        const healthRatio = Math.min(1.0, worldCurrentHP / baseMaxHP);
+        const healthRatio = Math.min(1.0, worldCurrentHP / realMaxHP);
 
         // 4. 将百分比应用到战场的 maxHealth 上 (maxHealth 已由 BaseUnit 应用了全局 Buff)
         if (healthRatio >= 0.99) {
@@ -1332,7 +1331,7 @@ export class HeroUnit extends BaseUnit {
             this.health = this.maxHealth * healthRatio;
         }
 
-        console.log(`%c[HeroUnit] %c主角入场同步: 大世界状态(${worldCurrentHP.toFixed(1)}/${baseMaxHP.toFixed(1)}) -> 战场状态(${this.health.toFixed(1)}/${this.maxHealth.toFixed(1)})`);
+        console.log(`%c[HeroUnit] %c主角入场同步: 大世界状态(${worldCurrentHP.toFixed(1)}/${realMaxHP.toFixed(1)}) -> 战场状态(${this.health.toFixed(1)}/${this.maxHealth.toFixed(1)})`);
         
         // --- 藏剑双形态逻辑 ---
         if (heroData.id === 'yeying') {
@@ -1496,7 +1495,8 @@ export class HeroUnit extends BaseUnit {
         super.takeDamage(amount);
         this.updateHealthBar();
         if (this.side === 'player') {
-            worldManager.heroData.hpCurrent = this.health;
+            // 核心重构：使用增量同步方法，保持与 WorldManager 逻辑一致
+            worldManager.modifyHeroHealth(this.health - worldManager.heroData.hpCurrent);
         }
     }
 

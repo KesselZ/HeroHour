@@ -685,13 +685,14 @@ export class CityObject extends WorldObject {
             // 访问自己的城市：补满侠客状态 (内力和气血)
             const hero = worldManager.heroData;
             if (hero.mpCurrent < hero.mpMax || hero.hpCurrent < hero.hpMax) {
-                hero.mpCurrent = hero.mpMax;
-                hero.hpCurrent = hero.hpMax;
+                worldManager.modifyHeroMana(hero.mpMax);
+                worldManager.modifyHeroHealth(hero.hpMax);
                 worldManager.showNotification(`回到 ${cityData.name}，侠客状态已补满`);
                 window.dispatchEvent(new CustomEvent('hero-stats-changed'));
             }
 
-            if (worldScene.activeCityId !== this.id) {
+            // 核心修复：即使面板已经打开（可能是远程打开的），也要更新为“亲自访问”状态
+            if (worldScene.activeCityId !== this.id || !worldScene.isPhysicalVisit) {
                 worldScene.openTownManagement(this.id, true); // 亲自到场访问
                 worldScene.activeCityId = this.id;
             }
@@ -744,7 +745,9 @@ export class CityObject extends WorldObject {
     }
 
     onExitRange(worldScene) {
-        if (worldScene.activeCityId === this.id) {
+        // 核心修复：只有在“亲临访问”的情况下离开才自动关闭
+        // 如果是远程通过 HUD 打开的（this.isPhysicalVisit 为 false），则不触发自动关闭
+        if (worldScene.activeCityId === this.id && worldScene.isPhysicalVisit) {
             worldScene.closeTownManagement();
         }
     }

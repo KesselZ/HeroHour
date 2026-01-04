@@ -1773,6 +1773,16 @@ export class BattleScene {
         });
 
         worldManager.updateHeroArmy(armyChanges);
+
+        // --- 核心重构：统一同步英雄战斗后的状态 (HP & MP) ---
+        if (this.heroUnit) {
+            worldManager.syncHeroStatsAfterBattle({
+                healthRatio: this.heroUnit.health / this.heroUnit.maxHealth,
+                mpCurrent: worldManager.heroData.mpCurrent,
+                isDead: this.heroUnit.isDead
+            });
+        }
+
         if (isVictory) {
             const totalPoints = this.enemyConfig ? this.enemyConfig.totalPoints : 0;
             const { timeManager } = await import('../core/TimeManager.js');

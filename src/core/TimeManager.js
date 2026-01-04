@@ -6,7 +6,7 @@ import { modifierManager } from './ModifierManager.js';
  */
 class TimeManager {
     constructor() {
-        this.year = 3; // 初始为天宝三年
+        this.year = 1; // 初始为天宝一年
         this.seasonIndex = 0; // 0:春, 1:夏, 2:秋, 3:冬
         this.seasons = ['春', '夏', '秋', '冬'];
         
@@ -216,7 +216,7 @@ class TimeManager {
      * 获取全局进度（已过的季度总数）
      */
     getGlobalProgress() {
-        return (this.year - 3) * 4 + this.seasonIndex;
+        return (this.year - 1) * 4 + this.seasonIndex;
     }
 
     /**

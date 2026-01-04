@@ -1795,9 +1795,6 @@ export class WorldScene {
 
         console.log(`%c[战斗结束] 结果: ${result.winner}, 目标: ${enemyId}`, "color: #ffaa00");
 
-        // 核心修改：无论输赢，战后血量回满 (侠客不死)，但蓝量保持持久化状态
-        worldManager.heroData.hpCurrent = worldManager.heroData.hpMax;
-
         if (result && result.winner === 'player') {
             // 核心改动：奇穴效果 - 战利清缴 (战后额外金钱)
             // 优雅实现：传入敌人强度作为基础值，中转站会自动根据 50% 加成返还 1.5 倍结果

@@ -886,7 +886,7 @@ export class WorldManager {
         const mpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_mp_regen', 0);
         if (mpRegenMult > 0) {
             const recoverAmount = Math.floor(this.heroData.mpMax * mpRegenMult);
-            this.heroData.mpCurrent = Math.min(this.heroData.mpMax, this.heroData.mpCurrent + recoverAmount);
+            this.modifyHeroMana(recoverAmount);
             this.showNotification(`气吞山河：由于时节更替，内力恢复了 ${recoverAmount} 点`);
         }
 
@@ -2500,6 +2500,43 @@ export class WorldManager {
      * 刷新英雄的所有全局修正器 (包含成长、统帅加成等)
      * 职责：将英雄的当前状态 (Level, Power, Morale) 同步到 ModifierManager
      */
+    /**
+     * 统一修改英雄内力 (加法/减法)
+     * @param {number} amount 变化量
+     */
+    modifyHeroMana(amount) {
+        if (!this.heroData) return;
+        this.heroData.mpCurrent = Math.max(0, Math.min(this.heroData.mpMax, this.heroData.mpCurrent + amount));
+        window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+    }
+
+    /**
+     * 统一修改英雄气血 (加法/减法)
+     * @param {number} amount 变化量
+     */
+    modifyHeroHealth(amount) {
+        if (!this.heroData) return;
+        this.heroData.hpCurrent = Math.max(0, Math.min(this.heroData.hpMax, this.heroData.hpCurrent + amount));
+        window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+    }
+
+    /**
+     * 战斗后统一同步英雄状态 (HP, MP)
+     */
+    syncHeroStatsAfterBattle({ healthRatio, mpCurrent, isDead }) {
+        const data = this.heroData;
+        if (!data) return;
+
+        // 1. 血量同步：战死设为 1，否则按比例映射 (通过增量方式调用 API 以保持统一)
+        const targetHp = isDead ? 1 : Math.max(1, Math.floor(data.hpMax * healthRatio));
+        this.modifyHeroHealth(targetHp - data.hpCurrent);
+
+        // 2. 蓝量同步：确保战斗结束时的数值被权威锁定
+        this.modifyHeroMana(mpCurrent - data.mpCurrent); // 增量同步
+
+        this.updateHUD();
+    }
+
     refreshHeroStats() {
         if (!this.heroData) return;
         
@@ -2579,6 +2616,11 @@ export class WorldManager {
                 source: 'trait'
             });
         });
+
+        // 5. 核心工程优化：自动压限 (Auto-Clamping)
+        // 逻辑：如果由于等级/天赋变化导致 Max 下降，确保 Current 不会溢出
+        this.modifyHeroHealth(0);
+        this.modifyHeroMana(0);
     }
 
     /**

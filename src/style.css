@@ -1062,12 +1062,22 @@ img {
 
 .hero-avatar-area {
     display: flex;
-    gap: 20px;
-    padding: 8px;
+    gap: 30px; /* 增加间距 */
+    padding: 12px;
     background: white;
     border: 2px solid var(--jx3-celadon-light);
     border-radius: var(--radius-md);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+
+.hero-big-portrait {
+    width: 150px;
+    height: 150px;
+    border: 4px solid var(--jx3-celadon);
+    background: white;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    image-rendering: pixelated;
+    background-size: 400% 400%; /* 适配 4x4 精灵图 */
 }
 
 .hero-identity {
