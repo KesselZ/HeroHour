@@ -1367,13 +1367,13 @@ img {
     background: radial-gradient(circle at 30% 40%, rgba(255, 204, 0, 0.12) 0%, transparent 50%) !important;
 }
 
-/* 星空背景装饰 - 移除默认色调，完全由门派皮肤控制 */
+/* 星空背景装饰 - 大幅增加容器尺寸 (300%) 并校准偏移，彻底消除边界感 */
 .talent-starry-bg {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: -100%;
+    left: -100%;
+    width: 300%;
+    height: 300%;
     pointer-events: none;
     background: transparent;
     overflow: hidden;
@@ -1384,10 +1384,10 @@ img {
 .talent-starry-bg::before {
     content: '';
     position: absolute;
-    width: 200%;
-    height: 200%;
-    top: -50%;
-    left: -50%;
+    width: 400%;
+    height: 400%;
+    top: -150%;
+    left: -150%;
     background-image: 
         radial-gradient(2px 2px at 20% 30%, #fff, rgba(0,0,0,0)),
         radial-gradient(3px 3px at 50% 10%, #fff, rgba(0,0,0,0)),
@@ -1404,10 +1404,10 @@ img {
 .talent-starry-bg::after {
     content: '';
     position: absolute;
-    width: 200%;
-    height: 200%;
-    top: -50%;
-    left: -50%;
+    width: 400%;
+    height: 400%;
+    top: -150%;
+    left: -150%;
     background-image: 
         radial-gradient(1px 1px at 15% 15%, #fff, rgba(0,0,0,0)),
         radial-gradient(1px 1px at 35% 45%, #fff, rgba(0,0,0,0)),

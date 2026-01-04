@@ -139,6 +139,7 @@ export const ASSET_REGISTRY = {
         'talent_spell_epic':  { name: '功参造化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 1 },
         'talent_chunyang_duration': { name: '气场时长', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 2 },
         'talent_chunyang_radius':   { name: '气场范围', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 3 },
+        'talent_chunyang_field_damage': { name: '行天道', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 1 },
         'talent_chunyang_huasanqing': { name: '化三清强化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 4 },
 
         // 将道/兵流系列 (TALENT3)

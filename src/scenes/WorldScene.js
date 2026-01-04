@@ -1911,6 +1911,9 @@ export class WorldScene {
     }
 
     checkInteractions() {
+        // --- 核心修复：如果当前有全屏 UI 打开（如江湖告示），禁止触发大世界交互 ---
+        if (this.isAnyMenuOpen()) return;
+
         const toRemove = [];
         const playerPos = this.playerGroup.position;
         const ms = worldManager.mapState;

@@ -1246,7 +1246,7 @@ export class BattleScene {
      * 持续伤害 API (DOT - Damage Over Time)
      */
     applyDOT(unit, options) {
-        const { damage, interval, count, color = 0xff3333, isHeroSource = false } = options;
+        const { damage, interval, count, color = 0xff3333, isHeroSource = false, immediate = false } = options;
         let ticksLeft = count;
 
         const executeTick = () => {
@@ -1255,7 +1255,7 @@ export class BattleScene {
             // 1. 造成伤害
             unit.takeDamage(damage, isHeroSource);
             
-            // 2. 视觉反馈：在单位身上冒出对应颜色的火花
+            // 2. 视觉反馈
             this.playVFX('vfx_sparkle', { unit, color, duration: 300, radius: 0.5 });
 
             ticksLeft--;
@@ -1264,7 +1264,11 @@ export class BattleScene {
             }
         };
 
-        executeTick();
+        if (immediate) {
+            executeTick();
+        } else {
+            setTimeout(executeTick, interval);
+        }
     }
 
     spawnProjectiles(options) {
@@ -1353,25 +1357,6 @@ export class BattleScene {
         units.forEach(unit => {
             unit.takeDamage(damage, isHeroSource);
             if (knockback > 0 && sourcePos) unit.applyKnockback(sourcePos, knockback);
-
-            // --- 核心：天策【龙牙破军】(招式流血) 逻辑 ---
-            if (isHeroSource) {
-                const heroId = worldManager.heroData?.id;
-                if (heroId === 'lichengen') {
-                    // 使用 dummy 查询天赋
-                    const dummy = { side: 'player', isHero: true, type: 'lichengen' };
-                    const bleedRatio = modifierManager.getModifiedValue(dummy, 'tiance_bleeding_enabled', 0);
-                    if (bleedRatio > 0) {
-                        this.applyDOT(unit, {
-                            damage: damage * bleedRatio,
-                            interval: 1000,
-                            count: 3,
-                            color: 0x880000,
-                            isHeroSource: true
-                        });
-                    }
-                }
-            }
         });
     }
 
@@ -1477,7 +1462,30 @@ export class BattleScene {
     }
 
     executeMovement(unit, type, targetPos, options = {}) {
-        const { duration = 300, damage = 0, knockback = 0, jumpHeight = 0, onHit = null, onComplete = null } = options;
+        const { 
+            duration = 300, 
+            damage = 0, 
+            knockback = 0, 
+            jumpHeight = 0, 
+            onHit = null, 
+            onComplete = null,
+            isHeroSource = false,
+            invincible = false // 新增：是否在位移途中无敌
+        } = options;
+
+        // --- 核心增强：位移途中无敌 ---
+        if (invincible && unit) {
+            modifierManager.addModifier({
+                id: `movement_invincible_${unit.id || 'hero'}_${Date.now()}`,
+                stat: 'invincible',
+                offset: 1,
+                targetUnit: unit,
+                source: 'skill',
+                duration: duration + 50, // 稍微多给 50ms 容错，防止落地瞬间被打
+                startTime: Date.now()
+            });
+        }
+
         if (type === 'dash') {
             const startPos = unit.position.clone();
             const startTime = Date.now();
@@ -1494,10 +1502,11 @@ export class BattleScene {
                 const jumpY = jumpHeight > 0 ? (4 * jumpHeight * progress * (1 - progress)) : 0;
                 unit.position.y = 0.6 + jumpY;
 
+                // 3. 碰撞检测：增加判定半径至 2.0，且传入 isHeroSource 触发流血等天赋
                 if (damage > 0 || knockback > 0 || onHit) {
-                    this.getUnitsInArea(unit.position, { shape: 'circle', radius: 1.5 }, 'enemy').forEach(target => {
+                    this.getUnitsInArea(unit.position, { shape: 'circle', radius: 2.0 }, 'enemy').forEach(target => {
                         if (!hitUnits.has(target)) {
-                            if (damage > 0) target.takeDamage(damage);
+                            if (damage > 0) target.takeDamage(damage, isHeroSource);
                             if (knockback > 0) target.applyKnockback(unit.position, knockback);
                             if (onHit) onHit(target);
                             hitUnits.add(target);

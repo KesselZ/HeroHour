@@ -604,6 +604,9 @@ export const SkillRegistry = {
     }),
 };
 
+// 暴露给全局以解决循环依赖问题
+window.SkillRegistry = SkillRegistry;
+
 /**
  * 定义各门派可研习的招式表
  */

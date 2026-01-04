@@ -1,6 +1,5 @@
 import { TALENT_UNITS, HERO_TREE_CONFIG, getHeroTalentTree } from './TalentRegistry.js';
 import { modifierManager } from './ModifierManager.js';
-import { SkillRegistry } from './SkillRegistry.js';
 
 /**
  * TalentManager: 奇穴系统逻辑管理器
@@ -11,6 +10,93 @@ class TalentManager {
         this.activeTalents = {};
         this.heroData = null;
         this.currentTree = null; // 缓存当前英雄生成的树
+    }
+
+    /**
+     * 核心重构：奇穴动作装饰器 (Action Decorator)
+     * 在技能执行前，允许奇穴根据当前状态动态修改或注入新的动作
+     * 这种方式彻底解耦了技能引擎 (Skill.js) 与 具体奇穴逻辑
+     */
+    decorateSkillActions(skill, caster, baseActions) {
+        let finalActions = [...baseActions];
+
+        // --- A. 天策联动收敛 ---
+        
+        // 1. 召兵升级 (原硬编码在 Skill.js)
+        const tianceUpgrade = modifierManager.getModifiedValue(caster, 'tiance_summon_upgrade', 0);
+        if (tianceUpgrade > 0 && skill.id === 'summon_militia') {
+            finalActions = finalActions.map(action => {
+                if (action.type === 'summon') return { ...action, unitType: 'tiance' };
+                return action;
+            });
+        }
+
+        // 2. 龙牙破军 (流血效果 - 彻底全覆盖)
+        const bleedFactor = modifierManager.getModifiedValue(caster, 'tiance_bleeding_enabled', 0);
+        if (bleedFactor > 0 && skill.category !== '普通攻击') {
+            // 定义标准流血零件
+            const bleedPart = { 
+                type: 'dot', 
+                damageFactor: bleedFactor, 
+                applyPowerToDamage: true, 
+                count: 3, 
+                interval: 1000, 
+                color: 0xff3300 
+            };
+
+            finalActions = finalActions.map(action => {
+                // 为所有伤害性动作注入命中零件
+                if (action.type === 'damage_aoe' || action.type === 'projectile' || action.type === 'tick_effect' || action.type === 'movement') {
+                    return { ...action, onHit: bleedPart };
+                }
+                return action;
+            });
+        }
+
+        // --- B. 纯阳联动收敛 ---
+
+        // 1. 行天道 (气场伤害 - 收敛为零件)
+        const xingTianDaoValue = modifierManager.getModifiedValue(caster, 'chunyang_field_damage_enabled', 0);
+        if (xingTianDaoValue > 0 && skill.category === '气场') {
+            finalActions = finalActions.map(action => {
+                if (action.type === 'tick_effect') {
+                    return { 
+                        ...action, 
+                        onTick: { 
+                            type: 'damage_aoe', 
+                            value: xingTianDaoValue, 
+                            color: 0x00ffff, 
+                            targeting: action.targeting 
+                        } 
+                    };
+                }
+                return action;
+            });
+        }
+
+        // --- C. 藏剑联动收敛 ---
+
+        // 1. 层云 (落地旋风斩 - 收敛为零件)
+        const jumpWhirlwind = modifierManager.getModifiedValue(caster, 'cangjian_jump_whirlwind_enabled', 0);
+        if (jumpWhirlwind > 0 && (skill.id === 'hegui' || skill.id === 'songshe')) {
+            finalActions = finalActions.map(action => {
+                if (action.type === 'movement') {
+                    return { 
+                        ...action, 
+                        // 这里直接注入一个二段伤害动作零件
+                        onComplete: { 
+                            type: 'damage_aoe', 
+                            value: 35, 
+                            targeting: { radius: 5.0 }, 
+                            color: 0xff8800 
+                        }
+                    };
+                }
+                return action;
+            });
+        }
+
+        return finalActions;
     }
 
     /**
@@ -105,7 +191,9 @@ class TalentManager {
             
             if (!hasSkill) {
                 const skillNames = requiredSkills.map(sid => {
-                    const skill = SkillRegistry[sid];
+                    // 核心修复：通过全局或动态方式获取技能名称，避免循环依赖导致的初始化失败
+                    const SkillRegistry = window.SkillRegistry; 
+                    const skill = SkillRegistry ? SkillRegistry[sid] : null;
                     return skill ? `【${skill.name}】` : sid;
                 }).join(' 或 ');
                 return { isLocked: true, reason: `需先领悟招式：${skillNames}` };
@@ -213,4 +301,6 @@ class TalentManager {
 }
 
 export const talentManager = new TalentManager();
+// 暴露给全局以解决循环依赖问题
+window.talentManager = talentManager;
 

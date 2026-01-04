@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { audioManager } from './AudioManager.js';
 import { modifierManager } from './ModifierManager.js';
+import { talentManager } from './TalentManager.js';
 
 /**
  * Skill: 技能逻辑的核心基类
@@ -45,9 +46,18 @@ export class Skill {
         const { skillPower, totalSkillMult, totalPowerMult } = multipliers;
         const params = { ...action };
         
-        // 1. 伤害/治疗缩放
-        const baseDmg = action.value || action.damage || action.onTickDamage || 0;
+        // 1. 基础伤害确定
+        let baseDmg = action.value || action.damage || action.onTickDamage || 0;
+        
+        // --- 核心进化：自然计算 (Natural Calculation) ---
+        // 如果零件带有 damageFactor，则基于父动作的【基础值】进行计算
+        if (action.damageFactor && action.parentBaseValue) {
+            baseDmg = action.parentBaseValue * action.damageFactor;
+        }
+
         if (baseDmg > 0) {
+            // 关键：不论是直接技能还是零件，统一应用当前的功法/力道倍率
+            // 这样流血就能吃到“持续伤害加成”、“最终伤害提升”等所有实时 Modifier
             const mult = action.applyPowerToDamage ? totalPowerMult : totalSkillMult;
             params.finalDamage = Math.floor(baseDmg * mult);
         }
@@ -302,7 +312,12 @@ export class Skill {
         const baseSpells = caster.baseStats ? caster.baseStats.spells : (heroData.stats ? heroData.stats.spells : 0);
         const skillPower = modifierManager.getModifiedValue(caster, 'skill_power', baseSpells);
 
-        this.actions.forEach(action => {
+        // --- 核心重构：动作拦截与注入 (Action Decoration) ---
+        // 引擎不再硬编码逻辑，而是允许 TalentManager 根据当前奇穴动态注入动作
+        const tm = talentManager || window.talentManager;
+        const finalActions = tm ? tm.decorateSkillActions(this, caster, this.actions) : this.actions;
+
+        finalActions.forEach(action => {
             const center = targetPos || caster.position;
             // 核心重构：执行动作时，自动注入技能的 category 作为 sourceCategory
             this._executeAction(action, battleScene, caster, center, skillPower, this.category);
@@ -382,8 +397,23 @@ export class Skill {
                     else dmgTargeting.facing = caster.getWorldDirection(new THREE.Vector3());
                 }
                 const targets = battleScene.getUnitsInArea(center, dmgTargeting, 'enemy');
-                // 修复：透传 action.color
                 battleScene.applyDamageToUnits(targets, res.finalDamage, center, action.knockback, caster.isHero, action.color);
+                
+                // --- 核心进化：支持零件化子动作 ---
+                if (action.onHit) {
+                    if (typeof action.onHit === 'function') {
+                        action.onHit(targets, battleScene, center, skillPower, res.finalDamage);
+                    } else if (typeof action.onHit === 'object') {
+                        // 如果是一个零件对象
+                        const subActions = Array.isArray(action.onHit) ? action.onHit : [action.onHit];
+                        subActions.forEach(sa => {
+                            // 核心重构：不再传递计算后的 finalDamage (快照)
+                            // 而是透传原始 action 的基础数值，让零件自己去“自然计算”
+                            const parentBaseValue = action.value || action.damage || 0;
+                            this._executeAction({ ...sa, parentBaseValue }, battleScene, caster, center, skillPower, sourceCategory);
+                        });
+                    }
+                }
                 break;
 
             case 'buff_aoe':
@@ -433,19 +463,34 @@ export class Skill {
                     interval: tickInt,
                     targetSide: action.side || 'enemy',
                     onTick: (targets) => {
-                        // 1. 伤害/治疗处理 (带跳字)
+                        // 1. 执行内置逻辑 (数据驱动：如生太极的 Buff)
                         if (action.onTickDamage) {
-                            battleScene.applyDamageToUnits(targets, res.finalDamage, center, 0, caster.isHero, action.color);
+                            battleScene.applyDamageToUnits(targets, res.finalDamage, center, action.knockback || 0, caster.isHero, action.color);
+                            
+                            // --- 核心钩子：tick_effect 命中子动作 ---
+                            if (action.onHit) {
+                                const subActions = Array.isArray(action.onHit) ? action.onHit : [action.onHit];
+                                subActions.forEach(sa => {
+                                    this._executeAction({ ...sa, parentBaseValue: action.onTickDamage }, battleScene, caster, center, skillPower, sourceCategory);
+                                });
+                            }
                         }
                         if (action.onTickHeal) {
                             battleScene.applyDamageToUnits(targets, -res.finalHeal, center, 0, caster.isHero, action.color || 0x44ff44);
                         }
-
-                        // 2. Buff 处理 (继承类别)
                         if (action.onTickBuff) {
                             battleScene.applyBuffToUnits(targets, { 
                                 ...action.onTickBuff, 
-                                sourceCategory // 核心：继承类别
+                                sourceCategory
+                            });
+                        }
+
+                        // --- 核心重构：支持通用 onTick 子动作 (如行天道) ---
+                        if (action.onTick && typeof action.onTick === 'object') {
+                            const tickActions = Array.isArray(action.onTick) ? action.onTick : [action.onTick];
+                            tickActions.forEach(ta => {
+                                // 这里如果是纯新增伤害，parentBaseValue 取 0
+                                this._executeAction(ta, battleScene, caster, center, skillPower, sourceCategory);
                             });
                         }
                     }
@@ -453,10 +498,7 @@ export class Skill {
                 break;
 
             case 'summon':
-                let finalUnitType = action.unitType;
-                if (this.id === 'summon_militia' && modifierManager.getModifiedValue(caster, 'tiance_summon_upgrade', 0) > 0) {
-                    finalUnitType = 'tiance';
-                }
+                const finalUnitType = action.unitType;
                 const finalCount = action.applySkillPowerToCount ? Math.floor(action.count * skillPower) : action.count;
                 battleScene.spawnSupportUnits(finalUnitType, finalCount, center);
                 break;
@@ -467,18 +509,30 @@ export class Skill {
                     damage: res.finalDamage || 0,
                     knockback: action.knockback || 0,
                     jumpHeight: action.jumpHeight || 0,
+                    isHeroSource: caster.isHero, // 补全：传入来源标记以触发天赋
+                    invincible: true, // 核心增强：所有主动位移技能在途中默认无敌
+                    onHit: (target) => {
+                        // --- 核心钩子：位移碰撞命中 ---
+                        if (action.onHit) {
+                            const subActions = Array.isArray(action.onHit) ? action.onHit : [action.onHit];
+                            subActions.forEach(sa => {
+                                this._executeAction({ ...sa, parentBaseValue: action.damage }, battleScene, caster, target.position.clone(), skillPower, sourceCategory);
+                            });
+                        }
+                    },
                     onComplete: () => {
-                        if (action.landActions) action.landActions.forEach(la => this._executeAction(la, battleScene, caster, caster.position.clone(), skillPower));
-                        if ((this.id === 'hegui' || this.id === 'songshe') && caster.isHero) {
-                            if (modifierManager.getModifiedValue(caster, 'cangjian_jump_whirlwind_enabled', 0) > 0) {
-                                setTimeout(() => {
-                                    if (caster.isDead) return;
-                                    const lp = caster.position.clone();
-                                    battleScene.playVFX('cangjian_whirlwind', { pos: lp, radius: 5.0, color: 0xff8800, duration: 250 });
-                                    const jt = battleScene.getUnitsInArea(lp, { shape: 'circle', radius: 5.0 }, 'enemy');
-                                    battleScene.applyDamageToUnits(jt, 35 * skillPower, lp, 0.035, true);
-                                }, 500);
-                            }
+                        if (action.landActions) action.landActions.forEach(la => this._executeAction(la, battleScene, caster, caster.position.clone(), skillPower, sourceCategory));
+                        
+                        // --- 核心钩子：onComplete ---
+                        if (typeof action.onComplete === 'function') {
+                            action.onComplete(battleScene, caster, caster.position.clone(), skillPower);
+                        }
+                        // 支持对象形式的 onComplete
+                        if (action.onComplete && typeof action.onComplete === 'object') {
+                            const endActions = Array.isArray(action.onComplete) ? action.onComplete : [action.onComplete];
+                            endActions.forEach(ea => {
+                                this._executeAction(ea, battleScene, caster, caster.position.clone(), skillPower, sourceCategory);
+                            });
                         }
                     }
                 };
@@ -502,15 +556,19 @@ export class Skill {
                 break;
 
             case 'dot':
-                const dotTargets = battleScene.getUnitsInArea(center, action.targeting || this.targeting, 'enemy');
+                const dotTargeting = { ...this.targeting, ...(action.targeting || {}) };
+                const dotTargets = battleScene.getUnitsInArea(center, dotTargeting, action.side || 'enemy');
                 dotTargets.forEach(t => {
-                    battleScene.applyDOT(t, {
-                        damage: res.finalDamage,
-                        interval: action.interval || 1000,
-                        count: action.count || 3,
-                        color: action.color,
-                        isHeroSource: caster.isHero
-                    });
+                    // 修正：统一使用 battleScene.applyDOT 接口
+                    if (battleScene.applyDOT) {
+                        battleScene.applyDOT(t, {
+                            damage: res.finalDamage,
+                            interval: action.interval || 1000,
+                            count: action.count || 3,
+                            color: action.color,
+                            isHeroSource: caster.isHero
+                        });
+                    }
                 });
                 break;
 

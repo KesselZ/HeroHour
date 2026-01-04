@@ -568,19 +568,21 @@ class UIManager {
         const starryBg = document.querySelector('.talent-starry-bg');
         const talentPanel = document.getElementById('talent-panel');
         
+        // --- 统一计算位置 ---
+        const panelWidth = talentPanel?.offsetWidth || window.innerWidth;
+        const panelHeight = talentPanel?.offsetHeight || window.innerHeight;
+        
+        // 理想中心偏移 (让 (2500, 2500) 居中)
+        const idealX = (panelWidth / 2) - 2500;
+        const idealY = (panelHeight / 2) - 2500;
+        
+        let finalX = this.talentDrag.offsetX;
+        let finalY = this.talentDrag.offsetY;
+
         if (container) {
             // --- 软边界逻辑实现 ---
-            const panelWidth = talentPanel?.offsetWidth || window.innerWidth;
-            const panelHeight = talentPanel?.offsetHeight || window.innerHeight;
-            
-            // 理想中心偏移 (让 (2500, 2500) 居中)
-            const idealX = (panelWidth / 2) - 2500;
-            const idealY = (panelHeight / 2) - 2500;
-            
             // 允许自由移动的阈值
             const threshold = 800;
-            let finalX = this.talentDrag.offsetX;
-            let finalY = this.talentDrag.offsetY;
             
             const diffX = finalX - idealX;
             if (Math.abs(diffX) > threshold) {
@@ -600,14 +602,15 @@ class UIManager {
             // 奇穴位点跟随移动并缩放
             container.style.transform = `translate(${finalX}px, ${finalY}px) scale(${this.talentDrag.scale})`;
         }
-// ... (rest unchanged)
         
         if (starryBg) {
             // 背景星空视差移动并伴随微弱缩放
-            const bgX = this.talentDrag.offsetX * 0.2;
-            const bgY = this.talentDrag.offsetY * 0.2;
-            // 星空缩放幅度更小，产生深度距离感 (基础 1.1 + 缩放增量的 20%)
-            const bgScale = 1.1 + (this.talentDrag.scale - 1.0) * 0.2;
+            const deltaX = finalX - idealX;
+            const deltaY = finalY - idealY;
+            
+            const bgX = deltaX * 0.1;
+            const bgY = deltaY * 0.1;
+            const bgScale = 1.05 + (this.talentDrag.scale - 1.0) * 0.1;
             starryBg.style.transform = `translate(${bgX}px, ${bgY}px) scale(${bgScale})`;
         }
     }
@@ -757,28 +760,27 @@ class UIManager {
                 tagEl.style.top = `${tag.pos.y + 2500}px`;
                 
                 // --- 动态亮度逻辑 ---
-                // 计算该分支的激活进度
-                let totalInGroup = 0;
-                let activeInGroup = 0;
+                // 根据该分支的激活节点数量，线性提升亮度
+                let activeCount = 0;
                 for (const nodeId in nodes) {
                     if (nodes[nodeId].groupId === tag.groupId) {
-                        totalInGroup++;
                         if ((talentManager.activeTalents[nodeId] || 0) > 0) {
-                            activeInGroup++;
+                            activeCount++;
                         }
                     }
                 }
 
-                const progress = totalInGroup > 0 ? activeInGroup / totalInGroup : 0;
+                // 计算进度：激活节点数 / 总节点数 (tag.weight)
+                const progress = tag.weight > 0 ? activeCount / tag.weight : 0;
                 
-                // 大幅提升亮度上限：基础透明度 0.05，最高点亮到 0.5
-                const opacity = 0.05 + progress * 0.45;
+                // 基础透明度 0.1，满激活时提升至 0.8
+                const opacity = 0.1 + progress * 0.7;
                 tagEl.style.color = `rgba(255, 255, 255, ${opacity})`;
                 
-                // 增强发光感：最高 50px 半径，0.6 透明度的强光
+                // 增强发光感：最高 60px 半径的强光
                 if (progress > 0) {
-                    const glowRadius = progress * 50;
-                    const glowOpacity = progress * 0.6;
+                    const glowRadius = progress * 60;
+                    const glowOpacity = progress * 0.8;
                     tagEl.style.textShadow = `0 0 ${glowRadius}px rgba(255, 255, 255, ${glowOpacity})`;
                 }
                 
