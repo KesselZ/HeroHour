@@ -1240,6 +1240,9 @@ export class WorldManager {
         // 使用局部生成方法覆盖全图 (以 0,0 为中心，半径足够大覆盖全图)
         this._generateEntitiesInArea(0, 0, size, generator, occupied, entities);
 
+        // --- 4.5 放置特殊建筑：神行祭坛 ---
+        this._placeSpecialAltars(size, generator, occupied, entities);
+
         // --- 5. 自动分配周边矿产逻辑 (圈地系统) ---
         // 规则：50米范围内的矿产自动归属于最近的敌方主城。
         // 注意：此逻辑不对玩家生效，玩家需要手动跑位占领以保留探索感。
@@ -1278,6 +1281,63 @@ export class WorldManager {
         this.mapState.exploredMap = new Uint8Array(size * size);
 
         return this.mapState;
+    }
+
+    /**
+     * 在地图的四个象限分别随机生成一个神行祭坛
+     */
+    _placeSpecialAltars(size, generator, occupiedBuffer, entitiesList) {
+        const halfSize = size / 2;
+        // 核心优化：增加“内缩偏移量”(Margin)，确保祭坛不会生成在象限的分界线上
+        const margin = 40; // 离分界线和地图边缘至少 40 米
+        
+        const quadrants = [
+            { minX: 20, maxX: halfSize - margin, minZ: 20, maxZ: halfSize - margin, id: 'TL' }, // 西北 (左上)
+            { minX: halfSize + margin, maxX: size - 20, minZ: 20, maxZ: halfSize - margin, id: 'TR' }, // 东北 (右上)
+            { minX: 20, maxX: halfSize - margin, minZ: halfSize + margin, maxZ: size - 20, id: 'BL' }, // 西南 (左下)
+            { minX: halfSize + margin, maxX: size - 20, minZ: halfSize + margin, maxZ: size - 20, id: 'BR' } // 东南 (右下)
+        ];
+
+        quadrants.forEach(q => {
+            let placed = false;
+            let attempts = 0;
+            while (!placed && attempts < 500) {
+                const rx = Math.floor(Math.random() * (q.maxX - q.minX)) + q.minX;
+                const rz = Math.floor(Math.random() * (q.maxZ - q.minZ)) + q.minZ;
+
+                // 检查草地、未被占用且不在主城安全区
+                if (generator.isSafeGrass(rx, rz) && !occupiedBuffer[rz * size + rx]) {
+                    const worldX = rx - halfSize;
+                    const worldZ = rz - halfSize;
+
+                    // 简单检查是否在任何城市的 20 米范围内（祭坛应该在野外）
+                    let tooCloseToCity = false;
+                    for (const cityId in this.cities) {
+                        const city = this.cities[cityId];
+                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 20) {
+                            tooCloseToCity = true;
+                            break;
+                        }
+                    }
+
+                    if (!tooCloseToCity) {
+                        entitiesList.push({
+                            id: `teleport_altar_${q.id}`,
+                            type: 'captured_building',
+                            spriteKey: 'spell_altar_v2',
+                            buildingType: 'teleport_altar',
+                            x: worldX,
+                            z: worldZ,
+                            config: { owner: 'none', type: 'teleport_altar' }
+                        });
+                        
+                        occupiedBuffer[rz * size + rx] = 1;
+                        placed = true;
+                    }
+                }
+                attempts++;
+            }
+        });
     }
 
     /**
@@ -1965,18 +2025,23 @@ export class WorldManager {
             });
         }
 
-        const name = config.type === 'gold_mine' ? '金矿' : '伐木场';
+        const names = {
+            'gold_mine': '金矿',
+            'sawmill': '伐木场',
+            'teleport_altar': '神行祭坛'
+        };
+        const name = names[config.type] || '建筑';
         const ownerName = newOwner === 'player' ? '玩家' : (this.factions[newOwner]?.name || '敌方');
         
-        if (newOwner === 'player') {
-            this.showNotification(`成功占领了${name}！每季度将产出额外资源。`);
-            
-            // 播放占领音效
-            if (config.type === 'gold_mine') {
-                audioManager.play('capture_gold_mine');
-            } else if (config.type === 'sawmill') {
-                audioManager.play('capture_sawmill');
-            }
+        // 2. 占领音效
+        const captureSounds = {
+            'gold_mine': 'capture_gold_mine',
+            'sawmill': 'capture_sawmill',
+            'teleport_altar': 'ui_teleport'
+        };
+        const soundKey = captureSounds[config.type];
+        if (newOwner === 'player' && soundKey) {
+            audioManager.play(soundKey);
         }
         
         console.log(`%c[占领] %c${name} (${id}) 现在归属于 ${ownerName}`, 'color: #00ff00; font-weight: bold', 'color: #fff');

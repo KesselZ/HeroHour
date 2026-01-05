@@ -215,6 +215,7 @@ class ResourcePreloader {
             '/audio/sources/升级音效.mp3',
             '/audio/sources/点天赋.mp3',
             '/audio/sources/获得木材.mp3',
+            '/audio/sources/传送.mp3',
             '/audio/sources/获得木材厂.mp3',
             '/audio/sources/获得金矿厂.mp3',
             '/audio/sources/获得金钱.mp3'

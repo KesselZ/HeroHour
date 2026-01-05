@@ -116,58 +116,67 @@ export class VFXLibrary {
      * 通用粒子系统发射器
      */
     createParticleSystem(options) {
-        const { 
-            pos = new THREE.Vector3(), 
-            parent = null, // 新增：支持指定父容器（如单位自身）
-            color = 0xffffff, 
-            duration = 1000, 
-            density = 1,
-            spawnRate = 100,
-            geometry = null,
-            initFn = (p) => {},
-            updateFn = (p, progress) => {}
+        // ...
+    }
+
+    /**
+     * 简单的粒子爆发效果 (用于传送、物品掉落等)
+     */
+    createParticleExplosion(pos, options = {}) {
+        const {
+            color = 0xffffff,
+            particleCount = 20,
+            size = 0.2,
+            duration = 800,
+            speed = 0.1
         } = options;
 
-        const actualParent = parent || this.scene;
+        const pGeo = new THREE.BoxGeometry(size, size, size);
         const group = new THREE.Group();
         group.position.copy(pos);
-        actualParent.add(group);
+        this.scene.add(group);
 
-        const pGeo = geometry || new THREE.BoxGeometry(0.1, 0.1, 0.1);
-        const startTime = Date.now();
+        for (let i = 0; i < particleCount; i++) {
+            const pMat = this._createMaterial({ color, transparent: true, opacity: 1.0 });
+            const p = new THREE.Mesh(pGeo, pMat);
+            
+            // 随机初速度
+            const phi = Math.random() * Math.PI * 2;
+            const theta = Math.random() * Math.PI;
+            const v = speed * (0.5 + Math.random() * 0.5);
+            p.userData.velocity = new THREE.Vector3(
+                Math.sin(theta) * Math.cos(phi) * v,
+                Math.cos(theta) * v + 0.05, // 稍微向上一点
+                Math.sin(theta) * Math.sin(phi) * v
+            );
 
-        const interval = setInterval(() => {
-            if (Date.now() - startTime > duration) {
-                clearInterval(interval);
-                setTimeout(() => {
-                    actualParent.remove(group);
-                    if (!geometry) pGeo.dispose();
-                }, 1500);
-                return;
-            }
+            group.add(p);
 
-            const count = Math.ceil(2 * density);
-            for (let i = 0; i < count; i++) {
-                const pMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
-                const p = new THREE.Mesh(pGeo, pMat);
-                initFn(p);
-                group.add(p);
+            const start = Date.now();
+            const anim = () => {
+                const elapsed = Date.now() - start;
+                const prg = elapsed / duration;
 
-                const pStart = Date.now();
-                const pDur = 500 + Math.random() * 500;
-                const anim = () => {
-                    const progress = (Date.now() - pStart) / pDur;
-                    if (progress < 1) {
-                        updateFn(p, progress);
-                        requestAnimationFrame(anim);
-                    } else {
-                        group.remove(p);
-                        pMat.dispose();
-                    }
-                };
-                anim();
-            }
-        }, spawnRate);
+                if (prg < 1) {
+                    p.position.add(p.userData.velocity);
+                    p.userData.velocity.multiplyScalar(0.96); // 阻力
+                    p.rotation.x += 0.1;
+                    p.rotation.y += 0.1;
+                    pMat.opacity = 1 - prg;
+                    p.scale.setScalar(1 - prg * 0.5);
+                    requestAnimationFrame(anim);
+                } else {
+                    group.remove(p);
+                    pMat.dispose();
+                }
+            };
+            anim();
+        }
+
+        setTimeout(() => {
+            this.scene.remove(group);
+            pGeo.dispose();
+        }, duration + 100);
     }
 
     createFieldVFX(pos, radius, color, duration) {

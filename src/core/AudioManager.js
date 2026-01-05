@@ -105,7 +105,8 @@ class AudioManager {
             // 战场结算音效
             'battle_victory': { files: ['/audio/click/胜利音效.mp3'], throttle: 1000 },
             'battle_defeat': { files: ['/audio/click/战斗失败音效.mp3'], throttle: 1000 },
-            'ui_bell': { files: ['/audio/click/铃铛.mp3'], throttle: 500 }
+            'ui_bell': { files: ['/audio/click/铃铛.mp3'], throttle: 500 },
+            'ui_teleport': { files: ['/audio/sources/传送.mp3'], throttle: 500 }
         };
     }
 

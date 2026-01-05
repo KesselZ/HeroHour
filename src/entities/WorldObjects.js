@@ -794,12 +794,22 @@ export class CapturedBuildingObject extends WorldObject {
     }
 
     onInteract(worldScene) {
+        // 1. 处理占领逻辑 (如果未占领会触发通知和音效)
         worldManager.handleCapture({
             id: this.id,
             type: 'captured_building',
             config: this.config,
             mesh: this.mesh
         });
+
+        // 2. 如果是神行祭坛，额外开启传送界面
+        if (this.buildingType === 'teleport_altar') {
+            // 延迟一小会儿，确保占领通知能被看到
+            setTimeout(() => {
+                worldScene.openTeleportMenu();
+            }, 100);
+        }
+        
         return false;
     }
 
@@ -808,12 +818,18 @@ export class CapturedBuildingObject extends WorldObject {
         const ownerFaction = worldManager.factions[owner];
         const ownerName = owner === 'none' ? '无人占领' : (ownerFaction ? ownerFaction.name : '未知势力');
         const factionColor = (owner === 'none') ? '#888888' : worldManager.getFactionColor(owner);
-        const typeName = this.buildingType === 'gold_mine' ? '金矿' : '锯木厂';
+        
+        const typeNames = {
+            'gold_mine': '金矿',
+            'sawmill': '锯木厂',
+            'teleport_altar': '神行祭坛'
+        };
+        const typeName = typeNames[this.buildingType] || '建筑';
         
         return {
             name: typeName,
-            level: '当前归属',
-            maxLevel: ownerName,
+            level: '当前状态',
+            maxLevel: owner === 'none' ? '未激活' : `由 ${ownerName} 占领`,
             color: factionColor
         };
     }

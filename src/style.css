@@ -1923,6 +1923,107 @@ img {
     flex-direction: column;
 }
 
+.teleport-btn-v3 {
+    width: 120px;
+    height: 32px;
+    background: var(--jx3-gold);
+    color: white;
+    border: 1px solid var(--jx3-celadon);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: bold;
+    font-family: "Microsoft YaHei", sans-serif;
+    transition: all 0.2s;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    justify-self: end; /* 靠右对齐 */
+}
+
+.teleport-btn-v3:hover {
+    background: #ffcc00;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.teleport-panel-v3 {
+    width: 600px;
+    max-width: 90vw;
+    padding: 40px 30px;
+    background: var(--jx3-paper);
+    border: 6px solid var(--jx3-celadon);
+    outline: 2px solid var(--jx3-gold);
+}
+
+.teleport-header {
+    text-align: center;
+    border-bottom: 2px solid var(--jx3-celadon-light);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+}
+
+.teleport-title {
+    font-size: 1.8rem;
+    color: var(--jx3-ink);
+    margin: 0;
+    letter-spacing: 8px;
+    font-family: "Microsoft YaHei", sans-serif;
+}
+
+.teleport-subtitle {
+    color: #666;
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+
+.teleport-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 15px;
+    max-height: 400px;
+}
+
+.teleport-dest-card {
+    background: white;
+    border: 1px solid var(--jx3-celadon-light);
+    border-radius: var(--radius-md);
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.teleport-dest-card:hover {
+    border-color: var(--jx3-gold);
+    background: #fff9e6;
+    transform: translateX(5px);
+}
+
+.teleport-dest-icon {
+    width: 48px;
+    height: 48px;
+    background-size: cover;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.teleport-dest-info {
+    flex: 1;
+}
+
+.teleport-dest-name {
+    display: block;
+    font-weight: bold;
+    font-size: 1rem;
+    color: var(--jx3-ink);
+}
+
+.teleport-dest-type {
+    display: block;
+    font-size: 0.8rem;
+    color: #888;
+}
+
 /* 城市管理面板 V3 精美重构 */
 .town-panel-v3 {
     width: 1150px;
@@ -1939,9 +2040,9 @@ img {
 }
 
 .town-header-top-v3 {
-    display: flex;
-    align-items: center; /* 改为居中对齐 */
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 200px 1fr 200px; /* 左右等宽，中间自适应 */
+    align-items: center;
     border-bottom: 3px double var(--jx3-celadon);
     margin-bottom: 5px;
     padding: 0 5px;
@@ -1955,12 +2056,10 @@ img {
     letter-spacing: 12px;
     font-weight: 900;
     font-family: "Microsoft YaHei", sans-serif;
-    flex: 2; 
     padding-bottom: 5px;
 }
 
 .town-income-v3 {
-    flex: 1;
     font-size: 0.85rem;
     font-weight: bold;
     color: #333;

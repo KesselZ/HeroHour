@@ -201,7 +201,7 @@
                 <div class="town-header-top-v3">
                     <div class="town-income-v3">季度产出: 💰<span id="town-income-gold">1000</span> 🪵<span id="town-income-wood">200</span></div>
                     <h2 id="town-name" class="town-title-v3">稻香村</h2>
-                    <div style="flex: 1;"></div>
+                    <button id="city-teleport-btn" class="teleport-btn-v3">神行千里</button>
                 </div>
                 <div class="town-main-content">
                     <div class="town-construction-section">
@@ -220,6 +220,20 @@
                         <button id="deposit-all-btn" class="transfer-btn" title="队伍全部驻守">◀</button>
                     </div>
                     <div class="army-container hero-army"><div class="army-label">我的队伍</div><div id="hero-army-list" class="army-slots-v3"></div></div>
+                </div>
+                <div class="menu-decoration-bottom"></div>
+            </div>
+
+            <!-- 神行千里传送面板 -->
+            <div id="teleport-panel" class="menu-container hidden teleport-panel-v3">
+                <div class="menu-decoration-top"></div>
+                <button id="close-teleport-panel" class="close-btn-v3" title="关闭">×</button>
+                <div class="teleport-header">
+                    <h2 class="teleport-title">神行千里</h2>
+                    <p class="teleport-subtitle">选择你要传送的目的地</p>
+                </div>
+                <div id="teleport-destinations" class="teleport-grid panel-content-scroll">
+                    <!-- 动态生成传送点 -->
                 </div>
                 <div class="menu-decoration-bottom"></div>
             </div>

@@ -349,6 +349,23 @@ export class WorldScene {
             };
         }
 
+        // --- 神行千里传送逻辑 ---
+        const teleportBtn = document.getElementById('city-teleport-btn');
+        if (teleportBtn) {
+            teleportBtn.onclick = () => {
+                audioManager.play('ui_click', { volume: 0.5 });
+                this.openTeleportMenu();
+            };
+        }
+
+        const closeTeleportBtn = document.getElementById('close-teleport-panel');
+        if (closeTeleportBtn) {
+            closeTeleportBtn.onclick = () => {
+                audioManager.play('ui_click', { volume: 0.4 });
+                document.getElementById('teleport-panel').classList.add('hidden');
+            };
+        }
+
         const closeHeroBtn = document.getElementById('close-hero-panel');
         if (closeHeroBtn) {
             closeHeroBtn.onclick = () => {
@@ -731,13 +748,19 @@ export class WorldScene {
 
     openTownManagement(cityId, isPhysical = false) {
         // --- 互斥逻辑：打开城镇面板时，关闭其他可能冲突的面板 ---
-        document.getElementById('hero-stats-panel').classList.add('hidden');
-        const skillLearnPanel = document.getElementById('skill-learn-panel');
-        if (skillLearnPanel) skillLearnPanel.classList.add('hidden');
-        const startWindow = document.getElementById('game-start-window');
-        if (startWindow) startWindow.classList.add('hidden');
-        const htpPanel = document.getElementById('how-to-play-panel');
-        if (htpPanel) htpPanel.classList.add('hidden');
+        const panelsToClose = [
+            'hero-stats-panel',
+            'skill-learn-panel',
+            'game-start-window',
+            'how-to-play-panel',
+            'teleport-panel',
+            'load-save-panel',
+            'save-game-panel'
+        ];
+        panelsToClose.forEach(id => {
+            const p = document.getElementById(id);
+            if (p) p.classList.add('hidden');
+        });
 
         // --- 手机端适配：在所有面板状态更新后，确定最终的 HUD 可见性 ---
         if (uiManager.isMobile) uiManager.setHUDVisibility(false);
@@ -1969,6 +1992,156 @@ export class WorldScene {
                 uiManager.setHUDVisibility(true);
             }
         }
+    }
+
+    /**
+     * 打开神行千里传送菜单
+     */
+    openTeleportMenu() {
+        // --- 互斥逻辑：打开传送面板时，关闭其他所有面板 ---
+        const panelsToClose = [
+            'hero-stats-panel',
+            'skill-learn-panel',
+            'game-start-window',
+            'how-to-play-panel',
+            'town-management-panel',
+            'load-save-panel',
+            'save-game-panel'
+        ];
+        panelsToClose.forEach(id => {
+            const p = document.getElementById(id);
+            if (p) p.classList.add('hidden');
+        });
+
+        // 手机端适配
+        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
+
+        const panel = document.getElementById('teleport-panel');
+        const container = document.getElementById('teleport-destinations');
+        if (!panel || !container) return;
+
+        // 清空列表
+        container.innerHTML = '';
+
+        // 收集目的地
+        const destinations = [];
+
+        // 1. 玩家拥有的城市
+        Object.values(worldManager.cities).forEach(city => {
+            if (city.owner === 'player') {
+                destinations.push({
+                    id: city.id,
+                    name: city.name,
+                    type: 'city',
+                    x: city.x,
+                    z: city.z,
+                    icon: city.getIconKey()
+                });
+            }
+        });
+
+        // 2. 激活的传送祭坛
+        const altarNames = {
+            'TL': '西北祭坛',
+            'TR': '东北祭坛',
+            'BL': '西南祭坛',
+            'BR': '东南祭坛'
+        };
+
+        worldManager.mapState.entities.forEach(entity => {
+            if (entity.type === 'captured_building' && entity.buildingType === 'teleport_altar') {
+                const isActivated = entity.config.owner !== 'none';
+                const suffix = entity.id.split('_').pop(); // 获取 TL, TR, BL, BR
+                
+                destinations.push({
+                    id: entity.id,
+                    name: altarNames[suffix] || '古老祭坛',
+                    type: 'altar',
+                    x: entity.x,
+                    z: entity.z,
+                    icon: 'spell_altar_v2',
+                    isActivated: isActivated
+                });
+            }
+        });
+
+        // 渲染列表
+        destinations.forEach(dest => {
+            const card = document.createElement('div');
+            // 恢复正常逻辑：未激活的祭坛显示锁定状态
+            card.className = `teleport-dest-card ${dest.isActivated === false ? 'is-locked' : ''}`;
+            
+            const statusText = dest.type === 'city' ? '城池' : (dest.isActivated ? '已激活' : '尚未激活');
+            
+            card.innerHTML = `
+                <div class="teleport-dest-icon" style="${this.getIconStyleString(dest.icon)}"></div>
+                <div class="teleport-dest-info">
+                    <span class="teleport-dest-name">${dest.name}</span>
+                    <span class="teleport-dest-type">${statusText}</span>
+                </div>
+            `;
+
+            card.onclick = () => {
+                if (dest.isActivated === false) {
+                    worldManager.showNotification("该祭坛尚未激活，无法传送。");
+                    audioManager.play('ui_invalid', { volume: 0.8 });
+                    return;
+                }
+                audioManager.play('ui_teleport', { volume: 0.8 });
+                this.teleportTo(dest.x, dest.z);
+                panel.classList.add('hidden');
+                this.closeTownManagement();
+            };
+
+            container.appendChild(card);
+        });
+
+        panel.classList.remove('hidden');
+    }
+
+    /**
+     * 执行传送
+     */
+    teleportTo(x, z) {
+        if (!this.playerGroup) return;
+
+        // 播放传送音效
+        audioManager.play('ui_teleport', { volume: 0.8 });
+
+        // 创建传送特效
+        this.vfxLibrary.createParticleExplosion(this.playerGroup.position, {
+            color: 0x44ccff,
+            particleCount: 30,
+            size: 0.3
+        });
+
+        // 延迟一小会儿执行位移，给特效一点时间
+        setTimeout(() => {
+            // 核心修改：直接传送到目标中心坐标 (x, z)
+            // 因为建筑生成时已经确保了所在地块是 passable 的 grass，所以直接传送是安全的
+            const targetX = x;
+            const targetZ = z;
+
+            this.playerGroup.position.set(targetX, 0, targetZ);
+            this.lastPlayerPos.copy(this.playerGroup.position);
+            
+            // 同步到逻辑层
+            worldManager.savePlayerPos(targetX, targetZ);
+
+            // 相机立即跟随
+            this.camera.position.x = targetX;
+            this.camera.position.z = targetZ + 15;
+            this.camera.lookAt(targetX, 0, targetZ);
+
+            // 到达特效
+            this.vfxLibrary.createParticleExplosion(this.playerGroup.position, {
+                color: 0xffffff,
+                particleCount: 20,
+                size: 0.2
+            });
+
+            worldManager.showNotification("神行千里，瞬息而至。");
+        }, 100);
     }
 
     /**
