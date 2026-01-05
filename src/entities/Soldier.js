@@ -428,7 +428,7 @@ export class BaseUnit extends THREE.Group {
     }
 
     applyDamageAndKnockback(target, damage, knockbackForce) {
-        target.takeDamage(damage + (rng.next() - 0.5) * 5, this.isHero);
+        target.takeDamage(damage, this.isHero);
         if (knockbackForce > 0) {
             target.applyKnockback(this.position, knockbackForce);
         }
@@ -932,7 +932,7 @@ export class BaseUnit extends THREE.Group {
             }
 
             // 默认单体攻击
-            this.target.takeDamage(this.attackDamage + (rng.next() - 0.5) * 5, this.isHero);
+            this.target.takeDamage(this.attackDamage, this.isHero);
         }
     }
 
@@ -1013,7 +1013,7 @@ export class BaseUnit extends THREE.Group {
                     });
                 } else if (this.target && !this.target.isDead) {
                     // 基础单体模式
-                    this.target.takeDamage(damage + (rng.next() - 0.5) * 5, this.isHero);
+                    this.target.takeDamage(damage, this.isHero);
                 }
             }, i * interval);
         }
@@ -1051,11 +1051,17 @@ export class BaseUnit extends THREE.Group {
     takeDamage(amount, isHeroSource = false) {
         if (this.isDead || this.isInvincible) return;
         
-        // 核心修正：如果是治疗 (amount < 0)，跳过减伤和护盾计算
+        // 1. 核心随机波动：所有伤害（及治疗）均有 ±5% 的基础浮动
+        // 这一步在所有减伤计算之前，确保“原始伤害”本身是带波动的
         let finalAmount = amount;
-        if (amount > 0) {
-            // 1. 应用减伤 (Multiplicative Independent Reduction)
-            finalAmount = amount * this.damageMultiplier;
+        if (amount !== 0) {
+            const variation = Math.abs(amount) * 0.1; // 0.1 * 0.5 = 0.05 (即 5%)
+            finalAmount += (rng.next() - 0.5) * variation;
+        }
+
+        if (finalAmount > 0) {
+            // 2. 应用减伤 (Multiplicative Independent Reduction)
+            finalAmount = finalAmount * this.damageMultiplier;
             
             // 2. 应用易伤桶 (Additive Internal, Multiplicative External)
             // 易伤计算：1 + (易伤A + 易伤B)
@@ -1594,6 +1600,8 @@ export class HeroUnit extends BaseUnit {
             const m = details.modes;
             const ident = worldManager.getHeroIdentity('yeying');
             const baseAtk = ident.combatBase.atk;
+            const currentAtk = this.attackDamage; // 缓存快照，确保连击伤害一致性
+
             if (this.cangjianStance === 'heavy') {
                 // 重剑模式：心剑旋风 (禁用冲刺位移)
                 const cfg = m.yeying_heavy;
@@ -1608,7 +1616,7 @@ export class HeroUnit extends BaseUnit {
                         window.battle.playVFX('cangjian_whirlwind', { unit: this, radius: this.attackRange, color: 0xffcc00, duration: 250 });
                         this.executeAOE(enemies, {
                             radius: this.attackRange,
-                            damage: this.attackDamage * (cfg.atk / baseAtk),
+                            damage: currentAtk * (cfg.atk / baseAtk),
                             knockbackForce: 0.035
                         });
                     }, i * 250);
@@ -1624,8 +1632,8 @@ export class HeroUnit extends BaseUnit {
                         audioManager.play('attack_melee', { volume: 0.25, force: true, pitchVar: 0.1 });
                         if (i === 0) this.onAttackAnimation(); 
                         
-                        const finalDmg = this.attackDamage * (cfg.atk / baseAtk);
-                        this.target.takeDamage(finalDmg + (rng.next() - 0.5) * 5, true);
+                        const finalDmg = currentAtk * (cfg.atk / baseAtk);
+                        this.target.takeDamage(finalDmg, true);
                     }, i * 150); 
                 }
             }
@@ -1726,7 +1734,7 @@ export class RangedSoldier extends BaseUnit {
                     startPos: this.position.clone().add(new THREE.Vector3(0, 0.4, 0)),
                     target: this.target,
                     speed: 0.15,
-                    damage: this.attackDamage + (rng.next() - 0.5) * 4,
+                    damage: this.attackDamage,
                     type: 'wave',
                     color: 0x00ffff
                 });
