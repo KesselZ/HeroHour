@@ -773,6 +773,16 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+// 核心修正：将重要的管理实例挂载到 window，方便控制台调试
+if (import.meta.env.DEV) {
+    window.worldManager = worldManager;
+    window.timeManager = timeManager;
+    window.modifierManager = modifierManager;
+    window.talentManager = talentManager;
+    window.WorldStatusManager = WorldStatusManager;
+    console.log('%c[Debug] 已挂载全局管理实例，可在控制台使用 worldManager.debugSpawnEvil() 等命令', 'color: #ff00ff; font-weight: bold');
+}
+
 animate();
 
 

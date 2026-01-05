@@ -250,6 +250,38 @@ export class WorldStatusManager {
                 });
             }
         });
+
+        // --- 核心新增：检查特殊的动态江湖事件 (如邪恶势力降临) ---
+        this._checkSpecialDynamicEvents(worldManagerRef);
+    }
+
+    /**
+     * 检查并触发特殊的动态世界事件
+     */
+    static _checkSpecialDynamicEvents(worldManagerRef) {
+        const globalProgress = timeManager.getGlobalProgress(); // 已过的季度总数
+        
+        // 邪恶势力降临逻辑：
+        // 第一年·夏 (进度 1) 开始，每个季度有概率降临一个邪恶势力，直到降满 2 个为止 (对应原逻辑规模)
+        // 用户提到“邪恶势力据点（如天一教、神策军）”，原逻辑是 3 选 2，我们也保持 2 个
+        if (globalProgress >= 1) {
+            const currentEvilBases = worldManagerRef.mapState.entities.filter(e => e.config?.isEvilBase && !e.isRemoved);
+            const evilFactions = ['tianyi', 'shence', 'red_cult'];
+            const existingFactions = currentEvilBases.map(e => e.config.faction);
+            const remainingFactions = evilFactions.filter(f => !existingFactions.includes(f));
+
+            // 如果当前存活的邪恶据点少于 2 个，且还有可选势力
+            if (currentEvilBases.length < 2 && remainingFactions.length > 0) {
+                // 进度 1 (第一年夏) 100% 降临第一个
+                // 之后每个季度 50% 概率降临第二个
+                const shouldSpawn = (globalProgress === 1 && currentEvilBases.length === 0) || (Math.random() < 0.5);
+                
+                if (shouldSpawn) {
+                    const nextFaction = remainingFactions[Math.floor(Math.random() * remainingFactions.length)];
+                    worldManagerRef.spawnEvilBaseDynamic(nextFaction);
+                }
+            }
+        }
     }
 
     /**

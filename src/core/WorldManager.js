@@ -421,6 +421,9 @@ export class WorldManager {
         // 5.5 当前对手信息 (用于开局展示)
         this.currentAIFactions = [];
 
+        // 6. 地图生成器引用 (用于后续动态生成)
+        this.lastGenerator = null;
+
         // 6. 兵种价格定义
         this.unitCosts = UNIT_COSTS;
 
@@ -1073,6 +1076,7 @@ export class WorldManager {
         
         const size = 400; 
         const grid = generator.generate(size);
+        this.lastGenerator = generator; // 保存引用用于动态生成
         
         // 记录地形偏移量和种子，以便存档时保存
         this.mapState.terrainOffsets = { x: generator.offsetX, y: generator.offsetY };
@@ -1175,49 +1179,6 @@ export class WorldManager {
                     z: az 
                 });
             });
-
-            // --- 2.5 挑选并放置邪恶势力据点 ---
-            // 从三大邪恶势力中挑选 2 个，放置在远离玩家的空余 POI
-            const evilFactions = ['tianyi', 'shence', 'red_cult'];
-            const chosenEvils = [...evilFactions].sort(() => Math.random() - 0.5).slice(0, 2);
-            
-            // 过滤掉已被主城占用的 POI
-            const remainingPois = generator.pois.filter(poi => {
-                const wx = poi.x - halfSize;
-                const wz = poi.z - halfSize;
-                // 检查是否与现有城市重叠
-                return !Object.values(this.cities).some(c => c.x === wx && c.z === wz);
-            });
-
-            chosenEvils.forEach((factionId, index) => {
-                // 寻找距离玩家最远的空余 POI
-                const playerPos = this.mapState.playerPos;
-                remainingPois.sort((a, b) => {
-                    const distA = Math.sqrt(Math.pow(a.x - halfSize - playerPos.x, 2) + Math.pow(a.z - halfSize - playerPos.z, 2));
-                    const distB = Math.sqrt(Math.pow(b.x - halfSize - playerPos.x, 2) + Math.pow(b.z - halfSize - playerPos.z, 2));
-                    return distB - distA; // 降序，最远的在前
-                });
-
-                if (remainingPois.length > 0) {
-                    const targetPoi = remainingPois.shift();
-                    const ex = targetPoi.x - halfSize;
-                    const ez = targetPoi.z - halfSize;
-                    
-                    const factionNames = { 'tianyi': '天一教总坛', 'shence': '神策军营', 'red_cult': '红衣教祭坛' };
-                    const iconKeys = { 'tianyi': 'tianyi_abomination', 'shence': 'shence_iron_pagoda', 'red_cult': 'red_cult_high_priestess' };
-
-                    entities.push({
-                        id: `evil_base_${factionId}`,
-                        type: 'decoration', // 暂时作为装饰物展示，后期可扩展为特殊交互点
-                        spriteKey: iconKeys[factionId],
-                        x: ex, z: ez,
-                        scale: 2.5,
-                        config: { isEvilBase: true, faction: factionId, name: factionNames[factionId] }
-                    });
-
-                    console.log(`%c[势力] %c${factionNames[factionId]} 已在偏远地区 POI (${ex}, ${ez}) 扎根`, 'color: #ff4444; font-weight: bold', 'color: #fff');
-                }
-            });
         } else {
             // 兜底逻辑：如果地图上一个 POI 都没找到（理论上不应该），随机找一个草地
             console.warn("[WorldManager] 未能找到任何 POI 候选点，启动兜底随机出生逻辑");
@@ -1272,107 +1233,12 @@ export class WorldManager {
             }
         });
 
-        // C. 邪恶势力据点 (提供整套势力怪加成)
-        entities.forEach(ent => {
-            if (ent.config && ent.config.isEvilBase) {
-                this.mapState.influenceCenters.push({
-                    type: 'evil',
-                    faction: ent.config.faction,
-                    x: ent.x,
-                    z: ent.z,
-                    strength: 1200,
-                    radius: 60
-                });
-            }
-        });
-
         // --- 4. 随机实体生成 (回归：优雅的网格随机采样) ---
         // 这种方式能带来比泊松采样更自然的疏密变化，同时保留了新系统的所有特性
         const occupied = new Uint8Array(size * size); 
-        const playerSpawnX = this.mapState.playerPos.x;
-        const playerSpawnZ = this.mapState.playerPos.z;
-
-        for (let z = 0; z < size; z++) {
-            for (let x = 0; x < size; x++) {
-                // 1. 基础合法性检查
-                if (!generator.isSafeGrass(x, z)) continue;
-
-                // 2. 邻域互斥检查 (升级：扩大至 2 格半径，增加稀疏感)
-                let hasAdjacent = false;
-                for (let dz = -2; dz <= 2; dz++) {
-                    for (let dx = -2; dx <= 2; dx++) {
-                        if (dx === 0 && dz === 0) continue;
-                        const nx = x + dx, nz = z + dz;
-                        if (nx >= 0 && nx < size && nz >= 0 && nz < size) {
-                            if (occupied[nz * size + nx]) { hasAdjacent = true; break; }
-                        }
-                    }
-                    if (hasAdjacent) break;
-                }
-                if (hasAdjacent) continue;
-
-                const worldX = x - halfSize;
-                const worldZ = z - halfSize;
-
-                // 3. 安全区检查 (半径 10)
-                const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
-                let inCitySafetyZone = distToPlayer < 10;
-                if (!inCitySafetyZone) {
-                    for (const cityId in this.cities) {
-                        const city = this.cities[cityId];
-                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 10) {
-                            inCitySafetyZone = true; break;
-                        }
-                    }
-                }
-                if (inCitySafetyZone) continue;
-
-                // 4. 核心逻辑：结合动态密度进行概率判定
-                const roll = Math.random();
-                const density = this.getDensityMultiplier(worldX, worldZ);
-                
-                // 老版本基础概率对齐：敌人 0.25%，总概率 1.7%
-                const enemyProb = 0.0025 * density;
-
-                let placed = false;
-                if (roll < 0.002) {
-                    entities.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.003) {
-                    entities.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.005) {
-                    entities.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.0055) {
-                    const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
-                    entities.push({ 
-                        id: `${bType}_${x}_${z}`, type: 'captured_building', 
-                        spriteKey: bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2',
-                        buildingType: bType, x: worldX, z: worldZ,
-                        config: { owner: 'none', type: bType }
-                    });
-                    placed = true;
-                } else if (roll < 0.0055 + enemyProb) {
-                    const tId = this.getDynamicEnemyType(worldX, worldZ);
-                    const template = this.enemyTemplates[tId];
-                    const points = Math.max(1, Math.floor(template.basePoints * (0.95 + Math.random() * 0.1)));
-                    entities.push({ 
-                        id: `enemy_${x}_${z}`, type: 'enemy_group', templateId: tId, x: worldX, z: worldZ,
-                        config: { name: template.name, unitPool: template.unitPool, totalPoints: points }
-                    });
-                    placed = true;
-                } else if (roll < 0.0055 + enemyProb + 0.007) {
-                    entities.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
-                    placed = true;
-                } else if (roll < 0.0055 + enemyProb + 0.009) {
-                    entities.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
-                    placed = true;
-                }
-
-                if (placed) occupied[z * size + x] = 1;
-            }
-        }
+        
+        // 使用局部生成方法覆盖全图 (以 0,0 为中心，半径足够大覆盖全图)
+        this._generateEntitiesInArea(0, 0, size, generator, occupied, entities);
 
         // --- 5. 自动分配周边矿产逻辑 (圈地系统) ---
         // 规则：50米范围内的矿产自动归属于最近的敌方主城。
@@ -1412,6 +1278,248 @@ export class WorldManager {
         this.mapState.exploredMap = new Uint8Array(size * size);
 
         return this.mapState;
+    }
+
+    /**
+     * 在指定区域内局部生成/补全实体
+     * @param {number} centerX 世界坐标 X
+     * @param {number} centerZ 世界坐标 Z
+     * @param {number} radius 生成半径 (米)
+     * @param {Object} generator 地图生成器实例
+     * @param {Uint8Array} occupiedBuffer 占用缓冲区，用于避免重叠
+     * @param {Array} entitiesList 实体列表，生成的实体将被 push 进这里
+     */
+    _generateEntitiesInArea(centerX, centerZ, radius, generator, occupiedBuffer, entitiesList) {
+        const size = this.mapState.size || 400;
+        const halfSize = size / 2;
+        
+        // 将世界坐标转换为格点范围
+        const minX = Math.max(0, Math.floor(centerX - radius + halfSize));
+        const maxX = Math.min(size - 1, Math.ceil(centerX + radius + halfSize));
+        const minZ = Math.max(0, Math.floor(centerZ - radius + halfSize));
+        const maxZ = Math.min(size - 1, Math.ceil(centerZ + radius + halfSize));
+
+        const playerSpawnX = this.mapState.playerPos.x;
+        const playerSpawnZ = this.mapState.playerPos.z;
+
+        for (let z = minZ; z <= maxZ; z++) {
+            for (let x = minX; x <= maxX; x++) {
+                // 圆形区域检查
+                const worldX = x - halfSize;
+                const worldZ = z - halfSize;
+                const distSq = Math.pow(worldX - centerX, 2) + Math.pow(worldZ - centerZ, 2);
+                if (distSq > radius * radius) continue;
+
+                // 1. 基础合法性检查
+                if (!generator.isSafeGrass(x, z)) continue;
+
+                // 2. 邻域互斥检查
+                let hasAdjacent = false;
+                for (let dz = -2; dz <= 2; dz++) {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        if (dx === 0 && dz === 0) continue;
+                        const nx = x + dx, nz = z + dz;
+                        if (nx >= 0 && nx < size && nz >= 0 && nz < size) {
+                            if (occupiedBuffer[nz * size + nx]) { hasAdjacent = true; break; }
+                        }
+                    }
+                    if (hasAdjacent) break;
+                }
+                if (hasAdjacent) continue;
+
+                // 3. 安全区检查 (半径 10)
+                const distToPlayer = Math.sqrt(Math.pow(worldX - playerSpawnX, 2) + Math.pow(worldZ - playerSpawnZ, 2));
+                let inCitySafetyZone = distToPlayer < 10;
+                if (!inCitySafetyZone) {
+                    for (const cityId in this.cities) {
+                        const city = this.cities[cityId];
+                        if (Math.sqrt(Math.pow(worldX - city.x, 2) + Math.pow(worldZ - city.z, 2)) < 10) {
+                            inCitySafetyZone = true; break;
+                        }
+                    }
+                }
+                if (inCitySafetyZone) continue;
+
+                // 4. 核心逻辑：结合动态密度进行概率判定
+                const roll = Math.random();
+                const density = this.getDensityMultiplier(worldX, worldZ);
+                const enemyProb = 0.0025 * density;
+
+                let placed = false;
+                if (roll < 0.002) {
+                    entitiesList.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.003) {
+                    entitiesList.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.005) {
+                    entitiesList.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.0055) {
+                    const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
+                    entitiesList.push({ 
+                        id: `${bType}_${x}_${z}`, type: 'captured_building', 
+                        spriteKey: bType === 'gold_mine' ? 'gold_mine_v2' : 'sawmill_v2',
+                        buildingType: bType, x: worldX, z: worldZ,
+                        config: { owner: 'none', type: bType }
+                    });
+                    placed = true;
+                } else if (roll < 0.0055 + enemyProb) {
+                    const tId = this.getDynamicEnemyType(worldX, worldZ);
+                    const template = this.enemyTemplates[tId];
+                    if (template) {
+                        const points = Math.max(1, Math.floor(template.basePoints * (0.95 + Math.random() * 0.1)));
+                        entitiesList.push({ 
+                            id: `enemy_${x}_${z}`, type: 'enemy_group', templateId: tId, x: worldX, z: worldZ,
+                            config: { name: template.name, unitPool: template.unitPool, totalPoints: points }
+                        });
+                        placed = true;
+                    }
+                } else if (roll < 0.0055 + enemyProb + 0.007) {
+                    entitiesList.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.0055 + enemyProb + 0.009) {
+                    entitiesList.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
+                    placed = true;
+                }
+
+                if (placed) occupiedBuffer[z * size + x] = 1;
+            }
+        }
+    }
+
+    /**
+     * 【动态事件接口】在随机 POI 处降临邪恶势力
+     * @param {string} factionId 'tianyi' | 'shence' | 'red_cult'
+     */
+    spawnEvilBaseDynamic(factionId) {
+        if (!this.lastGenerator) return;
+        const generator = this.lastGenerator;
+        const size = this.mapState.size;
+        const halfSize = size / 2;
+        
+        // 1. 寻找未被占用的 POI
+        const occupiedLocations = [
+            ...Object.values(this.cities).map(c => ({x: c.x, z: c.z})),
+            ...this.mapState.entities.filter(e => e.config?.isEvilBase).map(e => ({x: e.x, z: e.z}))
+        ];
+
+        let availablePois = generator.pois.filter(poi => {
+            const wx = poi.x - halfSize;
+            const wz = poi.z - halfSize;
+            return !occupiedLocations.some(loc => Math.abs(loc.x - wx) < 15 && Math.abs(loc.z - wz) < 15);
+        });
+
+        if (availablePois.length === 0) {
+            console.warn("[WorldManager] 没有足够的空余 POI 放置邪恶势力");
+            return;
+        }
+
+        // 按离玩家距离排序，选最远的
+        const playerPos = this.mapState.playerPos;
+        availablePois.sort((a, b) => {
+            const distA = Math.pow(a.x - halfSize - playerPos.x, 2) + Math.pow(a.z - halfSize - playerPos.z, 2);
+            const distB = Math.pow(b.x - halfSize - playerPos.x, 2) + Math.pow(b.z - halfSize - playerPos.z, 2);
+            return distB - distA;
+        });
+
+        const targetPoi = availablePois[0];
+        const ex = targetPoi.x - halfSize;
+        const ez = targetPoi.z - halfSize;
+
+        // 2. 清理周边区域 (半径 60 米)
+        const clearRadius = 60;
+        this.mapState.entities = this.mapState.entities.filter(ent => {
+            const distSq = Math.pow(ent.x - ex, 2) + Math.pow(ent.z - ez, 2);
+            if (distSq < clearRadius * clearRadius && ent.type !== 'city') {
+                ent.isRemoved = true; 
+                return false;
+            }
+            return true;
+        });
+
+        // 3. 建立新的影响力中心
+        const factionNames = { 'tianyi': '天一教总坛', 'shence': '神策军营', 'red_cult': '红衣教祭坛' };
+        const iconKeys = { 'tianyi': 'tianyi_abomination', 'shence': 'shence_iron_pagoda', 'red_cult': 'red_cult_high_priestess' };
+
+        const newCenter = {
+            type: 'evil',
+            faction: factionId,
+            x: ex, z: ez,
+            strength: 1200,
+            radius: 60
+        };
+        this.mapState.influenceCenters.push(newCenter);
+
+        // 4. 放置据点实体
+        const baseEntity = {
+            id: `evil_base_${factionId}_${Date.now()}`,
+            type: 'decoration',
+            spriteKey: iconKeys[factionId],
+            x: ex, z: ez,
+            scale: 2.5,
+            config: { isEvilBase: true, faction: factionId, name: factionNames[factionId] }
+        };
+        this.mapState.entities.push(baseEntity);
+
+        // 5. 局部重新生成野怪
+        // 构建临时的 occupied 数组（基于当前实体位置）
+        const occupied = new Uint8Array(size * size);
+        this.mapState.entities.forEach(ent => {
+            if (ent.isRemoved) return;
+            const gx = Math.round(ent.x + halfSize);
+            const gz = Math.round(ent.z + halfSize);
+            if (gx >= 0 && gx < size && gz >= 0 && gz < size) {
+                occupied[gz * size + gx] = 1;
+            }
+        });
+
+        this._generateEntitiesInArea(ex, ez, clearRadius, generator, occupied, this.mapState.entities);
+
+        // 6. 触发全局播报
+        WorldStatusManager.triggerActiveEvent(`evil_rise_${factionId}`, {
+            title: '危机降临',
+            text: `由于近期流民增多，【${factionNames[factionId]}】乘虚而入，已在偏远荒野 (${Math.round(ex)}, ${Math.round(ez)}) 建立据点，其势力范围内的野怪变得更加狂暴！`,
+            type: 'major',
+            affectsSituation: true
+        });
+
+        // 7. 自动分配周边矿产
+        this.mapState.entities.forEach(entity => {
+            if (entity.type === 'captured_building' && entity.config.owner === 'none') {
+                const dSq = Math.pow(entity.x - ex, 2) + Math.pow(entity.z - ez, 2);
+                if (dSq < 50 * 50) {
+                    entity.config.owner = factionId;
+                    console.log(`%c[圈地] %c${entity.config.type} 已划归至新生成的敌方据点 ${factionNames[factionId]} 名下`, 'color: #888; font-style: italic', 'color: #fff');
+                }
+            }
+        });
+
+        // 通知场景层刷新
+        window.dispatchEvent(new CustomEvent('map-entities-updated'));
+    }
+
+    /**
+     * 【调试接口】立即触发一个随机邪恶势力降临
+     * 可在控制台调用：worldManager.debugSpawnEvil()
+     */
+    debugSpawnEvil(factionId = null) {
+        const evilFactions = ['tianyi', 'shence', 'red_cult'];
+        const currentFactions = this.mapState.entities
+            .filter(e => e.config?.isEvilBase && !e.isRemoved)
+            .map(e => e.config.faction);
+            
+        const available = evilFactions.filter(f => !currentFactions.includes(f));
+        
+        const target = factionId || available[Math.floor(Math.random() * available.length)];
+        
+        if (!target) {
+            console.warn("[Debug] 所有邪恶势力已全部降临，或没有可用的势力。");
+            return;
+        }
+        
+        console.log(`%c[Debug] 手动触发邪恶势力降临: ${target}`, "color: #ff00ff; font-weight: bold");
+        this.spawnEvilBaseDynamic(target);
     }
 
     /**
