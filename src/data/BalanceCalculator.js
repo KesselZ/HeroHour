@@ -73,7 +73,7 @@ function runBalanceCheck() {
     const k = 2.0 / baseline.score; 
 
     console.log(`\n=== 士兵单位属性平衡 analysis 报告 (经济效率增强版 v5) ===`);
-    const header = `${padRight("单位名称", 14)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Range".padEnd(5)} | ${"Zones".padEnd(10)} | ${"Cost".padEnd(4)} | ${"Gold".padEnd(5)} | ${"理论战力".padEnd(6)} | ${"统御平衡".padEnd(8)} | ${"经济效率"}`;
+    const header = `${padRight("单位名称", 14)} | ${"HP".padEnd(4)} | ${"综合DPS".padEnd(7)} | ${"Targets".padEnd(7)} | ${"Speed".padEnd(5)} | ${"Range".padEnd(5)} | ${"Zones".padEnd(10)} | ${"Cost".padEnd(4)} | ${"Gold".padEnd(5)} | ${"理论战力".padEnd(6)} | ${"统御平衡".padEnd(8)} | ${"经济效率"}`;
     console.log(`-`.repeat(header.length + 10));
     console.log(header);
     console.log(`-`.repeat(header.length + 10));
@@ -101,6 +101,8 @@ function runBalanceCheck() {
         const nameStr = padRight(unit.name, 14);
         const hpStr = (unit.hp || 0).toString().padEnd(4);
         const dpsStr = dps.toFixed(1).toString().padEnd(7);
+        const targetsStr = targets.toFixed(1).toString().padEnd(7);
+        const speedStr = (unit.speed || 0).toFixed(1).toString().padEnd(5);
         const rangeStr = (unit.range || 0).toString().padEnd(5);
         const zonesStr = (unit.zones || "N/A").padEnd(10);
         const costStr = (unit.cost || 0).toString().padEnd(4);
@@ -108,7 +110,7 @@ function runBalanceCheck() {
         const powerStr = theoreticalPower.toFixed(2).padEnd(6);
 
         // 颜色代码不计入宽度，所以手动对齐
-        console.log(`${nameStr} | ${hpStr} | ${dpsStr} | ${rangeStr} | ${zonesStr} | ${costStr} | ${goldStr} | ${powerStr} | ${balanceStr.padEnd(balance > 115 || balance < 85 ? 17 : 8)} | ${geStr}`);
+        console.log(`${nameStr} | ${hpStr} | ${dpsStr} | ${targetsStr} | ${speedStr} | ${rangeStr} | ${zonesStr} | ${costStr} | ${goldStr} | ${powerStr} | ${balanceStr.padEnd(balance > 115 || balance < 85 ? 17 : 8)} | ${geStr}`);
     }
 }
 

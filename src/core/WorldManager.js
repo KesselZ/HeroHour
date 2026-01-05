@@ -2648,6 +2648,7 @@ export class WorldManager {
         let baseBurst = blueprint.burstCount || 1;
         let baseInterval = blueprint.attackSpeed || 1000;
         let baseRange = blueprint.range;
+        let baseTargets = blueprint.targets || 1.0;
 
         if (blueprint.modes) {
             const modeKeys = Object.keys(blueprint.modes);
@@ -2660,6 +2661,7 @@ export class WorldManager {
             baseBurst = firstMode.burstCount || baseBurst;
             baseInterval = firstMode.attackSpeed || baseInterval;
             baseRange = firstMode.range || baseRange;
+            baseTargets = firstMode.targets || baseTargets;
         }
 
         // 1. 应用所有全局动态修正
@@ -2679,14 +2681,15 @@ export class WorldManager {
         const speedMult = modifierManager.getModifiedValue(dummyUnit, 'attackSpeed', 1.0);
         const finalInterval = baseInterval / speedMult;
         
-        // 2. DPS 换算
-        const dps = Math.ceil((finalAtk * baseBurst / finalInterval) * 1000);
+        // 2. DPS 换算 (引入 baseTargets 以支持 AOE 伤害显示)
+        const dps = Math.ceil((finalAtk * baseBurst * baseTargets / finalInterval) * 1000);
 
         return {
             ...blueprint,
             hp: finalHP,
             atk: Math.ceil(finalAtk),
             range: baseRange,
+            targets: baseTargets, // 显式返回目标数
             speed: finalSpeed,
             qinggong: finalQinggong || finalSpeed,
             dps: dps,
