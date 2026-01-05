@@ -2086,7 +2086,8 @@ export class WorldScene {
                     type: 'city',
                     x: city.x,
                     z: city.z,
-                    icon: city.getIconKey()
+                    icon: city.getIconKey(),
+                    isActivated: true // 玩家拥有的城市默认就是激活的可传送点
                 });
             }
         });
