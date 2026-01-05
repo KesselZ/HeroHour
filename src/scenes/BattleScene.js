@@ -1172,6 +1172,9 @@ export class BattleScene {
             case 'damage_number':
                 this.vfxLibrary.createDamageNumberVFX(pos || (unit ? unit.position.clone() : new THREE.Vector3()), options.value, color, options.scale || 1.0);
                 break;
+            case 'floating_text':
+                this.vfxLibrary.createFloatingTextVFX(pos || (unit ? unit.position.clone() : new THREE.Vector3()), options.text, color, options.scale || 1.0);
+                break;
         }
     }
 

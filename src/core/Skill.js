@@ -365,6 +365,15 @@ export class Skill {
     }
 
     _executeAction(action, battleScene, caster, center, skillPower, sourceCategory) {
+        // --- 核心优化：声明式延迟支持 ---
+        if (action.delay > 0 && !action._delayed) {
+            setTimeout(() => {
+                // 递归调用，标记已处理延迟，防止循环
+                this._executeAction({ ...action, delay: 0, _delayed: true }, battleScene, caster, center, skillPower, sourceCategory);
+            }, action.delay);
+            return;
+        }
+
         if (action.audio) {
             audioManager.play(action.audio, { force: true });
         }

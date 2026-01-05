@@ -1431,8 +1431,20 @@ export class HeroUnit extends BaseUnit {
     get cangjianStance() { return this._cangjianStance; }
     set cangjianStance(v) {
         if (this._cangjianStance === v) return;
+        const oldStance = this._cangjianStance;
         this._cangjianStance = v;
         
+        // --- 核心优化：姿态切换文字提示 ---
+        if (window.battle && window.battle.isActive) {
+            const text = v === 'heavy' ? '切换重剑' : '切换轻剑';
+            window.battle.playVFX('floating_text', { 
+                unit: this, 
+                text: text, 
+                color: '#ffffff', 
+                scale: 1.2 
+            });
+        }
+
         const details = worldManager.getUnitBlueprint('yeying');
         const m = details.modes;
         const modeKey = v === 'heavy' ? 'yeying_heavy' : 'yeying_light';

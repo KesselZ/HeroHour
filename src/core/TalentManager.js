@@ -83,13 +83,27 @@ class TalentManager {
                 if (action.type === 'movement') {
                     return { 
                         ...action, 
-                        // 这里直接注入一个二段伤害动作零件
-                        onComplete: { 
-                            type: 'damage_aoe', 
-                            value: 35, 
-                            targeting: { radius: 5.0 }, 
-                            color: 0xff8800 
-                        }
+                        // 注入一组带 500ms 延迟的动作零件
+                        onComplete: [
+                            {
+                                type: 'vfx',
+                                delay: 500, // 0.5秒延迟
+                                name: 'cangjian_whirlwind', // 复用现有旋风斩特效
+                                params: { 
+                                    color: 0xffcc00, 
+                                    radius: 5.0, 
+                                    duration: 500 
+                                }
+                            },
+                            { 
+                                type: 'damage_aoe', 
+                                delay: 500, // 与特效同步延迟
+                                value: 35, 
+                                targeting: { radius: 5.0 }, 
+                                color: 0xff8800,
+                                // 不设置 applyPowerToDamage: true，默认使用 totalSkillMult (受功法影响)
+                            }
+                        ]
                     };
                 }
                 return action;

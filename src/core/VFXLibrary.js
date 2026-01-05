@@ -1239,25 +1239,29 @@ export class VFXLibrary {
      * 显示跳字特效 (像素风)
      */
     createDamageNumberVFX(pos, value, color = '#ff3333', scale = 1.0) {
+        return this.createFloatingTextVFX(pos, Math.floor(value), color, scale);
+    }
+
+    /**
+     * 通用像素漂浮文字 (可用于切换姿态、技能名、状态提示等)
+     */
+    createFloatingTextVFX(pos, text, color = '#ffffff', scale = 1.0) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        // 使用较小的画布尺寸，配合 NearestFilter 可以产生更明显的像素感
-        canvas.width = 64;
+        canvas.width = 128; // 稍微加宽以容纳更长的中文字符
         canvas.height = 64;
 
         ctx.imageSmoothingEnabled = false;
-        
-        // 紧凑的像素风字体感
-        ctx.font = 'bold 32px "Courier New", monospace';
+        ctx.font = 'bold 24px "Courier New", monospace'; // 稍微调小字号适配文字长度
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 4;
-        ctx.strokeText(Math.floor(value), 32, 32);
+        ctx.strokeText(text, 64, 32);
         
         ctx.fillStyle = color;
-        ctx.fillText(Math.floor(value), 32, 32);
+        ctx.fillText(text, 64, 32);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.magFilter = THREE.NearestFilter;
@@ -1271,44 +1275,31 @@ export class VFXLibrary {
         const sprite = new THREE.Sprite(spriteMat);
         
         sprite.position.copy(pos);
-        sprite.position.y += 1.0; 
+        sprite.position.y += 1.2; // 比伤害数字稍微高一点点，防止重叠
         
-        sprite.position.x += (Math.random() - 0.5) * 0.3;
-        sprite.position.z += (Math.random() - 0.5) * 0.3;
+        sprite.position.x += (Math.random() - 0.5) * 0.2;
+        sprite.position.z += (Math.random() - 0.5) * 0.2;
 
-        const baseScale = 0.8 * scale;
-        sprite.scale.set(baseScale, baseScale, 1);
+        const baseScale = 1.0 * scale;
+        sprite.scale.set(baseScale * 2, baseScale, 1); // 宽度翻倍适配比例
         this.scene.add(sprite);
 
         const startTime = Date.now();
-        const duration = 800;
+        const duration = 1000; // 停留时间稍微长一点
         const startY = sprite.position.y;
-        const maxUpDist = 0.5; // 固定最大漂浮距离
+        const maxUpDist = 0.6;
         
         const anim = () => {
             const elapsed = Date.now() - startTime;
             const prg = Math.min(1, elapsed / duration);
 
             if (prg < 1) {
-                // 核心：基于进度的位置计算，不再依赖帧率累加
-                // 使用二次方淡出曲线，让动作更丝滑
                 const currentOffset = prg * (2 - prg) * maxUpDist;
                 sprite.position.y = startY + currentOffset;
                 
-                // 缩放动效：弹出感微调
-                let s;
-                if (prg < 0.2) {
-                    s = baseScale * (1 + prg * 1.5); // 稍微降低弹出强度
-                } else {
-                    s = baseScale * (1.3 - (prg - 0.2) * 0.3);
+                if (prg > 0.7) {
+                    spriteMat.opacity = 1 - (prg - 0.7) / 0.3;
                 }
-                sprite.scale.set(s, s, 1);
-
-                // 透明度淡出 (最后 40% 时间开始淡出)
-                if (prg > 0.6) {
-                    spriteMat.opacity = 1 - (prg - 0.6) / 0.4;
-                }
-
                 requestAnimationFrame(anim);
             } else {
                 this.scene.remove(sprite);
