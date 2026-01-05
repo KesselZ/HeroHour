@@ -2750,6 +2750,55 @@ export class CYTaixuDisciple extends BaseUnit {
     }
 }
 
+export class CYFieldMaster extends BaseUnit {
+    static displayName = '纯阳气场大师';
+    constructor(side, index, projectileManager) {
+        const stats = worldManager.getUnitBlueprint('cy_field_master');
+        super({ 
+            side, 
+            index, 
+            type: 'cy_field_master', 
+            hp: stats.hp,
+            speed: stats.speed,
+            attackRange: stats.range,
+            attackDamage: stats.atk,
+            attackSpeed: stats.attackSpeed,
+            projectileManager,
+            cost: stats.cost
+        });
+    }
+
+    performAttack(enemies) {
+        const now = Date.now();
+        if (now - this.lastAttackTime > this.attackCooldownTime && this.target) {
+            this.lastAttackTime = now;
+            this.onAttackAnimation();
+            audioManager.play('skill_field', { volume: 0.3 });
+
+            // 释放小型吞日月气场
+            if (window.battle) {
+                const targetPos = this.target.position.clone();
+                // 视觉特效：缩小版气场
+                window.battle.playVFX('field', { pos: targetPos, radius: 2.5, color: 0xff4444, duration: 2000 });
+                
+                // 逻辑效果：降低移速与伤害 (固定 15% 减速与减伤，不吃系数)
+                const areaTargets = window.battle.getUnitsInArea(targetPos, { shape: 'circle', radius: 2.5 }, this.side === 'player' ? 'enemy' : 'player');
+                window.battle.applyBuffToUnits(areaTargets, {
+                    stat: ['moveSpeed', 'attackDamage'],
+                    multiplier: [0.85, 0.85],
+                    duration: 2500,
+                    color: 0xff4444,
+                    vfxName: 'slow',
+                    tag: 'small_tunriyue'
+                });
+
+                // 造成一次基础攻击伤害
+                this.target.takeDamage(this.attackDamage, this.isHero);
+            }
+        }
+    }
+}
+
 // --- 藏剑扩充单位类 ---
 
 export class CJRetainer extends BaseUnit {
@@ -2861,6 +2910,7 @@ export class CJXinjian extends BaseUnit {
             projectileManager,
             cost: stats.cost
         });
+        this.penetrationCount = stats.penetration || 0;
     }
 
     performAttack(enemies) {
@@ -2876,7 +2926,8 @@ export class CJXinjian extends BaseUnit {
                 speed: 0.2, 
                 damage: this.attackDamage, 
                 type: 'air_sword',
-                color: 0xffcc00 // 金色剑气
+                color: 0xffcc00, // 金色剑气
+                penetration: this.penetrationCount
             });
         }
     }
@@ -3144,15 +3195,15 @@ export class TCBanner extends BaseUnit {
 
     updateAI(enemies, allies, deltaTime) {
         super.updateAI(enemies, allies, deltaTime);
-        
+
         const now = Date.now();
         if (now - this.lastBuffTime > this.buffInterval) {
             this.lastBuffTime = now;
-            // 激励光环：提升 8 米内友军 15% 攻速
+            // 战旗激励：提升 8 米内友军 15% 伤害
             if (window.battle) {
                 const affectedAllies = allies.filter(a => !a.isDead && a.position.distanceTo(this.position) < 8.0);
                 window.battle.applyBuffToUnits(affectedAllies, {
-                    stat: 'attackSpeed',
+                    stat: 'attackDamage',
                     multiplier: 1.15,
                     duration: 3000,
                     color: 0xffaa00,

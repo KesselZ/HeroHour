@@ -12,7 +12,7 @@ import {
     ShenceCavalry, ShenceOverseer, ShenceAssassin, ShenceIronPagoda,
     RedCultPriestess, RedCultHighPriestess, RedCultSwordsman, RedCultArcher,
     RedCultAssassin, RedCultFireMage, RedCultExecutioner, RedCultAcolyte, RedCultEnforcer,
-    HeroUnit, CYTwinBlade, CYSwordArray, CYZixiaDisciple, CYTaixuDisciple,
+    HeroUnit, CYTwinBlade, CYSwordArray, CYZixiaDisciple, CYTaixuDisciple, CYFieldMaster,
     CJRetainer, CJWenshui, CJShanju, CJXinjian, CJGoldenGuard, CJElder,
     TCCrossbow, TCBanner, TCDualBlade, TCHalberdier, TCShieldVanguard, TCMountedCrossbow, TCHeavyCavalry
 } from '../entities/Soldier.js';
@@ -78,6 +78,7 @@ const UnitTypeMap = {
     'cy_sword_array': CYSwordArray,
     'cy_zixia_disciple': CYZixiaDisciple,
     'cy_taixu_disciple': CYTaixuDisciple,
+    'cy_field_master': CYFieldMaster,
     'cj_retainer': CJRetainer,
     'cj_wenshui': CJWenshui,
     'cj_shanju': CJShanju,

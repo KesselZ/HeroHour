@@ -729,7 +729,7 @@ export class CityObject extends WorldObject {
         const pools = {
             'liwangsheng': [
                 'chunyang', 'cy_twin_blade', 'cy_sword_array', 
-                'cy_zixia_disciple', 'cy_taixu_disciple'
+                'cy_zixia_disciple', 'cy_taixu_disciple', 'cy_field_master'
             ],
             'lichengen': [
                 'tiance', 'tc_crossbow', 'tc_banner', 'tc_dual_blade', 

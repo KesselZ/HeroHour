@@ -32,10 +32,11 @@ const BUILDING_REGISTRY = {
     // --- 纯阳高级兵种建筑 ---
     'cy_array_pavilion': { name: '玄门阵亭', category: 'military', maxLevel: 5, icon: 'altar_v3', cost: { gold: 1200, wood: 600 }, description: '解锁【玄门阵法师】，随后每级增加全军玄门阵法师 10% 伤害与生命。', requirements: [{ id: 'mage_guild', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 600, wood: 300 } } },
     'cy_zixia_shrine': { name: '紫霞圣地', category: 'military', maxLevel: 5, icon: 'library_v3', cost: { gold: 1000, wood: 500 }, description: '解锁【紫霞功真传弟子】，随后每级增加全军紫霞功真传弟子 10% 伤害与生命。', requirements: [{ id: 'mage_guild', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 500, wood: 250 } } },
+    'cy_field_shrine': { name: '气场圣殿', category: 'military', maxLevel: 5, icon: 'altar_v3', cost: { gold: 1300, wood: 700 }, description: '解锁【纯阳气场大师】，随后每级增加全军纯阳气场大师 10% 伤害与生命。', requirements: [{ id: 'cy_array_pavilion', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 650, wood: 350 } } },
 
     // --- 天策高级兵种建筑 ---
-    'tc_halberd_hall': { name: '骁骑营', category: 'military', maxLevel: 5, icon: 'training_yard_v3', cost: { gold: 900, wood: 450 }, description: '解锁【持戟中郎将】与【天策双刃校尉】，随后每级增加对应兵种 10% 伤害与生命。', requirements: [{ id: 'stable', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 450, wood: 225 } } },
-    'tc_iron_camp': { name: '玄甲营', category: 'military', maxLevel: 5, icon: 'gate_fortress_v3', cost: { gold: 1500, wood: 800 }, description: '解锁【玄甲陷阵骑】，随后每级增加其 10% 伤害与生命。', requirements: [{ id: 'tc_halberd_hall', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 800, wood: 400 } } },
+    'tc_halberd_hall': { name: '骁骑营', category: 'military', maxLevel: 5, icon: 'training_yard_v3', cost: { gold: 900, wood: 450 }, description: '解锁【战旗使】与【持戟中郎将】，随后每级增加对应兵种 10% 伤害与生命。', requirements: [{ id: 'stable', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 450, wood: 225 } } },
+    'tc_iron_camp': { name: '玄甲营', category: 'military', maxLevel: 5, icon: 'gate_fortress_v3', cost: { gold: 1500, wood: 800 }, description: '解锁【骁骑弩手】，随后每级增加其 10% 伤害与生命。', requirements: [{ id: 'tc_halberd_hall', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 800, wood: 400 } } },
 
     // --- 藏剑高级兵种建筑 ---
     'cj_spirit_pavilion': { name: '灵峰剑阁', category: 'military', maxLevel: 5, icon: 'sect_cangjian_v3', cost: { gold: 1100, wood: 550 }, description: '解锁【灵峰侍剑师】，随后每级增加其 10% 伤害与生命。', requirements: [{ id: 'sword_forge', level: 1 }], costGrowth: { type: 'linear', increment: { gold: 550, wood: 275 } } },
@@ -66,7 +67,7 @@ const BUILDING_REGISTRY = {
  * 2. 门派蓝图：定义每个门派出身的城市所拥有的建筑列表
  */
 const BLUEPRINTS = {
-    'chunyang': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'medical_pavilion', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_chunyang_basic', 'sect_chunyang_advanced', 'sect_chunyang_ultimate', 'clinic', 'cy_array_pavilion', 'cy_zixia_shrine'],
+    'chunyang': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'medical_pavilion', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_chunyang_basic', 'sect_chunyang_advanced', 'sect_chunyang_ultimate', 'clinic', 'cy_array_pavilion', 'cy_zixia_shrine', 'cy_field_shrine'],
     'tiance': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_tiance_basic', 'sect_tiance_advanced', 'sect_tiance_ultimate', 'medical_pavilion', 'clinic', 'tc_halberd_hall', 'tc_iron_camp'],
     'cangjian': ['town_hall', 'market', 'inn', 'bank', 'trade_post', 'barracks', 'archery_range', 'stable', 'sword_forge', 'martial_shrine', 'mage_guild', 'spell_altar', 'sect_cangjian_basic', 'sect_cangjian_advanced', 'sect_cangjian_ultimate', 'medical_pavilion', 'clinic', 'cj_spirit_pavilion', 'cj_golden_hall']
 };
@@ -830,11 +831,12 @@ export class WorldManager {
             // 纯阳高级
             { type: 'cy_sword_array', requiredBuilding: 'cy_array_pavilion' },
             { type: 'cy_zixia_disciple', requiredBuilding: 'cy_zixia_shrine' },
+            { type: 'cy_field_master', requiredBuilding: 'cy_field_shrine' },
             
             // 天策高级
+            { type: 'tc_banner', requiredBuilding: 'tc_halberd_hall' },
             { type: 'tc_halberdier', requiredBuilding: 'tc_halberd_hall' },
-            { type: 'tc_dual_blade', requiredBuilding: 'tc_halberd_hall' },
-            { type: 'tc_heavy_cavalry', requiredBuilding: 'tc_iron_camp' },
+            { type: 'tc_mounted_crossbow', requiredBuilding: 'tc_iron_camp' },
             
             // 藏剑高级
             { type: 'cj_xinjian', requiredBuilding: 'cj_spirit_pavilion' },
@@ -1863,17 +1865,21 @@ export class WorldManager {
                         modifierManager.addModifier({ id: `city_${cityId}_cy_zixia_dmg`, side: 'player', unitType: 'cy_zixia_disciple', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
                         modifierManager.addModifier({ id: `city_${cityId}_cy_zixia_hp`, side: 'player', unitType: 'cy_zixia_disciple', stat: 'hp', multiplier: milMultiplier, source: 'building' });
                         break;
+                    case 'cy_field_shrine':
+                        modifierManager.addModifier({ id: `city_${cityId}_cy_field_dmg`, side: 'player', unitType: 'cy_field_master', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_cy_field_hp`, side: 'player', unitType: 'cy_field_master', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        break;
 
                     // --- 天策高级 ---
                     case 'tc_halberd_hall':
+                        modifierManager.addModifier({ id: `city_${cityId}_tc_banner_dmg`, side: 'player', unitType: 'tc_banner', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_tc_banner_hp`, side: 'player', unitType: 'tc_banner', stat: 'hp', multiplier: milMultiplier, source: 'building' });
                         modifierManager.addModifier({ id: `city_${cityId}_tc_halberdier_dmg`, side: 'player', unitType: 'tc_halberdier', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
                         modifierManager.addModifier({ id: `city_${cityId}_tc_halberdier_hp`, side: 'player', unitType: 'tc_halberdier', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_dual_dmg`, side: 'player', unitType: 'tc_dual_blade', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_dual_hp`, side: 'player', unitType: 'tc_dual_blade', stat: 'hp', multiplier: milMultiplier, source: 'building' });
                         break;
                     case 'tc_iron_camp':
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_heavy_dmg`, side: 'player', unitType: 'tc_heavy_cavalry', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_heavy_hp`, side: 'player', unitType: 'tc_heavy_cavalry', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_tc_crossbow_dmg`, side: 'player', unitType: 'tc_mounted_crossbow', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                        modifierManager.addModifier({ id: `city_${cityId}_tc_crossbow_hp`, side: 'player', unitType: 'tc_mounted_crossbow', stat: 'hp', multiplier: milMultiplier, source: 'building' });
                         break;
 
                     // --- 藏剑高级 ---

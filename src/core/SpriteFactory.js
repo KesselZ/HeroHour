@@ -276,6 +276,7 @@ export const ASSET_REGISTRY = {
         'cy_sword_array': { name: '玄门阵法师', sheet: 'CHUNYANG', rows: 4, cols: 4, r: 2, c: 4, scale: 1.5, defaultFacing: 'right' },
         'cy_zixia_disciple': { name: '紫霞功真传弟子', sheet: 'CHUNYANG3', rows: 4, cols: 4, r: 3, c: 1, scale: 1.4, defaultFacing: 'right' },
         'cy_taixu_disciple': { name: '太虚剑意真传弟子', sheet: 'CHUNYANG3', rows: 4, cols: 4, r: 2, c: 1, scale: 1.5, defaultFacing: 'right' },
+        'cy_field_master': { name: '纯阳气场大师', sheet: 'CHUNYANG2', rows: 4, cols: 4, r: 3, c: 4, scale: 1.6, defaultFacing: 'right' },
 
         // --- 天策扩充势力单位 ---
         'tc_crossbow': { name: '天策羽林弩手', sheet: 'TIANCE', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'right' },

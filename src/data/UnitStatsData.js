@@ -32,7 +32,7 @@ export const UNIT_STATS_DATA = {
     'cj_retainer': { name: '藏剑入门弟子', hp: 130, atk: 12, range: 1.2, rangeType: '近战', speed: 4.2, attackSpeed: 1000, targets: 1.0, allowedZones: ['front'], description: '藏剑山庄的入门弟子，虽年轻但剑法扎实。' },
     'cj_wenshui': { name: '问水剑客', hp: 190, atk: 11, range: 1.2, rangeType: '爆发', speed: 4.7, attackSpeed: 1000, targets: 1.0, burstCount: 2, allowedZones: ['front'], description: '手持轻剑，身姿轻盈，能瞬间发动多段刺击。' },
     'cj_shanju': { name: '山居力士', hp: 280, atk: 22, range: 1.8, rangeType: '近战AOE', speed: 3.2, attackSpeed: 1500, targets: 2.0, allowedZones: ['front'], description: '手持重剑，力大无穷，横扫千军。' },
-    'cj_xinjian': { name: '灵峰侍剑师', hp: 320, atk: 28, range: 12.0, rangeType: '远程', speed: 3.8, attackSpeed: 1200, targets: 1.0, allowedZones: ['middle'], description: '藏剑门客，感悟西湖灵峰剑意，能凝聚金色气剑点射敌军。' },
+    'cj_xinjian': { name: '灵峰侍剑师', hp: 320, atk: 28, range: 12.0, rangeType: '远程', speed: 3.8, attackSpeed: 1200, targets: 1.8, penetration: 2, allowedZones: ['middle'], description: '藏剑门客，感悟西湖灵峰剑意，能凝聚金色气剑点射敌军。' },
     'cj_golden_guard': { name: '黄金剑卫', hp: 480, atk: 14, range: 1.2, rangeType: '重装', speed: 2.8, attackSpeed: 1200, mass: 3.0, targets: 1.0, allowedZones: ['front'], description: '身披金甲，不动如山，是藏剑最坚固的盾。' },
     'cj_elder': { name: '剑庐大长老', hp: 780, atk: 18, range: 2.5, rangeType: 'AOE旋风', speed: 3.5, attackSpeed: 2000, targets: 5.0, allowedZones: ['front'], description: '剑庐长老，周身剑气纵横，旋风斩毁灭一切。' },
 
@@ -41,6 +41,7 @@ export const UNIT_STATS_DATA = {
     'cy_sword_array': { name: '玄门阵法师', hp: 420, atk: 26, range: 15.0, rangeType: '穿透', speed: 3.2, attackSpeed: 1800, targets: 1.0, burstCount: 2, allowedZones: ['back'], description: '纯阳高徒，精通北斗阵法，发射具有强大穿透力的玄门剑气。' },
     'cy_zixia_disciple': { name: '紫霞功真传弟子', hp: 240, atk: 10, range: 12.0, rangeType: '远程爆发', speed: 3.5, attackSpeed: 1200, targets: 3.0, burstCount: 3, allowedZones: ['middle'], description: '气宗真传，能够连续发射三枚气剑压制敌人。' },
     'cy_taixu_disciple': { name: '太虚剑意真传弟子', hp: 320, atk: 12, range: 1.5, rangeType: '近战AOE', speed: 4.0, attackSpeed: 750, targets: 2.5, allowedZones: ['front'], description: '剑宗高手，重剑横扫，造成范围伤害。' },
+    'cy_field_master': { name: '纯阳气场大师', hp: 350, atk: 15, range: 10.0, rangeType: '小型吞日月', speed: 3.0, attackSpeed: 3000, targets: 1.0, allowedZones: ['middle'], description: '纯阳高手，会对敌军释放小型吞日月气场，降低敌人的移速与伤害。' },
     
     // --- 野外单位 ---
     'wild_boar': { name: '野猪', hp: 100, atk: 8, range: 1.2, rangeType: '冲撞', speed: 4.0, attackSpeed: 1000, targets: 1.0, allowedZones: ['front'] },
@@ -93,7 +94,7 @@ export const UNIT_STATS_DATA = {
 
     // --- 天策扩充势力 (强度/Cost 4-15) ---
     'tc_crossbow': { name: '天策羽林弩手', hp: 140, atk: 32, range: 18.0, rangeType: '远程', speed: 3.2, attackSpeed: 2800, targets: 1.5, allowedZones: ['back'], description: '威力巨大的劲弩，装填虽慢但足以致命。' },
-    'tc_banner': { name: '天策战旗使', hp: 700, atk: 12, range: 5.0, rangeType: '辅助', speed: 3.5, attackSpeed: 2000, targets: 1.0, allowedZones: ['middle'], description: '天策之魂，能够显著激励周围友军的斗志。' },
+    'tc_banner': { name: '天策战旗使', hp: 700, atk: 12, range: 5.0, rangeType: '辅助', speed: 3.5, attackSpeed: 2000, targets: 1.0, allowedZones: ['middle'], description: '天策之魂，每3秒提升周围8米友军15%伤害，持续3秒。' },
     'tc_dual_blade': { name: '天策双刃校尉', hp: 240, atk: 14, range: 1.2, rangeType: '近战', speed: 4.8, attackSpeed: 600, targets: 1.0, allowedZones: ['front'], description: '双刀挥舞如风，天策府中的突击尖兵。' },
     'tc_halberdier': { name: '持戟中郎将', hp: 420, atk: 22, range: 2.8, rangeType: '中程群伤', speed: 3.8, attackSpeed: 1600, targets: 2.0, allowedZones: ['front'], description: '长戟所到之处，敌军人仰马翻。' },
     'tc_shield_vanguard': { name: '天策前锋', hp: 720, atk: 16, range: 1.2, rangeType: '重装坦克', speed: 2.8, attackSpeed: 1200, mass: 3.0, targets: 1.0, allowedZones: ['front'], description: '身披厚甲持重盾，是天策阵地最稳固的前锋。' },
@@ -191,10 +192,11 @@ export const UNIT_COSTS = {
     'cy_sword_array': { gold: 380, cost: 11 },
     'cy_zixia_disciple': { gold: 300, cost: 10 },
     'cy_taixu_disciple': { gold: 260, cost: 8 },
+    'cy_field_master': { gold: 450, cost: 12 },
 
     // --- 天策扩充势力消耗 ---
     'tc_crossbow': { gold: 120, cost: 4 },
-    'tc_banner': { gold: 180, cost: 6 },
+    'tc_banner': { gold: 180, cost: 8 },
     'tc_dual_blade': { gold: 150, cost: 5 },
     'tc_halberdier': { gold: 250, cost: 7 },
     'tc_shield_vanguard': { gold: 300, cost: 8 },
