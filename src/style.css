@@ -2033,10 +2033,12 @@ img {
     flex-direction: column;
     gap: 10px;
     background: #f4f0e0;
+    height: 800px; /* 核心：设定固定高度，实现内容与面板尺寸的彻底解耦 */
     max-height: 96vh;
     border: 6px solid var(--jx3-celadon);
     outline: 2px solid var(--jx3-gold);
     box-sizing: border-box;
+    position: relative; /* 确保内部绝对定位正常 */
 }
 
 .town-header-top-v3 {
@@ -2107,8 +2109,8 @@ img {
     display: grid;
     grid-template-columns: 1fr 320px;
     gap: 12px;
-    min-height: 0;
-    flex-grow: 1;
+    flex: 1; /* 核心：自动填满面板剩余垂直空间 */
+    min-height: 0; /* 关键：允许 flex 子元素在空间不足时收缩并触发滚动 */
 }
 
 /* 建筑规划区块 */
@@ -2119,6 +2121,7 @@ img {
     border: 2px solid var(--jx3-celadon);
     border-radius: var(--radius-md);
     overflow: hidden;
+    height: 100%;
 }
 
 .construction-container {
@@ -2127,6 +2130,7 @@ img {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    flex: 1; /* 撑满父容器空间 */
 }
 
 .construction-category {
@@ -2260,6 +2264,7 @@ img {
     border-radius: var(--radius-md);
     overflow: hidden;
     transition: var(--transition-base);
+    height: 100%;
 }
 
 .recruit-list-v3 {
@@ -2268,6 +2273,7 @@ img {
     flex-direction: column;
     gap: 10px;
     overflow-y: auto;
+    flex: 1; /* 核心：独立滚动空间，不再受建筑列表长度影响 */
 }
 
 .recruit-item {
