@@ -1723,6 +1723,8 @@ export class WorldScene {
     _updateLevelUpFeedback() {
         if (worldManager.heroData.pendingLevelUps > 0) {
             this.vfxLibrary.createLevelUpVFX(this.playerGroup.position);
+            // 核心修复：添加 3D 场景中的“境界提升”文字特效
+            this.vfxLibrary.createFloatingTextVFX(this.playerGroup.position, "境界提升", "#ffd700", 1.5);
             audioManager.play('source_levelup', { volume: 0.8 });
             worldManager.heroData.pendingLevelUps--;
             console.log("%c[升级反馈] 已在大世界触发视觉特效", "color: #ffd700; font-weight: bold");
@@ -1890,6 +1892,16 @@ export class WorldScene {
                 this.refreshWorldHUD();
             } else {
                 // 普通野怪胜利：移除怪物
+                const entity = worldManager.mapState.entities.find(e => e.id === enemyId);
+                if (entity && entity.templateId) {
+                    // 检查是否属于邪恶势力的小怪 (天一、神策、红衣)
+                    const evilFactions = ['tianyi', 'shence', 'red_cult'];
+                    const faction = evilFactions.find(f => entity.templateId.startsWith(f));
+                    if (faction) {
+                        // 触发首次击败通报 (内部会处理去重)
+                        WorldStatusManager.broadcastFirstKill(faction);
+                    }
+                }
                 worldManager.removeEntity(enemyId);
                 const item = this.interactables.find(i => i.id === enemyId);
                 if (item) this.scene.remove(item.mesh);

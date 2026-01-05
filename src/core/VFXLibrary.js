@@ -114,9 +114,61 @@ export class VFXLibrary {
 
     /**
      * 通用粒子系统发射器
+     * 支持基于时间的发射、自定义几何体、初始状态和逐帧更新
      */
     createParticleSystem(options) {
-        // ...
+        const { 
+            pos = new THREE.Vector3(), 
+            parent = null, // 新增：支持指定父容器（如单位自身）
+            color = 0xffffff, 
+            duration = 1000, 
+            density = 1,
+            spawnRate = 100,
+            geometry = null,
+            initFn = (p) => {},
+            updateFn = (p, progress) => {}
+        } = options;
+
+        const actualParent = parent || this.scene;
+        const group = new THREE.Group();
+        group.position.copy(pos);
+        actualParent.add(group);
+
+        const pGeo = geometry || new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        const startTime = Date.now();
+
+        const interval = setInterval(() => {
+            if (Date.now() - startTime > duration) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    actualParent.remove(group);
+                    if (!geometry) pGeo.dispose();
+                }, 1500);
+                return;
+            }
+
+            const count = Math.ceil(2 * density);
+            for (let i = 0; i < count; i++) {
+                const pMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
+                const p = new THREE.Mesh(pGeo, pMat);
+                initFn(p);
+                group.add(p);
+
+                const pStart = Date.now();
+                const pDur = 500 + Math.random() * 500;
+                const anim = () => {
+                    const progress = (Date.now() - pStart) / pDur;
+                    if (progress < 1) {
+                        updateFn(p, progress);
+                        requestAnimationFrame(anim);
+                    } else {
+                        group.remove(p);
+                        pMat.dispose();
+                    }
+                };
+                anim();
+            }
+        }, spawnRate);
     }
 
     /**

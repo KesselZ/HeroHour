@@ -1989,6 +1989,8 @@ export class WorldManager {
 
         if (msg) {
             console.log(`%c[交互] %c${msg}`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
+            // 核心修复：将拾取提示显示在 UI 通知栏
+            this.showNotification(msg);
         }
 
         return reward;
@@ -2104,6 +2106,12 @@ export class WorldManager {
         }
         
         console.log(`%c[占领] %c${name} (${id}) 现在归属于 ${ownerName}`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        
+        // 核心修复：添加占领成功提示
+        if (newOwner === 'player') {
+            const icon = config.type === 'gold_mine' ? '💰' : (config.type === 'sawmill' ? '🪵' : '⛩️');
+            this.showNotification(`成功占领 ${icon}${name}！`);
+        }
         
         // 触发 UI 刷新或特效
         window.dispatchEvent(new CustomEvent('building-captured', { detail: { id, type: config.type, owner: newOwner } }));

@@ -13,7 +13,7 @@ export class WorldStatusManager {
     // --- 0. 频率控制超参数 ---
     static CONFIG = {
         SEASONAL_EXPECTATION: 0.8,      // 正常模式：每季度期望发生的逻辑事件总数
-        ATMOSPHERIC_EXPECTATION_PER_MIN: 1.5, // 正常模式：每分钟期望发生的氛围传闻总数
+        ATMOSPHERIC_EXPECTATION_PER_MIN: 0.75, // 正常模式：每分钟期望发生的氛围传闻总数 (降低一倍)
         DEBUG_MULTIPLIER: 8             // Debug 模式下的概率倍率
     };
 
@@ -26,24 +26,38 @@ export class WorldStatusManager {
 
     // 能够改变“局势描述”的重大事件定义
     static MAJOR_SITUATION_MODIFIERS = {
-        'defeated_rebel_leader': " 随着叛军首领落马，各州郡的压力稍有缓解，但残余势力仍在暗中窥伺。",
         'captured_main_city': " 阁下收复重镇之举震动朝野，百姓夹道欢迎，江湖威望已达巅峰！",
-        'first_winter_passed': " 熬过了最严酷的寒冬，各派势力开始复苏，新的平衡正在达成。"
+        'first_winter_passed': " 熬过了最严酷的寒冬，各派势力开始复苏，新的平衡正在达成。",
+        'first_tianyi_kill': " 侠客首次重创天一教先遣队的壮举传遍武林，各大门派深受鼓舞，已公开悬赏缉拿其门徒。",
+        'first_shence_kill': " 侠客正面击溃神策军叛军的消息震动朝野，天策府已发出江湖密令，号召天下豪杰共同讨逆。",
+        'first_red_cult_kill': " 侠客挫败红衣教邪道祭礼的消息不胫而走，武林正道已集结势力，誓要将其连根拔起。"
     };
 
     // 邪恶势力独特的江湖通报文案
     static EVIL_FACTION_BROADCASTS = {
         'tianyi': {
             title: '幽冥剧毒',
-            text: '腥红毒雾已彻底封锁荒野深处，【天一教】的尸傀大军正在疯狂扩张，所过之处寸草不生，生灵绝迹！'
+            text: '腥红毒雾已彻底封锁荒野深处，【天一教】的尸傀大军正在疯狂扩张，所过之处寸草不生，生灵绝迹！',
+            firstKill: {
+                title: '武林悬赏',
+                text: '侠客首次正面重创【天一教】！此举震动武林，各大门派已公开悬赏，正式开启全面抗击天一教的战争！'
+            }
         },
         'shence': {
             title: '禁军压境',
-            text: '玄甲铁骑的军旗已插遍荒野，【神策军】叛军封锁了所有命脉要道，正暴力搜刮每一寸土地，违令者杀无赦！'
+            text: '玄甲铁骑的军旗已插遍荒野，【神策军】叛军封锁了所有命脉要道，正暴力搜刮每一寸土地，违令者杀无赦！',
+            firstKill: {
+                title: '讨逆檄文',
+                text: '侠客竟正面击溃了【神策军】的先锋！天策府统领李承恩深感欣慰，已向全江湖发布讨逆檄文，誓要肃清叛逆！'
+            }
         },
         'red_cult': {
             title: '血色祭礼',
-            text: '恐怖的邪力正在荒野中心沸腾，【红衣教】的血色祭坛已经开启，方圆数里的生机已被祭礼强行掠夺，沦为焦土！'
+            text: '恐怖的邪力正在荒野中心沸腾，【红衣教】的血色祭坛已经开启，方圆数里的生机已被祭礼强行掠夺，沦为焦土！',
+            firstKill: {
+                title: '正道齐心',
+                text: '侠客挫败了【红衣教】的血色阴谋！武林各派英雄群情激昂，已集结精锐力量，开始围剿红衣教据点！'
+            }
         }
     };
 
@@ -51,6 +65,7 @@ export class WorldStatusManager {
     static activeSituationKeys = new Set(); // 当前生效的重大局势 ID
     static eventHistory = [];               // 所有的传闻播报历史
     static usedEvilFactions = new Set();    // 永久记录已经登场过的势力 ID
+    static firstKillFactions = new Set();   // 永久记录已经完成“首杀”的势力 ID
     static seasonalEventWeights = {};       // 季节事件的动态权重 (触发后衰减)
 
     // --- 3. 事件池定义 ---
@@ -207,6 +222,25 @@ export class WorldStatusManager {
         this.triggerActiveEvent(`evil_rise_${factionId}`, {
             title: config.title,
             text: config.text,
+            type: 'major',
+            affectsSituation: true
+        });
+    }
+
+    /**
+     * 触发势力首次被击败（小怪）的独特播报
+     */
+    static broadcastFirstKill(factionId) {
+        if (this.firstKillFactions.has(factionId)) return;
+
+        const config = this.EVIL_FACTION_BROADCASTS[factionId];
+        if (!config || !config.firstKill) return;
+
+        this.firstKillFactions.add(factionId);
+
+        this.triggerActiveEvent(`first_${factionId}_kill`, {
+            title: config.firstKill.title,
+            text: config.firstKill.text,
             type: 'major',
             affectsSituation: true
         });
@@ -480,6 +514,7 @@ export class WorldStatusManager {
             activeSituationKeys: Array.from(this.activeSituationKeys),
             eventHistory: this.eventHistory,
             usedEvilFactions: Array.from(this.usedEvilFactions), // 记录已登场的势力
+            firstKillFactions: Array.from(this.firstKillFactions), // 记录已首杀的势力
             seasonalEventWeights: this.seasonalEventWeights, // 记录季节事件权重
             flavorPoolWeights: this.ATMOSPHERIC_FLAVOR_POOL.map(e => e.weight)
         };
@@ -501,6 +536,10 @@ export class WorldStatusManager {
 
         if (data.usedEvilFactions) {
             this.usedEvilFactions = new Set(data.usedEvilFactions);
+        }
+
+        if (data.firstKillFactions) {
+            this.firstKillFactions = new Set(data.firstKillFactions);
         }
 
         if (data.seasonalEventWeights) {
