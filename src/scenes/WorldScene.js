@@ -2016,6 +2016,12 @@ export class WorldScene {
     closeTeleportMenu() {
         const panel = document.getElementById('teleport-panel');
         if (panel) panel.classList.add('hidden');
+        
+        // 核心修复：如果有关联的祭坛，添加交互锁，防止由于站在祭坛上导致立即重复开启
+        if (this.activeAltarId) {
+            worldManager.mapState.interactionLocks.add(this.activeAltarId);
+        }
+        
         this.activeAltarId = null;
 
         // --- 手机端适配：恢复 HUD ---
@@ -2095,7 +2101,9 @@ export class WorldScene {
 
         worldManager.mapState.entities.forEach(entity => {
             if (entity.type === 'captured_building' && entity.buildingType === 'teleport_altar') {
-                const isActivated = entity.config.owner !== 'none';
+                const owner = entity.config.owner || 'none';
+                const isActivated = owner === 'player';
+                const isEnemyOccupied = owner !== 'none' && owner !== 'player';
                 const suffix = entity.id.split('_').pop(); // 获取 TL, TR, BL, BR
                 
                 destinations.push({
@@ -2105,7 +2113,8 @@ export class WorldScene {
                     x: entity.x,
                     z: entity.z,
                     icon: 'spell_altar_v2',
-                    isActivated: isActivated
+                    isActivated: isActivated,
+                    isEnemyOccupied: isEnemyOccupied
                 });
             }
         });
@@ -2113,10 +2122,17 @@ export class WorldScene {
         // 渲染列表
         destinations.forEach(dest => {
             const card = document.createElement('div');
-            // 恢复正常逻辑：未激活的祭坛显示锁定状态
-            card.className = `teleport-dest-card ${dest.isActivated === false ? 'is-locked' : ''}`;
+            // 恢复正常逻辑：未激活或被敌人占据的祭坛显示锁定状态
+            card.className = `teleport-dest-card ${!dest.isActivated ? 'is-locked' : ''}`;
             
-            const statusText = dest.type === 'city' ? '城池' : (dest.isActivated ? '已激活' : '尚未激活');
+            let statusText = '未知';
+            if (dest.type === 'city') {
+                statusText = '城池';
+            } else {
+                if (dest.isActivated) statusText = '已占领';
+                else if (dest.isEnemyOccupied) statusText = '被敌方占据';
+                else statusText = '未激活';
+            }
             
             card.innerHTML = `
                 <div class="teleport-dest-icon" style="${this.getIconStyleString(dest.icon)}"></div>
@@ -2127,8 +2143,12 @@ export class WorldScene {
             `;
 
             card.onclick = () => {
-                if (dest.isActivated === false) {
-                    worldManager.showNotification("该祭坛尚未激活，无法传送。");
+                if (!dest.isActivated) {
+                    if (dest.isEnemyOccupied) {
+                        worldManager.showNotification("该祭坛被敌方势力占据，无法传送。");
+                    } else {
+                        worldManager.showNotification("该祭坛尚未激活，无法传送。");
+                    }
                     audioManager.play('ui_invalid', { volume: 0.8 });
                     return;
                 }

@@ -805,10 +805,14 @@ export class CapturedBuildingObject extends WorldObject {
 
         // 2. 如果是神行祭坛，额外开启传送界面
         if (this.buildingType === 'teleport_altar') {
-            // 延迟一小会儿，确保占领通知能被看到
-            setTimeout(() => {
-                worldScene.openTeleportMenu(this.id);
-            }, 100);
+            // 核心修复：防止重复开启传送菜单导致按钮失效 (DOM 刷新频率过快)
+            if (worldScene.activeAltarId !== this.id) {
+                worldScene.activeAltarId = this.id; // 立即标记，防止在 100ms 延迟期间重复进入
+                // 延迟一小会儿，确保占领通知能被看到
+                setTimeout(() => {
+                    worldScene.openTeleportMenu(this.id);
+                }, 100);
+            }
         }
         
         return false;
