@@ -6,8 +6,7 @@ import { rng } from './Random.js';
 export const TILE_TYPES = {
     WATER: 'water',       // 河流 (不可通行)
     GRASS: 'grass',       // 草地 (可通行)
-    MOUNTAIN: 'mountain', // 山脉 (不可通行)
-    POI: 'poi'            // 聚落点标记 (可通行，视觉标记为青色)
+    MOUNTAIN: 'mountain'  // 山脉 (不可通行)
 };
 
 /**
@@ -88,7 +87,6 @@ export class MapGenerator {
 
         // 寻找并标记聚落兴趣点 (POIs)
         const pois = this.findPOICandidates(10);
-        this.markPOIs(pois);
         this.pois = pois; 
 
         return this.grid;
@@ -122,8 +120,8 @@ export class MapGenerator {
                 const nz = gridZ + dz;
                 if (nx < 0 || nx >= this.size || nz < 0 || nz >= this.size) return false;
                 const type = this.grid[nz][nx];
-                // 允许在普通草地和聚落平原（POI）上生成物体
-                if (type !== TILE_TYPES.GRASS && type !== TILE_TYPES.POI) return false;
+                // 仅允许在普通草地上生成物体
+                if (type !== TILE_TYPES.GRASS) return false;
             }
         }
         return true;
@@ -147,8 +145,8 @@ export class MapGenerator {
 
         for (const p of points) {
             const type = this.getTileType(p.x, p.z);
-            // 草地和聚落标记点均可通行
-            if (type !== TILE_TYPES.GRASS && type !== TILE_TYPES.POI) {
+            // 仅草地可通行
+            if (type !== TILE_TYPES.GRASS) {
                 return false;
             }
         }
@@ -220,28 +218,6 @@ export class MapGenerator {
             }
         }
         return finalPois;
-    }
-
-    /**
-     * 将聚落标记在 grid 上
-     * 视觉标记半径根据实际平原大小动态调整
-     */
-    markPOIs(pois) {
-        pois.forEach(poi => {
-            const visualR = Math.floor(poi.radius * 0.8);
-            for (let dz = -visualR; dz <= visualR; dz++) {
-                for (let dx = -visualR; dx <= visualR; dx++) {
-                    if (dx*dx + dz*dz > visualR*visualR) continue;
-                    const nx = poi.x + dx;
-                    const nz = poi.z + dz;
-                    if (nx >= 0 && nx < this.size && nz >= 0 && nz < this.size) {
-                        if (this.grid[nz][nx] === TILE_TYPES.GRASS) {
-                            this.grid[nz][nx] = TILE_TYPES.POI;
-                        }
-                    }
-                }
-            }
-        });
     }
 
     /**

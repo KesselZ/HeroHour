@@ -1476,6 +1476,23 @@ export class WorldManager {
 
         this._generateEntitiesInArea(ex, ez, clearRadius, generator, occupied, this.mapState.entities);
 
+        // --- 核心修正：根据势力背景精准分配地形样式 ---
+        // 天一教 -> 深紫腐蚀 (evil)
+        // 神策军 -> 凄凉战乱 (shence)
+        // 红衣教 -> 枫华谷金秋 (autumn)
+        let style = 'evil';
+        if (factionId === 'shence') style = 'shence';
+        else if (factionId === 'red_cult') style = 'autumn';
+
+        window.dispatchEvent(new CustomEvent('terrain-style-change', {
+            detail: {
+                x: ex,
+                z: ez,
+                radius: clearRadius,
+                style: style
+            }
+        }));
+
         // 6. 触发全局播报
         WorldStatusManager.triggerActiveEvent(`evil_rise_${factionId}`, {
             title: '危机降临',

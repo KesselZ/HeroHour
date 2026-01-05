@@ -5,6 +5,7 @@ import { WorldManager, worldManager } from '../core/WorldManager.js'; // 引入�
 import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
 import { timeManager } from '../core/TimeManager.js';
 import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
+import { terrainManager, TERRAIN_STYLES } from '../core/TerrainManager.js';
 import { createWorldObject, PlayerObject } from '../entities/WorldObjects.js';
 import { VFXLibrary } from '../core/VFXLibrary.js'; // 核心引入
 import { Pathfinder } from '../core/Pathfinder.js';
@@ -36,6 +37,7 @@ export class WorldScene {
         this.footstepInterval = 650;        
         // 交互控制
         this.interactables = [];
+        this.worldObjects = new Map(); // 新增：记录 ID 与实体的映射，用于动态同步
         this.activeCityId = null;        
         this.floatingStack = 0;          
         
@@ -169,15 +171,56 @@ export class WorldScene {
      */
     renderWorldEntities(entities) {
         entities.forEach(data => {
-            if (data.isRemoved) return; // 跳过已被捡走的
+            this.syncEntity(data);
+        });
+    }
 
+    /**
+     * 同步单个实体的状态（新增或移除）
+     */
+    syncEntity(data) {
+        const existing = this.worldObjects.get(data.id);
+
+        if (data.isRemoved) {
+            // 如果标记为移除，且场景中存在，则清理它
+            if (existing) {
+                existing.removeFromScene(this.scene);
+                this.worldObjects.delete(data.id);
+                this.interactables = this.interactables.filter(obj => obj.id !== data.id);
+            }
+            return;
+        }
+
+        // 如果不存在且未被移除，则创建并添加
+        if (!existing) {
             const worldObj = createWorldObject(data);
             worldObj.spawn(this.scene);
+            this.worldObjects.set(data.id, worldObj);
             
             if (worldObj.isInteractable) {
                 this.interactables.push(worldObj);
             }
-        });
+        }
+    }
+
+    /**
+     * 全量同步实体状态（处理批量更新）
+     */
+    syncWorldEntities() {
+        const entities = worldManager.mapState.entities;
+        
+        // 1. 处理新增和已标记移除的
+        entities.forEach(data => this.syncEntity(data));
+
+        // 2. 额外安全检查：如果 entities 列表中已经彻底消失的 ID，也需要从场景移除
+        const currentIds = new Set(entities.map(e => e.id));
+        for (const [id, obj] of this.worldObjects.entries()) {
+            if (!currentIds.has(id)) {
+                obj.removeFromScene(this.scene);
+                this.worldObjects.delete(id);
+                this.interactables = this.interactables.filter(o => o.id !== id);
+            }
+        }
     }
 
     initUI() {
@@ -988,85 +1031,34 @@ export class WorldScene {
     createGround(mapData) {
         const size = mapGenerator.size;
         const heightMap = worldManager.mapState.heightMap;
-        const geometry = new THREE.PlaneGeometry(size, size, size, size);
         
-        const colors = [];
-        const color = new THREE.Color();
-        const vertices = geometry.attributes.position.array;
+        // 使用 TerrainManager 接管地形创建，复用原本的高度和颜色逻辑
+        this.ground = terrainManager.init(this.scene, mapData, heightMap, size);
 
-        for (let z = 0; z <= size; z++) {
-            for (let x = 0; x <= size; x++) {
-                const gridX = Math.min(x, size - 1);
-                const gridZ = Math.min(z, size - 1);
-                const type = mapData[gridZ][gridX];
-                const rawNoise = heightMap[gridZ][gridX];
-
-                let h = 0;
-                if (type === TILE_TYPES.WATER) {
-                    color.setHex(0x1a3a6d);
-                    const diff = Math.abs(rawNoise + 0.15);
-                    h = -1.5 - (diff * 8.4 + Math.pow(diff, 2) * 14.0); 
-                } else if (type === TILE_TYPES.MOUNTAIN) {
-                    const step = Math.floor(rawNoise * 5) / 5;
-                    const greyVal = 0.3 + (step * 0.3);
-                    color.setRGB(greyVal, greyVal, greyVal * 1.1);
-                    const diff = rawNoise - 0.20;
-                    h = 2.0 + (diff * 14.0 + Math.pow(diff, 2) * 35.0); 
-                } else {
-                    const step = Math.floor(rawNoise * 4) / 4;
-                    const greenVal = 0.4 + (step * 0.2);
-                    color.setRGB(greenVal * 0.4, greenVal, greenVal * 0.2);
-                    h = 0;
-                }
-                
-                const idx = (z * (size + 1) + x) * 3;
-                vertices[idx + 2] = h;
-
-                colors.push(color.r, color.g, color.b);
-            }
-        }
-
-        geometry.attributes.position.needsUpdate = true;
-        geometry.computeVertexNormals();
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 16;
-        canvas.height = 16;
-        const ctx = canvas.getContext('2d');
-        for (let i = 0; i < 16; i++) {
-            for (let j = 0; j < 16; j++) {
-                const noise = Math.random() * 40;
-                const brightness = 210 + noise;
-                ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
-                ctx.fillRect(i, j, 1, 1);
-            }
-        }
-        
-        const terrainTex = new THREE.CanvasTexture(canvas);
-        terrainTex.magFilter = THREE.NearestFilter;
-        terrainTex.minFilter = THREE.NearestFilter;
-        terrainTex.wrapS = terrainTex.wrapT = THREE.RepeatWrapping;
-        terrainTex.repeat.set(size / 4, size / 4); 
-
-        const material = new THREE.MeshStandardMaterial({ 
-            map: terrainTex,
-            vertexColors: true,
-            roughness: 1.0,
-            metalness: 0.0,
-            flatShading: true
-        });
-
-        this.ground = new THREE.Mesh(geometry, material);
-        this.ground.rotation.x = -Math.PI / 2;
-        this.ground.receiveShadow = true;
-        this.scene.add(this.ground);
-
+        // 原本的网格辅助线逻辑保持不变
         const grid = new THREE.GridHelper(size, size / 10, 0x445544, 0x223322);
         grid.position.y = 0.1;
         grid.material.opacity = 0.05;
         grid.material.transparent = true;
         this.scene.add(grid);
+
+        /* 暂时注释掉出生点地形演示代码
+        const playerPos = worldManager.mapState.playerPos;
+        if (playerPos) {
+            // 延迟一秒执行，确保玩家已经看到原本的地形，然后再执行变化演示
+            setTimeout(() => {
+                console.log("Autumn colors are spreading (Fenghua Valley style)...");
+                terrainManager.setAreaStyle(
+                    playerPos.x, 
+                    playerPos.z, 
+                    36,
+                    TERRAIN_STYLES.AUTUMN,
+                    mapData,
+                    heightMap
+                );
+            }, 1000);
+        }
+        */
     }
 
     createWater(size) {
@@ -1161,6 +1153,20 @@ export class WorldScene {
         window.addEventListener('pointerup', this.onPointerUp);
         window.addEventListener('contextmenu', this.onContextMenu);
         
+        // 监听地形样式改变事件
+        window.addEventListener('terrain-style-change', (e) => {
+            const { x, z, radius, style } = e.detail;
+            const mapData = worldManager.mapState.grid;
+            const heightMap = worldManager.mapState.heightMap;
+            terrainManager.setAreaStyle(x, z, radius, style, mapData, heightMap);
+        });
+
+        // 监听实体更新事件 (如邪恶势力降临、动态清空区域)
+        window.addEventListener('map-entities-updated', () => {
+            console.log("%c[WorldScene] 接收到实体更新指令，正在同步场景...", "color: #00ffff");
+            this.syncWorldEntities();
+        });
+
         const hud = document.getElementById('world-ui');
         if (hud) {
             hud.classList.remove('hidden');
