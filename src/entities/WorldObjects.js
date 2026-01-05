@@ -749,6 +749,7 @@ export class CityObject extends WorldObject {
         // 如果是远程通过 HUD 打开的（this.isPhysicalVisit 为 false），则不触发自动关闭
         if (worldScene.activeCityId === this.id && worldScene.isPhysicalVisit) {
             worldScene.closeTownManagement();
+            worldScene.closeTeleportMenu(); // 离开城市时，如果开了传送界面也一并关闭
         }
     }
 
@@ -806,11 +807,18 @@ export class CapturedBuildingObject extends WorldObject {
         if (this.buildingType === 'teleport_altar') {
             // 延迟一小会儿，确保占领通知能被看到
             setTimeout(() => {
-                worldScene.openTeleportMenu();
+                worldScene.openTeleportMenu(this.id);
             }, 100);
         }
         
         return false;
+    }
+
+    onExitRange(worldScene) {
+        // 如果是该祭坛开启了传送界面，走远了就自动关闭
+        if (this.buildingType === 'teleport_altar' && worldScene.activeAltarId === this.id) {
+            worldScene.closeTeleportMenu();
+        }
     }
 
     getTooltipData() {

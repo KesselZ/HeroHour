@@ -39,6 +39,7 @@ export class WorldScene {
         this.interactables = [];
         this.worldObjects = new Map(); // 新增：记录 ID 与实体的映射，用于动态同步
         this.activeCityId = null;        
+        this.activeAltarId = null; // 新增：记录当前交互的祭坛 ID
         this.floatingStack = 0;          
         
         // 悬浮检测
@@ -353,6 +354,11 @@ export class WorldScene {
         const teleportBtn = document.getElementById('city-teleport-btn');
         if (teleportBtn) {
             teleportBtn.onclick = () => {
+                if (!this.isPhysicalVisit) {
+                    worldManager.showNotification("必须亲临城市才能使用神行千里！");
+                    audioManager.play('ui_invalid', { volume: 0.8 });
+                    return;
+                }
                 audioManager.play('ui_click', { volume: 0.5 });
                 this.openTeleportMenu();
             };
@@ -362,7 +368,7 @@ export class WorldScene {
         if (closeTeleportBtn) {
             closeTeleportBtn.onclick = () => {
                 audioManager.play('ui_click', { volume: 0.4 });
-                document.getElementById('teleport-panel').classList.add('hidden');
+                this.closeTeleportMenu();
             };
         }
 
@@ -865,6 +871,14 @@ export class WorldScene {
             depositBtn.title = canTransfer ? "队伍全部驻守" : "必须亲临城市才能遣散";
             depositBtn.style.opacity = canTransfer ? "1" : "0.3";
             depositBtn.style.cursor = canTransfer ? "pointer" : "not-allowed";
+        }
+
+        // --- 核心限制：远程访问不允许神行千里 ---
+        const teleportBtn = document.getElementById('city-teleport-btn');
+        if (teleportBtn) {
+            teleportBtn.title = this.isPhysicalVisit ? "开启神行千里" : "必须亲临城市才能使用神行千里";
+            teleportBtn.style.opacity = this.isPhysicalVisit ? "1" : "0.3";
+            teleportBtn.style.cursor = this.isPhysicalVisit ? "pointer" : "not-allowed";
         }
 
         // 1. 刷新建筑面板
@@ -1984,10 +1998,37 @@ export class WorldScene {
             const heroPanel = document.getElementById('hero-stats-panel');
             const talentPanel = document.getElementById('talent-panel');
             const skillPanel = document.getElementById('skill-learn-panel');
+            const teleportPanel = document.getElementById('teleport-panel');
             if (
                 (!heroPanel || heroPanel.classList.contains('hidden')) &&
                 (!talentPanel || talentPanel.classList.contains('hidden')) &&
-                (!skillPanel || skillPanel.classList.contains('hidden'))
+                (!skillPanel || skillPanel.classList.contains('hidden')) &&
+                (!teleportPanel || teleportPanel.classList.contains('hidden'))
+            ) {
+                uiManager.setHUDVisibility(true);
+            }
+        }
+    }
+
+    /**
+     * 关闭神行千里传送菜单
+     */
+    closeTeleportMenu() {
+        const panel = document.getElementById('teleport-panel');
+        if (panel) panel.classList.add('hidden');
+        this.activeAltarId = null;
+
+        // --- 手机端适配：恢复 HUD ---
+        if (uiManager.isMobile) {
+            const heroPanel = document.getElementById('hero-stats-panel');
+            const talentPanel = document.getElementById('talent-panel');
+            const skillPanel = document.getElementById('skill-learn-panel');
+            const townPanel = document.getElementById('town-management-panel');
+            if (
+                (!heroPanel || heroPanel.classList.contains('hidden')) &&
+                (!talentPanel || talentPanel.classList.contains('hidden')) &&
+                (!skillPanel || skillPanel.classList.contains('hidden')) &&
+                (!townPanel || townPanel.classList.contains('hidden'))
             ) {
                 uiManager.setHUDVisibility(true);
             }
@@ -1996,8 +2037,9 @@ export class WorldScene {
 
     /**
      * 打开神行千里传送菜单
+     * @param {string} altarId 如果是从祭坛打开的，传入祭坛 ID
      */
-    openTeleportMenu() {
+    openTeleportMenu(altarId = null) {
         // --- 互斥逻辑：打开传送面板时，关闭其他所有面板 ---
         const panelsToClose = [
             'hero-stats-panel',
@@ -2012,6 +2054,9 @@ export class WorldScene {
             const p = document.getElementById(id);
             if (p) p.classList.add('hidden');
         });
+
+        // 记录来源
+        this.activeAltarId = altarId;
 
         // 手机端适配
         if (uiManager.isMobile) uiManager.setHUDVisibility(false);
@@ -2089,7 +2134,7 @@ export class WorldScene {
                 }
                 audioManager.play('ui_teleport', { volume: 0.8 });
                 this.teleportTo(dest.x, dest.z);
-                panel.classList.add('hidden');
+                this.closeTeleportMenu();
                 this.closeTownManagement();
             };
 
