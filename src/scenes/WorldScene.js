@@ -669,6 +669,16 @@ export class WorldScene {
             }
         }
         
+        // --- 核心修复：防止 Tooltip 穿透 ---
+        // 如果鼠标当前不在 Canvas 上（而是在 UI 面板上），则清理悬停状态并跳过检测
+        if (e.target.tagName !== 'CANVAS') {
+            if (this.hoveredObject) {
+                uiManager.hideTooltip();
+                this.hoveredObject = null;
+            }
+            return;
+        }
+
         // 1. 更新鼠标归一化坐标用于 Raycaster
         this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -678,9 +688,28 @@ export class WorldScene {
     }
 
     /**
-     * 判断当前是否有任何全屏或阻塞性 UI 面板打开
-     * 职责：统一管理 UI 状态，供移动、交互、Tooltip 等逻辑进行互斥判定
-     * 注意：town-management-panel 豁免，因为主城界面允许在城镇周围移动
+     * 判断当前是否有任何 UI 面板打开 (用于禁用大世界 Tooltip)
+     * 职责：比 isAnyMenuOpen 更严格，包含所有可能遮挡视线的面板
+     */
+    isAnyUIOpen() {
+        // 首先检查基础的阻塞性面板
+        if (this.isAnyMenuOpen()) return true;
+
+        // 加上那些允许移动但应禁用 Tooltip 的面板
+        const extraPanels = [
+            'town-management-panel',
+            'teleport-panel'
+        ];
+        return extraPanels.some(id => {
+            const el = document.getElementById(id);
+            return el && !el.classList.contains('hidden');
+        });
+    }
+
+    /**
+     * 判断当前是否有阻塞性 UI 面板打开 (禁用 WASD 和点击移动)
+     * 职责：统一管理 UI 状态，供移动、交互等逻辑进行互斥判定
+     * 注意：town-management-panel 和 teleport-panel 豁免，因为允许在周围移动
      */
     isAnyMenuOpen() {
         const panels = [
@@ -692,7 +721,8 @@ export class WorldScene {
             'skip-battle-modal',
             'battle-settlement',
             'load-save-panel',
-            'save-game-panel'
+            'save-game-panel',
+            'world-event-history-panel'
         ];
         return panels.some(id => {
             const el = document.getElementById(id);
@@ -704,7 +734,8 @@ export class WorldScene {
         if (!this.isActive) return;
 
         // --- 核心修复：防止 Tooltip 穿透 UI 面板 ---
-        if (this.isAnyMenuOpen()) {
+        // 这里使用更严格的 isAnyUIOpen，确保即便在城镇界面也会隐藏大世界 Tooltip
+        if (this.isAnyUIOpen()) {
             if (this.hoveredObject) {
                 uiManager.hideTooltip();
                 this.hoveredObject = null;

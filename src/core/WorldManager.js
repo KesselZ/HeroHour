@@ -1580,13 +1580,8 @@ export class WorldManager {
             }
         }));
 
-        // 6. 触发全局播报
-        WorldStatusManager.triggerActiveEvent(`evil_rise_${factionId}`, {
-            title: '危机降临',
-            text: `由于近期流民增多，【${factionNames[factionId]}】乘虚而入，已在偏远荒野 (${Math.round(ex)}, ${Math.round(ez)}) 建立据点，其势力范围内的野怪变得更加狂暴！`,
-            type: 'major',
-            affectsSituation: true
-        });
+        // 6. 触发全局播报 (逻辑已收敛至 WorldStatusManager)
+        WorldStatusManager.broadcastEvilSpawn(factionId);
 
         // 7. 自动分配周边矿产
         this.mapState.entities.forEach(entity => {

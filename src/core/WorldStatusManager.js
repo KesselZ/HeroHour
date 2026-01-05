@@ -31,9 +31,27 @@ export class WorldStatusManager {
         'first_winter_passed': " 熬过了最严酷的寒冬，各派势力开始复苏，新的平衡正在达成。"
     };
 
+    // 邪恶势力独特的江湖通报文案
+    static EVIL_FACTION_BROADCASTS = {
+        'tianyi': {
+            title: '幽冥剧毒',
+            text: '腥红毒雾已彻底封锁荒野深处，【天一教】的尸傀大军正在疯狂扩张，所过之处寸草不生，生灵绝迹！'
+        },
+        'shence': {
+            title: '禁军压境',
+            text: '玄甲铁骑的军旗已插遍荒野，【神策军】叛军封锁了所有命脉要道，正暴力搜刮每一寸土地，违令者杀无赦！'
+        },
+        'red_cult': {
+            title: '血色祭礼',
+            text: '恐怖的邪力正在荒野中心沸腾，【红衣教】的血色祭坛已经开启，方圆数里的生机已被祭礼强行掠夺，沦为焦土！'
+        }
+    };
+
     // --- 2. 状态存储 ---
     static activeSituationKeys = new Set(); // 当前生效的重大局势 ID
     static eventHistory = [];               // 所有的传闻播报历史
+    static usedEvilFactions = new Set();    // 永久记录已经登场过的势力 ID
+    static seasonalEventWeights = {};       // 季节事件的动态权重 (触发后衰减)
 
     // --- 3. 事件池定义 ---
     
@@ -44,7 +62,7 @@ export class WorldStatusManager {
             title: '万物复苏',
             text: '细雨斜风，江湖各地的柳色渐深，正是结伴同游、切磋技艺的好季节。',
             type: 'rumor',
-            chance: 0.8,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '春'
         },
         {
@@ -52,7 +70,7 @@ export class WorldStatusManager {
             title: '少年英才',
             text: '春意盎然，江湖上涌现出一批资质不凡的少年侠客，引得各大门派纷纷关注。',
             type: 'rumor',
-            chance: 0.5,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '春'
         },
         {
@@ -60,7 +78,7 @@ export class WorldStatusManager {
             title: '名剑大会',
             text: '藏剑山庄叶英传帖江湖，欲召开名剑大会，引得各路剑客纷纷侧目。',
             type: 'rumor',
-            chance: 0.4,
+            weight: 1.0,
             condition: (ctx) => ctx.factions.includes('yeying') && ctx.playerHeroId !== 'yeying' && ctx.season === '春'
         },
         {
@@ -68,7 +86,7 @@ export class WorldStatusManager {
             title: '炎夏避暑',
             text: '烈日当头，不少侠客选择去青城山避暑，传闻那里的凉气可洗涤内功杂质。',
             type: 'rumor',
-            chance: 0.8,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '夏'
         },
         {
@@ -76,7 +94,7 @@ export class WorldStatusManager {
             title: '东海潮汐',
             text: '盛夏时节，东海潮汐异常壮观，传闻有渔民在海滩捡到了散发着微光的奇异贝壳。',
             type: 'rumor',
-            chance: 0.6,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '夏'
         },
         {
@@ -84,7 +102,7 @@ export class WorldStatusManager {
             title: '岁物丰收',
             text: '秋收季节，百姓安居乐业，各地城池的税收有所提升。',
             type: 'rumor',
-            chance: 0.8,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '秋'
         },
         {
@@ -92,7 +110,7 @@ export class WorldStatusManager {
             title: '枫华红叶',
             text: '枫华谷的枫叶红透了，不少文人墨客云集于此，吟咏“霜叶红于二月花”。',
             type: 'rumor',
-            chance: 0.7,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '秋'
         },
         {
@@ -100,7 +118,7 @@ export class WorldStatusManager {
             title: '大雪封山',
             text: '严冬已至，大雪封山，传闻北方势力正在囤积粮草，局势愈发扑朔迷离。',
             type: 'rumor',
-            chance: 0.6,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '冬'
         },
         {
@@ -108,7 +126,7 @@ export class WorldStatusManager {
             title: '塞外休战',
             text: '严冬酷寒，塞外各部族暂时停止了袭扰，边境一带难得地进入了平静期。',
             type: 'rumor',
-            chance: 0.5,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '冬'
         },
         {
@@ -116,7 +134,7 @@ export class WorldStatusManager {
             title: '岁末张灯',
             text: '岁末将至，各地城池张灯结彩，虽有严寒，但百姓心中充满对新年的期盼。',
             type: 'rumor',
-            chance: 0.8,
+            weight: 1.0,
             condition: (ctx) => ctx.season === '冬'
         }
     ];
@@ -180,6 +198,21 @@ export class WorldStatusManager {
     ];
 
     /**
+     * 触发势力降临的独特播报
+     */
+    static broadcastEvilSpawn(factionId) {
+        const config = this.EVIL_FACTION_BROADCASTS[factionId];
+        if (!config) return;
+
+        this.triggerActiveEvent(`evil_rise_${factionId}`, {
+            title: config.title,
+            text: config.text,
+            type: 'major',
+            affectsSituation: true
+        });
+    }
+
+    /**
      * 【主动事件接口】
      * 由外部逻辑（如战斗结束、占领城池）手动调用
      * @param {string} eventId 事件 ID
@@ -228,28 +261,72 @@ export class WorldStatusManager {
         if (validEvents.length === 0) return;
 
         /**
-         * 概率缩放逻辑：
-         * 我们希望触发的总数期望值 = SEASONAL_EXPECTATION (0.8)
-         * 假设每个事件原始概率为 p_i，缩放后的概率 P_i = p_i * k
-         * 则期望值 E = Σ P_i = k * Σ p_i
-         * 所以缩放系数 k = SEASONAL_EXPECTATION / Σ p_i
+         * 权重随机逻辑：
+         * 1. 每个事件有初始权重 1.0
+         * 2. 触发后权重衰减至 20% (乘以 0.2)
+         * 3. 使用权重随机算法确保期望总量为 SEASONAL_EXPECTATION (0.8)
          */
-        const sumOriginalChances = validEvents.reduce((sum, e) => sum + e.chance, 0);
-        let k = this.CONFIG.SEASONAL_EXPECTATION / sumOriginalChances;
+
+        // 为符合条件的事件获取当前权重
+        const eventsWithWeights = validEvents.map(eventDef => ({
+            ...eventDef,
+            currentWeight: this.seasonalEventWeights[eventDef.id] !== undefined ?
+                this.seasonalEventWeights[eventDef.id] : eventDef.weight
+        }));
+
+        // 计算期望触发数量并进行权重随机
+        const targetCount = this.CONFIG.SEASONAL_EXPECTATION;
+        let remainingTarget = targetCount;
 
         // 如果开启 Debug 模式，应用倍率
-        if (worldManager.constructor.DEBUG.HIGH_EVENT_FREQUENCY) k *= this.CONFIG.DEBUG_MULTIPLIER;
+        if (worldManager.constructor.DEBUG.HIGH_EVENT_FREQUENCY) {
+            remainingTarget *= this.CONFIG.DEBUG_MULTIPLIER;
+        }
 
-        validEvents.forEach(eventDef => {
-            if (Math.random() < eventDef.chance * k) {
-                this.triggerActiveEvent(eventDef.id, {
-                    title: eventDef.title,
-                    text: eventDef.text,
-                    type: eventDef.type || 'major',
-                    affectsSituation: false 
-                });
+        // 使用权重随机算法选择事件
+        while (remainingTarget > 0 && eventsWithWeights.length > 0) {
+            // 核心修正：如果剩余期望不足 1.0，则按概率判定本次是否触发
+            if (remainingTarget < 1.0 && Math.random() > remainingTarget) {
+                break;
             }
-        });
+
+            const totalWeight = eventsWithWeights.reduce((sum, e) => sum + e.currentWeight, 0);
+            if (totalWeight <= 0) break;
+
+            const randomValue = Math.random() * totalWeight;
+            let cumulativeWeight = 0;
+            let selectedIndex = -1;
+
+            for (let i = 0; i < eventsWithWeights.length; i++) {
+                cumulativeWeight += eventsWithWeights[i].currentWeight;
+                if (randomValue <= cumulativeWeight) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+
+            if (selectedIndex !== -1) {
+                const selectedEvent = eventsWithWeights[selectedIndex];
+
+                // 触发事件
+                this.triggerActiveEvent(selectedEvent.id, {
+                    title: selectedEvent.title,
+                    text: selectedEvent.text,
+                    type: selectedEvent.type || 'major',
+                    affectsSituation: false
+                });
+
+                // 权重衰减 (乘以 0.2)
+                this.seasonalEventWeights[selectedEvent.id] = selectedEvent.currentWeight * 0.2;
+
+                // 从候选列表中移除，避免重复触发
+                eventsWithWeights.splice(selectedIndex, 1);
+
+                remainingTarget--;
+            } else {
+                break; // 无法选择事件，退出循环
+            }
+        }
 
         // --- 核心新增：检查特殊的动态江湖事件 (如邪恶势力降临) ---
         this._checkSpecialDynamicEvents(worldManagerRef);
@@ -260,27 +337,36 @@ export class WorldStatusManager {
      */
     static _checkSpecialDynamicEvents(worldManagerRef) {
         const globalProgress = timeManager.getGlobalProgress(); // 已过的季度总数
-        
-        // 邪恶势力降临逻辑：
-        // 第一年·夏 (进度 1) 开始，每个季度有概率降临一个邪恶势力，直到降满 2 个为止 (对应原逻辑规模)
-        // 用户提到“邪恶势力据点（如天一教、神策军）”，原逻辑是 3 选 2，我们也保持 2 个
-        if (globalProgress >= 1) {
-            const currentEvilBases = worldManagerRef.mapState.entities.filter(e => e.config?.isEvilBase && !e.isRemoved);
-            const evilFactions = ['tianyi', 'shence', 'red_cult'];
-            const existingFactions = currentEvilBases.map(e => e.config.faction);
-            const remainingFactions = evilFactions.filter(f => !existingFactions.includes(f));
+        const difficulty = timeManager.difficulty || 'easy';
 
-            // 如果当前存活的邪恶据点少于 2 个，且还有可选势力
-            if (currentEvilBases.length < 2 && remainingFactions.length > 0) {
-                // 进度 1 (第一年夏) 100% 降临第一个
-                // 之后每个季度 50% 概率降临第二个
-                const shouldSpawn = (globalProgress === 1 && currentEvilBases.length === 0) || (Math.random() < 0.5);
-                
-                if (shouldSpawn) {
-                    const nextFaction = remainingFactions[Math.floor(Math.random() * remainingFactions.length)];
-                    worldManagerRef.spawnEvilBaseDynamic(nextFaction);
-                }
-            }
+        // --- 核心逻辑：根据难度定制邪恶势力登场节奏 ---
+        // 简单：第 1 季度结束（入夏）登场 1 个
+        // 困难：第 1, 2 季度结束（入夏、入秋）各登场 1 个，共 2 个
+        // 地狱：第 1, 2, 3 季度结束（入夏、入秋、入冬）各登场 1 个，共 3 个
+        
+        let targetCount = 0;
+        if (difficulty === 'easy') {
+            if (globalProgress === 1) targetCount = 1;
+        } else if (difficulty === 'hard') {
+            if (globalProgress >= 1 && globalProgress <= 2) targetCount = globalProgress;
+        } else if (difficulty === 'hell') {
+            if (globalProgress >= 1 && globalProgress <= 3) targetCount = globalProgress;
+        }
+
+        // 如果当前已登场的势力数量已经达到或超过该阶段应有的数量，则跳过
+        if (this.usedEvilFactions.size >= targetCount) return;
+
+        const evilFactions = ['tianyi', 'shence', 'red_cult'];
+        const remainingPool = evilFactions.filter(f => !this.usedEvilFactions.has(f));
+
+        if (remainingPool.length > 0) {
+            const nextFaction = remainingPool[Math.floor(Math.random() * remainingPool.length)];
+            
+            // 永久记录
+            this.usedEvilFactions.add(nextFaction);
+            
+            // 执行生成
+            worldManagerRef.spawnEvilBaseDynamic(nextFaction);
         }
     }
 
@@ -393,6 +479,8 @@ export class WorldStatusManager {
         return {
             activeSituationKeys: Array.from(this.activeSituationKeys),
             eventHistory: this.eventHistory,
+            usedEvilFactions: Array.from(this.usedEvilFactions), // 记录已登场的势力
+            seasonalEventWeights: this.seasonalEventWeights, // 记录季节事件权重
             flavorPoolWeights: this.ATMOSPHERIC_FLAVOR_POOL.map(e => e.weight)
         };
     }
@@ -409,6 +497,14 @@ export class WorldStatusManager {
         
         if (data.eventHistory) {
             this.eventHistory = data.eventHistory;
+        }
+
+        if (data.usedEvilFactions) {
+            this.usedEvilFactions = new Set(data.usedEvilFactions);
+        }
+
+        if (data.seasonalEventWeights) {
+            this.seasonalEventWeights = data.seasonalEventWeights;
         }
 
         if (data.flavorPoolWeights && data.flavorPoolWeights.length === this.ATMOSPHERIC_FLAVOR_POOL.length) {
