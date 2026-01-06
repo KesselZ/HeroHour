@@ -11,17 +11,17 @@ import { HERO_IDENTITY } from '../data/UnitStatsData.js';
 // 1. 最小天赋单位 (原子效果)
 export const TALENT_UNITS = {
     // --- 第一组：商道·金戈 (经济与财富) ---
-    'unit_income_base': { 
-        name: '生财有道', icon: 'talent_gold_base', 
-        description: '生财有方，每座城池<span class="skill-term-highlight">季度金钱产出</span>提升 <span class="skill-num-highlight">200</span> 点。', 
+    'unit_income_base': {
+        name: '生财有道', icon: 'talent_gold_base',
+        description: '生财有方，每座城池<span class="skill-term-highlight">季度金钱产出</span>提升 <span class="skill-num-highlight">200</span> 点。',
         requires: ['node_core'],
-        effects: [{ type: 'modifier', target: 'global', key: 'gold_income', value: 200, method: 'add' }] 
+        effects: [{ type: 'modifier', unitType: 'main_city', key: 'gold_income', value: 200, method: 'add' }]
     },
-    'unit_kill_gold': { 
-        name: '战力清剿', icon: 'talent_loot', 
-        description: '以战养战，战斗胜利后额外获得相当于<span class="skill-term-highlight">敌人强度</span><span class="skill-num-highlight">三倍</span>的金钱。', 
+    'unit_kill_gold': {
+        name: '战力清剿', icon: 'talent_loot',
+        description: '以战养战，战斗胜利后额外获得相当于<span class="skill-term-highlight">敌人强度</span><span class="skill-num-highlight">五倍</span>的金钱。',
         requires: ['unit_income_base'],
-        effects: [{ type: 'modifier', target: 'hero', key: 'kill_gold', value: 3.0, method: 'percent' }] 
+        effects: [{ type: 'modifier', target: 'hero', key: 'kill_gold', value: 5.0, method: 'percent' }]
     },
     'unit_wood_save': { 
         name: '以物易物', icon: 'talent_wood', 
