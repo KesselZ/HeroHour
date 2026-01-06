@@ -43,15 +43,16 @@ function calculateHeroCombat(heroId, mode = 'default') {
         const m = stats.modes;
         if (mode === 'yeying_heavy') {
             const cfg = m.yeying_heavy;
+            // 优化：直接使用配置值，不再进行无谓的比例换算
             actualAtk = baseAtk * (cfg.atk / cb.atk);
-            actualAS = stats.attackSpeed * (cfg.attackSpeed / stats.attackSpeed);
+            actualAS = cfg.attackSpeed;
             actualTargets = cfg.targets || 5.0;
             actualBurst = cfg.burstCount || 3;
             range = cfg.range || 2.5;
         } else {
             const cfg = m.yeying_light;
             actualAtk = baseAtk * (cfg.atk / cb.atk);
-            actualAS = stats.attackSpeed * (cfg.attackSpeed / stats.attackSpeed);
+            actualAS = cfg.attackSpeed;
             actualTargets = cfg.targets || 1.0;
             actualBurst = cfg.burstCount || 1;
             range = cfg.range || 1.5; 

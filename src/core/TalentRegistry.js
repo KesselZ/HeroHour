@@ -181,9 +181,10 @@ export const TALENT_UNITS = {
     },
     'cangjian_kill_shield': {
         name: '映波锁澜', icon: 'talent_cangjian_shield',
-        description: '重剑之威，势不可挡。重剑形态下，英雄亲手击杀敌方单位后立即获得相当于自身最大生命值 <span class="skill-num-highlight">10%</span> 的护盾，持续 <span class="skill-num-highlight">2</span> 秒。',
+        description: '重剑之威，势不可挡。重剑形态下，英雄亲手击杀敌方单位后，每重获得相当于自身最大生命值 <span class="skill-num-highlight">5%</span> 的护盾，持续 <span class="skill-num-highlight">2</span> 秒。',
+        maxLevel: 3,
         requires: ['node_core'],
-        effects: [{ type: 'modifier', target: 'hero', key: 'cangjian_kill_shield_enabled', value: 0.1, method: 'add' }]
+        effects: [{ type: 'modifier', target: 'hero', key: 'cangjian_kill_shield_enabled', value: 0.05, perLevel: true, method: 'add' }]
     },
     'cangjian_heavy_burst': {
         name: '莺鸣柳浪', icon: 'talent_cangjian_burst',

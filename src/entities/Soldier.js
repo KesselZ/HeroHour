@@ -1383,7 +1383,7 @@ export class HeroUnit extends BaseUnit {
         
         // --- 藏剑双形态逻辑 ---
         if (heroData.id === 'yeying') {
-            this._cangjianStance = 'heavy'; // 默认重剑
+            this.cangjianStance = 'heavy'; // 核心修复：使用 setter 触发攻速 Modifier 注入
             this.scale.set(1.5, 1.5, 1.5);
         }
         

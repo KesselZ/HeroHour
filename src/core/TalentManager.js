@@ -360,7 +360,7 @@ class TalentManager {
             if (!hasSkill) {
                 const skillNames = requiredSkills.map(sid => {
                     // 核心修复：通过全局或动态方式获取技能名称，避免循环依赖导致的初始化失败
-                    const SkillRegistry = window.SkillRegistry; 
+                    const SkillRegistry = typeof window !== 'undefined' ? window.SkillRegistry : null; 
                     const skill = SkillRegistry ? SkillRegistry[sid] : null;
                     return skill ? `【${skill.name}】` : sid;
                 }).join(' 或 ');
@@ -437,7 +437,9 @@ class TalentManager {
             });
         }
 
-        window.dispatchEvent(new CustomEvent('talents-updated'));
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('talents-updated'));
+        }
     }
 
     /**
@@ -469,6 +471,8 @@ class TalentManager {
 }
 
 export const talentManager = new TalentManager();
-// 暴露给全局以解决循环依赖问题
-window.talentManager = talentManager;
+// 暴露给全局以解决循环依赖问题 (仅在浏览器环境下执行)
+if (typeof window !== 'undefined') {
+    window.talentManager = talentManager;
+}
 

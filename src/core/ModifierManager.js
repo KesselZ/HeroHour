@@ -287,7 +287,9 @@ class ModifierManager {
                 return true;
             });
 
-            window.dispatchEvent(new CustomEvent('modifiers-updated'));
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('modifiers-updated'));
+            }
         }
     }
 

@@ -132,7 +132,7 @@ export const SkillRegistry = {
         description: '【大风车】自身快速旋转，持续 {duration} 秒，每 {interval} 秒对周围敌人造成 {tickDamage} 点范围伤害',
         actions: [
             { type: 'vfx', name: 'mega_whirlwind', params: { color: 0xff6600, duration: 3000, radius: 5 } },
-            { type: 'tick_effect', duration: 3000, interval: 300, onTickDamage: 7.2, knockback: 0.12, targeting: { radius: 5 } }
+            { type: 'tick_effect', duration: 3000, interval: 300, onTickDamage: 9, knockback: 0.12, targeting: { radius: 5 } }
         ]
     }),
     'renchicheng': new Skill('renchicheng', {
@@ -606,7 +606,9 @@ export const SkillRegistry = {
 };
 
 // 暴露给全局以解决循环依赖问题
-window.SkillRegistry = SkillRegistry;
+if (typeof window !== 'undefined') {
+    window.SkillRegistry = SkillRegistry;
+}
 
 /**
  * 定义各门派可研习的招式表

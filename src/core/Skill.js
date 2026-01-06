@@ -211,7 +211,7 @@ export class Skill {
 
     getDescription(heroData) {
         const unit = this._getUnitContext(heroData);
-        const tm = talentManager || window.talentManager;
+        const tm = talentManager || (typeof window !== 'undefined' ? window.talentManager : null);
         
         // --- 核心重构：注入描述装饰器 ---
         // 允许奇穴动态修改描述文本模板 (例如增加 "{bonus2}% 攻速")
@@ -317,7 +317,7 @@ export class Skill {
 
         // --- 核心重构：动作拦截与注入 (Action Decoration) ---
         // 引擎不再硬编码逻辑，而是允许 TalentManager 根据当前奇穴动态注入动作
-        const tm = talentManager || window.talentManager;
+        const tm = talentManager || (typeof window !== 'undefined' ? window.talentManager : null);
         const finalActions = tm ? tm.decorateSkillActions(this, caster, this.actions) : this.actions;
 
         // 徐如林回血 (技能释放时回血)
