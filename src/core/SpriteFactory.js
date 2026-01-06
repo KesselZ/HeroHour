@@ -30,6 +30,8 @@ export const ASSET_REGISTRY = {
         TALENT4: '/assets/talents/talent4.png',
         TALENT5: '/assets/talents/talent5.png',
         TALENT6: '/assets/talents/talent6.png',
+        TALENT_CANGJIAN: '/assets/talents/talent_cangjian.png',
+        TALENT_CANGJIAN2: '/assets/talents/talent_cangjian2.png',
         TALENT_TIANCE: '/assets/talents/talent_tiance.png',
         TALENT_TIANCE2: '/assets/talents/talent_tiance2.png',
         BUILDING2: '/assets/buildings/building2.png',
@@ -134,7 +136,6 @@ export const ASSET_REGISTRY = {
 
         // 武道/演武系列 (TALENT2)
         'talent_spell_power': { name: '功法提升', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_combo':       { name: '连招联动', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 2 },
         'talent_mp':          { name: '内力根基', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 3 },
         'talent_spell_epic':  { name: '功参造化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 1 },
         'talent_chunyang_duration': { name: '气场时长', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 2 },
@@ -175,6 +176,9 @@ export const ASSET_REGISTRY = {
         'talent_cangjian_shield':   { name: '映波锁澜图标', sheet: 'SKILL7', rows: 4, cols: 4, r: 1, c: 1 }, // 借用泉凝月图标
         'talent_cangjian_burst':    { name: '莺鸣柳浪图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 4, c: 3 }, 
         'talent_cangjian_jump':     { name: '层云图标', sheet: 'SKILL6', rows: 4, cols: 4, r: 4, c: 2 }, 
+        'talent_cangjian_tingying': { name: '听莺图标', sheet: 'TALENT_CANGJIAN', rows: 4, cols: 4, r: 1, c: 4 },
+        'talent_cangjian_pianyu':   { name: '片玉图标', sheet: 'TALENT_CANGJIAN2', rows: 4, cols: 4, r: 2, c: 2 },
+        'talent_cangjian_xingyun':  { name: '行云流水图标', sheet: 'TALENT_CANGJIAN', rows: 4, cols: 4, r: 3, c: 2 },
         
         // --- 核心节点占位符 (如果需要) ---
         'talent_core': { name: '核心', sheet: 'TALENT4', rows: 4, cols: 4, r: 4, c: 4 },

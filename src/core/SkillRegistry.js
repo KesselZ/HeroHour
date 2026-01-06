@@ -314,7 +314,6 @@ export const SkillRegistry = {
         icon: 'skill_sixiang', // 假设图标已存在或后续添加
         cost: 25,
         cooldown: 3000,
-        audio: 'attack_air_sword',
         targeting: { type: 'instant', radius: 10 },
         description: '集聚浩然之气，连续发射 {count} 枚气剑，每枚造成 {damage} 点伤害',
         actions: [
@@ -327,7 +326,8 @@ export const SkillRegistry = {
                 color: 0x00ffff,
                 autoTarget: true,
                 targetMode: 'nearest', // 四象轮回：盯着最近的打，适合集火
-                scale: 1.5 // 技能射出的剑比普攻大 50%
+                scale: 1.5, // 技能射出的剑比普攻大 50%
+                audio: 'attack_air_sword'
             }
         ]
     }),
@@ -338,7 +338,6 @@ export const SkillRegistry = {
         icon: 'skill_liangyi',
         cost: 40,
         cooldown: 8000,
-        audio: 'attack_air_sword',
         targeting: { type: 'instant', radius: 12 },
         description: '【进阶招式】瞬间爆发万千气劲，发射 {count} 枚追踪气剑，每枚造成 {damage} 点伤害',
         actions: [
@@ -351,7 +350,8 @@ export const SkillRegistry = {
                 color: 0x00ffff,
                 autoTarget: true,
                 targetMode: 'spread', // 两仪化形：智能散布，每人分几剑，华丽清场
-                scale: 1.8 // 进阶技能的剑气更粗壮
+                scale: 1.8, // 进阶技能的剑气更粗壮
+                audio: 'attack_air_sword'
             }
         ]
     }),
@@ -362,7 +362,6 @@ export const SkillRegistry = {
         icon: 'skill_wanshi',
         cost: 80,
         cooldown: 20000,
-        audio: 'attack_air_sword',
         targeting: { type: 'instant', radius: 15 },
         description: '【纯阳绝技】生生不息，气劲无穷。持续发射 {count} 枚强力气剑随机轰击周围敌人',
         actions: [
@@ -375,7 +374,8 @@ export const SkillRegistry = {
                 color: 0x00ffff,
                 autoTarget: true,
                 targetMode: 'random',
-                scale: 2.5 // 绝技的剑气具有毁灭性的压迫感，最大！
+                scale: 2.5, // 绝技的剑气具有毁灭性的压迫感，最大！
+                audio: 'attack_air_sword'
             }
         ]
     }),

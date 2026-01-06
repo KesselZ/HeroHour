@@ -109,8 +109,9 @@ export const TALENT_UNITS = {
         effects: [{ type: 'modifier', target: 'hero', key: 'season_mp_regen', value: 0.8, method: 'percent' }] 
     },
     'unit_combo_chain': {
-        name: '行云流水', icon: 'talent_combo',
+        name: '行云流水', icon: 'talent_cangjian_xingyun',
         description: '招式如龙，释放技能后 3 秒内提升<span class="skill-num-highlight">两成</span><span class="skill-term-highlight">功法</span>，且每次施法都会刷新持续时间。',
+        requires: ['cangjian_heavy_burst'],
         effects: [{ type: 'modifier', target: 'hero', key: 'combo_chain_enabled', value: 1, method: 'add' }]
     },
 
@@ -189,7 +190,7 @@ export const TALENT_UNITS = {
     'cangjian_heavy_burst': {
         name: '莺鸣柳浪', icon: 'talent_cangjian_burst',
         description: '重剑之威，更进一层。重剑形态下的普通攻击次数由 <span class="skill-num-highlight">3</span> 段提升至 <span class="skill-num-highlight">4</span> 段。',
-        requires: ['cangjian_fengming'],
+        requires: ['cangjian_kill_shield'],
         effects: [{ type: 'modifier', target: 'hero', key: 'yeying_heavy_burst_bonus', value: 1, method: 'add' }]
     },
     'cangjian_jump_whirlwind': {
@@ -209,7 +210,7 @@ export const TALENT_UNITS = {
     'cangjian_tingying': {
         name: '听莺', icon: 'talent_cangjian_tingying',
         description: '【西子情】泉凝月的<span class="skill-term-highlight">护盾基础值</span>提高至最大生命值的 <span class="skill-num-highlight">50%</span>，且<span class="skill-term-highlight">持续时间</span>延长至 <span class="skill-num-highlight">5</span> 秒。',
-        requires: ['node_core'],
+        requires: ['cangjian_fengming'],
         effects: [
             { type: 'modifier', target: 'hero', key: 'skill_quanningyue_percent_override', value: 0.5, method: 'add' },
             { type: 'modifier', target: 'hero', key: 'skill_quanningyue_duration_override', value: 5000, method: 'add' }
@@ -218,7 +219,7 @@ export const TALENT_UNITS = {
     'cangjian_pianyu': {
         name: '片玉', icon: 'talent_cangjian_pianyu',
         description: '【问水决】梦泉虎跑期间的<span class="skill-term-highlight">受到的伤害</span>额外降低，使总减伤效果提升至 <span class="skill-num-highlight">80%</span>。',
-        requires: ['cangjian_fengming'],
+        requires: ['cangjian_tingying'],
         effects: [
             { type: 'modifier', target: 'hero', key: 'skill_mengquan_dr_override', value: 0.8, method: 'add' }
         ]
@@ -409,14 +410,14 @@ export const TALENT_GROUPS = {
         name: '问水决·灵动',
         tag: '轻剑',
         major: 'cangjian_fengming', // 凤鸣 (核心：梦泉虎跑强化)
-        minors: ['cangjian_heavy_burst', 'unit_power_epic', 'cangjian_tingying', 'cangjian_pianyu'] // 莺鸣柳浪 + 史诗属性 + 听莺 + 片玉
+        minors: ['cangjian_tingying', 'cangjian_pianyu', 'unit_power_epic'] // 听莺 -> 片玉，以及 神力惊世
     },
     // 【藏剑·山居】主打重剑爆发与生存
     'group_cangjian_heavy': {
         name: '山居剑意·厚重',
         tag: '重剑',
         major: 'cangjian_kill_shield', // 映波锁澜 (核心：重剑杀敌获盾)
-        minors: ['cangjian_jump_whirlwind', 'cangjian_fenglai_heavy'] // 层云 + 吴山雷鸣
+        minors: ['cangjian_jump_whirlwind', 'cangjian_fenglai_heavy', 'cangjian_heavy_burst', 'unit_combo_chain'] // 层云 + 吴山雷鸣，以及 莺鸣柳浪 -> 行云流水
     },
 
     // --- 纯阳专属组 ---
@@ -463,10 +464,9 @@ export const HERO_TREE_CONFIG = {
     'yeying': {
         core: { 
             name: '藏剑山庄', icon: 'core_yeying', 
-            description: '秀水灵山隐剑锋，君子如风名满城。<span class="skill-term-highlight">释放招式</span>后，提升 <span class="skill-num-highlight">20%</span> <span class="skill-term-highlight">功法</span>，持续 3 秒，可刷新。', 
+            description: '秀水灵山隐剑锋，君子如风名满城。永久提升 <span class="skill-num-highlight">12</span> 点 <span class="skill-term-highlight">身法</span>。', 
             effects: [
-                { type: 'stat', stat: 'power', value: 12 },
-                { type: 'modifier', target: 'hero', key: 'combo_chain_enabled', value: 1, method: 'add' }
+                { type: 'stat', stat: 'power', value: 12 }
             ] 
         },
         groups: [
