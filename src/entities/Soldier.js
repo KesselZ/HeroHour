@@ -55,6 +55,7 @@ export class BaseUnit extends THREE.Group {
         
         this.target = null;
         this.lastAttackTime = 0;
+        this.lastAIScanTime = 0; // 新增：记录上次 AI 全局扫描时间
         this.isFleeing = false; // 新增：逃跑状态
         this.isVictoryMarch = false; // 新增：胜利进军状态
         
@@ -806,16 +807,21 @@ export class BaseUnit extends THREE.Group {
     }
 
     updateAI(enemies, allies) {
+        const now = Date.now();
         // 1. 基础逻辑：目标死亡或不存在时索敌
         const needsNewTarget = !this.target || this.target.isDead;
         
-        // 2. 优化：远程单位在准备好攻击时重新索敌，增加灵活性
+        // 2. 周期性索敌逻辑：普通士兵每 1000ms 重新评估一次，增加战场灵活性
+        const isTimeForScan = (now - this.lastAIScanTime) > 1000;
+
+        // 3. 远程单位特权：攻击就绪时即刻重扫
         // 设定 2.0 为远程阈值，确保他们总是攻击当前最近的威胁
         const isRanged = this.attackRange > 2.0;
-        const isReadyToAttack = (Date.now() - this.lastAttackTime) >= this.attackCooldownTime;
+        const isReadyToAttack = (now - this.lastAttackTime) >= this.attackCooldownTime;
         const shouldRefreshTarget = isRanged && isReadyToAttack;
 
-        if (needsNewTarget || shouldRefreshTarget) {
+        if (needsNewTarget || isTimeForScan || shouldRefreshTarget) {
+            this.lastAIScanTime = now;
             const newTarget = this.findNearestEnemy(enemies);
             if (newTarget) {
                 this.target = newTarget;
@@ -1484,6 +1490,27 @@ export class HeroUnit extends BaseUnit {
         // 范围：X轴 [-40, 40] (长80), Z轴 [-15, 15] (宽30)
         this.position.x = Math.max(-40, Math.min(40, this.position.x));
         this.position.z = Math.max(-15, Math.min(15, this.position.z));
+    }
+
+    /**
+     * 主角 AI 逻辑重写：
+     * 为了极致的战斗手感，主角每一帧都会重新检索最近的目标。
+     * 配合 findNearestEnemy(strict=true)，主角将始终攻击当前绝对最近的敌人。
+     */
+    updateAI(enemies, allies) {
+        const newTarget = this.findNearestEnemy(enemies);
+        if (newTarget) {
+            this.target = newTarget;
+        } else {
+            this.target = null;
+        }
+    }
+
+    /**
+     * 主角索敌重写：始终使用严格模式寻找最近的目标
+     */
+    findNearestEnemy(enemies, strict = true) {
+        return super.findNearestEnemy(enemies, strict);
     }
 
     /**
@@ -2751,6 +2778,7 @@ export class CYSwordArray extends BaseUnit {
             projectileManager,
             cost: stats.cost
         });
+        this.penetrationCount = stats.penetration || 0;
     }
 
     performAttack(enemies) {
@@ -2765,7 +2793,7 @@ export class CYSwordArray extends BaseUnit {
                 damage: this.attackDamage,
                 projectileType: 'air_sword',
                 projectileColor: 0x88ffff,
-                projectilePenetration: 2,
+                projectilePenetration: this.penetrationCount,
                 soundName: 'attack_air_sword'
             });
         }
@@ -3249,10 +3277,10 @@ export class TCCrossbow extends BaseUnit {
     static displayName = '天策羽林弩手';
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('tc_crossbow');
-        super({ 
-            side, 
-            index, 
-            type: 'tc_crossbow', 
+        super({
+            side,
+            index,
+            type: 'tc_crossbow',
             hp: stats.hp,
             speed: stats.speed,
             attackRange: stats.range,
@@ -3261,6 +3289,7 @@ export class TCCrossbow extends BaseUnit {
             projectileManager,
             cost: stats.cost
         });
+        this.penetrationCount = stats.penetration || 0;
     }
 
     performAttack(enemies) {
@@ -3278,7 +3307,7 @@ export class TCCrossbow extends BaseUnit {
                 type: 'arrow',
                 color: 0x654321, // 深褐色劲弩
                 scale: 1.2,
-                penetration: 2
+                penetration: this.penetrationCount
             });
         }
     }
@@ -3417,10 +3446,10 @@ export class TCMountedCrossbow extends BaseUnit {
     static displayName = '骁骑弩手';
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('tc_mounted_crossbow');
-        super({ 
-            side, 
-            index, 
-            type: 'tc_mounted_crossbow', 
+        super({
+            side,
+            index,
+            type: 'tc_mounted_crossbow',
             hp: stats.hp,
             speed: stats.speed,
             attackRange: stats.range,
@@ -3429,6 +3458,7 @@ export class TCMountedCrossbow extends BaseUnit {
             projectileManager,
             cost: stats.cost
         });
+        this.penetrationCount = stats.penetration || 0;
     }
 
     performAttack(enemies) {
@@ -3445,7 +3475,7 @@ export class TCMountedCrossbow extends BaseUnit {
                 damage: this.attackDamage,
                 type: 'arrow',
                 color: 0xff4400, // 火焰红色
-                penetration: 3 // 新增：3次穿透属性
+                penetration: this.penetrationCount
             });
         }
     }
