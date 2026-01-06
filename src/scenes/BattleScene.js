@@ -825,7 +825,9 @@ export class BattleScene {
                         mpCost: `消耗: ${cost} 内力`,
                         cdText: `冷却: ${cd}s`,
                         description: skill.getDescription(this.heroUnit || heroData),
-                        type: 'skill'
+                        type: 'skill',
+                        skillId: skillId,
+                        heroData: this.heroUnit || heroData
                     };
                 });
 

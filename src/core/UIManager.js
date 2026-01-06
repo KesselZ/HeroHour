@@ -915,6 +915,11 @@ class UIManager {
     showTooltip(data) {
         if (!this.tooltip || !this.tooltipTitle || !this.tooltipDesc) return;
 
+        // 核心记录：如果是技能提示，记录 ID 以便 update 中实时刷新
+        if (data.type === 'skill' && data.skillId) {
+            this.lastSkillTooltip = { skillId: data.skillId, heroData: data.heroData };
+        }
+
         // 1. 处理标题（支持技能等级标签）
         if (data.level && (data.level === '初级' || data.level === '高级' || data.level === '绝技')) {
             this.tooltipTitle.innerHTML = `
@@ -1004,7 +1009,9 @@ class UIManager {
             mpCost: `消耗: ${actualCost} 内力`,
             cdText: `冷却: ${actualCD}s`,
             description: skill.getDescription(heroData),
-            type: 'skill'
+            type: 'skill',
+            skillId,
+            heroData
         });
     }
 }

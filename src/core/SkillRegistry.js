@@ -495,7 +495,7 @@ export const SkillRegistry = {
                 },
                 // 数据驱动：声明联动逻辑
                 linkedModifiers: [
-                    { requireTalent: 'cangjian_fengming', stat: 'skill_pinghu_cooldown_multiplier', multiplier: 0.7 }
+                    { requireTalent: 'cangjian_fengming_enabled', stat: 'skill_pinghu_cooldown_multiplier', multiplier: 0.7 }
                 ]
             },
             { 
