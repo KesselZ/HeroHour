@@ -412,8 +412,8 @@ class UIManager {
             uiLayer.classList.add('ui-layer-distort-out');
             gameCanvas.classList.add('ui-layer-distort-out');
 
-            // 2. 暂停大世界时间流动
-            timeManager.pause();
+            // 2. 使用统一接口暂停游戏逻辑与时间
+            if (window.setGamePaused) window.setGamePaused(true);
             
             // 3. 立即显示天赋面板
             talentPanel.classList.remove('hidden');
@@ -454,8 +454,8 @@ class UIManager {
             uiLayer.classList.remove('ui-layer-distort-out');
             gameCanvas.classList.remove('ui-layer-distort-out');
 
-            // 2. 恢复时间流动
-            timeManager.resume();
+            // 2. 使用统一接口恢复游戏逻辑与时间流动
+            if (window.setGamePaused) window.setGamePaused(false);
             
             // 3. 隐藏奇穴面板
             talentPanel.classList.add('hidden');

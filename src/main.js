@@ -29,7 +29,6 @@ let currentState = GameState.MENU;
 let worldInstance = null; // 大世界实例
 let battleInstance = null;
 let selectedHero = null;
-let isPaused = false;
 
 /**
  * 切换暂停状态
@@ -38,12 +37,11 @@ function togglePause() {
     // 只有在世界或战斗中才能暂停
     if (currentState !== GameState.WORLD && currentState !== GameState.BATTLE) return;
 
-    isPaused = !isPaused;
+    const nextState = !timeManager.isLogicPaused;
     const pauseMenu = document.getElementById('pause-menu');
     
-    if (isPaused) {
+    if (nextState) {
         pauseMenu.classList.remove('hidden');
-        timeManager.pause();
         audioManager.play('ui_click');
     } else {
         pauseMenu.classList.add('hidden');
@@ -52,17 +50,34 @@ function togglePause() {
         const settingOps = document.getElementById('pause-settings-options');
         if (defaultOps) defaultOps.classList.remove('hidden');
         if (settingOps) settingOps.classList.add('hidden');
-
-        timeManager.resume();
         audioManager.play('ui_click');
     }
+
+    // 核心重构：统一使用 setGamePaused
+    window.setGamePaused(nextState);
 }
+
+// 暴露全局暂停接口，自动同步时间管理器与游戏逻辑
+window.setGamePaused = (paused) => {
+    // 核心改进：逻辑暂停状态现在直接存储在 timeManager 中，消除 main.js 的冗余变量
+    timeManager.isLogicPaused = paused;
+    
+    // 安全同步：确保时间流逝也跟随暂停/恢复
+    if (paused) {
+        timeManager.pause();
+    } else {
+        timeManager.resume();
+    }
+    
+    console.log(`%c[核心系统] 暂停状态同步: ${paused ? '暂停' : '恢复'}`, "color: #ff00ff; font-weight: bold");
+};
 
 // 监听 ESC 键
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         // 1. 检查是否有打开的面板需要关闭 (优先级高于暂停)
         const panels = [
+            'talent-panel',
             'hero-stats-panel',
             'town-management-panel',
             'skill-learn-panel',
@@ -76,6 +91,13 @@ window.addEventListener('keydown', (e) => {
         for (const id of panels) {
             const panel = document.getElementById(id);
             if (panel && !panel.classList.contains('hidden')) {
+                // 特殊逻辑：奇穴面板需要调用 toggle 以触发动画和逻辑恢复
+                if (id === 'talent-panel') {
+                    uiManager.toggleTalentPanel(false);
+                    panelClosed = true;
+                    break;
+                }
+
                 panel.classList.add('hidden');
                 audioManager.play('ui_click', { volume: 0.4 });
                 
@@ -87,6 +109,11 @@ window.addEventListener('keydown', (e) => {
                 if (id === 'world-event-history-panel') {
                     WorldStatusManager.updateNotificationDot(false);
                 }
+                // 特殊逻辑：如果是招式图谱或指南，恢复 HUD
+                if ((id === 'skill-learn-panel' || id === 'how-to-play-panel') && uiManager.isMobile) {
+                    uiManager.setHUDVisibility(true);
+                }
+
                 panelClosed = true;
                 break; // 每次只关闭一个面板
             }
@@ -454,8 +481,9 @@ function renderSaveSlots(containerId, mode) {
                             await spriteFactory.load();
                             selectedHero = worldManager.heroData.id;
                             enterGameState(GameState.WORLD);
-                            isPaused = false;
-                            timeManager.resume();
+                            
+                            // 核心改进：使用统一接口恢复游戏，不再手动操作两个变量
+                            window.setGamePaused(false);
                         }, 800);
                     }
                 }
@@ -758,8 +786,8 @@ function animate() {
     
     const deltaTime = clock.getDelta();
 
-    // 如果处于暂停状态，跳过逻辑更新，只进行渲染
-    if (isPaused) {
+    // 核心改进：逻辑暂停状态现在由 timeManager 统一提供
+    if (timeManager.isLogicPaused) {
         renderer.render(scene, camera);
         return;
     }

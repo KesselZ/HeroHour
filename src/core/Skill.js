@@ -406,6 +406,33 @@ export class Skill {
                 battleScene.playVFX(action.name, { pos: center, unit: vfxUnit, ...vfxParams });
                 break;
 
+            case 'shield':
+                // 1. 确定目标 (支持 side: 'caster' 或根据 targeting 范围选取)
+                const shieldTargets = (action.side === 'caster') ? [caster] : 
+                    battleScene.getUnitsInArea(center, { ...this.targeting, ...(action.targeting || {}) }, action.side || 'player');
+                
+                // 2. 计算护盾量 (优先使用缩放后的数值，其次使用缩放后的百分比)
+                const sPercent = (res.bonusValues && res.bonusValues[0] && action.percent) ? (res.bonusValues[0] / 100) : (action.percent || 0);
+                const sDur = this.getActualDuration(heroData, res.scaledDuration || action.duration || 0);
+                
+                shieldTargets.forEach(target => {
+                    if (target.addShield && !target.isDead) {
+                        let amount = 0;
+                        if (res.finalDamage) {
+                            amount = res.finalDamage;
+                        } else if (sPercent > 0) {
+                            amount = target.maxHealth * sPercent;
+                        }
+
+                        if (amount > 0) {
+                            // 使用 skill_${id} 作为标识，确保同技能护盾刷新而非无限堆叠
+                            const shieldId = `skill_${this.id}_${action.tag || 'shield'}`;
+                            target.addShield(amount, sDur, shieldId);
+                        }
+                    }
+                });
+                break;
+
             case 'damage_aoe':
                 const dmgTargeting = { ...this.targeting, ...(action.targeting || {}) };
                 if (dmgTargeting.radius) dmgTargeting.radius = this.getActualRadius(heroData, dmgTargeting.radius);
@@ -437,7 +464,10 @@ export class Skill {
             case 'buff_aoe':
                 const buffTargeting = { ...this.targeting };
                 if (buffTargeting.radius) buffTargeting.radius = this.getActualRadius(heroData, buffTargeting.radius);
-                const buffTargets = battleScene.getUnitsInArea(center, buffTargeting, action.side || 'all');
+                
+                // 核心修复：增加对 side: 'caster' 的支持，允许技能精准仅作用于施法者自身
+                const buffTargets = (action.side === 'caster') ? [caster] : 
+                    battleScene.getUnitsInArea(center, buffTargeting, action.side || 'all');
                 
                 const buffParams = { ...action.params };
                 if (res.bonusValues) {
@@ -456,7 +486,7 @@ export class Skill {
                 battleScene.applyBuffToUnits(buffTargets, { 
                     ...buffParams, 
                     duration: finalBuffDur, 
-                    tag: action.tag, 
+                    tag: action.tag || this.id, // 核心优化：如果没有显式 tag，则使用技能 ID，防止多个技能 buff 互相覆盖
                     sourceCategory, // 核心：继承类别
                     linkedModifiers: action.linkedModifiers // 透传联动协议
                 });

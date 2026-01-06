@@ -14,7 +14,8 @@ class TimeManager {
         this.lastUpdateTime = Date.now();
         this.currentTime = 0; // 当前季度的进度 (0 到 seasonDuration)
         
-        this.isPaused = false;
+        this.isPaused = false;       // 时间流逝暂停 (例如进战斗时，大世界时间不走)
+        this.isLogicPaused = false;  // 全局逻辑暂停 (例如打开菜单，所有东西都不动)
 
         // 难度配置项 (DIFFICULTY PRESETS)
         this.difficulty = 'easy'; // 默认难度
@@ -80,7 +81,8 @@ class TimeManager {
     }
 
     update() {
-        if (this.isPaused) return false;
+        // 如果全局逻辑暂停，或者时间流逝暂停，则跳过
+        if (this.isLogicPaused || this.isPaused) return false;
 
         const now = Date.now();
         const delta = now - this.lastUpdateTime;

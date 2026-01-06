@@ -147,7 +147,7 @@ export const SkillRegistry = {
         description: '天策骑术：大幅提升移速与 {bonus}% 攻击频率，持续 {duration} 秒',
         actions: [
             { type: 'vfx', name: 'pulse', params: { color: 0xff4400, duration: 800, radius: 5 } },
-            { type: 'buff_aoe', side: 'player', params: { 
+            { type: 'buff_aoe', side: 'caster', params: { 
                 stat: ['moveSpeed', 'attackSpeed'], 
                 multiplier: [1.3, 1.5], 
                 duration: 5000, 
@@ -172,7 +172,7 @@ export const SkillRegistry = {
             // 逻辑层：减伤设为 0.8 (即受损 20%)
             { 
                 type: 'buff_aoe', 
-                side: 'player', 
+                side: 'caster', 
                 applySkillPowerToMultiplier: false, // 核心修复：减伤百分比固定为 80%
                 applySkillPowerToDuration: true,    // 核心修复：只有持续时间随功法提升
                 params: { 
@@ -567,6 +567,7 @@ export const SkillRegistry = {
             {
                 type: 'buff_aoe',
                 side: 'caster',
+                tag: 'yingmingliu', // 核心修复：显式注入 tag，确保不会被其他技能覆盖
                 applySkillPowerToMultiplier: true,
                 params: {
                     // 同时对物理和魔法增伤桶进行加成，实现“全伤害提升”
