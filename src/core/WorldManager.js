@@ -1502,15 +1502,23 @@ export class WorldManager {
             return;
         }
 
-        // 按离玩家距离排序，选最远的
+        // 按离玩家距离排序
         const playerPos = this.mapState.playerPos;
         availablePois.sort((a, b) => {
             const distA = Math.pow(a.x - halfSize - playerPos.x, 2) + Math.pow(a.z - halfSize - playerPos.z, 2);
             const distB = Math.pow(b.x - halfSize - playerPos.x, 2) + Math.pow(b.z - halfSize - playerPos.z, 2);
-            return distB - distA;
+            return distA - distB; // 改为升序排列（近 -> 远）
         });
 
-        const targetPoi = availablePois[0];
+        // 挑选目标：排除最近的 2 个 POI，从剩余的 POI 中随机选择一个
+        // 这样既保证了不“贴脸”刷怪，又增加了位置的不可预测性
+        let candidatePois = availablePois;
+        if (availablePois.length > 2) {
+            candidatePois = availablePois.slice(2);
+        }
+        
+        const targetIdx = candidatePois.length > 1 ? rng.nextInt(0, candidatePois.length - 1) : 0;
+        const targetPoi = candidatePois[targetIdx];
         const ex = targetPoi.x - halfSize;
         const ez = targetPoi.z - halfSize;
 
