@@ -125,7 +125,7 @@ export const TALENT_UNITS = {
     'tiance_yulin_spear': {
         name: '横扫千军', icon: 'talent_tiance_sweep',
         description: '领悟天策府高深枪法，将原本厚重的单体穿刺攻击升级为大范围横扫。虽<span class="skill-term-highlight">单体伤害</span>下降至<span class="skill-num-highlight">75%</span>，但获得了极其强悍的群体杀伤能力。',
-        requires: ['node_core'],
+        requires: ['tiance_xu_ru_lin'],
         effects: [{ type: 'modifier', target: 'hero', key: 'tiance_yulin_enabled', value: 1, method: 'add' }]
     },
     'tiance_benlei_spear': {
@@ -136,10 +136,35 @@ export const TALENT_UNITS = {
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_tu_cooldown_override', value: 1000, method: 'add' }]
     },
 
+    'tiance_shout_speed_boost': {
+        name: '激雷', icon: 'talent_tiance_3_4',
+        description: '【撼如雷】的振奋效果更进一层，每重额外使全军<span class="skill-term-highlight">攻击速度</span>提升 <span class="skill-num-highlight">8%</span>。',
+        maxLevel: 3,
+        requires: ['tiance_tiger_hp_lock'],
+        requiredSkill: 'battle_shout',
+        effects: [{ type: 'modifier', target: 'hero', key: 'tiance_shout_haste_enabled', value: 0.08, perLevel: true, method: 'add' }]
+    },
+
+    'tiance_tiger_hp_lock': {
+        name: '虎啸', icon: 'talent_tiance_3_2',
+        description: '【啸如虎】的意志感染全军。锁血阈值从 <span class="skill-num-highlight">1</span> 点提升至最大生命值的 <span class="skill-num-highlight">50%</span>。',
+        requires: ['node_core'],
+        requiredSkill: 'xiaoruhu',
+        effects: [{ type: 'modifier', target: 'hero', key: 'tiance_tiger_lock_enhanced', value: 1, method: 'add' }]
+    },
+
+    'tiance_xu_ru_lin': {
+        name: '徐如林', icon: 'talent_tiance_2_1',
+        description: '徐如林，其寿如山。每重使普通攻击及武学招式释放时，恢复自身<span class="skill-num-highlight">8%</span>的<span class="skill-term-highlight">已损失生命值</span>。',
+        maxLevel: 3,
+        requires: ['node_core'],
+        effects: [{ type: 'modifier', target: 'hero', key: 'tiance_heal_on_cast_factor', value: 0.08, perLevel: true, method: 'add' }]
+    },
+
     'tiance_bleeding_edge': {
         name: '龙牙破军', icon: 'talent_tiance_bleeding',
         description: '所有的武学招式（非普攻）在命中敌人时都会造成伤口，使敌人额外受到共计相当于<span class="skill-term-highlight">该招式伤害</span><span class="skill-num-highlight">36%</span>的<span class="skill-term-highlight">流血伤害</span>，持续 <span class="skill-num-highlight">3</span> 秒。',
-        requires: ['node_core'],
+        requires: ['tiance_xu_ru_lin'],
         effects: [{ type: 'modifier', target: 'hero', key: 'tiance_bleeding_enabled', value: 0.12, method: 'add' }]
     },
 
@@ -340,19 +365,19 @@ export const TALENT_GROUPS = {
 
     // --- 职业专属组 ---
 
-    // 【天策·羽林】主打英雄自身的普攻横扫形态与近战爆发
-    'group_tiance_commander': {
-        name: '羽林枪法',
-        tag: '羽林',
-        major: 'tiance_yulin_spear', // 横扫千军 (核心形态)
-        minors: ['tiance_cavalry_upgrade'] // 围绕主属性与形态补充
-    },
-    // 【天策·破军】主打高频率的招式衔接与流血伤害
-    'group_tiance_martial': {
-        name: '傲血战意',
+    // 【天策·羽林】主打战吼与团队增益 (基于原有的 commander 组重构)
+    'group_tiance_shout': {
+        name: '将道·破军',
         tag: '破军',
-        major: 'tiance_bleeding_edge', // 龙牙破军 (招式流血核心)
-        minors: ['tiance_benlei_spear'] // 围绕调息与功法加成
+        major: 'tiance_tiger_hp_lock', // 虎啸 (核心锁血)
+        minors: ['tiance_shout_speed_boost'] // 激雷 (依赖虎啸)
+    },
+    // 【天策·战神】主打英雄自身的战斗形态与回血 (基于原有的 martial 组重构)
+    'group_tiance_warrior': {
+        name: '侠道·傲血',
+        tag: '战神',
+        major: 'tiance_xu_ru_lin', // 徐如林 (核心回血)
+        minors: ['tiance_bleeding_edge', 'tiance_benlei_spear', 'tiance_yulin_spear', 'tiance_cavalry_upgrade'] // 两个分支：流血与横扫
     },
     // 【藏剑·问水】主打轻剑身法与普攻强化
     'group_cangjian_light': {
@@ -392,7 +417,7 @@ export const HERO_TREE_CONFIG = {
     'lichengen': {
         core: { name: '天策府', icon: 'core_tiance', description: '长枪所指，守我大唐河山。', effects: [{ type: 'stat', stat: 'power', value: 10 }] },
         groups: [
-            'group_tiance_commander', 'group_tiance_martial', // 独特：带兵、流血
+            'group_tiance_shout', 'group_tiance_warrior', // 重构后的两个流派
             'group_military', 'group_economy', 'group_attributes' // 通用
         ]
     },

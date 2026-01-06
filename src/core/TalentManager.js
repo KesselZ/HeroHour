@@ -15,15 +15,17 @@ class TalentManager {
     /**
      * 核心重构：奇穴动作装饰器 (Action Decorator)
      * 在技能执行前，允许奇穴根据当前状态动态修改或注入新的动作
-     * 这种方式彻底解耦了技能引擎 (Skill.js) 与 具体奇穴逻辑
      */
     decorateSkillActions(skill, caster, baseActions) {
         let finalActions = [...baseActions];
 
+        // 统一处理：确保所有 caster (包括 heroData 镜像) 都能被识别
+        const unitContext = caster.side ? caster : { side: 'player', isHero: true, type: caster.id || caster.type };
+
         // --- A. 天策联动收敛 ---
         
-        // 1. 召兵升级 (原硬编码在 Skill.js)
-        const tianceUpgrade = modifierManager.getModifiedValue(caster, 'tiance_summon_upgrade', 0);
+        // 1. 召兵升级
+        const tianceUpgrade = modifierManager.getModifiedValue(unitContext, 'tiance_summon_upgrade', 0);
         if (tianceUpgrade > 0 && skill.id === 'summon_militia') {
             finalActions = finalActions.map(action => {
                 if (action.type === 'summon') return { ...action, unitType: 'tiance' };
@@ -31,10 +33,9 @@ class TalentManager {
             });
         }
 
-        // 2. 龙牙破军 (流血效果 - 彻底全覆盖)
-        const bleedFactor = modifierManager.getModifiedValue(caster, 'tiance_bleeding_enabled', 0);
+        // 2. 龙牙破军 (流血效果)
+        const bleedFactor = modifierManager.getModifiedValue(unitContext, 'tiance_bleeding_enabled', 0);
         if (bleedFactor > 0 && skill.category !== '普通攻击') {
-            // 定义标准流血零件
             const bleedPart = { 
                 type: 'dot', 
                 damageFactor: bleedFactor, 
@@ -45,12 +46,60 @@ class TalentManager {
             };
 
             finalActions = finalActions.map(action => {
-                // 为所有伤害性动作注入命中零件
                 if (action.type === 'damage_aoe' || action.type === 'projectile' || action.type === 'tick_effect' || action.type === 'movement') {
-                    return { ...action, onHit: bleedPart };
+                    return { ...action, onHit: action.onHit ? (Array.isArray(action.onHit) ? [...action.onHit, bleedPart] : [action.onHit, bleedPart]) : bleedPart };
                 }
                 return action;
             });
+        }
+
+        // 3. 撼如雷强化 (激雷)
+        if (skill.id === 'battle_shout') {
+            const shoutHaste = modifierManager.getModifiedValue(unitContext, 'tiance_shout_haste_enabled', 0);
+            if (shoutHaste > 0) {
+                finalActions = finalActions.map(action => {
+                    if (action.type === 'buff_aoe') {
+                        const stats = Array.isArray(action.params.stat) ? [...action.params.stat] : [action.params.stat];
+                        const multipliers = Array.isArray(action.params.multiplier) ? [...action.params.multiplier] : [action.params.multiplier];
+                        
+                        if (!stats.includes('attackSpeed')) {
+                            stats.push('attackSpeed');
+                            multipliers.push(1.0 + shoutHaste);
+                        }
+                        
+                        return {
+                            ...action,
+                            params: {
+                                ...action.params,
+                                stat: stats,
+                                multiplier: multipliers
+                            }
+                        };
+                    }
+                    return action;
+                });
+            }
+        }
+
+        // 4. 啸如虎强化 (虎啸)
+        if (skill.id === 'xiaoruhu') {
+            const tigerEnhanced = modifierManager.getModifiedValue(unitContext, 'tiance_tiger_lock_enhanced', 0);
+            if (tigerEnhanced > 0) {
+                finalActions = finalActions.map(action => {
+                    if (action.type === 'buff_aoe') {
+                        return {
+                            ...action,
+                            params: {
+                                ...action.params,
+                                stat: ['tigerHeart', 'tiger_heart_lock_percent'],
+                                multiplier: [1, 1],
+                                offset: [1, 0.5]
+                            }
+                        };
+                    }
+                    return action;
+                });
+            }
         }
 
         // --- B. 纯阳联动收敛 ---
@@ -111,6 +160,34 @@ class TalentManager {
         }
 
         return finalActions;
+    }
+
+    /**
+     * 核心重构：奇穴描述装饰器 (Description Decorator)
+     * 允许奇穴动态修改技能的描述模板
+     */
+    decorateSkillDescription(skill, caster, baseDescription) {
+        let desc = baseDescription;
+        const unitContext = caster.side ? caster : { side: 'player', isHero: true, type: caster.id || caster.type };
+
+        // 1. 激雷：为撼如雷增加攻速描述
+        if (skill.id === 'battle_shout') {
+            const val = modifierManager.getModifiedValue(unitContext, 'tiance_shout_haste_enabled', 0);
+            if (val > 0) {
+                // 将描述中的 "提升 {bonus}%" 替换为 "提升 {bonus}% 及 {bonus2}% 攻击速度"
+                desc = desc.replace('提升 {bonus}%', '提升 {bonus}% 及 {bonus2}% <span class="skill-term-highlight">攻击速度</span>');
+            }
+        }
+
+        // 2. 虎啸：修改啸如虎的锁血点描述
+        if (skill.id === 'xiaoruhu') {
+            const val = modifierManager.getModifiedValue(unitContext, 'tiance_tiger_lock_enhanced', 0);
+            if (val > 0) {
+                desc = desc.replace('1 点', '<span class="skill-num-highlight">50%</span> 最大生命值');
+            }
+        }
+
+        return desc;
     }
 
     /**
@@ -191,8 +268,10 @@ class TalentManager {
             for (const reqId of node.requires) {
                 const reqLevel = this.activeTalents[reqId] || 0;
                 const reqNode = this.currentTree.nodes[reqId];
-                if (reqLevel < (reqNode ? reqNode.maxLevel : 1)) {
-                    return { isLocked: true, reason: `需先修满前置奇穴：${reqNode ? reqNode.name : reqId}` };
+                
+                // 核心重构：取消“必须修满”限制，只要点出 1 重即可解锁后续
+                if (reqLevel < 1) {
+                    return { isLocked: true, reason: `需先领悟前置奇穴：${reqNode ? reqNode.name : reqId}` };
                 }
             }
         }

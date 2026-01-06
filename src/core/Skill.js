@@ -210,8 +210,12 @@ export class Skill {
     }
 
     getDescription(heroData) {
-        let desc = this.description;
         const unit = this._getUnitContext(heroData);
+        const tm = talentManager || window.talentManager;
+        
+        // --- 核心重构：注入描述装饰器 ---
+        // 允许奇穴动态修改描述文本模板 (例如增加 "{bonus2}% 攻速")
+        let desc = tm ? tm.decorateSkillDescription(this, unit, this.description) : this.description;
 
         const totalSkillMult = modifierManager.getModifiedValue(unit, 'final_skill_multiplier', 1.0);
         const totalPowerMult = modifierManager.getModifiedValue(unit, 'final_power_skill_multiplier', 1.0);
@@ -238,6 +242,7 @@ export class Skill {
                         desc = desc.split(key).join(res.isBonusDynamic ? hl(val) : normal(val));
                     });
                 }
+                // ... (后面逻辑不变)
                 if (action.count) {
                     const isDyn = action.applySkillPowerToCount === true;
                     const val = isDyn ? Math.floor(action.count * skillPower) : action.count;
@@ -245,9 +250,6 @@ export class Skill {
                 }
                 if (res.scaledDuration !== undefined) {
                     const isVFX = action.type === 'vfx';
-                    // --- 核心修复：智能识别主逻辑时长 ---
-                    // 1. 优先选择非 VFX 动作的时长（如 Buff、气场等）
-                    // 2. 在同类动作（同为 VFX 或同为逻辑动作）中，选择最长的那个
                     const shouldUpdate = foundDuration === null || 
                                          (!isVFX && (foundIsVFX || res.scaledDuration > foundDuration)) ||
                                          (isVFX && foundIsVFX && res.scaledDuration > foundDuration);
@@ -255,8 +257,6 @@ export class Skill {
                     if (shouldUpdate) {
                         const rawDuration = action.duration || (action.params && action.params.duration) || 0;
                         const actualDur = this.getActualDuration(heroData, rawDuration);
-                        
-                        // 核心修复：应基于 res.isDurationDynamic 判断是否应用缩放，而不是只看 action 顶层
                         foundDuration = res.isDurationDynamic ? (actualDur * skillPower) : actualDur;
                         isDurationDynamic = res.isDurationDynamic;
                         foundIsVFX = isVFX;
@@ -277,7 +277,10 @@ export class Skill {
             });
         };
 
-        processActions(this.actions);
+        // --- 核心重构：处理装饰后的动作 ---
+        // 这样才能让 {bonus2} 匹配到由奇穴注入的新参数
+        const finalActions = tm ? tm.decorateSkillActions(this, unit, this.actions) : this.actions;
+        processActions(finalActions);
 
         if (foundDuration !== null) {
             const val = foundDuration >= 900000 ? '永久' : (foundDuration / 1000).toFixed(1);
@@ -316,6 +319,11 @@ export class Skill {
         // 引擎不再硬编码逻辑，而是允许 TalentManager 根据当前奇穴动态注入动作
         const tm = talentManager || window.talentManager;
         const finalActions = tm ? tm.decorateSkillActions(this, caster, this.actions) : this.actions;
+
+        // 徐如林回血 (技能释放时回血)
+        if (caster.triggerTianceHeal) {
+            caster.triggerTianceHeal();
+        }
 
         finalActions.forEach(action => {
             const center = targetPos || caster.position;
@@ -406,7 +414,8 @@ export class Skill {
                     else dmgTargeting.facing = caster.getWorldDirection(new THREE.Vector3());
                 }
                 const targets = battleScene.getUnitsInArea(center, dmgTargeting, 'enemy');
-                battleScene.applyDamageToUnits(targets, res.finalDamage, center, action.knockback, caster.isHero, action.color);
+                const isHeroSource = !!(caster.isHero || (caster.side === 'player' && caster.index === -1)); 
+                battleScene.applyDamageToUnits(targets, res.finalDamage, center, action.knockback || 0, isHeroSource, action.color);
                 
                 // --- 核心进化：支持零件化子动作 ---
                 if (action.onHit) {
@@ -466,6 +475,7 @@ export class Skill {
                 if (tickTargeting.radius) tickTargeting.radius = this.getActualRadius(heroData, tickTargeting.radius);
                 const tickDur = this.getActualDuration(heroData, res.scaledDuration || action.duration);
                 const tickInt = this.getActualInterval(heroData, action.interval);
+                const isHeroSourceForTick = !!(caster.isHero || (caster.side === 'player' && caster.index === -1));
                 
                 battleScene.applyTickEffect(center, tickTargeting, {
                     duration: tickDur,
@@ -474,7 +484,7 @@ export class Skill {
                     onTick: (targets) => {
                         // 1. 执行内置逻辑 (数据驱动：如生太极的 Buff)
                         if (action.onTickDamage) {
-                            battleScene.applyDamageToUnits(targets, res.finalDamage, center, action.knockback || 0, caster.isHero, action.color);
+                            battleScene.applyDamageToUnits(targets, res.finalDamage, center, action.knockback || 0, isHeroSourceForTick, action.color);
                             
                             // --- 核心钩子：tick_effect 命中子动作 ---
                             if (action.onHit) {
@@ -485,7 +495,7 @@ export class Skill {
                             }
                         }
                         if (action.onTickHeal) {
-                            battleScene.applyDamageToUnits(targets, -res.finalHeal, center, 0, caster.isHero, action.color || 0x44ff44);
+                            battleScene.applyDamageToUnits(targets, -res.finalHeal, center, 0, isHeroSourceForTick, action.color || 0x44ff44);
                         }
                         if (action.onTickBuff) {
                             battleScene.applyBuffToUnits(targets, { 
@@ -513,12 +523,13 @@ export class Skill {
                 break;
 
             case 'movement':
+                const isHeroSourceForMove = !!(caster.isHero || (caster.side === 'player' && caster.index === -1));
                 const moveOptions = {
                     duration: action.duration,
                     damage: res.finalDamage || 0,
                     knockback: action.knockback || 0,
                     jumpHeight: action.jumpHeight || 0,
-                    isHeroSource: caster.isHero, // 补全：传入来源标记以触发天赋
+                    isHeroSource: isHeroSourceForMove, // 补全：传入来源标记以触发天赋
                     invincible: true, // 核心增强：所有主动位移技能在途中默认无敌
                     onHit: (target) => {
                         // --- 核心钩子：位移碰撞命中 ---
@@ -553,12 +564,13 @@ export class Skill {
                 
                 // 核心重构：优雅地剥离“技能动作属性”与“子弹视觉属性”，解决命名冲突
                 const { type: actionType, projType, visualType, ...projectileParams } = action;
+                const isHeroSourceForProj = !!(caster.isHero || (caster.side === 'player' && caster.index === -1));
                 
                 battleScene.spawnProjectiles({
                     ...projectileParams,
                     type: projType || visualType || 'arrow', // 显式映射视觉类型到底层的 type 字段
                     damage: res.finalDamage,
-                    isHeroSource: caster.isHero,
+                    isHeroSource: isHeroSourceForProj,
                     startPos: caster.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
                     target: projTargets[0]
                 });
@@ -567,6 +579,7 @@ export class Skill {
             case 'dot':
                 const dotTargeting = { ...this.targeting, ...(action.targeting || {}) };
                 const dotTargets = battleScene.getUnitsInArea(center, dotTargeting, action.side || 'enemy');
+                const isHeroSourceForDOT = !!(caster.isHero || (caster.side === 'player' && caster.index === -1));
                 dotTargets.forEach(t => {
                     // 修正：统一使用 battleScene.applyDOT 接口
                     if (battleScene.applyDOT) {
@@ -575,7 +588,7 @@ export class Skill {
                             interval: action.interval || 1000,
                             count: action.count || 3,
                             color: action.color,
-                            isHeroSource: caster.isHero
+                            isHeroSource: isHeroSourceForDOT
                         });
                     }
                 });

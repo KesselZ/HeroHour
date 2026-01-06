@@ -166,6 +166,9 @@ export const ASSET_REGISTRY = {
         'talent_tiance_tu':       { name: '奔雷枪术', sheet: 'TALENT_TIANCE2', rows: 4, cols: 4, r: 1, c: 3 },
         'talent_tiance_monarch':  { name: '王者之气', sheet: 'TALENT_TIANCE2', rows: 4, cols: 4, r: 3, c: 1 },
         'talent_tiance_bleeding': { name: '龙牙图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 1, c: 4 },
+        'talent_tiance_3_4': { name: '激雷图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 3, c: 4 },
+        'talent_tiance_3_2': { name: '虎啸图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 3, c: 2 },
+        'talent_tiance_2_1': { name: '徐如林图标', sheet: 'TALENT_TIANCE', rows: 4, cols: 4, r: 2, c: 1 },
 
         // 藏剑专属
         'talent_cangjian_fengming': { name: '凤鸣图标', sheet: 'SKILL5', rows: 4, cols: 4, r: 3, c: 1 }, 

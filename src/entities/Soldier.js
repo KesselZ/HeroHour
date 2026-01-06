@@ -1048,6 +1048,20 @@ export class BaseUnit extends THREE.Group {
         return new THREE.Vector3(isFlipped ? -1 : 1, 0, 0);
     }
 
+    /**
+     * 核心：天策“徐如林”回血逻辑 (攻击侧触发)
+     */
+    triggerTianceHeal() {
+        const healFactor = modifierManager.getModifiedValue(this, 'tiance_heal_on_cast_factor', 0);
+        if (healFactor > 0) {
+            const missingHp = this.maxHealth - this.health;
+            if (missingHp > 0) {
+                // 传入 false 避免来源判定循环，主角回血不视为“主角攻击”
+                this.takeDamage(-(missingHp * healFactor), false);
+            }
+        }
+    }
+
     takeDamage(amount, isHeroSource = false) {
         if (this.isDead || this.isInvincible) return;
         
@@ -1118,9 +1132,17 @@ export class BaseUnit extends THREE.Group {
             }
         }
 
-        // 2. 啸如虎：锁血 1 点逻辑
+        // 2. 啸如虎：锁血逻辑
         if (this.isTigerHeart) {
-            this.health = Math.max(1, this.health - finalAmount);
+            // 从 Modifier 获取当前单位的锁血比例，默认为 0 (代表传统的 1 点血)
+            // 增加“不回血”安全检查：锁血阈值不能高于当前血量
+            const lockPercent = modifierManager.getModifiedValue(this, 'tiger_heart_lock_percent', 0);
+            const potentialThreshold = lockPercent > 0 ? (this.maxHealth * lockPercent) : 1;
+            
+            // 核心：锁血不能变成加血。如果当前血量已经低于阈值，则锁血点设为当前血量
+            const actualThreshold = Math.min(this.health, potentialThreshold);
+            
+            this.health = Math.max(actualThreshold, this.health - finalAmount);
         } else {
             this.health -= finalAmount;
         }
@@ -1529,8 +1551,8 @@ export class HeroUnit extends BaseUnit {
         worldManager.refreshHeroStats();
     }
 
-    takeDamage(amount) {
-        super.takeDamage(amount);
+    takeDamage(amount, isHeroSource = false) {
+        super.takeDamage(amount, isHeroSource);
         this.updateHealthBar();
         if (this.side === 'player') {
             // 核心重构：使用增量同步方法，保持与 WorldManager 逻辑一致
@@ -1565,6 +1587,9 @@ export class HeroUnit extends BaseUnit {
 
             this.lastAttackTime = now;
             this.onAttackAnimation();
+            
+            // 徐如林回血 (攻击发起时回血)
+            this.triggerTianceHeal();
 
             if (isSweepEnabled) {
                 // 情况 1: 横扫 (1.5倍伤害)
@@ -1645,6 +1670,7 @@ export class HeroUnit extends BaseUnit {
             // 此时已在 performAttack 顶层处理了羽林枪法覆盖，这里的逻辑仅作保底（通常不会走到）
             audioManager.play('attack_melee', { volume: 0.5, force: true });
             this.onAttackAnimation();
+            this.triggerTianceHeal();
             this.performTianceAttack(enemies, details);
         }
     }
