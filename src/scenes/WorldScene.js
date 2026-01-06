@@ -9,6 +9,7 @@ import { terrainManager, TERRAIN_STYLES } from '../core/TerrainManager.js';
 import { createWorldObject, PlayerObject } from '../entities/WorldObjects.js';
 import { VFXLibrary } from '../core/VFXLibrary.js'; // 核心引入
 import { Pathfinder } from '../core/Pathfinder.js';
+import { weatherManager } from '../core/WeatherManager.js';
 
 /**
  * 大世界场景类
@@ -25,6 +26,7 @@ export class WorldScene {
         this.renderer = renderer;
         
         this.vfxLibrary = new VFXLibrary(this.scene); // 初始化特效库
+        weatherManager.init(this.scene, this.camera); // 初始化天气系统
         
         this.playerHero = null;
         this.heroId = null;
@@ -1786,6 +1788,12 @@ export class WorldScene {
 
     update(deltaTime) {
         if (!this.isActive || !this.playerGroup) return;
+
+        // 更新地形渐变动画 (例如季节变换)
+        terrainManager.update(deltaTime);
+        
+        // 更新天气系统
+        weatherManager.update(deltaTime);
 
         // 核心修复：如果正在进行战斗结算或对话（如碾压对话框），暂停大世界逻辑更新
         // 这不仅解决了重复触发交互的问题，也让怪物在对话时停止移动

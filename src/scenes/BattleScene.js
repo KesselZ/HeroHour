@@ -95,6 +95,8 @@ const UnitTypeMap = {
 };
 
 import { GrasslandEnvironment, AutumnEnvironment, WinterEnvironment } from '../environment/Environments.js';
+import { terrainManager, TERRAIN_STYLES } from '../core/TerrainManager.js';
+import { weatherManager } from '../core/WeatherManager.js';
 import { ProjectileManager } from '../core/ProjectileManager.js';
 import { VFXLibrary } from '../core/VFXLibrary.js';
 import { rng, setSeed } from '../core/Random.js';
@@ -188,9 +190,25 @@ export class BattleScene {
         // 初始化局内蓝条
         this.updateMPUI();
         
-        // 暂时为了测试，强制使用秋天环境
-        this.environment = new AutumnEnvironment(this.scene);
+        // --- 核心联动：根据大世界当前地形风格选择战斗环境 ---
+        const style = terrainManager.currentBaseStyle;
+        if (style === TERRAIN_STYLES.SNOW) {
+            this.environment = new WinterEnvironment(this.scene);
+        } else if (style === TERRAIN_STYLES.NORMAL_AUTUMN || style === TERRAIN_STYLES.AUTUMN) {
+            this.environment = new AutumnEnvironment(this.scene);
+        } else {
+            this.environment = new GrasslandEnvironment(this.scene);
+        }
         this.environment.init();
+
+        // --- 核心联动：将大世界的天气效果同步至战场 ---
+        if (weatherManager.type !== 'none') {
+            const savedType = weatherManager.type;
+            const savedIntensity = weatherManager.rainIntensity;
+            weatherManager.init(this.scene, this.camera);
+            if (savedType === 'rain') weatherManager.setRain(savedIntensity);
+            else if (savedType === 'snow') weatherManager.setSnow();
+        }
 
         // 查找地面用于射线检测
         this.ground = this.scene.children.find(obj => obj.geometry instanceof THREE.PlaneGeometry);
@@ -1571,6 +1589,9 @@ export class BattleScene {
     update(deltaTime) {
         // 驱动 ModifierManager 的自动计时系统 (Point 4)
         modifierManager.update(deltaTime);
+
+        // 驱动天气系统 (Point 5)
+        weatherManager.update(deltaTime);
 
         // 驱动 UIManager 实时刷新 (所见即所得)
         uiManager.update();

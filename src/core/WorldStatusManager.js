@@ -8,6 +8,8 @@
 import { timeManager } from './TimeManager.js';
 import { audioManager } from './AudioManager.js';
 import { worldManager } from './WorldManager.js';
+import { terrainManager, TERRAIN_STYLES } from './TerrainManager.js';
+import { weatherManager } from './WeatherManager.js';
 
 export class WorldStatusManager {
     // --- 0. 频率控制超参数 ---
@@ -81,6 +83,15 @@ export class WorldStatusManager {
             condition: (ctx) => ctx.season === '春'
         },
         {
+            id: 'spring_rain',
+            title: '润物无声',
+            text: '随风潜入夜，润物细无声。一场春雨悄然而至。',
+            type: 'rumor',
+            weight: 0.6,
+            condition: (ctx) => ctx.season === '春',
+            weather: 'rain_light'
+        },
+        {
             id: 'spring_heroes',
             title: '少年英才',
             text: '春意盎然，江湖上涌现出一批资质不凡的少年侠客，引得各大门派纷纷关注。',
@@ -105,6 +116,15 @@ export class WorldStatusManager {
             condition: (ctx) => ctx.season === '夏'
         },
         {
+            id: 'summer_storm',
+            title: '骤雨敲窗',
+            text: '盛夏时节，乌云压顶，一场暴雨即将洗刷大地。',
+            type: 'rumor',
+            weight: 0.6,
+            condition: (ctx) => ctx.season === '夏',
+            weather: 'rain_medium'
+        },
+        {
             id: 'summer_tide',
             title: '东海潮汐',
             text: '盛夏时节，东海潮汐异常壮观，传闻有渔民在海滩捡到了散发着微光的奇异贝壳。',
@@ -126,7 +146,8 @@ export class WorldStatusManager {
             text: '枫华谷的枫叶红透了，不少文人墨客云集于此，吟咏“霜叶红于二月花”。',
             type: 'rumor',
             weight: 1.0,
-            condition: (ctx) => ctx.season === '秋'
+            condition: (ctx) => ctx.season === '秋',
+            terrain: 'NORMAL_AUTUMN'
         },
         {
             id: 'heavy_snow',
@@ -134,7 +155,9 @@ export class WorldStatusManager {
             text: '严冬已至，大雪封山，传闻北方势力正在囤积粮草，局势愈发扑朔迷离。',
             type: 'rumor',
             weight: 1.0,
-            condition: (ctx) => ctx.season === '冬'
+            condition: (ctx) => ctx.season === '冬',
+            weather: 'snow',
+            terrain: 'SNOW'
         },
         {
             id: 'winter_pause',
@@ -311,6 +334,8 @@ export class WorldStatusManager {
         // 计算期望触发数量并进行权重随机
         const targetCount = this.CONFIG.SEASONAL_EXPECTATION;
         let remainingTarget = targetCount;
+        let terrainStyleToSet = null;
+        let weatherToSet = 'none'; // 核心新增：天气联动变量
 
         // 如果开启 Debug 模式，应用倍率
         if (worldManager.constructor.DEBUG.HIGH_EVENT_FREQUENCY) {
@@ -342,6 +367,14 @@ export class WorldStatusManager {
             if (selectedIndex !== -1) {
                 const selectedEvent = eventsWithWeights[selectedIndex];
 
+                // --- 核心联动：如果触发了带效果的事件，自动设置目标样式 ---
+                if (selectedEvent.terrain) {
+                    terrainStyleToSet = TERRAIN_STYLES[selectedEvent.terrain] || selectedEvent.terrain;
+                }
+                if (selectedEvent.weather) {
+                    weatherToSet = selectedEvent.weather;
+                }
+
                 // 触发事件
                 this.triggerActiveEvent(selectedEvent.id, {
                     title: selectedEvent.title,
@@ -360,6 +393,30 @@ export class WorldStatusManager {
             } else {
                 break; // 无法选择事件，退出循环
             }
+        }
+
+        // --- 核心联动：应用地形变换 ---
+        const mapData = worldManagerRef.mapState.grid;
+        const heightMap = worldManagerRef.mapState.heightMap;
+
+        if (terrainStyleToSet) {
+            // 触发了特殊天气（如大雪、红叶），切换到对应地形
+            terrainManager.setGlobalStyle(terrainStyleToSet, mapData, heightMap);
+        } else if (terrainManager.currentBaseStyle !== TERRAIN_STYLES.DEFAULT) {
+            // 季节更替且没有触发特殊天气，则平滑恢复为默认草地
+            terrainManager.setGlobalStyle(TERRAIN_STYLES.DEFAULT, mapData, heightMap);
+        }
+
+        // --- 核心联动：应用天气效果 ---
+        if (weatherToSet === 'snow') {
+            weatherManager.setSnow();
+        } else if (weatherToSet === 'rain_light') {
+            weatherManager.setRain('light');
+        } else if (weatherToSet === 'rain_medium') {
+            weatherManager.setRain('medium');
+        } else {
+            // 如果新季节没有触发持续性降水事件，则停止之前的降水 (满足“下个季节结束”逻辑)
+            weatherManager.stop();
         }
 
         // --- 核心新增：检查特殊的动态江湖事件 (如邪恶势力降临) ---

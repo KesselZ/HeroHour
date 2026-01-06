@@ -334,6 +334,8 @@ class City {
  * 大世界数据管理器 (单例)
  * 负责追踪资源、英雄兵力、城镇兵力
  */
+import { terrainManager, TERRAIN_STYLES } from './TerrainManager.js';
+
 export class WorldManager {
     /**
      * 全局调试配置中心 (唯一控制台)
@@ -2934,6 +2936,19 @@ export class WorldManager {
             return true;
         }
         return false;
+    }
+
+    /**
+     * [Debug] 手动设置全球地形样式 (等同于季节切换逻辑)
+     * @param {string} styleKey 样式名称 (如 'snow', 'autumn', 'normal_autumn', 'default')
+     */
+    debugSetTerrain(styleKey) {
+        const style = TERRAIN_STYLES[styleKey.toUpperCase()] || styleKey;
+        const mapData = this.mapState.grid;
+        const heightMap = this.mapState.heightMap;
+        
+        console.log(`%c[Debug] 手动触发季节性地形变换: ${style}`, "color: #ffffff; background: #8e44ad; padding: 2px 5px; border-radius: 3px;");
+        terrainManager.setGlobalStyle(style, mapData, heightMap);
     }
 }
 
