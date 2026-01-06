@@ -32,6 +32,8 @@ export const ASSET_REGISTRY = {
         TALENT6: '/assets/talents/talent6.png',
         TALENT_CANGJIAN: '/assets/talents/talent_cangjian.png',
         TALENT_CANGJIAN2: '/assets/talents/talent_cangjian2.png',
+        TALENT_CHUNYANG: '/assets/talents/talent_chunyang.png',
+        TALENT_CHUNYANG2: '/assets/talents/talent_chunyang2.png',
         TALENT_TIANCE: '/assets/talents/talent_tiance.png',
         TALENT_TIANCE2: '/assets/talents/talent_tiance2.png',
         BUILDING2: '/assets/buildings/building2.png',
@@ -138,10 +140,6 @@ export const ASSET_REGISTRY = {
         'talent_spell_power': { name: '功法提升', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 1 },
         'talent_mp':          { name: '内力根基', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 3 },
         'talent_spell_epic':  { name: '功参造化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 1 },
-        'talent_chunyang_duration': { name: '气场时长', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 2 },
-        'talent_chunyang_radius':   { name: '气场范围', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 3 },
-        'talent_chunyang_field_damage': { name: '行天道', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 1 },
-        'talent_chunyang_huasanqing': { name: '化三清强化', sheet: 'TALENT2', rows: 4, cols: 4, r: 2, c: 4 },
 
         // 将道/兵流系列 (TALENT3)
         'talent_army_hp':   { name: '军队气血', sheet: 'TALENT3', rows: 4, cols: 4, r: 1, c: 1 },
@@ -180,6 +178,18 @@ export const ASSET_REGISTRY = {
         'talent_cangjian_pianyu':   { name: '片玉图标', sheet: 'TALENT_CANGJIAN2', rows: 4, cols: 4, r: 2, c: 2 },
         'talent_cangjian_xingyun':  { name: '行云流水图标', sheet: 'TALENT_CANGJIAN', rows: 4, cols: 4, r: 3, c: 2 },
         
+        // 纯阳专属
+        'talent_chunyang_qiguan':   { name: '气贯长虹图标', sheet: 'TALENT_CHUNYANG', rows: 4, cols: 4, r: 2, c: 4 },
+        'talent_chunyang_jianyue':  { name: '剑影随心图标', sheet: 'TALENT_CHUNYANG', rows: 4, cols: 4, r: 4, c: 2 },
+        'talent_chunyang_wanjian':  { name: '万剑归宗图标', sheet: 'TALENT_CHUNYANG2', rows: 4, cols: 4, r: 4, c: 2 },
+        'talent_chunyang_sanqing_hen': { name: '三清化神恒图标', sheet: 'TALENT_CHUNYANG2', rows: 4, cols: 4, r: 3, c: 3 },
+        'talent_chunyang_sanqing_ji':  { name: '三清化神极图标', sheet: 'TALENT_CHUNYANG2', rows: 4, cols: 4, r: 1, c: 4 },
+        'talent_chunyang_bujie':    { name: '不竭图标', sheet: 'TALENT_CHUNYANG2', rows: 4, cols: 4, r: 4, c: 3 },
+        'talent_chunyang_guangyu':  { name: '广域图标', sheet: 'TALENT4', rows: 4, cols: 4, r: 2, c: 3 },
+        'talent_chunyang_huasanqing_yan': { name: '化三清延图标', sheet: 'TALENT6', rows: 4, cols: 4, r: 2, c: 4 },
+        'talent_chunyang_xingtian': { name: '行天道图标', sheet: 'TALENT6', rows: 4, cols: 4, r: 3, c: 4 },
+        'talent_chunyang_zuowang':  { name: '坐忘无我图标', sheet: 'TALENT_CHUNYANG', rows: 4, cols: 4, r: 2, c: 2 },
+
         // --- 核心节点占位符 (如果需要) ---
         'talent_core': { name: '核心', sheet: 'TALENT4', rows: 4, cols: 4, r: 4, c: 4 },
 

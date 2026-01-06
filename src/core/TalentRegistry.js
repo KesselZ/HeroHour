@@ -227,45 +227,45 @@ export const TALENT_UNITS = {
 
     // --- 纯阳职业特色奇穴 (仅李忘生可见) ---
     'chunyang_array_duration': {
-        name: '不竭', icon: 'talent_chunyang_duration',
+        name: '不竭', icon: 'talent_chunyang_bujie',
         description: '道法自然，生生不息。所有【气场】类招式的<span class="skill-term-highlight">持续时间</span>延长 <span class="skill-num-highlight">2</span> 秒。',
         requires: ['node_core'],
         effects: [{ type: 'modifier', target: 'hero', key: 'category_气场_duration_offset', value: 2000, method: 'add' }]
     },
     'chunyang_array_radius': {
-        name: '广域', icon: 'talent_chunyang_radius',
+        name: '广域', icon: 'talent_chunyang_guangyu',
         description: '乾坤之内，皆为道场。所有【气场】类招式的<span class="skill-term-highlight">影响半径</span>提升 <span class="skill-num-highlight">30%</span>。',
         requires: ['chunyang_array_duration'],
         effects: [{ type: 'modifier', target: 'hero', key: 'category_气场_radius_multiplier', value: 1.3, method: 'mult' }]
     },
     'chunyang_huasanqing_permanent': {
-        name: '化三清·延', icon: 'talent_chunyang_huasanqing',
+        name: '化三清·延', icon: 'talent_chunyang_huasanqing_yan',
         description: '悟彻三清，气劲延绵。【化三清】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
         requires: ['chunyang_array_duration'],
         requiredSkill: 'huasanqing',
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_huasanqing_duration_override', value: 999000, method: 'add' }]
     },
     'unit_chunyang_field_damage': {
-        name: '行天道', icon: 'talent_chunyang_field_damage',
+        name: '行天道', icon: 'talent_chunyang_xingtian',
         description: '【气场强化】道法自然，天道昭彰。所有【气场】获得范围伤害效果，使圈内的敌人每秒受到 <span class="skill-num-highlight">3</span> 点伤害（受功法加成）。',
         requires: ['chunyang_array_radius'],
         effects: [{ type: 'modifier', target: 'hero', key: 'chunyang_field_damage_enabled', value: 3, method: 'add' }]
     },
     'chunyang_array_mana_regen': {
-        name: '坐忘无我', icon: 'talent_mp_regen',
+        name: '坐忘无我', icon: 'talent_chunyang_zuowang',
         description: '坐忘玄机，物我两忘。侠客在【气场】范围内时，每秒额外<span class="skill-term-highlight">恢复内力</span> <span class="skill-num-highlight">3</span> 点。',
         requires: ['chunyang_array_duration'],
         effects: [{ type: 'modifier', target: 'hero', key: 'chunyang_array_mp_regen_enabled', value: 3, method: 'add' }]
     },
     'chunyang_sanqing_huashen_permanent': {
-        name: '三清化神·恒', icon: 'talent_chunyang_huasanqing',
+        name: '三清化神·恒', icon: 'talent_chunyang_sanqing_hen',
         description: '玄门化神，剑气长存。【三清化神】的<span class="skill-term-highlight">持续时间</span>变为<span class="skill-num-highlight">永久</span>（持续 999 秒）。',
         requires: ['unit_power_epic'],
         requiredSkill: 'sanqing_huashen',
         effects: [{ type: 'modifier', target: 'hero', key: 'skill_sanqing_huashen_duration_override', value: 999000, method: 'add' }]
     },
     'chunyang_sanqing_huashen_mastery': {
-        name: '三清化神·极', icon: 'talent_chunyang_huasanqing',
+        name: '三清化神·极', icon: 'talent_chunyang_sanqing_ji',
         description: '三清造化，神技自成。【三清化神】的<span class="skill-term-highlight">内力消耗</span>降低为 <span class="skill-num-highlight">0</span>，且发射<span class="skill-term-highlight">间隔</span>缩短 <span class="skill-num-highlight">1</span> 秒。',
         requires: ['chunyang_sanqing_huashen_permanent'],
         requiredSkill: 'sanqing_huashen',
@@ -275,7 +275,7 @@ export const TALENT_UNITS = {
         ]
     },
     'chunyang_sword_penetration': {
-        name: '万剑归宗', icon: 'talent_power_epic',
+        name: '万剑归宗', icon: 'talent_chunyang_wanjian',
         description: '心剑合一，气剑纵横。每重提升 <span class="skill-num-highlight">1</span> 次<span class="skill-term-highlight">穿透</span>，且<span class="skill-term-highlight">攻击范围</span>提高 <span class="skill-num-highlight">10%</span>。',
         maxLevel: 3,
         requires: ['unit_power_epic'],
@@ -285,15 +285,15 @@ export const TALENT_UNITS = {
         ]
     },
     'chunyang_sword_damage_boost': {
-        name: '凭虚御风', icon: 'talent_power',
-        description: '剑气如风，虚怀若谷。普通攻击造成的<span class="skill-term-highlight">伤害</span>提升 <span class="skill-num-highlight">20%</span>。',
+        name: '气贯长虹', icon: 'talent_chunyang_qiguan',
+        description: '浩然正气，气贯长虹。普通攻击造成的<span class="skill-term-highlight">伤害</span>提升 <span class="skill-num-highlight">20%</span>。',
         requires: ['unit_power_epic'],
         effects: [
             { type: 'modifier', target: 'hero', key: 'more_damage', value: 1.2, method: 'mult' }
         ]
     },
     'chunyang_sword_haste': {
-        name: '凭虚·疾', icon: 'talent_haste',
+        name: '剑影随心', icon: 'talent_chunyang_jianyue',
         description: '剑随意动，身随气行。普通攻击的<span class="skill-term-highlight">攻击速度</span>提升 <span class="skill-num-highlight">15%</span>。',
         requires: ['chunyang_sword_damage_boost'],
         effects: [
