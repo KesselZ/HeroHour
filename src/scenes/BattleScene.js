@@ -1824,7 +1824,7 @@ export class BattleScene {
         if (isVictory) {
             const totalPoints = this.enemyConfig ? this.enemyConfig.totalPoints : 0;
             const { timeManager } = await import('../core/TimeManager.js');
-            const xpGained = Math.floor(totalPoints * 4 * (1.0 + timeManager.getGlobalProgress() * 0.05));
+            const xpGained = Math.floor(totalPoints * 4);
             
             // 记录升级前的状态，用于结算界面展示
             const data = worldManager.heroData;

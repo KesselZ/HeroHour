@@ -321,6 +321,130 @@ export class DecorationObject extends WorldObject {
 }
 
 /**
+ * 砍树物体
+ */
+export class TreeObject extends WorldObject {
+    constructor(data) {
+        super(data);
+        this.spriteKey = data.spriteKey || 'tree';
+        this.durability = Math.floor(Math.random() * 6) + 13; // 13-18 下耐久
+        this.chopCount = 0;
+        this.chopTimer = 0;
+        this.chopCooldown = 800; // 0.8s 砍一下
+        this.shakeTime = 0;
+        this.mainSprite = null;
+        
+        // 核心修复：必须设置为可交互，否则 WorldScene 不会将其加入更新循环
+        this.isInteractable = true;
+        this.interactionRadius = 0.5; // 减小触发半径，防止干扰自动砍伐逻辑
+    }
+
+    createMesh() {
+        const group = new THREE.Group();
+        const sprite = spriteFactory.createUnitSprite(this.spriteKey);
+        this.mainSprite = sprite;
+        
+        // 核心修复：确保 Sprite 在 Group 内的锚点和偏移正确
+        // 由于 WorldObject.spawn 会设置 Group 的 position，Sprite 保持局部 (0,0,0) 即可
+        if (sprite instanceof THREE.Sprite) {
+            sprite.center.set(0.5, 0.1); // 保持和 WorldObject.spawn 一致的锚点逻辑
+        }
+        
+        group.add(sprite);
+        return group;
+    }
+
+    getTooltipData() {
+        // 获取当前全局木材收益倍率 (仅包含可能的奇穴加成)
+        const currentMult = modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', 1);
+        // 估算总收益：剩余耐久度 / 3 * (20-30的平均值 25) * 当前倍率
+        const estimatedTotal = Math.floor((this.durability / 3) * 25 * currentMult);
+        
+        return {
+            name: '树木',
+            level: '可采集',
+            maxLevel: `约 ${estimatedTotal} 份木材`,
+            description: `靠近后自动砍伐。`
+        };
+    }
+
+    update(deltaTime, playerPos) {
+        if (!this.mesh || !playerPos || this.durability <= 0) return;
+
+        // 寻找主体 Sprite (如果还没找到)
+        if (!this.mainSprite) {
+            if (this.mesh instanceof THREE.Sprite) {
+                this.mainSprite = this.mesh;
+            } else if (this.mesh instanceof THREE.Group) {
+                this.mainSprite = this.mesh.children.find(c => c instanceof THREE.Sprite);
+            }
+        }
+
+        // 自动砍树逻辑：距离检测
+        const dist = playerPos.distanceTo(this.mesh.position);
+        const chopRadius = 1.3; // 稍微大一点，提高体验
+
+        if (dist < chopRadius) {
+            if (this.chopTimer <= 0) {
+                this.chop();
+                this.chopTimer = this.chopCooldown;
+            }
+        }
+        
+        if (this.chopTimer > 0) {
+            this.chopTimer -= deltaTime * 1000;
+        }
+
+        // 抖动动画逻辑
+        if (this.shakeTime > 0) {
+            this.shakeTime -= deltaTime * 1000;
+            const intensity = 0.12;
+            if (this.mainSprite) {
+                this.mainSprite.position.x = (Math.random() - 0.5) * intensity;
+            }
+        } else if (this.mainSprite) {
+            this.mainSprite.position.x = 0;
+        }
+    }
+
+    chop() {
+        if (this.durability <= 0) return; // 再次确保安全
+        
+        this.durability--;
+        this.chopCount++;
+        this.shakeTime = 300; // 抖动 0.3s
+        
+        // 耐久耗尽逻辑
+        if (this.durability <= 0) {
+            // 播放砍断音效
+            audioManager.play('farm_tree_down', { volume: 0.8 });
+            
+            worldManager.removeEntity(this.id);
+            // 核心修复：确保从场景中彻底消失
+            if (this.mesh) {
+                if (this.mesh.parent) this.mesh.parent.remove(this.mesh);
+            }
+            // 立即触发全图实体的视觉同步
+            window.dispatchEvent(new CustomEvent('map-entities-updated'));
+        } else {
+            // 还没断，播放普通砍树音效 (1, 2 随机由 AudioManager 处理)
+            audioManager.play('farm_chop', { volume: 0.6, pitchVar: 0.2 });
+        }
+
+        // 每砍三下获得随机木材，并随季度增长
+        if (this.chopCount % 3 === 0) {
+            const baseAmount = Math.floor(Math.random() * 11) + 20; // 20-30 随机
+            
+            // 接入全局资源成长系统：使用 ModifierManager 计算最终收益
+            // 这会自动包含 TimeManager 注入的季度增长 (5%/季度) 以及可能的奇穴加成
+            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', baseAmount));
+            
+            worldManager.addWood(finalAmount);
+        }
+    }
+}
+
+/**
  * 可捡起物体（如金币、木材）
  */
 export class PickupObject extends WorldObject {
@@ -900,7 +1024,10 @@ export function createWorldObject(data) {
         case 'enemy_group':
             return new EnemyGroupObject(data);
         case 'decoration':
+            if (data.spriteKey === 'tree') return new TreeObject(data);
             return new DecorationObject(data);
+        case 'tree':
+            return new TreeObject(data);
         case 'pickup':
             return new PickupObject(data);
         case 'captured_building':

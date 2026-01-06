@@ -218,7 +218,12 @@ class ResourcePreloader {
             '/audio/sources/传送.mp3',
             '/audio/sources/获得木材厂.mp3',
             '/audio/sources/获得金矿厂.mp3',
-            '/audio/sources/获得金钱.mp3'
+            '/audio/sources/获得金钱.mp3',
+            
+            // 农活/砍树音效
+            '/audio/farm/砍树声音1.mp3',
+            '/audio/farm/砍树声音2.mp3',
+            '/audio/farm/砍断了树.mp3'
         ];
 
         return audioPaths;

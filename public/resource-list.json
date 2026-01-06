@@ -41,6 +41,7 @@
     "/assets/talents/talent6.png",
     "/assets/talents/talent7.png",
     "/assets/talents/talent8.png",
+    "/assets/talents/talent_chunyang.png",
     "/assets/talents/talent_tiance.png",
     "/assets/talents/talent_tiance2.png",
     "/assets/ui/clan.png",
@@ -62,6 +63,9 @@
     "/audio/click/清脆按钮.mp3",
     "/audio/click/胜利音效.mp3",
     "/audio/click/铃铛.mp3",
+    "/audio/farm/砍断了树.mp3",
+    "/audio/farm/砍树声音1.mp3",
+    "/audio/farm/砍树声音2.mp3",
     "/audio/fight/士兵呐喊.mp3",
     "/audio/fight/进入战斗.mp3",
     "/audio/onhit/被击中1.mp3",
@@ -91,7 +95,7 @@
     "/audio/walk/草地奔跑脚步2.mp3",
     "/audio/walk/草地奔跑脚步3.mp3"
   ],
-  "generatedAt": "2026-01-06T06:10:03.772Z",
-  "totalImages": 45,
-  "totalAudios": 43
+  "generatedAt": "2026-01-06T12:18:42.419Z",
+  "totalImages": 46,
+  "totalAudios": 46
 }

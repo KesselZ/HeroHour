@@ -1463,7 +1463,7 @@ export class WorldManager {
                         placed = true;
                     }
                 } else if (roll < 0.0055 + enemyProb + 0.007) {
-                    entitiesList.push({ id: `tree_${x}_${z}`, type: 'decoration', spriteKey: 'tree', x: worldX, z: worldZ });
+                    entitiesList.push({ id: `tree_${x}_${z}`, type: 'tree', spriteKey: 'tree', x: worldX, z: worldZ });
                     placed = true;
                 } else if (roll < 0.0055 + enemyProb + 0.009) {
                     entitiesList.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
@@ -2272,7 +2272,7 @@ export class WorldManager {
         this.updateHeroArmy(armyChanges);
 
         // 4. 计算阅历 (参考 BattleScene.js 逻辑)
-        const xpGained = Math.floor(scaledPoints * 4 * (1.0 + timeManager.getGlobalProgress() * 0.05));
+        const xpGained = Math.floor(scaledPoints * 4);
         
         const data = this.heroData;
         const xpBefore = data.xp;
