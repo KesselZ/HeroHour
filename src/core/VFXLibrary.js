@@ -247,8 +247,8 @@ export class VFXLibrary {
         const c = new THREE.Color(color);
         const rgb = `${Math.floor(c.r * 255)},${Math.floor(c.g * 255)},${Math.floor(c.b * 255)}`;
         gradient.addColorStop(0, `rgba(${rgb}, 0)`);     // 中心消失，形成中空感
-        gradient.addColorStop(0.5, `rgba(${rgb}, 0.3)`); // 中间渐变
-        gradient.addColorStop(1, `rgba(${rgb}, 0.8)`);   // 边缘最实，强调边界
+        gradient.addColorStop(0.5, `rgba(${rgb}, 0.2)`); // 中间渐变
+        gradient.addColorStop(1, `rgba(${rgb}, 0.5)`);   // 边缘适中，保持优雅
         
         ctx.clearRect(0, 0, 256, 256); // 显式清空，防止残留
         ctx.fillStyle = gradient;
@@ -261,12 +261,13 @@ export class VFXLibrary {
         const fillMat = this._createMaterial({
             map: texture,
             transparent: true,
-            opacity: 0.4,
+            opacity: 0, // 初始透明度为0，用于入场动画
             depthWrite: false,
             blending: THREE.AdditiveBlending
         });
         const fill = new THREE.Mesh(fillGeo, fillMat);
         fill.rotation.x = -Math.PI / 2;
+        fill.scale.setScalar(0.1); // 初始缩放极小
         group.add(fill);
 
         // 2. 细腻的边缘亮环
@@ -274,30 +275,43 @@ export class VFXLibrary {
         const ringMat = this._createMaterial({ 
             color: color, 
             transparent: true, 
-            opacity: 0.6,
+            opacity: 0,
             side: THREE.DoubleSide,
             depthWrite: false
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
+        ring.scale.setScalar(0.1); // 初始缩放极小
         group.add(ring);
 
         const startTime = Date.now();
-        const fadeDuration = 600; // 0.6 秒消失时间
+        const entryDuration = 400; // 入场动画时间
+        const fadeDuration = 600; // 淡出时间
+        
         const anim = () => {
             const elapsed = Date.now() - startTime;
             
             if (elapsed < duration + fadeDuration) {
-                // 计算淡出进度（只有当经过时间超过 duration 时才开始 > 0）
-                const fadeProgress = Math.max(0, (elapsed - duration) / fadeDuration);
-                
-                // 呼吸动效
-                const pulse = 1 + Math.sin(elapsed * 0.003) * 0.05;
-                fill.scale.set(pulse, pulse, 1);
-                
-                // 在 duration 期间保持饱满（呼吸），在最后的 fadeDuration 内线性淡出
-                fillMat.opacity = 0.4 * (1 - fadeProgress) * (0.8 + Math.sin(elapsed * 0.005) * 0.2);
-                ringMat.opacity = 0.6 * (1 - fadeProgress);
+                if (elapsed < entryDuration) {
+                    // 入场动画：快速展开 + 渐亮
+                    const prg = elapsed / entryDuration;
+                    const easeOut = 1 - Math.pow(1 - prg, 3); // 缓动函数
+                    fill.scale.setScalar(easeOut);
+                    ring.scale.setScalar(easeOut);
+                    fillMat.opacity = 0.4 * easeOut;
+                    ringMat.opacity = 0.6 * easeOut;
+                } else {
+                    // 常驻逻辑：呼吸动效 + 最终淡出
+                    const fadeProgress = Math.max(0, (elapsed - duration) / fadeDuration);
+                    
+                    // 呼吸动效
+                    const pulse = 1 + Math.sin(elapsed * 0.003) * 0.02;
+                    fill.scale.setScalar(pulse);
+                    
+                    // 在 duration 期间保持，在最后的 fadeDuration 内线性淡出
+                    fillMat.opacity = 0.4 * (1 - fadeProgress) * (0.8 + Math.sin(elapsed * 0.005) * 0.2);
+                    ringMat.opacity = 0.6 * (1 - fadeProgress);
+                }
                 
                 requestAnimationFrame(anim);
             } else {
@@ -309,22 +323,78 @@ export class VFXLibrary {
         };
         anim();
 
-        // 3. 极细微的上升星光
+        // 3. 入场时的瞬间脉冲粒子 (能量释放感)
+        this.createParticleExplosion(pos.clone().add(new THREE.Vector3(0, 0.1, 0)), {
+            color: color,
+            particleCount: 12,
+            size: 0.06,
+            duration: 600,
+            speed: 0.12
+        });
+
+        // 4. 核心“气”粒子：优雅的螺旋上升
         this.createParticleSystem({
             pos: pos.clone(),
             color: 0xffffff,
             duration: duration,
-            density: 0.8,
-            spawnRate: 300,
-            geometry: new THREE.BoxGeometry(0.02, 0.02, 0.02),
+            density: 2.5, // 密度提升
+            spawnRate: 150, // 发射频率加快
+            geometry: new THREE.BoxGeometry(0.04, 0.3, 0.02), // 剑气尺寸增大
             initFn: (p) => {
                 const r = Math.sqrt(Math.random()) * radius;
                 const theta = Math.random() * Math.PI * 2;
                 p.position.set(Math.cos(theta) * r, 0, Math.sin(theta) * r);
+                p.userData.angle = theta;
+                p.userData.radius = r;
+                p.userData.speedY = 0.015 + Math.random() * 0.02;
             },
             updateFn: (p, prg) => {
-                p.position.y += 0.01;
-                p.material.opacity = 0.5 * (1 - prg);
+                // 缓慢螺旋上升
+                p.userData.angle += 0.015;
+                p.position.x = Math.cos(p.userData.angle) * p.userData.radius;
+                p.position.z = Math.sin(p.userData.angle) * p.userData.radius;
+                p.position.y += p.userData.speedY;
+                
+                // 颜色演变：由白转为气场色
+                const targetColor = new THREE.Color(color);
+                p.material.color.lerp(targetColor, 0.05);
+                
+                // 透明度：淡入淡出，更有灵性
+                p.material.opacity = 0.6 * Math.sin(Math.PI * prg);
+                p.scale.setScalar(1 - prg * 0.4);
+                p.rotation.y += 0.05;
+            }
+        });
+
+        // 5. 零散的玄秘光芒 (Scattered Glimmers)
+        this.createParticleSystem({
+            pos: pos.clone(),
+            color: color,
+            duration: duration,
+            density: 1.5, // 密度提升
+            spawnRate: 300, // 频率加快
+            geometry: new THREE.BoxGeometry(0.08, 0.08, 0.08), // 光点尺寸增大
+            initFn: (p) => {
+                const r = Math.sqrt(Math.random()) * radius;
+                const theta = Math.random() * Math.PI * 2;
+                p.position.set(Math.cos(theta) * r, 0.1 + Math.random() * 0.8, Math.sin(theta) * r);
+                p.userData.floatSpeed = 0.005 + Math.random() * 0.01;
+                p.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+            },
+            updateFn: (p, prg) => {
+                // 极其缓慢地漂浮
+                p.position.y += p.userData.floatSpeed;
+                
+                // 闪烁感：正弦波控制透明度
+                p.material.opacity = 0.8 * Math.sin(Math.PI * prg);
+                
+                // 随机旋转增加光影闪烁感
+                p.rotation.x += 0.02;
+                p.rotation.z += 0.02;
+                
+                // 尺寸微调
+                const s = 1 - prg * 0.2;
+                p.scale.setScalar(s);
             }
         });
     }
@@ -570,26 +640,153 @@ export class VFXLibrary {
         });
     }
 
+    /**
+     * 高级半球气场 (镇山河专属优化)
+     * 包含：地面太极法阵、半透明流光罩子、入场冲击感
+     */
     createDomeVFX(pos, radius, color, duration) {
-        const geo = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-        const mat = this._createMaterial({ color, transparent: true, opacity: 0.3 });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.copy(pos);
-        this.scene.add(mesh);
+        const group = new THREE.Group();
+        group.position.copy(pos);
+        this.scene.add(group);
 
-        const start = Date.now();
+        // --- 核心修正：处理颜色，使其蓝得更深邃、饱和度更高 ---
+        const baseColor = new THREE.Color(color);
+        const hsl = {};
+        baseColor.getHSL(hsl);
+        // 强制高饱和度 (1.0)，降低亮度 (0.18)，这样叠加后依然是纯正的深色调
+        baseColor.setHSL(hsl.h, 1.0, 0.18); 
+        const deepColorHex = baseColor.getHex();
+        const rgb = `${Math.floor(baseColor.r * 255)},${Math.floor(baseColor.g * 255)},${Math.floor(baseColor.b * 255)}`;
+
+        // 1. 地面太极法阵 (Canvas 动态生成)
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        const cx = 128, cy = 128, r = 120;
+        
+        // 绘制外圈
+        ctx.strokeStyle = `rgba(${rgb}, 0.9)`;
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 绘制简约太极轮廓
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r - 15, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - r + 15);
+        ctx.bezierCurveTo(cx + r, cy - r, cx + r, cy + r, cx, cy + r - 15);
+        ctx.bezierCurveTo(cx - r, cy + r, cx - r, cy - r, cx, cy - r + 15);
+        ctx.fillStyle = `rgba(${rgb}, 0.3)`;
+        ctx.fill();
+        ctx.stroke();
+
+        const groundTex = new THREE.CanvasTexture(canvas);
+        const groundGeo = new THREE.PlaneGeometry(radius * 2.2, radius * 2.2);
+        const groundMat = this._createMaterial({ 
+            map: groundTex, 
+            transparent: true, 
+            opacity: 0, 
+            depthWrite: false,
+            blending: THREE.AdditiveBlending 
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = 0.05;
+        group.add(ground);
+
+        // 2. 半球罩子
+        const domeGeo = new THREE.SphereGeometry(radius, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2);
+        const domeMat = this._createMaterial({ 
+            color: deepColorHex, 
+            transparent: true, 
+            opacity: 0, 
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const dome = new THREE.Mesh(domeGeo, domeMat);
+        group.add(dome);
+
+        // 3. 顶部装饰光圈
+        const topRingGeo = new THREE.TorusGeometry(radius * 0.2, 0.015, 8, 32);
+        const ringColor = new THREE.Color(deepColorHex).lerp(new THREE.Color(0xffffff), 0.15);
+        const topRingMat = this._createMaterial({ color: ringColor, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+        const topRing = new THREE.Mesh(topRingGeo, topRingMat);
+        topRing.rotation.x = Math.PI / 2;
+        topRing.position.y = radius * 0.95;
+        group.add(topRing);
+
+        const startTime = Date.now();
+        const entryTime = 500;
+        const fadeTime = 800;
+
         const anim = () => {
-            const el = Date.now() - start;
-            if (el < duration) {
-                const s = 1 + Math.sin(el * 0.005) * 0.05;
-                mesh.scale.set(s, s, s);
+            const elapsed = Date.now() - startTime;
+            if (elapsed < duration + fadeTime) {
+                const prg = elapsed / duration;
+                
+                if (elapsed < entryTime) {
+                    // 入场：从下往上弹出 + 渐亮
+                    const entryPrg = elapsed / entryTime;
+                    const ease = 1 - Math.pow(1 - entryPrg, 3);
+                    dome.scale.set(ease, ease, ease);
+                    dome.position.y = -radius * (1 - ease);
+                    domeMat.opacity = 0.5 * ease; 
+                    groundMat.opacity = 0.6 * ease;
+                    topRingMat.opacity = 0.7 * ease;
+                } else if (elapsed > duration) {
+                    // 淡出
+                    const fadePrg = (elapsed - duration) / fadeTime;
+                    const out = 1 - fadePrg;
+                    domeMat.opacity = 0.5 * out;
+                    groundMat.opacity = 0.6 * out;
+                    topRingMat.opacity = 0.7 * out;
+                    group.scale.setScalar(1 + fadePrg * 0.1);
+                } else {
+                    // 常驻：呼吸 + 旋转
+                    const pulse = 1 + Math.sin(elapsed * 0.002) * 0.03;
+                    dome.scale.set(pulse, pulse, pulse);
+                    domeMat.opacity = 0.35 + Math.sin(elapsed * 0.003) * 0.1;
+                    ground.rotation.z += 0.004; // 地面法阵缓慢旋转
+                }
+
                 requestAnimationFrame(anim);
             } else {
-                this.scene.remove(mesh);
-                geo.dispose(); mat.dispose();
+                this.scene.remove(group);
+                groundTex.dispose(); groundGeo.dispose(); groundMat.dispose();
+                domeGeo.dispose(); domeMat.dispose();
+                topRingGeo.dispose(); topRingMat.dispose();
             }
         };
         anim();
+
+        // 4. 伴随效果：落剑感 (快速落下的光束)
+        for(let i = 0; i < 3; i++) {
+            setTimeout(() => {
+                this.createParticleSystem({
+                    pos: pos.clone().add(new THREE.Vector3((Math.random()-0.5)*radius, 0, (Math.random()-0.5)*radius)),
+                    color: deepColorHex, 
+                    duration: 400,
+                    density: 1,
+                    spawnRate: 100,
+                    geometry: new THREE.BoxGeometry(0.1, 2.0, 0.1),
+                    initFn: p => { 
+                        p.position.y = 10; 
+                        p.material.opacity = 0.6;
+                        p.material.blending = THREE.AdditiveBlending;
+                    },
+                    updateFn: (p, prg) => { 
+                        p.position.y -= 0.8; 
+                        p.material.opacity = 0.6 * (1 - prg); 
+                    }
+                });
+            }, i * 150);
+        }
     }
 
     createSweepVFX(pos, dir, radius, color, duration, angle, parent = null) {
@@ -822,64 +1019,80 @@ export class VFXLibrary {
     }
 
     /**
-     * 风来吴山专属特效：巨大巨剑旋风斩
+     * 风来吴山专属特效：沉重的重剑旋风斩
+     * 优化点：强调重剑的重量感与排山倒海的气浪，移除电锯般的切割感
      */
     createMegaWhirlwindVFX(pos, radius, color, duration, parent = null) {
         const actualParent = parent || this.scene;
         const group = new THREE.Group();
         group.position.copy(pos);
-        group.position.y = 0.8; // 稍微抬高一点，显得宏大
+        group.position.y = 0.1; // 极低重心，表现贴地横扫的力量
         actualParent.add(group);
 
         if (parent && parent.scale) {
             group.scale.set(1/parent.scale.x, 1/parent.scale.y, 1/parent.scale.z);
         }
 
-        // 1. 核心巨剑幻影 (多个长方体模拟巨剑)
-        const swordCount = 4;
-        const swords = [];
-        const swordGeo = new THREE.BoxGeometry(radius * 1.8, 0.2, 0.4); // 很长很宽的剑
-        for (let i = 0; i < swordCount; i++) {
-            const swordMat = this._createMaterial({ 
-                color: color, 
-                transparent: true, 
-                opacity: 0.7,
-                depthWrite: false 
-            });
-            const sword = new THREE.Mesh(swordGeo, swordMat);
-            sword.rotation.y = (i * Math.PI * 2) / swordCount;
-            group.add(sword);
-            swords.push({ mesh: sword, mat: swordMat });
-        }
+        // --- 核心修正：强化橙色的深邃感与饱和度 ---
+        const baseColor = new THREE.Color(color);
+        const hsl = {};
+        baseColor.getHSL(hsl);
+        // 强制高饱和度 (1.0)，适度压低亮度 (0.3 - 0.4)，确保叠加后呈现浓郁的橙色
+        baseColor.setHSL(hsl.h, 1.0, 0.35); 
+        const heavyColorHex = baseColor.getHex();
+        const rgb = `${Math.floor(baseColor.r * 255)},${Math.floor(baseColor.g * 255)},${Math.floor(baseColor.b * 255)}`;
 
-        // 2. 华丽的旋转气浪
-        const waveCount = 5;
-        const waves = [];
-        for (let i = 0; i < waveCount; i++) {
-            const innerR = radius * (0.4 + i * 0.15);
-            const outerR = radius * (0.7 + i * 0.15);
-            const geo = new THREE.RingGeometry(innerR, outerR, 64, 1, Math.random() * Math.PI, Math.PI * 1.5);
-            const mat = this._createMaterial({ 
-                color: i % 2 === 0 ? color : 0xffffff, // 交替白光和金光
-                transparent: true, 
-                opacity: 0.4,
+        // 1. 创建“重剑气浪”纹理 (Canvas)
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // 绘制一个厚重的、带有拖尾的宽阔弧光
+        ctx.clearRect(0, 0, 512, 512);
+        const grad = ctx.createRadialGradient(256, 256, 150, 256, 256, 250);
+        grad.addColorStop(0, `rgba(${rgb}, 0)`);
+        grad.addColorStop(0.3, `rgba(${rgb}, 0.9)`); // 增加不透明度，让颜色更“实”
+        grad.addColorStop(1, `rgba(${rgb}, 0)`);
+        
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 85; // 进一步加宽
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        // 缩短弧度到 180 度左右，突出每一剑“抡”出来的感觉
+        ctx.arc(256, 256, 200, 0, Math.PI * 1.1); 
+        ctx.stroke();
+
+        const heavyTrailTex = new THREE.CanvasTexture(canvas);
+        
+        // 2. 核心气浪层 (表现体积感)
+        const layers = [];
+        const layerCount = 3;
+        for (let i = 0; i < layerCount; i++) {
+            const r = radius * (0.9 + i * 0.15);
+            const geo = new THREE.PlaneGeometry(r * 2.2, r * 2.2);
+            const mat = this._createMaterial({
+                map: heavyTrailTex,
+                transparent: true,
+                opacity: 0,
                 side: THREE.DoubleSide,
-                depthWrite: false
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
             });
-            const wave = new THREE.Mesh(geo, mat);
-            wave.rotation.x = -Math.PI / 2;
-            wave.position.y = (i - 2) * 0.2; // 错落有致
-            group.add(wave);
-            waves.push({ mesh: wave, mat, speed: 0.2 + i * 0.05 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.y = i * 0.3; 
+            mesh.rotation.z = (i * Math.PI) / 2;
+            group.add(mesh);
+            // 降低转速，突出沉重感
+            layers.push({ mesh, mat, speed: 0.12 + i * 0.03 });
         }
 
-        // 3. 底部金色法阵
-        const circleGeo = new THREE.CircleGeometry(radius, 32);
-        const circleMat = this._createMaterial({ color, transparent: true, opacity: 0.15 });
-        const circle = new THREE.Mesh(circleGeo, circleMat);
-        circle.rotation.x = -Math.PI / 2;
-        circle.position.y = -0.7;
-        group.add(circle);
+        // 3. 地面震荡波 (Shockwaves)
+        const ringGeo = new THREE.RingGeometry(radius * 0.8, radius, 64);
+        const ringMat = this._createMaterial({ color: heavyColorHex, transparent: true, opacity: 0.4, depthWrite: false });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        group.add(ring);
 
         const startTime = Date.now();
         const anim = () => {
@@ -887,58 +1100,62 @@ export class VFXLibrary {
             const prg = elapsed / duration;
 
             if (prg < 1) {
-                // 巨剑旋转：从 0.25 降为 0.1，让巨剑轨迹清晰可见
-                group.rotation.y += 0.1;
+                const timeFactor = elapsed * 0.001;
                 
-                // 气浪旋转和错动：同样减速，增加厚重感
-                waves.forEach(w => {
-                    w.mesh.rotation.z += w.speed * 0.5;
-                    w.mat.opacity = 0.4 * (1 - prg);
+                // 0.8秒快速渐入，最后0.6秒快速渐出
+                const fadeIn = Math.min(1, elapsed / 800);
+                const fadeOut = Math.min(1, (duration - elapsed) / 600);
+                const fs = fadeIn * fadeOut;
+
+                layers.forEach((layer, idx) => {
+                    layer.mesh.rotation.z += layer.speed;
+                    layer.mesh.position.y = (idx * 0.3) + Math.sin(timeFactor * 10 + idx) * 0.05;
+                    const baseOpacity = 0.85 - idx * 0.15;
+                    layer.mat.opacity = baseOpacity * fs;
                 });
 
-                swords.forEach(s => {
-                    s.mat.opacity = 0.7 * (1 - prg);
-                });
-
-                circleMat.opacity = 0.15 * (1 - prg);
+                ring.scale.setScalar(1 + Math.sin(timeFactor * 15) * 0.05);
+                ringMat.opacity = 0.3 * fs;
                 
                 requestAnimationFrame(anim);
             } else {
                 actualParent.remove(group);
-                swordGeo.dispose();
-                circleGeo.dispose();
-                swords.forEach(s => s.mat.dispose());
-                waves.forEach(w => { w.mesh.geometry.dispose(); w.mat.dispose(); });
-                circleMat.dispose();
+                heavyTrailTex.dispose();
+                layers.forEach(l => { l.mesh.geometry.dispose(); l.mat.dispose(); });
+                ringGeo.dispose(); ringMat.dispose();
             }
         };
         anim();
 
-        // 4. 大量喷发粒子
+        // 4. 重力粒子：地面翻起的碎石与尘土
         this.createParticleSystem({
             pos: pos.clone(),
             parent: actualParent,
-            color: 0xffcc00,
+            color: heavyColorHex, // 使用加重后的橙色
             duration: duration,
-            density: 4,
-            spawnRate: 40,
-            geometry: new THREE.BoxGeometry(0.15, 0.15, 0.15),
+            density: 3.0,
+            spawnRate: 60,
+            geometry: new THREE.BoxGeometry(0.12, 0.12, 0.12), 
             initFn: (p) => {
-                const angle = Math.random() * Math.PI * 2;
-                const r = radius * Math.random();
-                p.position.set(Math.cos(angle) * r, -0.5, Math.sin(angle) * r);
-                p.userData.vel = new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.2,
-                    0.1 + Math.random() * 0.2,
-                    (Math.random() - 0.5) * 0.2
-                );
+                const a = Math.random() * Math.PI * 2;
+                const r = radius * (0.5 + Math.random() * 0.5);
+                p.position.set(Math.cos(a) * r, -0.2, Math.sin(a) * r);
+                p.userData.velY = 0.1 + Math.random() * 0.15;
+                p.userData.angle = a;
+                p.userData.r = r;
             },
             updateFn: (p, prg) => {
-                p.position.add(p.userData.vel);
-                p.rotation.x += 0.2;
-                p.rotation.y += 0.2;
-                p.material.opacity = 0.8 * (1 - prg);
-                p.scale.setScalar(1.5 * (1 - prg));
+                p.userData.angle += 0.1;
+                p.position.x = Math.cos(p.userData.angle) * p.userData.r;
+                p.position.z = Math.sin(p.userData.angle) * p.userData.r;
+                
+                p.position.y += p.userData.velY;
+                p.userData.velY -= 0.01;
+                if(p.position.y < 0) p.position.y = 0;
+
+                p.rotation.x += 0.1;
+                p.material.opacity = 0.7 * (1 - prg);
+                p.scale.setScalar(1 - prg * 0.5);
             }
         });
     }

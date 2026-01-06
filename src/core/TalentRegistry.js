@@ -198,6 +198,13 @@ export const TALENT_UNITS = {
         requiredSkill: ['hegui', 'songshe'],
         effects: [{ type: 'modifier', target: 'hero', key: 'cangjian_jump_whirlwind_enabled', value: 1, method: 'add' }]
     },
+    'cangjian_fenglai_heavy': {
+        name: '吴山雷鸣', icon: 'talent_cangjian_burst',
+        description: '【绝技强化】大巧不工，重剑之极。风来吴山的<span class="skill-term-highlight">持续时间</span>延长 <span class="skill-num-highlight">2</span> 秒。',
+        requires: ['cangjian_jump_whirlwind'],
+        requiredSkill: 'fenglaiwushan',
+        effects: [{ type: 'modifier', target: 'hero', key: 'skill_fenglaiwushan_duration_offset', value: 2000, method: 'add' }]
+    },
     'cangjian_tingying': {
         name: '听莺', icon: 'talent_cangjian_tingying',
         description: '【西子情】泉凝月的<span class="skill-term-highlight">护盾基础值</span>提高至最大生命值的 <span class="skill-num-highlight">50%</span>，且<span class="skill-term-highlight">持续时间</span>延长至 <span class="skill-num-highlight">5</span> 秒。',
@@ -408,7 +415,7 @@ export const TALENT_GROUPS = {
         name: '山居剑意·厚重',
         tag: '重剑',
         major: 'cangjian_kill_shield', // 映波锁澜 (核心：重剑杀敌获盾)
-        minors: ['cangjian_jump_whirlwind'] // 层云
+        minors: ['cangjian_jump_whirlwind', 'cangjian_fenglai_heavy'] // 层云 + 吴山雷鸣
     },
 
     // --- 纯阳专属组 ---
