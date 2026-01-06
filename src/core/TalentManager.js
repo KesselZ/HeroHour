@@ -3,7 +3,24 @@ import { modifierManager } from './ModifierManager.js';
 
 /**
  * TalentManager: 奇穴系统逻辑管理器
- * 处理点数分配、前置检查及加成应用
+ * 
+ * --- 开发者指南：如何优雅地让奇穴影响技能？ ---
+ * 
+ * 方式 A: 声明式覆盖 (推荐：用于通用参数)
+ * - 适用：CD、内力消耗、持续时间(Duration)、影响半径(Radius)。
+ * - 实现：直接在 TalentRegistry 的 effects 中定义 `skill_ID_cooldown_override` 等 Key。
+ * - 原理：Skill.js 核心逻辑会自动检查这些 Key，无需在 TalentManager 中写逻辑。
+ * 
+ * 方式 B: 动作装饰注入 (用于深层逻辑/动作修改)
+ * - 适用：修改 Action 内部的基础值(如护盾比例)、注入新 Action (如流血、落地回旋斩)、改变动作属性(如召兵种类)。
+ * - 实现：在下方的 `decorateSkillActions` 方法中进行拦截和 map 处理。
+ * - 注意：这里只改“图纸基础值”，不处理英雄属性倍率计算。
+ * 
+ * 方式 C: 描述装饰 (仅用于显示)
+ * - 适用：当 Action 被装饰后，默认的 Tooltip 模板(Template)需要改变时（例如增加原本没有的文字）。
+ * - 实现：在下方的 `decorateSkillDescription` 中修改字符串模板。
+ * - 自动化：如果 Action 的基础值变了且模板中有 {bonus} 等占位符，系统会自动计算并显示最终值，无需在此手动处理。
+ * - 禁忌：严禁在此方法中修改任何战斗逻辑。
  */
 class TalentManager {
     constructor() {
@@ -13,8 +30,15 @@ class TalentManager {
     }
 
     /**
-     * 核心重构：奇穴动作装饰器 (Action Decorator)
-     * 在技能执行前，允许奇穴根据当前状态动态修改或注入新的动作
+     * 奇穴动作装饰器 (Action Decorator)
+     * 
+     * 职责：在技能执行前，根据当前奇穴状态，动态修改技能的“动作图纸”。
+     * 分工：
+     * 1. 修改 Action 的基础数值 (如：percent, value)。这些值随后会进入 Skill.js 正常的倍率缩放流程。
+     * 2. 注入新的 Action (如：onHit 零件，onComplete 零件)。
+     * 3. 拦截并替换 Action 类型 (如：summon 兵种替换)。
+     * 
+     * 注意：如果只是修改 CD 或内力消耗，请使用【方式 A】，不要在此处手动 map。
      */
     decorateSkillActions(skill, caster, baseActions) {
         let finalActions = [...baseActions];
@@ -124,8 +148,6 @@ class TalentManager {
         }
 
         // --- C. 藏剑联动收敛 ---
-
-        // 1. 层云 (落地旋风斩 - 收敛为零件)
         const jumpWhirlwind = modifierManager.getModifiedValue(caster, 'cangjian_jump_whirlwind_enabled', 0);
         if (jumpWhirlwind > 0 && (skill.id === 'hegui' || skill.id === 'songshe')) {
             finalActions = finalActions.map(action => {
@@ -159,12 +181,52 @@ class TalentManager {
             });
         }
 
+        // 2. 泉凝月强化 (听莺)
+        const tingyingPercent = modifierManager.getModifiedValue(unitContext, 'skill_quanningyue_percent_override', 0);
+        const tingyingDuration = modifierManager.getModifiedValue(unitContext, 'skill_quanningyue_duration_override', 0);
+        if (skill.id === 'quanningyue' && tingyingPercent > 0) {
+            finalActions = finalActions.map(action => {
+                if (action.type === 'shield') {
+                    return { ...action, percent: tingyingPercent, duration: tingyingDuration || action.duration };
+                }
+                return action;
+            });
+        }
+
+        // 3. 梦泉虎跑强化 (片玉)
+        const pianyuDR = modifierManager.getModifiedValue(unitContext, 'skill_mengquan_dr_override', 0);
+        if (skill.id === 'mengquan' && pianyuDR > 0) {
+            finalActions = finalActions.map(action => {
+                // 找到包含减伤的 buff 动作
+                if (action.type === 'buff_aoe' && action.params.stat && action.params.stat.includes('damageReduction')) {
+                    const stats = Array.isArray(action.params.stat) ? [...action.params.stat] : [action.params.stat];
+                    const offsets = Array.isArray(action.params.offset) ? [...action.params.offset] : [action.params.offset];
+                    
+                    const drIndex = stats.indexOf('damageReduction');
+                    if (drIndex !== -1) {
+                        offsets[drIndex] = pianyuDR; // 使用来自奇穴数据的数值
+                    }
+                    
+                    return {
+                        ...action,
+                        params: { ...action.params, offset: offsets }
+                    };
+                }
+                return action;
+            });
+        }
+
         return finalActions;
     }
 
     /**
-     * 核心重构：奇穴描述装饰器 (Description Decorator)
-     * 允许奇穴动态修改技能的描述模板
+     * 奇穴描述装饰器 (Description Decorator)
+     * 
+     * 职责：修正技能面板(Tooltip)的文字描述模板。
+     * 
+     * 准则：
+     * 1. 仅限替换字符串模板。
+     * 2. 只有在原始描述是“死文字”且无法通过占位符自然表达时，才在此处进行手动替换。
      */
     decorateSkillDescription(skill, caster, baseDescription) {
         let desc = baseDescription;
@@ -184,6 +246,19 @@ class TalentManager {
             const val = modifierManager.getModifiedValue(unitContext, 'tiance_tiger_lock_enhanced', 0);
             if (val > 0) {
                 desc = desc.replace('1 点', '<span class="skill-num-highlight">50%</span> 最大生命值');
+            }
+        }
+
+        // 3. 听莺：原本 quanningyue 描述已有 {bonus} 和 {duration} 占位符
+        // 由于 decorateSkillActions 已经修改了基础值，系统会自动算出最终百分比。
+        // 此处不再需要任何逻辑，系统会自然渲染。
+
+        // 4. 片玉：修改梦泉虎跑的减伤描述
+        // 注意：原本 mengquan 的减伤描述是硬编码的 "65%"，所以这里需要手动替换模板
+        if (skill.id === 'mengquan') {
+            const pianyuDR = modifierManager.getModifiedValue(unitContext, 'skill_mengquan_dr_override', 0);
+            if (pianyuDR > 0) {
+                desc = desc.replace('减伤提高 65%', `减伤提高 <span class="skill-num-highlight">${Math.round(pianyuDR * 100)}%</span>`);
             }
         }
 

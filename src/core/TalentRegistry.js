@@ -198,6 +198,23 @@ export const TALENT_UNITS = {
         requiredSkill: ['hegui', 'songshe'],
         effects: [{ type: 'modifier', target: 'hero', key: 'cangjian_jump_whirlwind_enabled', value: 1, method: 'add' }]
     },
+    'cangjian_tingying': {
+        name: '听莺', icon: 'talent_cangjian_tingying',
+        description: '【西子情】泉凝月的<span class="skill-term-highlight">护盾基础值</span>提高至最大生命值的 <span class="skill-num-highlight">50%</span>，且<span class="skill-term-highlight">持续时间</span>延长至 <span class="skill-num-highlight">5</span> 秒。',
+        requires: ['node_core'],
+        effects: [
+            { type: 'modifier', target: 'hero', key: 'skill_quanningyue_percent_override', value: 0.5, method: 'add' },
+            { type: 'modifier', target: 'hero', key: 'skill_quanningyue_duration_override', value: 5000, method: 'add' }
+        ]
+    },
+    'cangjian_pianyu': {
+        name: '片玉', icon: 'talent_cangjian_pianyu',
+        description: '【问水决】梦泉虎跑期间的<span class="skill-term-highlight">受到的伤害</span>额外降低，使总减伤效果提升至 <span class="skill-num-highlight">80%</span>。',
+        requires: ['cangjian_fengming'],
+        effects: [
+            { type: 'modifier', target: 'hero', key: 'skill_mengquan_dr_override', value: 0.8, method: 'add' }
+        ]
+    },
 
     // --- 纯阳职业特色奇穴 (仅李忘生可见) ---
     'chunyang_array_duration': {
@@ -384,7 +401,7 @@ export const TALENT_GROUPS = {
         name: '问水决·灵动',
         tag: '轻剑',
         major: 'cangjian_fengming', // 凤鸣 (核心：梦泉虎跑强化)
-        minors: ['cangjian_heavy_burst', 'unit_power_epic'] // 莺鸣柳浪 + 史诗属性
+        minors: ['cangjian_heavy_burst', 'unit_power_epic', 'cangjian_tingying', 'cangjian_pianyu'] // 莺鸣柳浪 + 史诗属性 + 听莺 + 片玉
     },
     // 【藏剑·山居】主打重剑爆发与生存
     'group_cangjian_heavy': {
