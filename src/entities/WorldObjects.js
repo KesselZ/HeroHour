@@ -357,14 +357,14 @@ export class TreeObject extends WorldObject {
     getTooltipData() {
         // 获取当前全局木材收益倍率 (仅包含可能的奇穴加成)
         const currentMult = modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', 1);
-        // 估算总收益：剩余耐久度 / 3 * (20-30的平均值 25) * 当前倍率
-        const estimatedTotal = Math.floor((this.durability / 3) * 25 * currentMult);
+        // 估算总收益：(剩余耐久度 / 3 * 20) + 40 (砍断奖励)
+        const estimatedTotal = Math.floor(((this.durability / 3) * 20 + 40) * currentMult);
         
         return {
             name: '树木',
             level: '可采集',
             maxLevel: `约 ${estimatedTotal} 份木材`,
-            description: `靠近后自动砍伐。`
+            description: `靠近后自动砍伐。砍断树木可获得额外惊喜奖励。`
         };
     }
 
@@ -418,6 +418,12 @@ export class TreeObject extends WorldObject {
         if (this.durability <= 0) {
             // 播放砍断音效
             audioManager.play('farm_tree_down', { volume: 0.8 });
+
+            // 核心修改：砍断树木直接获得 30-50 木材
+            const baseFinalAmount = Math.floor(Math.random() * 21) + 30; // 30-50 随机
+            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', baseFinalAmount));
+            worldManager.addWood(finalAmount);
+            worldManager.showNotification(`树木倒下了！额外获得 🪵${finalAmount}`);
             
             worldManager.removeEntity(this.id);
             // 核心修复：确保从场景中彻底消失
@@ -432,11 +438,11 @@ export class TreeObject extends WorldObject {
         }
 
         // 每砍三下获得随机木材，并随季度增长
-        if (this.chopCount % 3 === 0) {
-            const baseAmount = Math.floor(Math.random() * 11) + 20; // 20-30 随机
+        if (this.chopCount % 3 === 0 && this.durability > 0) {
+            // 核心修改：降低每三下的收益为 15-25
+            const baseAmount = Math.floor(Math.random() * 11) + 15; // 15-25 随机
             
             // 接入全局资源成长系统：使用 ModifierManager 计算最终收益
-            // 这会自动包含 TimeManager 注入的季度增长 (5%/季度) 以及可能的奇穴加成
             const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', baseAmount));
             
             worldManager.addWood(finalAmount);

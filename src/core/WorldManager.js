@@ -1441,10 +1441,11 @@ export class WorldManager {
                 } else if (roll < 0.003) {
                     entitiesList.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.005) {
+                } else if (roll < 0.0042) {
+                    // 核心调整：木材刷新率降低 40% (从 0.002 降至 0.0012)
                     entitiesList.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.0055) {
+                } else if (roll < 0.0047) {
                     const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
                     entitiesList.push({ 
                         id: `${bType}_${x}_${z}`, type: 'captured_building', 
@@ -1453,7 +1454,7 @@ export class WorldManager {
                         config: { owner: 'none', type: bType }
                     });
                     placed = true;
-                } else if (roll < 0.0055 + enemyProb) {
+                } else if (roll < 0.0047 + enemyProb) {
                     const tId = this.getDynamicEnemyType(worldX, worldZ);
                     const template = this.enemyTemplates[tId];
                     if (template) {
@@ -1464,10 +1465,10 @@ export class WorldManager {
                         });
                         placed = true;
                     }
-                } else if (roll < 0.0055 + enemyProb + 0.007) {
+                } else if (roll < 0.0047 + enemyProb + 0.007) {
                     entitiesList.push({ id: `tree_${x}_${z}`, type: 'tree', spriteKey: 'tree', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.0055 + enemyProb + 0.009) {
+                } else if (roll < 0.0047 + enemyProb + 0.009) {
                     entitiesList.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
                     placed = true;
                 }

@@ -134,7 +134,6 @@ export const ASSET_REGISTRY = {
         'talent_gold_base': { name: '生财有道', sheet: 'TALENT3', rows: 4, cols: 4, r: 2, c: 2 },
         'talent_loot':      { name: '赏金猎人', sheet: 'TALENT3', rows: 4, cols: 4, r: 3, c: 2 },
         'talent_wood':      { name: '以物易物', sheet: 'TALENT1', rows: 4, cols: 4, r: 1, c: 3 },
-        'talent_monopoly':  { name: '资源垄断', sheet: 'TALENT1', rows: 4, cols: 4, r: 2, c: 1 },
 
         // 武道/演武系列 (TALENT2)
         'talent_spell_power': { name: '功法提升', sheet: 'TALENT2', rows: 4, cols: 4, r: 1, c: 1 },
@@ -189,6 +188,8 @@ export const ASSET_REGISTRY = {
         'talent_chunyang_huasanqing_yan': { name: '化三清延图标', sheet: 'TALENT6', rows: 4, cols: 4, r: 2, c: 4 },
         'talent_chunyang_xingtian': { name: '行天道图标', sheet: 'TALENT6', rows: 4, cols: 4, r: 3, c: 4 },
         'talent_chunyang_zuowang':  { name: '坐忘无我图标', sheet: 'TALENT_CHUNYANG', rows: 4, cols: 4, r: 2, c: 2 },
+        'talent_economy_treasure': { name: '寻宝达人图标', sheet: 'TALENT_TIANCE2', rows: 4, cols: 4, r: 4, c: 4 },
+        'talent_economy_deep_plow': { name: '资源深耕图标', sheet: 'TALENT3', rows: 4, cols: 4, r: 4, c: 1 },
 
         // --- 核心节点占位符 (如果需要) ---
         'talent_core': { name: '核心', sheet: 'TALENT4', rows: 4, cols: 4, r: 4, c: 4 },

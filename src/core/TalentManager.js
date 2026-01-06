@@ -419,7 +419,7 @@ class TalentManager {
                     
                     modifierManager.addModifier({
                         side: 'player', 
-                        unitType: effect.target, 
+                        unitType: effect.unitType || effect.target, 
                         stat: effect.key,
                         value: finalValue, 
                         type: effect.method || method,

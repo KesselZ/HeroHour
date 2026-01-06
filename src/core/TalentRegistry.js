@@ -18,7 +18,7 @@ export const TALENT_UNITS = {
         effects: [{ type: 'modifier', unitType: 'main_city', key: 'gold_income', value: 200, method: 'add' }]
     },
     'unit_kill_gold': {
-        name: '战力清剿', icon: 'talent_loot',
+        name: '赏金猎人', icon: 'talent_loot',
         description: '以战养战，战斗胜利后额外获得相当于<span class="skill-term-highlight">敌人强度</span><span class="skill-num-highlight">五倍</span>的金钱。',
         requires: ['unit_income_base'],
         effects: [{ type: 'modifier', target: 'hero', key: 'kill_gold', value: 5.0, method: 'percent' }]
@@ -30,14 +30,14 @@ export const TALENT_UNITS = {
         effects: [{ type: 'modifier', target: 'global', key: 'building_wood_cost', value: -0.25, method: 'percent' }] 
     },
     'unit_loot_bonus': { 
-        name: '赏金猎人', icon: 'talent_loot', 
+        name: '寻宝达人', icon: 'talent_economy_treasure', 
         description: '拾取野外资源点（金矿、宝箱）时，获得<span class="skill-term-highlight">金钱</span><span class="skill-num-highlight">翻倍</span>。', 
         requires: ['unit_income_base'],
         effects: [{ type: 'modifier', target: 'hero', key: 'world_loot', value: 1.0, method: 'percent' }] 
     },
     'unit_trade_monopoly': {
-        name: '奇货可居', icon: 'talent_monopoly',
-        description: '战略物资垄断，所有<span class="skill-term-highlight">金矿和伐木场的季度产量</span>提升<span class="skill-num-highlight">五成</span>。',
+        name: '资源深耕', icon: 'talent_economy_deep_plow',
+        description: '战略物资优化，所有<span class="skill-term-highlight">金矿和伐木场的季度产量</span>提升<span class="skill-num-highlight">五成</span>。',
         requires: ['unit_loot_bonus'], 
         effects: [
             { type: 'modifier', target: 'gold_mine', key: 'gold_income', value: 0.5, method: 'percent' },
