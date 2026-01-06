@@ -641,6 +641,11 @@ export class BaseUnit extends THREE.Group {
 
         // 最后统一调用程序化动画更新 (包括闲置呼吸)
         this.updateProceduralAnimation(deltaTime);
+
+        // 核心改动：边界钳制 (解耦视觉 Mesh 与 逻辑活动区)
+        // 范围：X轴 [-40, 40] (长80), Z轴 [-15, 15] (宽30)
+        this.position.x = Math.max(-40, Math.min(40, this.position.x));
+        this.position.z = Math.max(-15, Math.min(15, this.position.z));
     }
 
     /**
@@ -1398,6 +1403,87 @@ export class HeroUnit extends BaseUnit {
         this.scale.set(1.5, 1.5, 1.5);
         this.updateHealthBar();
         if (this.hpSprite) this.hpSprite.visible = true;
+    }
+
+    /**
+     * 核心重构：主角采用 WASD 手动控制位移，但保持自动索敌与攻击
+     */
+    update(enemies, allies, deltaTime) {
+        if (this.isDead) return;
+
+        this.lastPosition.copy(this.position);
+        this.isActuallyMoving = false;
+
+        // 1. 基础状态更新 (复用基类逻辑：回血、护盾、视觉、冲刺)
+        const currentHpRegen = this.hpRegen;
+        if (currentHpRegen !== 0) {
+            this.health = Math.min(this.maxHealth, this.health + currentHpRegen * deltaTime);
+            this.updateHealthBar();
+        }
+
+        if (this.side === 'player') {
+            const currentMpRegen = this.mpRegen;
+            if (currentMpRegen !== 0) {
+                worldManager.modifyHeroMana(currentMpRegen * deltaTime);
+            }
+        }
+
+        this.updateShields();
+        this.updateVisualState();
+        this.updateLunge(deltaTime);
+
+        // 2. 特殊状态判定 (逃跑、胜利、眩晕、击退)
+        if (this.isFleeing || this.isVictoryMarch || this.isStunned || this.knockbackVelocity.lengthSq() > 0.0001) {
+            // 这些状态下，主角失去 WASD 控制权，遵循基类物理逻辑
+            super.update(enemies, allies, deltaTime);
+            return;
+        }
+
+        // 3. 核心：WASD 手动位移逻辑
+        const moveDir = new THREE.Vector3(0, 0, 0);
+        const keys = window.battle ? window.battle.keys : null;
+
+        if (keys) {
+            if (keys.w || keys.arrowup) moveDir.z -= 1;
+            if (keys.s || keys.arrowdown) moveDir.z += 1;
+            if (keys.a || keys.arrowleft) moveDir.x -= 1;
+            if (keys.d || keys.arrowright) moveDir.x += 1;
+        }
+
+        if (moveDir.lengthSq() > 0) {
+            moveDir.normalize();
+            // 采用英雄的最终移速
+            const actualSpeed = this.moveSpeed * deltaTime;
+            this.position.addScaledVector(moveDir, actualSpeed);
+            this.isActuallyMoving = true;
+        }
+
+        // 4. 处理特殊技能状态 (如旋风斩期间依然可以 WASD 移动)
+        if (this.type === 'yeying' && this.isSpinning) {
+            this.updateWhirlwind(enemies, deltaTime);
+        }
+
+        // 5. 自动索敌与攻击逻辑
+        this.updateAI(enemies, allies);
+
+        if (this.target) {
+            const distance = this.position.distanceTo(this.target.position);
+            this.updateFacing(); // 始终面向目标（或 WASD 移动方向，这里优先面向目标以方便攻击）
+
+            // 只要够得着，就自动攻击
+            if (distance <= this.attackRange) {
+                this.performAttack(enemies, allies);
+            }
+        }
+
+        // 6. 碰撞挤压与动画
+        this.applySeparation(allies, enemies, deltaTime);
+        this.updateProceduralAnimation(deltaTime);
+
+        // 核心改动：边界钳制 (解耦视觉 Mesh 与 逻辑活动区)
+        // 范围：X轴 [-40, 40] (长80), Z轴 [-15, 15] (宽30)
+        this.position.x = Math.max(-40, Math.min(40, this.position.x));
+        this.position.z = Math.max(-15, Math.min(15, this.position.z));
     }
 
     /**

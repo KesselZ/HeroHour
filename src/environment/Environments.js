@@ -10,137 +10,275 @@ export class BaseEnvironment {
         this.objects = [];
     }
 
-    init() {
-        // 子类实现具体环境初始化
-    }
+    init() { }
 
+    /**
+     * [性能加固] 深度清理资源，防止纹理导致的内存泄漏
+     */
     cleanup() {
         this.objects.forEach(obj => {
             if (obj.geometry) obj.geometry.dispose();
             if (obj.material) {
-                if (Array.isArray(obj.material)) {
-                    obj.material.forEach(m => m.dispose());
-                } else {
-                    obj.material.dispose();
-                }
+                const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+                materials.forEach(m => {
+                    if (m.map) m.map.dispose(); // 显式销毁贴图
+                    m.dispose();
+                });
             }
             this.scene.remove(obj);
         });
         this.objects = [];
     }
+
+    /**
+     * 共享的山脉生成逻辑
+     */
+    _createSharedMountains(config) {
+        const { 
+            rockColor = '#4a2c1a', 
+            topColor = '#2d4c2d', 
+            snowCover = 0, 
+            jitter = 2.0,
+            count = 18 
+        } = config;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = rockColor; 
+        ctx.fillRect(0, 0, 128, 256);
+        
+        for (let i = 0; i < 30; i++) {
+            const y = rng.next() * 256;
+            ctx.fillStyle = `rgba(0, 0, 0, 0.15)`;
+            ctx.fillRect(0, y, 128, 2 + rng.next() * 6);
+        }
+        
+        const grad = ctx.createLinearGradient(0, 0, 0, 180);
+        if (snowCover > 0) {
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(snowCover, '#ffffff');
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+        } else {
+            grad.addColorStop(0, topColor);
+            grad.addColorStop(0.6, 'rgba(0,0,0,0)');
+        }
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 128, 180);
+
+        const mtTex = new THREE.CanvasTexture(canvas);
+        const mtMat = new THREE.MeshStandardMaterial({ 
+            map: mtTex, 
+            flatShading: true, 
+            roughness: 0.8 
+        });
+        
+        for (let i = 0; i < count; i++) {
+            const h = 10 + rng.next() * 15;
+            const r = 6 + rng.next() * 10;
+            const geo = new THREE.ConeGeometry(r, h, 8, 4);
+            const posAttr = geo.attributes.position;
+            
+            for (let j = 0; j < posAttr.count; j++) {
+                const y = posAttr.getY(j);
+                if (y > -h/2 + 1 && y < h/2 - 1) {
+                    posAttr.setX(j, posAttr.getX(j) + (rng.next() - 0.5) * jitter);
+                    posAttr.setZ(j, posAttr.getZ(j) + (rng.next() - 0.5) * jitter);
+                }
+            }
+            geo.computeVertexNormals();
+
+            const mt = new THREE.Mesh(geo, mtMat);
+            const x = -70 + i * (140/count) + (rng.next() - 0.5) * 10;
+            const z = -18 - rng.next() * 15;
+            mt.position.set(x, h/2 - 1, z);
+            mt.rotation.y = rng.next() * Math.PI;
+            mt.rotation.x = (rng.next() - 0.5) * 0.15;
+            
+            this.scene.add(mt);
+            this.objects.push(mt);
+        }
+    }
+
+    _drawSeamlessPatch(ctx, size, x, y, radius, color) {
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                const cx = x + dx * size;
+                const cy = y + dy * size;
+                const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                grad.addColorStop(0, color);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
 }
 
 /**
- * 第一种场景：青山绿水（草地战场）
+ * 场景：青山绿水（草地战场）
  */
 export class GrasslandEnvironment extends BaseEnvironment {
-    constructor(scene) {
-        super(scene);
-    }
-
     init() {
-        // 1. 天空盒与背景美化
-        this.setupSky();
+        this.scene.background = new THREE.Color(0x87ceeb);
+        this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.02);
 
-        // 2. 地面：生成动态颗粒感的草地贴图
-        this.createProceduralGrass();
-
-        // 3. 远景：更优美的群山
-        this.createMountains();
-
-        // 4. 灯光美化：温暖的武侠黄昏/清晨感
-        this.setupLighting();
-    }
-
-    setupSky() {
-        // 设置一个优美的渐变天空背景
-        this.scene.background = new THREE.Color(0x87ceeb); // 天蓝色
-        this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.02); // 加入大气雾化效果
-    }
-
-    setupLighting() {
-        // 1. 战斗环境光：0.4
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        this.scene.add(ambientLight);
-        this.objects.push(ambientLight);
-
-        // 2. 战斗直射主光源：3.0 (高强度直射光，模拟战场肃杀感)
         const sunLight = new THREE.DirectionalLight(0xfff5e1, 3.0);
         sunLight.position.set(20, 30, 10);
         sunLight.castShadow = true;
-        // 提升阴影质量
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        this.scene.add(sunLight);
-        this.objects.push(sunLight);
-    }
+        this.scene.add(ambientLight, sunLight);
+        this.objects.push(ambientLight, sunLight);
 
-    createProceduralGrass() {
-        // 创建一个 Canvas 来生成程序化草地纹理
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
+        canvas.width = 512; canvas.height = 512;
         const ctx = canvas.getContext('2d');
-
-        // 填充基础绿
-        ctx.fillStyle = '#4a7a3a';
+        ctx.fillStyle = '#4a7a3a'; 
         ctx.fillRect(0, 0, 512, 512);
 
-        // 使用 seeded rng 生成固定的草地颗粒
-        for (let i = 0; i < 20000; i++) {
-            const x = rng.next() * 512;
-            const y = rng.next() * 512;
-            const h = 1 + rng.next() * 3;
-            const g = 80 + rng.next() * 40;
-            ctx.fillStyle = `rgb(40, ${g}, 30)`;
-            ctx.fillRect(x, y, 2, h);
+        // [性能优化] 批处理草地线条绘制
+        ctx.beginPath();
+        for (let i = 0; i < 10000; i++) {
+            const x = rng.next() * 512; const y = rng.next() * 512;
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + 2 + rng.next() * 3);
         }
+        ctx.strokeStyle = 'rgba(40, 80, 30, 0.3)';
+        ctx.stroke();
 
         const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        // 关键：为了像素感和颗粒感
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        // 增加重复次数，让地面看起来很大
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(10, 5);
-
-        // 创建非常长的地面，避免看到左右边界
-        const groundGeo = new THREE.PlaneGeometry(100, 30); 
-        const groundMat = new THREE.MeshStandardMaterial({ 
-            map: texture,
-            roughness: 1,
-            metalness: 0
-        });
         
-        const ground = new THREE.Mesh(groundGeo, groundMat);
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 50), new THREE.MeshStandardMaterial({ map: texture }));
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         this.scene.add(ground);
         this.objects.push(ground);
-    }
 
-    createMountains() {
-        // 使用更自然的群山色调
-        const mtMat = new THREE.MeshStandardMaterial({ 
-            color: 0x1e351e,
-            flatShading: true 
-        });
-        
-        // 放置两排山脉，增加层次感
-        for (let i = 0; i < 15; i++) {
-            const h = 8 + rng.next() * 12;
-            const r = 5 + rng.next() * 8;
-            const geo = new THREE.ConeGeometry(r, h, 4);
-            const mt = new THREE.Mesh(geo, mtMat);
+        this._createSharedMountains({ rockColor: '#1e351e', topColor: '#2d4c2d' });
+    }
+}
+
+/**
+ * 场景：枫林尽染（秋天战场）
+ */
+export class AutumnEnvironment extends BaseEnvironment {
+    init() {
+        this.scene.background = new THREE.Color(0xb0c4de);
+        this.scene.fog = new THREE.FogExp2(0xb0c4de, 0.01); 
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const sunLight = new THREE.DirectionalLight(0xfff5e1, 2.5);
+        sunLight.position.set(20, 30, 10);
+        sunLight.castShadow = true;
+        this.scene.add(ambientLight, sunLight);
+        this.objects.push(ambientLight, sunLight);
+
+        const canvas = document.createElement('canvas');
+        const size = 512;
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // 1. 底色
+        ctx.fillStyle = '#6b7045'; 
+        ctx.fillRect(0, 0, size, size);
+
+        // 2. [性能优化] 路径批处理绘制干草：大幅降低 CPU 负担
+        const drawGrassBatch = (color, count) => {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            for (let i = 0; i < count; i++) {
+                const x = rng.next() * size;
+                const y = rng.next() * size;
+                const len = 2 + rng.next() * 3;
+                const angle = rng.next() * Math.PI;
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+            }
+            ctx.stroke();
+        };
+        drawGrassBatch('#7d7a4a', 15000); // 浅枯草
+        drawGrassBatch('#5a5e3a', 15000); // 深枯草
+
+        // 3. 绘制落叶
+        const colors = ['#a0522d', '#8b4513', '#cd853f', '#d2691e', '#b22222'];
+        for (let i = 0; i < 120; i++) {
+            const px = rng.next() * size;
+            const py = rng.next() * size;
+            const patchRadius = 10 + rng.next() * 30;
+            const leafColor = colors[Math.floor(rng.next() * colors.length)];
+            const leafDensity = 15 + Math.floor(rng.next() * 20);
             
-            // 随机分布在远方
-            const x = -60 + i * 10 + (rng.next() - 0.5) * 5;
-            const z = -15 - rng.next() * 10;
-            mt.position.set(x, h/2 - 1, z);
-            mt.rotation.y = rng.next() * Math.PI;
-            this.scene.add(mt);
-            this.objects.push(mt);
+            ctx.fillStyle = leafColor;
+            for (let j = 0; j < leafDensity; j++) {
+                const lx = px + (rng.next() - 0.5) * patchRadius * 2;
+                const ly = py + (rng.next() - 0.5) * patchRadius * 2;
+                const lSize = 1 + rng.next() * 2;
+                // 利用循环包裹逻辑进行无缝绘制
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        ctx.fillRect((lx + dx * size) % size, (ly + dy * size) % size, lSize, lSize);
+                    }
+                }
+            }
         }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(6, 3);
+
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 50), new THREE.MeshStandardMaterial({ map: texture, roughness: 1.0 }));
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+        this.objects.push(ground);
+
+        this._createSharedMountains({ rockColor: '#5c4033', topColor: '#8b4513', jitter: 2.2 });
+    }
+}
+
+/**
+ * 场景：银装素裹（冬天战场）
+ */
+export class WinterEnvironment extends BaseEnvironment {
+    init() {
+        this.scene.background = new THREE.Color(0xe0efff);
+        this.scene.fog = new THREE.FogExp2(0xe0efff, 0.02); 
+
+        const ambientLight = new THREE.AmbientLight(0xddeeff, 0.7);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        sunLight.position.set(-20, 15, 10);
+        sunLight.castShadow = true;
+        this.scene.add(ambientLight, sunLight);
+        this.objects.push(ambientLight, sunLight);
+
+        const canvas = document.createElement('canvas');
+        const size = 512;
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#3d4531'; 
+        ctx.fillRect(0, 0, size, size);
+
+        for (let i = 0; i < 120; i++) {
+            const x = rng.next() * size;
+            const y = rng.next() * size;
+            const radius = 10 + rng.next() * 45;
+            this._drawSeamlessPatch(ctx, size, x, y, radius, 'rgba(240, 248, 255, 0.8)');
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(4, 2);
+
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 50), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.6 }));
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+        this.objects.push(ground);
+
+        this._createSharedMountains({ rockColor: '#2c3e50', snowCover: 0.4, jitter: 3.0 });
     }
 }

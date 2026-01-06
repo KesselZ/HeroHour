@@ -94,7 +94,7 @@ const UnitTypeMap = {
     'tc_heavy_cavalry': TCHeavyCavalry
 };
 
-import { GrasslandEnvironment } from '../environment/Environments.js';
+import { GrasslandEnvironment, AutumnEnvironment, WinterEnvironment } from '../environment/Environments.js';
 import { ProjectileManager } from '../core/ProjectileManager.js';
 import { VFXLibrary } from '../core/VFXLibrary.js';
 import { rng, setSeed } from '../core/Random.js';
@@ -152,8 +152,27 @@ export class BattleScene {
         this.worldManager = worldManager; // 挂载管理器方便组件访问
         this.isFleeing = false; // 新增：战斗是否处于撤退逃跑状态
 
+        // 移动控制
+        this.keys = { w: false, a: false, s: false, d: false };
+        this.onKeyDown = this.onKeyDown.bind(this);
+        this.onKeyUp = this.onKeyUp.bind(this);
+
         // 全局挂载，方便兵种 AI 逻辑访问场景状态
         window.battle = this;
+    }
+
+    onKeyDown(e) {
+        const key = e.key.toLowerCase();
+        if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+            this.keys[key] = true;
+        }
+    }
+
+    onKeyUp(e) {
+        const key = e.key.toLowerCase();
+        if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+            this.keys[key] = false;
+        }
     }
 
     start() {
@@ -169,7 +188,8 @@ export class BattleScene {
         // 初始化局内蓝条
         this.updateMPUI();
         
-        this.environment = new GrasslandEnvironment(this.scene);
+        // 暂时为了测试，强制使用秋天环境
+        this.environment = new AutumnEnvironment(this.scene);
         this.environment.init();
 
         // 查找地面用于射线检测
@@ -194,6 +214,8 @@ export class BattleScene {
         window.addEventListener('pointermove', this.onPointerMove);
         window.addEventListener('pointerup', this.onPointerUp);
         window.addEventListener('contextmenu', this.onContextMenu); // 核心：拦截右键
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup', this.onKeyUp);
         this.updateUI();
     }
 
@@ -248,8 +270,9 @@ export class BattleScene {
     }
 
     createDeploymentIndicator() {
-        // 统一化：玩家部署区为 X: -50 到 0，宽度 50
-        const geometry = new THREE.PlaneGeometry(50, 30);
+        // 核心改动：由于逻辑边界缩减为 X:[-40, 40]，部署区也要同步缩减
+        // 原本是 50x30，现在改为 40x30，中心点设在 -20
+        const geometry = new THREE.PlaneGeometry(40, 30);
         const material = new THREE.MeshBasicMaterial({ 
             color: 0x00ffff, 
             transparent: true, 
@@ -259,8 +282,8 @@ export class BattleScene {
         });
         this.placementZoneIndicator = new THREE.Mesh(geometry, material);
         this.placementZoneIndicator.rotation.x = -Math.PI / 2;
-        // 中心点设在 -25，这样覆盖范围就是 -50 到 0
-        this.placementZoneIndicator.position.set(-25, 0.01, 0); 
+        // 中心点设在 -20，覆盖范围就是 -40 到 0
+        this.placementZoneIndicator.position.set(-20, 0.01, 0); 
         this.scene.add(this.placementZoneIndicator);
     }
 
@@ -1552,7 +1575,7 @@ export class BattleScene {
         // 驱动 UIManager 实时刷新 (所见即所得)
         uiManager.update();
 
-        this.camera.position.set(0, 15, 18); 
+        this.camera.position.set(0, 18, 18); 
         this.camera.lookAt(0, 0, 0);
         
         // --- 核心新增：悬停显示血条逻辑 ---
@@ -1772,6 +1795,8 @@ export class BattleScene {
         window.removeEventListener('contextmenu', this.onContextMenu);
         window.removeEventListener('pointerdown', this.onPointerDown);
         window.removeEventListener('pointerdown', this.handleSkillTargeting);
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keyup', this.onKeyUp);
         
         console.log(message);
         const survivalCounts = {};
