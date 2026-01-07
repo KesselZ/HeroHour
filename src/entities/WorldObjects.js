@@ -144,6 +144,18 @@ export class MovableWorldObject extends WorldObject {
      */
     moveTo(targetX, targetZ) {
         if (!this.pathfinder) return;
+
+        // 记录最终目的地，用于处理长距离分段寻路
+        this.finalTargetX = targetX;
+        this.finalTargetZ = targetZ;
+
+        // 性能优化：如果目标点几乎没有变化，且当前已有路径，则不需要重新计算
+        if (this.currentPath && this.currentPath.length > 0) {
+            const finalTarget = this.currentPath[this.currentPath.length - 1];
+            const dx = targetX - finalTarget.x;
+            const dz = targetZ - finalTarget.z;
+            if (dx * dx + dz * dz < 0.25) return; 
+        }
         
         const halfSize = mapGenerator.size / 2;
         const start = {
@@ -155,12 +167,15 @@ export class MovableWorldObject extends WorldObject {
             z: Math.round(targetZ + halfSize)
         };
         
+        // 增加异步感知：对于极长距离，Pathfinder 现在会返回部分路径 (5000次迭代截断)
         const path = this.pathfinder.findPath(start, end);
-        if (path) {
+        if (path && path.length > 0) {
             this.currentPath = path.map(p => ({
                 x: p.x - halfSize,
                 z: p.z - halfSize
             }));
+        } else {
+            this.currentPath = [];
         }
     }
 
@@ -190,7 +205,18 @@ export class MovableWorldObject extends WorldObject {
             if (distSq < 0.15) {
                 this.currentPath.shift();
                 if (this.currentPath.length === 0) {
-                    this.isMoving = false;
+                    // 如果路径走完了，但还没到最终目的地 (可能是因为之前是部分寻路)，则重新触发寻路
+                    if (this.finalTargetX !== undefined && this.finalTargetZ !== undefined) {
+                        const dxFinal = this.finalTargetX - this.mesh.position.x;
+                        const dzFinal = this.finalTargetZ - this.mesh.position.z;
+                        if (dxFinal * dxFinal + dzFinal * dzFinal > 1.0) {
+                            this.moveTo(this.finalTargetX, this.finalTargetZ);
+                        } else {
+                            this.isMoving = false;
+                        }
+                    } else {
+                        this.isMoving = false;
+                    }
                 } else {
                     const next = this.currentPath[0];
                     moveDir.set(next.x - this.mesh.position.x, 0, next.z - this.mesh.position.z).normalize();
