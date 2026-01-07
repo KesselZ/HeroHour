@@ -1842,19 +1842,10 @@ export class WorldScene {
         // 2. 核心位移与寻路逻辑
         this._processInputAndMovement(deltaTime);
 
-        // 3. 更新所有交互物体的逻辑 (例如敌人移动、AI 占领)
-        const activeHeroes = [];
-        if (this.playerGroup) {
-            activeHeroes.push({ id: 'player', factionId: 'player', position: this.playerGroup.position });
-        }
-        this.worldObjects.forEach(obj => {
-            if (obj.type === 'ai_hero' && obj.mesh) {
-                activeHeroes.push({ id: obj.id, factionId: obj.factionId, position: obj.mesh.position });
-            }
-        });
-
+        // 3. 更新所有交互物体的逻辑 (例如敌人移动)
+        const playerPos = this.playerGroup.position;
         this.interactables.forEach(obj => {
-            if (obj.update) obj.update(deltaTime, activeHeroes);
+            if (obj.update) obj.update(deltaTime, playerPos);
         });
 
         // 核心修复：全局交互检测（确保玩家站着不动被敌人撞到也能触发战斗）

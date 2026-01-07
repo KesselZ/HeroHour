@@ -350,7 +350,8 @@ export class WorldManager {
         LICHENGEN_GOD_MODE: import.meta.env.DEV, // 李承恩起始获得全兵种各 2 个 + 无限统御
         START_RESOURCES: import.meta.env.DEV,    // 初始金钱 10000，木头 5000
         HIGH_EVENT_FREQUENCY: false,             // 暂时强制关闭高频事件触发
-        SHOW_MOTION_DEBUG: false                 // 运动调试日志：默认依然关闭，除非手动开启
+        SHOW_MOTION_DEBUG: false,                // 运动调试日志
+        DISABLE_AI: false                        // 【性能测试】一键关闭 AI 英雄生成与逻辑
     };
 
     constructor() {
@@ -854,7 +855,11 @@ export class WorldManager {
     /**
      * 获取全局总产出及其明细
      */
-    getGlobalProduction() {
+    /**
+     * 获取指定势力的全局季度收益 (城市 + 矿产)
+     * @param {string} factionId 势力 ID，默认为 'player'
+     */
+    getGlobalProduction(factionId = 'player') {
         let totalGold = 0;
         let totalWood = 0;
         const breakdown = {
@@ -862,10 +867,10 @@ export class WorldManager {
             mines: { gold: 0, wood: 0, count: { gold_mine: 0, sawmill: 0 } }
         };
 
-        // 1. 统计所有玩家城镇的产出
+        // 1. 统计该势力所有城镇的产出
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
-            if (city.owner === 'player') {
+            if (city.owner === factionId) {
                 const finalGold = city.getGoldIncome();
                 const finalWood = city.getWoodIncome();
                 totalGold += finalGold;
@@ -878,10 +883,10 @@ export class WorldManager {
             }
         }
 
-        // 2. 统计所有已占领矿产的收益 (接入 ModifierManager 以支持全局加成)
+        // 2. 统计该势力所有已占领矿产的收益
         this.capturedBuildings.forEach(b => {
-            if (b.owner === 'player') {
-                const dummy = { side: 'player', type: b.type };
+            if (b.owner === factionId) {
+                const dummy = { side: factionId, type: b.type };
                 if (b.type === 'gold_mine') {
                     // 基础金矿产量 100，支持全局百分比加成
                     const mineGold = Math.floor(modifierManager.getModifiedValue(dummy, 'final_gold_income', 100));
@@ -906,23 +911,31 @@ export class WorldManager {
     }
 
     /**
-     * 资源产出 Tick：根据所有城镇的产出增加全局资源
+     * 资源产出 Tick：遍历所有势力并分发季度收益
      */
     processResourceProduction() {
-        const prodData = this.getGlobalProduction();
-        
-        if (prodData.gold > 0) this.addGold(prodData.gold);
-        if (prodData.wood > 0) this.addWood(prodData.wood);
-        
-        // 核心改动：奇穴效果 - 气吞山河 (季节更替回蓝)
-        const mpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_mp_regen', 0);
-        if (mpRegenMult > 0) {
-            const recoverAmount = Math.floor(this.heroData.mpMax * mpRegenMult);
-            this.modifyHeroMana(recoverAmount);
-            this.showNotification(`气吞山河：由于时节更替，内力恢复了 ${recoverAmount} 点`);
-        }
+        Object.keys(this.factions).forEach(factionId => {
+            const faction = this.factions[factionId];
 
-        console.log(`%c[季度结算] %c总收入金钱 +${prodData.gold}, 木材 +${prodData.wood}`, 'color: #557755; font-weight: bold', 'color: #fff');
+            // 如果关闭了 AI，则跳过非玩家势力的产出结算
+            if (WorldManager.DEBUG.DISABLE_AI && !faction.isPlayer) return;
+
+            const prodData = this.getGlobalProduction(factionId);
+            
+            if (prodData.gold > 0) this.addGold(prodData.gold, factionId);
+            if (prodData.wood > 0) this.addWood(prodData.wood, factionId);
+            
+            // 核心改动：仅对玩家执行季节更替回复内力 (奇穴效果)
+            if (faction.isPlayer) {
+                const mpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_mp_regen', 0);
+                if (mpRegenMult > 0) {
+                    const recoverAmount = Math.floor(this.heroData.mpMax * mpRegenMult);
+                    this.modifyHeroMana(recoverAmount);
+                    this.showNotification(`气吞山河：由于时节更替，内力恢复了 ${recoverAmount} 点`);
+                }
+                console.log(`%c[季度结算] %c总收入金钱 +${prodData.gold}, 木材 +${prodData.wood}`, 'color: #557755; font-weight: bold', 'color: #fff');
+            }
+        });
     }
 
     /**
@@ -1118,6 +1131,7 @@ export class WorldManager {
         
         const entities = [];
         const halfSize = size / 2;
+        const isCheat = WorldManager.DEBUG.ENABLED && WorldManager.DEBUG.START_RESOURCES;
 
         // --- 1. 势力初始化逻辑 ---
         const playerHeroId = this.heroData.id;
@@ -1130,8 +1144,11 @@ export class WorldManager {
             heroId: playerHeroId,
             isPlayer: true,
             cities: ['main_city_1'],
-            resources: this.resources // 引用现有的 resources 对象，保持兼容
+            resources: { gold: isCheat ? 10000 : 1000, wood: isCheat ? 5000 : 500 }
         };
+
+        // 核心同步：让 this.resources 引用玩家势力的资源，保持向后兼容
+        this.resources = this.factions['player'].resources;
 
         // 识别潜在对手 (排除玩家选中的)
         const opponentPool = Object.keys(this.availableHeroes).filter(id => id !== playerHeroId);
@@ -1217,17 +1234,19 @@ export class WorldManager {
                 });
 
                 // --- 核心新增：为每个 AI 势力在据点处生成一位游走英雄 ---
-                entities.push({
-                    id: `ai_hero_${index + 1}`,
-                    type: 'ai_hero',
-                    x: ax + (Math.random() - 0.5) * 4, // 在城市附近微偏一点
-                    z: az + (Math.random() - 0.5) * 4,
-                    config: {
-                        name: aiHeroInfo.name,
-                        heroId: aiHeroId,
-                        factionId: factionId
-                    }
-                });
+                if (!WorldManager.DEBUG.DISABLE_AI) {
+                    entities.push({
+                        id: `ai_hero_${index + 1}`,
+                        type: 'ai_hero',
+                        x: ax + (Math.random() - 0.5) * 4, // 在城市附近微偏一点
+                        z: az + (Math.random() - 0.5) * 4,
+                        config: {
+                            name: aiHeroInfo.name,
+                            heroId: aiHeroId,
+                            factionId: factionId
+                        }
+                    });
+                }
             });
         } else {
             // 兜底逻辑：如果地图上一个 POI 都没找到（理论上不应该），随机找一个草地
@@ -1664,69 +1683,81 @@ export class WorldManager {
     /**
      * 处理攻城战胜利后的城市占领
      * @param {string} cityId 
-     * @param {string} newOwner 占领者势力 ID
      */
-    captureCity(cityId, newOwner = 'player') {
+    captureCity(cityId) {
         const city = this.cities[cityId];
         if (!city) return;
 
         const oldOwner = city.owner;
-        if (oldOwner === newOwner) return; // 已经是自己的了
-
         const oldFaction = this.factions[oldOwner];
-        const newFaction = this.factions[newOwner];
-        if (!newFaction) return;
-
         const oldHeroId = oldFaction ? oldFaction.heroId : null;
 
-        city.owner = newOwner;
-        city.side = newOwner; // 同步更新 side，确保 ModifierManager 能正确匹配产出修正
+        city.owner = 'player';
+        city.side = 'player'; // 核心修复：同步更新 side，确保 ModifierManager 能正确匹配该城市的产出修正
         
-        const isNewOwnerPlayer = newOwner === 'player';
+        // --- 核心重构：使用主动事件接口，并标记该事件会改变长久局势 ---
+        WorldStatusManager.triggerActiveEvent('captured_main_city', {
+            title: '收复重镇',
+            text: `阁下指挥若定，一举收复了【${city.name}】！百姓夹道欢迎，江湖威望已达巅峰！`,
+            type: 'important',
+            affectsSituation: true // 只有这种大事才会改变 Tooltip 里的描述
+        });
 
-        // --- 核心重构：仅当玩家占领时触发大世界事件和全局提示 ---
-        if (isNewOwnerPlayer) {
-            WorldStatusManager.triggerActiveEvent('captured_main_city', {
-                title: '收复重镇',
-                text: `阁下指挥若定，一举收复了【${city.name}】！百姓夹道欢迎，江湖威望已达巅峰！`,
-                type: 'important',
-                affectsSituation: true 
-            });
-            this.showNotification(`成功收复了 ${city.name}！其势力范围内的野怪已溃散，产业已归收。`);
-        } else if (oldOwner === 'player') {
-            this.showNotification(`糟糕！你的城镇 ${city.name} 被【${newFaction.name}】夺走了！`);
-        }
-
+        // 备注：学院建筑会自动随 owner 变更而动态切换显示逻辑
+        
         // 更新势力的城市列表
         if (oldFaction) {
             oldFaction.cities = oldFaction.cities.filter(id => id !== cityId);
         }
         
-        if (!newFaction.cities.includes(cityId)) {
-            newFaction.cities.push(cityId);
+        if (!this.factions['player'].cities.includes(cityId)) {
+            this.factions['player'].cities.push(cityId);
         }
 
-        // --- 核心改动 1：移除地图上对应旧门派的弟子野怪 (仅当旧所有者是英雄势力时) ---
-        if (oldHeroId && oldOwner !== 'player') {
-            // ... 保持原有逻辑 ...
+        // --- 核心改动 1：移除地图上对应门派的弟子野怪 ---
+        if (oldHeroId) {
+            // 找到所有绑定到该英雄的敌人模板 ID
+            const templateIdsToRemove = Object.entries(this.enemyTemplates)
+                .filter(([_, t]) => t.sectHero === oldHeroId)
+                .map(([id, _]) => id);
+
+            this.mapState.entities.forEach(entity => {
+                if (entity.type === 'enemy_group' && templateIdsToRemove.includes(entity.templateId)) {
+                    entity.isRemoved = true; // 标记为逻辑移除
+                }
+            });
+            
+            // 派发事件让场景层立即清除对应 Mesh
+            window.dispatchEvent(new CustomEvent('sect-monsters-cleared', { detail: { templateIds: templateIdsToRemove } }));
         }
 
         // --- 核心改动 2：接收该势力名下的所有产业 (矿产等) ---
         this.mapState.entities.forEach(entity => {
             if (entity.type === 'captured_building' && entity.config.owner === oldOwner) {
-                this.handleCapture(entity, newOwner);
+                entity.config.owner = 'player';
+                
+                // 同步更新 capturedBuildings 数组以便收益计算
+                const recorded = this.capturedBuildings.find(b => b.id === entity.id);
+                if (recorded) {
+                    recorded.owner = 'player';
+                } else {
+                    this.capturedBuildings.push({
+                        id: entity.id,
+                        type: entity.config.type,
+                        owner: 'player'
+                    });
+                }
             }
         });
 
-        console.log(`%c[攻城战] %c${city.name} 及其附属产业现在归属于 ${newFaction.name}`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        this.showNotification(`成功收复了 ${city.name}！其势力范围内的野怪已溃散，产业已归收。`);
+        console.log(`%c[攻城胜利] %c${city.name} 及其附属产业现在归属于玩家势力`, 'color: #00ff00; font-weight: bold', 'color: #fff');
 
-        // 统一同步建筑效果
+        // 核心修复：占领后立即同步一次建筑效果，确保产出立即生效
         this.syncBuildingsToModifiers();
 
-        // 检查胜利条件 (如果玩家占领了所有 AI 城市)
-        if (isNewOwnerPlayer) {
-            this.checkVictoryCondition();
-        }
+        // 检查是否所有敌方主城都被占领
+        this.checkVictoryCondition();
     }
 
     /**
@@ -1987,25 +2018,22 @@ export class WorldManager {
     /**
      * 处理捡起大世界物品的通用接口
      * @param {string} itemType 物品类型 ('gold_pile', 'chest' 等)
-     * @param {string} factionId 获得物品的势力 ID (默认玩家)
      * @returns {Object} 获得的奖励描述
      */
-    handlePickup(itemType, factionId = 'player') {
+    handlePickup(itemType) {
         let reward = { gold: 0, wood: 0, xp: 0 };
         let msg = "";
 
-        const isPlayer = factionId === 'player';
         // 获取当前战力/时间缩放系数 (每季度增加 4%)
         const powerMult = timeManager.getPowerMultiplier();
 
-        // 简化的单位上下文，用于 ModifierManager
-        const dummyHero = { side: factionId, isHero: true }; 
-
+        // 获取奇穴加成：赏金猎人 (拾取翻倍)
+        const dummyHero = this.getPlayerHeroDummy();
         switch (itemType) {
             case 'gold_pile':
                 const rawGold = (Math.floor(Math.random() * 51) + 200) * powerMult; // 200-250 金币 * 缩放
                 reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawGold));
-                msg = isPlayer ? `捡到了一堆金币，获得 ${reward.gold} 💰` : `【${this.factions[factionId].name}】捡到了一堆金币`;
+                msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
                 break;
             case 'chest':
                 // 宝箱给金币和木材
@@ -2013,23 +2041,24 @@ export class WorldManager {
                 const rawChestWood = (Math.floor(Math.random() * 101) + 200) * powerMult; // 200-300 * 缩放
                 reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestGold));
                 reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestWood));
-                msg = isPlayer ? `开启了宝箱，获得 ${reward.gold} 💰 和 ${reward.wood} 🪵` : `【${this.factions[factionId].name}】开启了宝箱`;
-                reward.xp = isPlayer ? 30 : 0; // 暂时只有玩家给经验
+                msg = `开启了宝箱，获得 ${reward.gold} 💰 和 ${reward.wood} 🪵`;
+                reward.xp = 30; // 奖励丰厚，多给点经验
                 break;
             case 'wood_pile':
                 const rawWood = (Math.floor(Math.random() * 61) + 90) * powerMult; // 90-150 * 缩放
                 reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawWood));
-                msg = isPlayer ? `捡到了木材堆，获得 ${reward.wood} 🪵` : `【${this.factions[factionId].name}】捡到了木材堆`;
+                msg = `捡到了木材堆，获得 ${reward.wood} 🪵`;
                 break;
         }
 
-        if (reward.gold > 0) this.addGold(reward.gold, factionId);
-        if (reward.wood > 0) this.addWood(reward.wood, factionId);
-        if (reward.xp > 0 && isPlayer) this.gainXP(reward.xp);
+        if (reward.gold > 0) this.addGold(reward.gold);
+        if (reward.wood > 0) this.addWood(reward.wood);
+        if (reward.xp > 0) this.gainXP(reward.xp);
 
         if (msg) {
             console.log(`%c[交互] %c${msg}`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
-            if (isPlayer) this.showNotification(msg);
+            // 核心修复：将拾取提示显示在 UI 通知栏
+            this.showNotification(msg);
         }
 
         return reward;
@@ -2110,8 +2139,6 @@ export class WorldManager {
         // 如果已经是该势力的，直接返回
         if (config.owner === newOwner) return;
 
-        const oldOwner = config.owner;
-        
         // 占领逻辑
         config.owner = newOwner;
         
@@ -2135,26 +2162,24 @@ export class WorldManager {
         const name = names[config.type] || '建筑';
         const ownerName = newOwner === 'player' ? '玩家' : (this.factions[newOwner]?.name || '敌方');
         
-        // 2. 占领反馈 (仅对玩家生效)
-        const isNewOwnerPlayer = newOwner === 'player';
-        
-        if (isNewOwnerPlayer) {
-            const captureSounds = {
-                'gold_mine': 'capture_gold_mine',
-                'sawmill': 'capture_sawmill',
-                'teleport_altar': 'ui_teleport'
-            };
-            const soundKey = captureSounds[config.type];
-            if (soundKey) audioManager.play(soundKey);
-
-            const icon = config.type === 'gold_mine' ? '💰' : (config.type === 'sawmill' ? '🪵' : '⛩️');
-            this.showNotification(`成功占领 ${icon}${name}！`);
-        } else if (oldOwner === 'player') {
-            // 如果玩家的产业被 AI 抢走，也给个提示
-            this.showNotification(`警告：你的 ${name} 被【${ownerName}】占领了！`);
+        // 2. 占领音效
+        const captureSounds = {
+            'gold_mine': 'capture_gold_mine',
+            'sawmill': 'capture_sawmill',
+            'teleport_altar': 'ui_teleport'
+        };
+        const soundKey = captureSounds[config.type];
+        if (newOwner === 'player' && soundKey) {
+            audioManager.play(soundKey);
         }
         
         console.log(`%c[占领] %c${name} (${id}) 现在归属于 ${ownerName}`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        
+        // 核心修复：添加占领成功提示
+        if (newOwner === 'player') {
+            const icon = config.type === 'gold_mine' ? '💰' : (config.type === 'sawmill' ? '🪵' : '⛩️');
+            this.showNotification(`成功占领 ${icon}${name}！`);
+        }
         
         // 触发 UI 刷新或特效
         window.dispatchEvent(new CustomEvent('building-captured', { detail: { id, type: config.type, owner: newOwner } }));
@@ -2421,7 +2446,6 @@ export class WorldManager {
         // 核心修复：加载存档前必须清空所有全局修正器，防止不同存档间的属性叠加
         modifierManager.clear();
 
-        this.resources = { ...data.resources };
         this.heroData = JSON.parse(JSON.stringify(data.heroData));
         this.heroArmy = { ...data.heroArmy };
         
@@ -2458,6 +2482,15 @@ export class WorldManager {
         }
 
         this.factions = JSON.parse(JSON.stringify(data.factions));
+        
+        // 核心同步：恢复 player 资源的引用关联
+        if (this.factions['player']) {
+            this.resources = this.factions['player'].resources;
+        } else {
+            // 兜底：如果存档中没有 factions (旧版本存档)，手动创建
+            this.resources = { ...data.resources };
+        }
+
         this.currentAIFactions = JSON.parse(JSON.stringify(data.currentAIFactions));
         this.capturedBuildings = JSON.parse(JSON.stringify(data.capturedBuildings));
 
@@ -2477,7 +2510,7 @@ export class WorldManager {
 
     /**
      * 增加金钱接口
-     * @param {number} amount 金额
+     * @param {number} amount 增加数量
      * @param {string} factionId 势力 ID
      */
     addGold(amount, factionId = 'player') {
@@ -2488,7 +2521,8 @@ export class WorldManager {
 
         faction.resources.gold += amount;
 
-        if (factionId === 'player') {
+        // 仅对玩家执行 HUD 更新和动画
+        if (faction.isPlayer) {
             this.updateHUD();
             this.triggerResourceAnimation('gold');
             audioManager.play('source_gold');
@@ -2502,7 +2536,7 @@ export class WorldManager {
 
     /**
      * 增加木材接口
-     * @param {number} amount 木材数量
+     * @param {number} amount 增加数量
      * @param {string} factionId 势力 ID
      */
     addWood(amount, factionId = 'player') {
@@ -2513,7 +2547,8 @@ export class WorldManager {
 
         faction.resources.wood += amount;
 
-        if (factionId === 'player') {
+        // 仅对玩家执行 HUD 更新和动画
+        if (faction.isPlayer) {
             this.updateHUD();
             this.triggerResourceAnimation('wood');
             audioManager.play('source_wood');
@@ -2527,10 +2562,13 @@ export class WorldManager {
     /**
      * 消耗金钱接口
      */
-    spendGold(amount) {
-        if (this.resources.gold >= amount) {
-            this.resources.gold -= amount;
-            this.updateHUD();
+    spendGold(amount, factionId = 'player') {
+        const faction = this.factions[factionId];
+        if (!faction) return false;
+
+        if (faction.resources.gold >= amount) {
+            faction.resources.gold -= amount;
+            if (faction.isPlayer) this.updateHUD();
             return true;
         }
         return false;
@@ -2539,10 +2577,13 @@ export class WorldManager {
     /**
      * 消耗木材接口
      */
-    spendWood(amount) {
-        if (this.resources.wood >= amount) {
-            this.resources.wood -= amount;
-            this.updateHUD();
+    spendWood(amount, factionId = 'player') {
+        const faction = this.factions[factionId];
+        if (!faction) return false;
+
+        if (faction.resources.wood >= amount) {
+            faction.resources.wood -= amount;
+            if (faction.isPlayer) this.updateHUD();
             return true;
         }
         return false;
@@ -2551,20 +2592,26 @@ export class WorldManager {
     /**
      * 检查资源是否足够
      */
-    hasResources(costs) {
+    hasResources(costs, factionId = 'player') {
+        const faction = this.factions[factionId];
+        if (!faction) return false;
+
         const goldNeeded = costs.gold || 0;
         const woodNeeded = costs.wood || 0;
-        return this.resources.gold >= goldNeeded && this.resources.wood >= woodNeeded;
+        return faction.resources.gold >= goldNeeded && faction.resources.wood >= woodNeeded;
     }
 
     /**
      * 同时消耗多种资源 (原子操作，要么全扣，要么不扣)
      */
-    spendResources(costs) {
-        if (this.hasResources(costs)) {
-            if (costs.gold) this.resources.gold -= costs.gold;
-            if (costs.wood) this.resources.wood -= costs.wood;
-            this.updateHUD();
+    spendResources(costs, factionId = 'player') {
+        const faction = this.factions[factionId];
+        if (!faction) return false;
+
+        if (this.hasResources(costs, factionId)) {
+            if (costs.gold) faction.resources.gold -= costs.gold;
+            if (costs.wood) faction.resources.wood -= costs.wood;
+            if (faction.isPlayer) this.updateHUD();
             return true;
         }
         return false;

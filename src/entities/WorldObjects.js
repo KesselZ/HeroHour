@@ -5,6 +5,7 @@ import { timeManager } from '../core/TimeManager.js';
 import { mapGenerator } from '../core/MapGenerator.js';
 import { Pathfinder } from '../core/Pathfinder.js';
 import { audioManager } from '../core/AudioManager.js';
+import { AIController } from '../core/AIController.js';
 
 /**
  * 大世界物体的基类
@@ -66,11 +67,9 @@ export class WorldObject {
 
     /**
      * 每帧更新
-     * @param {number} deltaTime 
-     * @param {Array} activeHeroes 当前地图上所有活动的英雄 (包含玩家和 AI)
      */
-    update(deltaTime, activeHeroes) {
-        // 子类实现逻辑
+    update(deltaTime, playerPos) {
+        // 子类可以实现逻辑
     }
 
     /**
@@ -168,7 +167,7 @@ export class MovableWorldObject extends WorldObject {
     /**
      * 执行移动与动画更新
      */
-    update(deltaTime, activeHeroes) {
+    update(deltaTime, playerPos = null) {
         if (!this.mesh) return;
         
         let moveDir = new THREE.Vector3(0, 0, 0);
@@ -371,8 +370,8 @@ export class TreeObject extends WorldObject {
         };
     }
 
-    update(deltaTime, activeHeroes) {
-        if (!this.mesh || this.durability <= 0) return;
+    update(deltaTime, playerPos) {
+        if (!this.mesh || !playerPos || this.durability <= 0) return;
 
         // 寻找主体 Sprite (如果还没找到)
         if (!this.mainSprite) {
@@ -383,22 +382,13 @@ export class TreeObject extends WorldObject {
             }
         }
 
-        // 自动砍树逻辑：检测周围所有的英雄
-        const chopRadius = 1.3;
-        let nearestHero = null;
-        let minDist = Infinity;
+        // 自动砍树逻辑：距离检测
+        const dist = playerPos.distanceTo(this.mesh.position);
+        const chopRadius = 1.3; // 稍微大一点，提高体验
 
-        activeHeroes.forEach(hero => {
-            const dist = hero.position.distanceTo(this.mesh.position);
-            if (dist < chopRadius && dist < minDist) {
-                minDist = dist;
-                nearestHero = hero;
-            }
-        });
-
-        if (nearestHero) {
+        if (dist < chopRadius) {
             if (this.chopTimer <= 0) {
-                this.chop(nearestHero.factionId);
+                this.chop();
                 this.chopTimer = this.chopCooldown;
             }
         }
@@ -419,43 +409,45 @@ export class TreeObject extends WorldObject {
         }
     }
 
-    /**
-     * 执行砍伐动作
-     * @param {string} factionId 正在砍树的势力 ID
-     */
-    chop(factionId = 'player') {
-        if (this.durability <= 0) return; 
+    chop() {
+        if (this.durability <= 0) return; // 再次确保安全
         
-        const isPlayer = factionId === 'player';
         this.durability--;
         this.chopCount++;
         this.shakeTime = 300; // 抖动 0.3s
         
         // 耐久耗尽逻辑
         if (this.durability <= 0) {
-            // 只有玩家砍树才有音效
-            if (isPlayer) audioManager.play('farm_tree_down', { volume: 0.8 });
+            // 播放砍断音效
+            audioManager.play('farm_tree_down', { volume: 0.8 });
 
-            // 砍断树木直接获得 30-50 木材 (通过 side 获取对应的加成)
-            const baseFinalAmount = Math.floor(Math.random() * 21) + 30; 
-            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: factionId }, 'wood_income', baseFinalAmount));
-            
-            worldManager.addWood(finalAmount, factionId);
-            if (isPlayer) worldManager.showNotification(`树木倒下了！额外获得 🪵${finalAmount}`);
+            // 核心修改：砍断树木直接获得 30-50 木材
+            const baseFinalAmount = Math.floor(Math.random() * 21) + 30; // 30-50 随机
+            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', baseFinalAmount));
+            worldManager.addWood(finalAmount);
+            worldManager.showNotification(`树木倒下了！额外获得 🪵${finalAmount}`);
             
             worldManager.removeEntity(this.id);
-            if (this.mesh && this.mesh.parent) this.mesh.parent.remove(this.mesh);
+            // 核心修复：确保从场景中彻底消失
+            if (this.mesh) {
+                if (this.mesh.parent) this.mesh.parent.remove(this.mesh);
+            }
+            // 立即触发全图实体的视觉同步
             window.dispatchEvent(new CustomEvent('map-entities-updated'));
         } else {
-            // 还没断，播放普通砍树音效 (仅对玩家)
-            if (isPlayer) audioManager.play('farm_chop', { volume: 0.6, pitchVar: 0.2 });
+            // 还没断，播放普通砍树音效 (1, 2 随机由 AudioManager 处理)
+            audioManager.play('farm_chop', { volume: 0.6, pitchVar: 0.2 });
         }
 
-        // 每砍三下获得随机木材
+        // 每砍三下获得随机木材，并随季度增长
         if (this.chopCount % 3 === 0 && this.durability > 0) {
-            const baseAmount = Math.floor(Math.random() * 11) + 15; 
-            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: factionId }, 'wood_income', baseAmount));
-            worldManager.addWood(finalAmount, factionId);
+            // 核心修改：降低每三下的收益为 15-25
+            const baseAmount = Math.floor(Math.random() * 11) + 15; // 15-25 随机
+            
+            // 接入全局资源成长系统：使用 ModifierManager 计算最终收益
+            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', baseAmount));
+            
+            worldManager.addWood(finalAmount);
         }
     }
 }
@@ -475,38 +467,14 @@ export class PickupObject extends WorldObject {
         return spriteFactory.createUnitSprite(this.pickupType);
     }
 
-    update(deltaTime, activeHeroes) {
-        if (this.isPickedUp || !this.mesh) return;
-
-        // 自动拾取逻辑：检测周围所有的英雄
-        const pickupRadius = this.interactionRadius;
-        activeHeroes.forEach(hero => {
-            const dist = hero.position.distanceTo(this.mesh.position);
-            if (dist < pickupRadius) {
-                this.onInteractWithFaction(hero.factionId);
-            }
-        });
-    }
-
     onInteract(worldScene) {
-        // 主动交互 (通常是点击)
-        return this.onInteractWithFaction('player');
-    }
-
-    /**
-     * 被指定势力拾取
-     */
-    onInteractWithFaction(factionId) {
         if (this.isPickedUp) return false;
         this.isPickedUp = true;
         
-        worldManager.handlePickup(this.pickupType, factionId);
+        worldManager.handlePickup(this.pickupType);
         worldManager.removeEntity(this.id);
-        
-        if (this.mesh && this.mesh.parent) {
-            this.mesh.parent.remove(this.mesh);
-        }
-        return true; 
+        this.removeFromScene(worldScene.scene);
+        return true; // 表示已移除
     }
 
     getTooltipData() {
@@ -844,26 +812,6 @@ export class CityObject extends WorldObject {
         return 0; // 城市贴地
     }
 
-    update(deltaTime, activeHeroes) {
-        if (!this.mesh) return;
-
-        // 自动触发逻辑：检测周围所有的英雄
-        const interactionRadius = this.interactionRadius;
-        activeHeroes.forEach(hero => {
-            const cityData = worldManager.cities[this.id];
-            if (!cityData) return;
-
-            // 如果是 AI 英雄走到了不是自己的城市
-            if (hero.factionId !== 'player' && cityData.owner !== hero.factionId) {
-                const dist = hero.position.distanceTo(this.mesh.position);
-                if (dist < interactionRadius) {
-                    // AI 占领城镇逻辑 (目前简化为直接占领，未来可接入攻城模拟)
-                    worldManager.captureCity(this.id, hero.factionId);
-                }
-            }
-        });
-    }
-
     onInteract(worldScene) {
         const cityData = worldManager.cities[this.id];
         if (!cityData) return false;
@@ -981,29 +929,21 @@ export class CapturedBuildingObject extends WorldObject {
         return 0;
     }
 
-    update(deltaTime, activeHeroes) {
-        if (!this.mesh) return;
-
-        // 自动占领逻辑：检测周围所有的英雄
-        const captureRadius = 1.5; // 稍微小于交互半径，增加“站上去”的感觉
-        activeHeroes.forEach(hero => {
-            if (this.config.owner !== hero.factionId) {
-                const dist = hero.position.distanceTo(this.mesh.position);
-                if (dist < captureRadius) {
-                    this.onInteractWithFaction(hero.factionId);
-                }
-            }
-        });
-    }
-
     onInteract(worldScene) {
-        // 主动交互 (通常是点击)
-        this.onInteractWithFaction('player');
-        
-        // 2. 如果是神行祭坛且占领者是玩家，额外开启传送界面
-        if (this.buildingType === 'teleport_altar' && this.config.owner === 'player') {
+        // 1. 处理占领逻辑 (如果未占领会触发通知和音效)
+        worldManager.handleCapture({
+            id: this.id,
+            type: 'captured_building',
+            config: this.config,
+            mesh: this.mesh
+        });
+
+        // 2. 如果是神行祭坛，额外开启传送界面
+        if (this.buildingType === 'teleport_altar') {
+            // 核心修复：防止重复开启传送菜单导致按钮失效 (DOM 刷新频率过快)
             if (worldScene.activeAltarId !== this.id) {
-                worldScene.activeAltarId = this.id; 
+                worldScene.activeAltarId = this.id; // 立即标记，防止在 100ms 延迟期间重复进入
+                // 延迟一小会儿，确保占领通知能被看到
                 setTimeout(() => {
                     worldScene.openTeleportMenu(this.id);
                 }, 100);
@@ -1011,18 +951,6 @@ export class CapturedBuildingObject extends WorldObject {
         }
         
         return false;
-    }
-
-    /**
-     * 被指定势力占领
-     */
-    onInteractWithFaction(factionId) {
-        worldManager.handleCapture({
-            id: this.id,
-            type: 'captured_building',
-            config: this.config,
-            mesh: this.mesh
-        }, factionId);
     }
 
     onExitRange(worldScene) {
@@ -1110,18 +1038,10 @@ export class AIHeroObject extends MovableWorldObject {
         this.isInteractable = true;
         this.interactionRadius = 1.5;
         
-        // --- 状态机架构 ---
-        this.state = 'IDLE'; // IDLE, SEEK_RESOURCE, WANDER
-        this.decisionTimer = 0;
-        this.targetEntityId = null;
-        
-        // 游走 AI 参数
-        this.idleTimer = 0;
-        this.wanderRadius = 15;
-        this.spawnX = data.x;
-        this.spawnZ = data.z;
-        
-        this.moveSpeed = 3.5; 
+        this.moveSpeed = 3.5; // 稍微比玩家慢一点点，或者持平
+
+        // 核心改动：注入大脑
+        this.brain = new AIController(this);
     }
 
     createMesh() {
@@ -1155,92 +1075,13 @@ export class AIHeroObject extends MovableWorldObject {
         return group;
     }
 
-    update(deltaTime, activeHeroes) {
-        super.update(deltaTime, activeHeroes);
-
-        // 1. 状态决策心跳 (每秒进行一次逻辑决策)
-        this.decisionTimer -= deltaTime * 1000;
-        if (this.decisionTimer <= 0) {
-            this._makeDecision();
-            this.decisionTimer = 1000;
-        }
-
-        // 2. 执行当前状态的特定逻辑
-        this._executeStateLogic(deltaTime);
-    }
-
-    /**
-     * 核心决策逻辑：决定 AI 目前最想做什么
-     */
-    _makeDecision() {
-        // 如果正在战斗等待中，停止决策
-        if (worldManager.mapState.pendingBattleEnemyId) return;
-
-        // 优先级 1: 占领附近的金矿/伐木场 (贪婪逻辑)
-        const entities = worldManager.mapState.entities;
-        let nearestResource = null;
-        let minDist = 80; // 搜索半径 80 米
-
-        entities.forEach(e => {
-            // 目标：属于中立或他人的资源点，且未标记移除
-            if (e.type === 'captured_building' && e.config.owner !== this.factionId && !e.isRemoved) {
-                // 不去占领神行祭坛，AI 暂时只爱钱
-                if (e.buildingType === 'teleport_altar') return;
-
-                const d = Math.sqrt(Math.pow(e.x - this.x, 2) + Math.pow(e.z - this.z, 2));
-                if (d < minDist) {
-                    minDist = d;
-                    nearestResource = e;
-                }
-            }
-        });
-
-        if (nearestResource) {
-            this.state = 'SEEK_RESOURCE';
-            this.targetEntityId = nearestResource.id;
-            this.moveTo(nearestResource.x, nearestResource.z);
-            return;
-        }
-
-        // 优先级 2: 如果没有发现资源点，进入随机游走
-        if (this.state !== 'WANDER' && !this.isMoving) {
-            this.state = 'WANDER';
-            this.targetEntityId = null;
-        }
-    }
-
-    /**
-     * 执行具体的状态动作
-     */
-    _executeStateLogic(deltaTime) {
-        if (this.state === 'WANDER') {
-            // 传统的随机游走逻辑
-            if (!this.isMoving && this.currentPath.length === 0) {
-                this.idleTimer -= deltaTime * 1000;
-                if (this.idleTimer <= 0) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const dist = 5 + Math.random() * this.wanderRadius;
-                    const tx = this.spawnX + Math.cos(angle) * dist;
-                    const tz = this.spawnZ + Math.sin(angle) * dist;
-                    if (mapGenerator.isPassable(tx, tz)) {
-                        this.moveTo(tx, tz);
-                    }
-                    this.idleTimer = 2000 + Math.random() * 3000;
-                }
-            }
-        } else if (this.state === 'SEEK_RESOURCE') {
-            // 检查目标是否已经被别人占领（或者自己占领了）
-            const target = worldManager.mapState.entities.find(e => e.id === this.targetEntityId);
-            if (!target || target.config.owner === this.factionId) {
-                // 目标已达成或消失，重置状态重新决策
-                this.state = 'IDLE';
-                this.currentPath = [];
-            }
-        }
+    update(deltaTime, playerPos) {
+        super.update(deltaTime, playerPos);
+        // 让大脑驱动行为
+        this.brain.update(deltaTime);
     }
 
     onInteract(worldScene) {
-        // 暂时只打印一下，后续可以触发战斗
         console.log(`%c[遭遇] %c与英雄【${this.config.name}】狭路相逢！`, 'color: #ff4444; font-weight: bold', 'color: #fff');
         worldManager.showNotification(`遭遇了敌方英雄：${this.config.name}`);
         return false;
@@ -1250,16 +1091,12 @@ export class AIHeroObject extends MovableWorldObject {
         const faction = worldManager.factions[this.factionId];
         const factionColor = worldManager.getFactionColor(this.factionId);
         
-        let stateText = "正在休息";
-        if (this.state === 'SEEK_RESOURCE') stateText = "正在抢占资源";
-        else if (this.state === 'WANDER') stateText = "巡视领地";
-
         return {
             name: this.config.name,
             level: '敌方英雄',
             maxLevel: faction ? faction.name : '未知势力',
             color: factionColor,
-            description: `目标：${stateText}。这是一位正在扩充势力的敌方侠客。`
+            description: '一位正在巡视江湖的敌方侠客。'
         };
     }
 }
