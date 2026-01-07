@@ -209,6 +209,8 @@ class ModifierManager {
         let moreProduct = 1.0;      // 独立乘区 (More)
         let incSum = 0;             // 加法乘区 (Increased)
         let flatSum = 0;            // 基础加算 (Flat)
+        let maxFlat = -Infinity;    // 最大基础加算 (用于某些取最高值的属性)
+        let hasFlat = false;
 
         for (const mod of this.globalModifiers) {
             if (!this._isMatch(mod, unit, targetStat)) continue;
@@ -224,7 +226,17 @@ class ModifierManager {
                     incSum += (mod.multiplier - 1);
                 }
                 flatSum += mod.offset;
+                if (mod.offset !== undefined) {
+                    maxFlat = Math.max(maxFlat, mod.offset);
+                    hasFlat = true;
+                }
             }
+        }
+
+        // --- 3.5 特殊逻辑：取最高值而非叠加 ---
+        // 目前仅针对 survival_rate (医馆伤兵营救率) 执行“取最高级医馆效果”逻辑
+        if (statName === 'survival_rate' && hasFlat) {
+            flatSum = maxFlat;
         }
 
         // 特殊处理：减伤属性 (damage_multiplier) 采用乘法堆叠逻辑

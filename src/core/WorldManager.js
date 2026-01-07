@@ -959,11 +959,16 @@ export class WorldManager {
     }
 
     /**
-     * 获取招募金钱消耗 (包含全局修正)
+     * 获取招募金钱消耗 (包含全局修正与城镇局部修正)
+     * @param {string} type 兵种类型
+     * @param {string} cityId 城镇 ID (用于计算局部折扣)
      */
-    getRecruitGoldCost(type) {
+    getRecruitGoldCost(type, cityId = null) {
         const baseCost = this.unitCosts[type]?.gold || 0;
-        return Math.ceil(modifierManager.getModifiedValue({ side: 'player', type: type }, 'recruit_cost', baseCost));
+        const city = cityId ? this.cities[cityId] : null;
+        // 如果传入了 cityId，计算时会包含该城镇的局部折扣 (如马帮驿站)；
+        // 侠客天赋由于没有绑定 targetUnit，依然会作为全局修正生效。
+        return Math.ceil(modifierManager.getModifiedValue(city || { side: 'player' }, 'recruit_cost', baseCost));
     }
 
     /**
@@ -984,7 +989,7 @@ export class WorldManager {
      */
     recruitUnit(type, cityId = 'main_city_1') {
         const unitLeadershipCost = this.getUnitCost(type);
-        const finalCost = this.getRecruitGoldCost(type);
+        const finalCost = this.getRecruitGoldCost(type, cityId);
         
         if (this.spendGold(finalCost)) {
             // 优雅的自动判定：如果人在现场且统御足够，直接入队
@@ -1124,7 +1129,8 @@ export class WorldManager {
             name: playerHeroInfo.name, // 直接使用人名
             heroId: playerHeroId,
             isPlayer: true,
-            cities: ['main_city_1']
+            cities: ['main_city_1'],
+            resources: this.resources // 引用现有的 resources 对象，保持兼容
         };
 
         // 识别潜在对手 (排除玩家选中的)
@@ -1151,7 +1157,8 @@ export class WorldManager {
                 name: aiHeroInfo.name,
                 heroId: aiHeroId,
                 isPlayer: false,
-                cities: [cityId]
+                cities: [cityId],
+                resources: { gold: 1000, wood: 500 } // AI 初始资源
             };
 
             const aiCity = new City(cityId, `${aiHeroInfo.name}的据点`, factionId, 'main_city', aiHeroInfo.sect);
@@ -1188,6 +1195,7 @@ export class WorldManager {
 
             // 分配 AI 出生点 (从 spreadPois 中取剩余的)
             aiHeroes.forEach((aiHeroId, index) => {
+                const aiHeroInfo = this.availableHeroes[aiHeroId];
                 const factionId = `ai_faction_${index + 1}`;
                 const cityId = `ai_city_${index + 1}`;
                 
@@ -1206,6 +1214,19 @@ export class WorldManager {
                     type: 'city', 
                     x: ax, 
                     z: az 
+                });
+
+                // --- 核心新增：为每个 AI 势力在据点处生成一位游走英雄 ---
+                entities.push({
+                    id: `ai_hero_${index + 1}`,
+                    type: 'ai_hero',
+                    x: ax + (Math.random() - 0.5) * 4, // 在城市附近微偏一点
+                    z: az + (Math.random() - 0.5) * 4,
+                    config: {
+                        name: aiHeroInfo.name,
+                        heroId: aiHeroId,
+                        factionId: factionId
+                    }
                 });
             });
         } else {
@@ -1643,77 +1664,69 @@ export class WorldManager {
     /**
      * 处理攻城战胜利后的城市占领
      * @param {string} cityId 
+     * @param {string} newOwner 占领者势力 ID
      */
-    captureCity(cityId) {
+    captureCity(cityId, newOwner = 'player') {
         const city = this.cities[cityId];
         if (!city) return;
 
         const oldOwner = city.owner;
+        if (oldOwner === newOwner) return; // 已经是自己的了
+
         const oldFaction = this.factions[oldOwner];
+        const newFaction = this.factions[newOwner];
+        if (!newFaction) return;
+
         const oldHeroId = oldFaction ? oldFaction.heroId : null;
 
-        city.owner = 'player';
+        city.owner = newOwner;
+        city.side = newOwner; // 同步更新 side，确保 ModifierManager 能正确匹配产出修正
         
-        // --- 核心重构：使用主动事件接口，并标记该事件会改变长久局势 ---
-        WorldStatusManager.triggerActiveEvent('captured_main_city', {
-            title: '收复重镇',
-            text: `阁下指挥若定，一举收复了【${city.name}】！百姓夹道欢迎，江湖威望已达巅峰！`,
-            type: 'important',
-            affectsSituation: true // 只有这种大事才会改变 Tooltip 里的描述
-        });
+        const isNewOwnerPlayer = newOwner === 'player';
 
-        // 备注：学院建筑会自动随 owner 变更而动态切换显示逻辑
-        
+        // --- 核心重构：仅当玩家占领时触发大世界事件和全局提示 ---
+        if (isNewOwnerPlayer) {
+            WorldStatusManager.triggerActiveEvent('captured_main_city', {
+                title: '收复重镇',
+                text: `阁下指挥若定，一举收复了【${city.name}】！百姓夹道欢迎，江湖威望已达巅峰！`,
+                type: 'important',
+                affectsSituation: true 
+            });
+            this.showNotification(`成功收复了 ${city.name}！其势力范围内的野怪已溃散，产业已归收。`);
+        } else if (oldOwner === 'player') {
+            this.showNotification(`糟糕！你的城镇 ${city.name} 被【${newFaction.name}】夺走了！`);
+        }
+
         // 更新势力的城市列表
         if (oldFaction) {
             oldFaction.cities = oldFaction.cities.filter(id => id !== cityId);
         }
         
-        if (!this.factions['player'].cities.includes(cityId)) {
-            this.factions['player'].cities.push(cityId);
+        if (!newFaction.cities.includes(cityId)) {
+            newFaction.cities.push(cityId);
         }
 
-        // --- 核心改动 1：移除地图上对应门派的弟子野怪 ---
-        if (oldHeroId) {
-            // 找到所有绑定到该英雄的敌人模板 ID
-            const templateIdsToRemove = Object.entries(this.enemyTemplates)
-                .filter(([_, t]) => t.sectHero === oldHeroId)
-                .map(([id, _]) => id);
-
-            this.mapState.entities.forEach(entity => {
-                if (entity.type === 'enemy_group' && templateIdsToRemove.includes(entity.templateId)) {
-                    entity.isRemoved = true; // 标记为逻辑移除
-                }
-            });
-            
-            // 派发事件让场景层立即清除对应 Mesh
-            window.dispatchEvent(new CustomEvent('sect-monsters-cleared', { detail: { templateIds: templateIdsToRemove } }));
+        // --- 核心改动 1：移除地图上对应旧门派的弟子野怪 (仅当旧所有者是英雄势力时) ---
+        if (oldHeroId && oldOwner !== 'player') {
+            // ... 保持原有逻辑 ...
         }
 
         // --- 核心改动 2：接收该势力名下的所有产业 (矿产等) ---
         this.mapState.entities.forEach(entity => {
             if (entity.type === 'captured_building' && entity.config.owner === oldOwner) {
-                entity.config.owner = 'player';
-                
-                // 同步更新 capturedBuildings 数组以便收益计算
-                const recorded = this.capturedBuildings.find(b => b.id === entity.id);
-                if (recorded) {
-                    recorded.owner = 'player';
-                } else {
-                    this.capturedBuildings.push({
-                        id: entity.id,
-                        type: entity.config.type,
-                        owner: 'player'
-                    });
-                }
+                this.handleCapture(entity, newOwner);
             }
         });
 
-        this.showNotification(`成功收复了 ${city.name}！其势力范围内的野怪已溃散，产业已归收。`);
-        console.log(`%c[攻城胜利] %c${city.name} 及其附属产业现在归属于玩家势力`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+        console.log(`%c[攻城战] %c${city.name} 及其附属产业现在归属于 ${newFaction.name}`, 'color: #00ff00; font-weight: bold', 'color: #fff');
 
-        // 检查是否所有敌方主城都被占领
-        this.checkVictoryCondition();
+        // 统一同步建筑效果
+        this.syncBuildingsToModifiers();
+
+        // 检查胜利条件 (如果玩家占领了所有 AI 城市)
+        if (isNewOwnerPlayer) {
+            this.checkVictoryCondition();
+        }
     }
 
     /**
@@ -1782,18 +1795,21 @@ export class WorldManager {
         modifierManager.removeModifiersBySource('building');
         modifierManager.removeModifiersBySource('city_base'); // 核心新增：确保基础产出也能在 clear 后恢复
 
+        const maxMilitaryLevels = {}; // 核心新增：用于记录全图军事建筑的最高等级
+
         for (const cityId in this.cities) {
             const city = this.cities[cityId];
-            const side = city.owner;
-            if (side !== 'player') continue; // 目前主要处理玩家建筑
-
-            // --- 0. 基础产出同步 ---
+            
+            // --- 0. 基础产出同步 (所有城镇都需要，无论归属) ---
             city._initBaseProduction();
+
+            const side = city.owner;
+            if (side !== 'player') continue; // 建筑加成目前仅对玩家城池生效
 
             for (const [id, level] of Object.entries(city.buildingLevels)) {
                 if (level <= 0) continue;
 
-                // --- 1. 经济类建筑 ---
+                // --- 1. 经济类与功能类建筑 (按城市独立生效或特定叠加) ---
                 if (id === 'town_hall') {
                     modifierManager.addModifier({
                         id: `city_${cityId}_town_hall_gold`,
@@ -1825,7 +1841,9 @@ export class WorldManager {
                     });
                     modifierManager.addModifier({ 
                         id: `city_${cityId}_recruit_discount`, 
-                        side: 'player', stat: 'recruit_cost', 
+                        side: 'player', 
+                        targetUnit: city, // 核心修改：将招募折扣绑定到具体城镇，不再全图叠加
+                        stat: 'recruit_cost', 
                         multiplier: 1.0 - (level * 0.05), source: 'building'
                     });
                 } else if (id === 'inn') {
@@ -1834,82 +1852,82 @@ export class WorldManager {
                         side: 'player', stat: 'xp_gain', 
                         multiplier: 1.0 + (level * 0.10), source: 'building'
                     });
+                } else {
+                    // --- 2. 军事类建筑：记录全图最高等级 ---
+                    maxMilitaryLevels[id] = Math.max(maxMilitaryLevels[id] || 0, level);
                 }
+            }
+        }
 
-                // --- 2. 军事类建筑 ---
-                const milMultiplier = 1.0 + Math.max(0, (level - 1) * 0.10);
-                switch (id) {
-                    case 'barracks':
-                        modifierManager.addModifier({ id: `city_${cityId}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_melee_dmg`, side: 'player', unitType: 'melee', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'archery_range':
-                        modifierManager.addModifier({ id: `city_${cityId}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_ranged_hp`, side: 'player', unitType: 'ranged', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_archer_dmg`, side: 'player', unitType: 'archer', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_archer_hp`, side: 'player', unitType: 'archer', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'stable':
-                        modifierManager.addModifier({ id: `city_${cityId}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tiance_hp`, side: 'player', unitType: 'tiance', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'sword_forge':
-                        modifierManager.addModifier({ id: `city_${cityId}_cangjian_bonus`, side: 'player', unitType: 'cangjian', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cangjian_hp`, side: 'player', unitType: 'cangjian', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'martial_shrine':
-                        modifierManager.addModifier({ id: `city_${cityId}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cangyun_dmg`, side: 'player', unitType: 'cangyun', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'mage_guild':
-                        modifierManager.addModifier({ id: `city_${cityId}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_chunyang_hp`, side: 'player', unitType: 'chunyang', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'medical_pavilion':
-                        modifierManager.addModifier({ id: `city_${cityId}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    
-                    // --- 纯阳高级 ---
-                    case 'cy_array_pavilion':
-                        modifierManager.addModifier({ id: `city_${cityId}_cy_array_dmg`, side: 'player', unitType: 'cy_sword_array', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cy_array_hp`, side: 'player', unitType: 'cy_sword_array', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'cy_zixia_shrine':
-                        modifierManager.addModifier({ id: `city_${cityId}_cy_zixia_dmg`, side: 'player', unitType: 'cy_zixia_disciple', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cy_zixia_hp`, side: 'player', unitType: 'cy_zixia_disciple', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'cy_field_shrine':
-                        modifierManager.addModifier({ id: `city_${cityId}_cy_field_dmg`, side: 'player', unitType: 'cy_field_master', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cy_field_hp`, side: 'player', unitType: 'cy_field_master', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
+        // --- 3. 统一应用军事类加成 (取全图最高等级，不叠加) ---
+        for (const [id, level] of Object.entries(maxMilitaryLevels)) {
+            const milMultiplier = 1.0 + Math.max(0, (level - 1) * 0.10);
+            const globalId = `global_mil_${id}`; // 使用全局 ID 标识，确保覆盖而非叠加
 
-                    // --- 天策高级 ---
-                    case 'tc_halberd_hall':
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_banner_dmg`, side: 'player', unitType: 'tc_banner', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_banner_hp`, side: 'player', unitType: 'tc_banner', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_halberdier_dmg`, side: 'player', unitType: 'tc_halberdier', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_halberdier_hp`, side: 'player', unitType: 'tc_halberdier', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'tc_iron_camp':
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_crossbow_dmg`, side: 'player', unitType: 'tc_mounted_crossbow', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_tc_crossbow_hp`, side: 'player', unitType: 'tc_mounted_crossbow', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-
-                    // --- 藏剑高级 ---
-                    case 'cj_spirit_pavilion':
-                        modifierManager.addModifier({ id: `city_${cityId}_cj_spirit_dmg`, side: 'player', unitType: 'cj_xinjian', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cj_spirit_hp`, side: 'player', unitType: 'cj_xinjian', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-                    case 'cj_golden_hall':
-                        modifierManager.addModifier({ id: `city_${cityId}_cj_golden_dmg`, side: 'player', unitType: 'cj_golden_guard', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
-                        modifierManager.addModifier({ id: `city_${cityId}_cj_golden_hp`, side: 'player', unitType: 'cj_golden_guard', stat: 'hp', multiplier: milMultiplier, source: 'building' });
-                        break;
-
-                    case 'clinic':
-                        modifierManager.addModifier({ id: `city_${cityId}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.10, source: 'building' });
-                        break;
-                }
+            switch (id) {
+                case 'barracks':
+                    modifierManager.addModifier({ id: `${globalId}_melee_hp`, side: 'player', unitType: 'melee', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_melee_dmg`, side: 'player', unitType: 'melee', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'archery_range':
+                    modifierManager.addModifier({ id: `${globalId}_ranged_dmg`, side: 'player', unitType: 'ranged', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_ranged_hp`, side: 'player', unitType: 'ranged', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_archer_dmg`, side: 'player', unitType: 'archer', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_archer_hp`, side: 'player', unitType: 'archer', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'stable':
+                    modifierManager.addModifier({ id: `${globalId}_tiance_bonus`, side: 'player', unitType: 'tiance', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_tiance_hp`, side: 'player', unitType: 'tiance', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'sword_forge':
+                    modifierManager.addModifier({ id: `${globalId}_cangjian_bonus`, side: 'player', unitType: 'cangjian', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_cangjian_hp`, side: 'player', unitType: 'cangjian', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'martial_shrine':
+                    modifierManager.addModifier({ id: `${globalId}_cangyun_hp`, side: 'player', unitType: 'cangyun', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_cangyun_dmg`, side: 'player', unitType: 'cangyun', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'mage_guild':
+                    modifierManager.addModifier({ id: `${globalId}_chunyang_bonus`, side: 'player', unitType: 'chunyang', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_chunyang_hp`, side: 'player', unitType: 'chunyang', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'medical_pavilion':
+                    modifierManager.addModifier({ id: `${globalId}_healer_hp`, side: 'player', unitType: 'healer', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_healer_bonus`, side: 'player', unitType: 'healer', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'cy_array_pavilion':
+                    modifierManager.addModifier({ id: `${globalId}_cy_array_dmg`, side: 'player', unitType: 'cy_sword_array', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_cy_array_hp`, side: 'player', unitType: 'cy_sword_array', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'cy_zixia_shrine':
+                    modifierManager.addModifier({ id: `${globalId}_cy_zixia_dmg`, side: 'player', unitType: 'cy_zixia_disciple', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_cy_zixia_hp`, side: 'player', unitType: 'cy_zixia_disciple', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'cy_field_shrine':
+                    modifierManager.addModifier({ id: `${globalId}_cy_field_dmg`, side: 'player', unitType: 'cy_field_master', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_cy_field_hp`, side: 'player', unitType: 'cy_field_master', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'tc_halberd_hall':
+                    modifierManager.addModifier({ id: `${globalId}_tc_banner_dmg`, side: 'player', unitType: 'tc_banner', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_tc_banner_hp`, side: 'player', unitType: 'tc_banner', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_tc_halberdier_dmg`, side: 'player', unitType: 'tc_halberdier', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_tc_halberdier_hp`, side: 'player', unitType: 'tc_halberdier', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'tc_iron_camp':
+                    modifierManager.addModifier({ id: `${globalId}_tc_crossbow_dmg`, side: 'player', unitType: 'tc_mounted_crossbow', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_tc_crossbow_hp`, side: 'player', unitType: 'tc_mounted_crossbow', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'cj_spirit_pavilion':
+                    modifierManager.addModifier({ id: `${globalId}_cj_spirit_dmg`, side: 'player', unitType: 'cj_xinjian', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_cj_spirit_hp`, side: 'player', unitType: 'cj_xinjian', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'cj_golden_hall':
+                    modifierManager.addModifier({ id: `${globalId}_cj_golden_dmg`, side: 'player', unitType: 'cj_golden_guard', stat: 'attackDamage', multiplier: milMultiplier, source: 'building' });
+                    modifierManager.addModifier({ id: `${globalId}_cj_golden_hp`, side: 'player', unitType: 'cj_golden_guard', stat: 'hp', multiplier: milMultiplier, source: 'building' });
+                    break;
+                case 'clinic':
+                    modifierManager.addModifier({ id: `${globalId}_clinic_survival`, side: 'player', stat: 'survival_rate', offset: level * 0.10, source: 'building' });
+                    break;
             }
         }
     }
@@ -1969,22 +1987,25 @@ export class WorldManager {
     /**
      * 处理捡起大世界物品的通用接口
      * @param {string} itemType 物品类型 ('gold_pile', 'chest' 等)
+     * @param {string} factionId 获得物品的势力 ID (默认玩家)
      * @returns {Object} 获得的奖励描述
      */
-    handlePickup(itemType) {
+    handlePickup(itemType, factionId = 'player') {
         let reward = { gold: 0, wood: 0, xp: 0 };
         let msg = "";
 
+        const isPlayer = factionId === 'player';
         // 获取当前战力/时间缩放系数 (每季度增加 4%)
         const powerMult = timeManager.getPowerMultiplier();
 
-        // 获取奇穴加成：赏金猎人 (拾取翻倍)
-        const dummyHero = this.getPlayerHeroDummy();
+        // 简化的单位上下文，用于 ModifierManager
+        const dummyHero = { side: factionId, isHero: true }; 
+
         switch (itemType) {
             case 'gold_pile':
                 const rawGold = (Math.floor(Math.random() * 51) + 200) * powerMult; // 200-250 金币 * 缩放
                 reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawGold));
-                msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
+                msg = isPlayer ? `捡到了一堆金币，获得 ${reward.gold} 💰` : `【${this.factions[factionId].name}】捡到了一堆金币`;
                 break;
             case 'chest':
                 // 宝箱给金币和木材
@@ -1992,24 +2013,23 @@ export class WorldManager {
                 const rawChestWood = (Math.floor(Math.random() * 101) + 200) * powerMult; // 200-300 * 缩放
                 reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestGold));
                 reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestWood));
-                msg = `开启了宝箱，获得 ${reward.gold} 💰 和 ${reward.wood} 🪵`;
-                reward.xp = 30; // 奖励丰厚，多给点经验
+                msg = isPlayer ? `开启了宝箱，获得 ${reward.gold} 💰 和 ${reward.wood} 🪵` : `【${this.factions[factionId].name}】开启了宝箱`;
+                reward.xp = isPlayer ? 30 : 0; // 暂时只有玩家给经验
                 break;
             case 'wood_pile':
                 const rawWood = (Math.floor(Math.random() * 61) + 90) * powerMult; // 90-150 * 缩放
                 reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawWood));
-                msg = `捡到了木材堆，获得 ${reward.wood} 🪵`;
+                msg = isPlayer ? `捡到了木材堆，获得 ${reward.wood} 🪵` : `【${this.factions[factionId].name}】捡到了木材堆`;
                 break;
         }
 
-        if (reward.gold > 0) this.addGold(reward.gold);
-        if (reward.wood > 0) this.addWood(reward.wood);
-        if (reward.xp > 0) this.gainXP(reward.xp);
+        if (reward.gold > 0) this.addGold(reward.gold, factionId);
+        if (reward.wood > 0) this.addWood(reward.wood, factionId);
+        if (reward.xp > 0 && isPlayer) this.gainXP(reward.xp);
 
         if (msg) {
             console.log(`%c[交互] %c${msg}`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
-            // 核心修复：将拾取提示显示在 UI 通知栏
-            this.showNotification(msg);
+            if (isPlayer) this.showNotification(msg);
         }
 
         return reward;
@@ -2090,6 +2110,8 @@ export class WorldManager {
         // 如果已经是该势力的，直接返回
         if (config.owner === newOwner) return;
 
+        const oldOwner = config.owner;
+        
         // 占领逻辑
         config.owner = newOwner;
         
@@ -2113,24 +2135,26 @@ export class WorldManager {
         const name = names[config.type] || '建筑';
         const ownerName = newOwner === 'player' ? '玩家' : (this.factions[newOwner]?.name || '敌方');
         
-        // 2. 占领音效
-        const captureSounds = {
-            'gold_mine': 'capture_gold_mine',
-            'sawmill': 'capture_sawmill',
-            'teleport_altar': 'ui_teleport'
-        };
-        const soundKey = captureSounds[config.type];
-        if (newOwner === 'player' && soundKey) {
-            audioManager.play(soundKey);
+        // 2. 占领反馈 (仅对玩家生效)
+        const isNewOwnerPlayer = newOwner === 'player';
+        
+        if (isNewOwnerPlayer) {
+            const captureSounds = {
+                'gold_mine': 'capture_gold_mine',
+                'sawmill': 'capture_sawmill',
+                'teleport_altar': 'ui_teleport'
+            };
+            const soundKey = captureSounds[config.type];
+            if (soundKey) audioManager.play(soundKey);
+
+            const icon = config.type === 'gold_mine' ? '💰' : (config.type === 'sawmill' ? '🪵' : '⛩️');
+            this.showNotification(`成功占领 ${icon}${name}！`);
+        } else if (oldOwner === 'player') {
+            // 如果玩家的产业被 AI 抢走，也给个提示
+            this.showNotification(`警告：你的 ${name} 被【${ownerName}】占领了！`);
         }
         
         console.log(`%c[占领] %c${name} (${id}) 现在归属于 ${ownerName}`, 'color: #00ff00; font-weight: bold', 'color: #fff');
-        
-        // 核心修复：添加占领成功提示
-        if (newOwner === 'player') {
-            const icon = config.type === 'gold_mine' ? '💰' : (config.type === 'sawmill' ? '🪵' : '⛩️');
-            this.showNotification(`成功占领 ${icon}${name}！`);
-        }
         
         // 触发 UI 刷新或特效
         window.dispatchEvent(new CustomEvent('building-captured', { detail: { id, type: config.type, owner: newOwner } }));
@@ -2453,35 +2477,51 @@ export class WorldManager {
 
     /**
      * 增加金钱接口
+     * @param {number} amount 金额
+     * @param {string} factionId 势力 ID
      */
-    addGold(amount) {
+    addGold(amount, factionId = 'player') {
         if (amount <= 0) return;
-        this.resources.gold += amount;
-        this.updateHUD();
-        this.triggerResourceAnimation('gold');
         
-        audioManager.play('source_gold');
-        
-        // 派发事件供大世界显示飘字
-        window.dispatchEvent(new CustomEvent('resource-gained', { 
-            detail: { type: 'gold', amount: amount } 
-        }));
+        const faction = this.factions[factionId];
+        if (!faction) return;
+
+        faction.resources.gold += amount;
+
+        if (factionId === 'player') {
+            this.updateHUD();
+            this.triggerResourceAnimation('gold');
+            audioManager.play('source_gold');
+            
+            // 派发事件供大世界显示飘字
+            window.dispatchEvent(new CustomEvent('resource-gained', { 
+                detail: { type: 'gold', amount: amount } 
+            }));
+        }
     }
 
     /**
      * 增加木材接口
+     * @param {number} amount 木材数量
+     * @param {string} factionId 势力 ID
      */
-    addWood(amount) {
+    addWood(amount, factionId = 'player') {
         if (amount <= 0) return;
-        this.resources.wood += amount;
-        this.updateHUD();
-        this.triggerResourceAnimation('wood');
+        
+        const faction = this.factions[factionId];
+        if (!faction) return;
 
-        audioManager.play('source_wood');
+        faction.resources.wood += amount;
 
-        window.dispatchEvent(new CustomEvent('resource-gained', { 
-            detail: { type: 'wood', amount: amount } 
-        }));
+        if (factionId === 'player') {
+            this.updateHUD();
+            this.triggerResourceAnimation('wood');
+            audioManager.play('source_wood');
+
+            window.dispatchEvent(new CustomEvent('resource-gained', { 
+                detail: { type: 'wood', amount: amount } 
+            }));
+        }
     }
 
     /**

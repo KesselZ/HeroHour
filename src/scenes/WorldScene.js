@@ -1004,8 +1004,8 @@ export class WorldScene {
                 const item = document.createElement('div');
                 item.className = 'recruit-item';
                 
-                // 计算最终招募价格
-                const finalCost = worldManager.getRecruitGoldCost(type);
+                // 计算最终招募价格 (带入当前城镇 ID 以应用局部折扣)
+                const finalCost = worldManager.getRecruitGoldCost(type, cityId);
 
                 item.innerHTML = `
                     <div class="slot-icon" style="${this.getIconStyleString(type)}"></div>
@@ -1257,6 +1257,31 @@ export class WorldScene {
         if (minimap) minimap.classList.remove('hidden');
 
         timeManager.updateUI();
+
+        // --- DEBUG: 开局模拟随机占领一座 AI 城市 ---
+        this.debugCaptureRandomCity();
+    }
+
+    /**
+     * [DEBUG] 模拟占领随机一座 AI 城市
+     */
+    debugCaptureRandomCity() {
+        const aiCities = Object.values(worldManager.cities).filter(c => c.owner !== 'player');
+        if (aiCities.length > 0) {
+            const randomCity = aiCities[Math.floor(Math.random() * aiCities.length)];
+            console.log(`%c[DEBUG] 正在执行模拟占领: ${randomCity.name} (ID: ${randomCity.id})`, 'color: #ff9900; font-weight: bold');
+            
+            // 执行核心占领逻辑 (与战斗胜利后的逻辑完全一致)
+            worldManager.captureCity(randomCity.id);
+            
+            // 刷新 HUD 以显示新占领的城市
+            this.refreshWorldHUD();
+            
+            // 弹出一条系统通知告知结果
+            worldManager.showNotification(`[Debug] 已自动收复：${randomCity.name}`);
+        } else {
+            console.warn("[DEBUG] 未找到可占领的 AI 城市");
+        }
     }
 
     /**
@@ -1817,10 +1842,19 @@ export class WorldScene {
         // 2. 核心位移与寻路逻辑
         this._processInputAndMovement(deltaTime);
 
-        // 3. 更新所有交互物体的逻辑 (例如敌人移动)
-        const playerPos = this.playerGroup.position;
+        // 3. 更新所有交互物体的逻辑 (例如敌人移动、AI 占领)
+        const activeHeroes = [];
+        if (this.playerGroup) {
+            activeHeroes.push({ id: 'player', factionId: 'player', position: this.playerGroup.position });
+        }
+        this.worldObjects.forEach(obj => {
+            if (obj.type === 'ai_hero' && obj.mesh) {
+                activeHeroes.push({ id: obj.id, factionId: obj.factionId, position: obj.mesh.position });
+            }
+        });
+
         this.interactables.forEach(obj => {
-            if (obj.update) obj.update(deltaTime, playerPos);
+            if (obj.update) obj.update(deltaTime, activeHeroes);
         });
 
         // 核心修复：全局交互检测（确保玩家站着不动被敌人撞到也能触发战斗）
