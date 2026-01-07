@@ -28,9 +28,8 @@ export class WorldObject {
     spawn(scene) {
         this.mesh = this.createMesh();
         if (this.mesh) {
-            // 核心修复：仅在大世界物体生成时，将锚点设为底部偏上 (0.1)
+            // 核心修复：仅在大世界物体生成时，同步配置缩放
             if (this.mesh instanceof THREE.Sprite) {
-                this.mesh.center.set(0.5, 0.1);
                 // 优雅同步：在 spawn 时直接获取配置缩放
                 const spriteKey = this.mesh.userData.spriteKey || this.type;
                 const config = spriteFactory.unitConfig[spriteKey];
@@ -58,7 +57,11 @@ export class WorldObject {
     }
 
     getElevation() {
-        return 0; // 既然锚点已调至底部，位置高度应设为 0 以便贴地
+        // 统一高度补偿：为了让 0.1 锚点的底边贴地，需要抬升 scale * 0.1
+        const spriteKey = (this.mesh && this.mesh.userData && this.mesh.userData.spriteKey) || this.type;
+        const config = spriteFactory.unitConfig[spriteKey];
+        const scale = config ? config.scale : 1.4;
+        return scale * 0.1;
     }
 
     /**
@@ -255,6 +258,7 @@ export class MovableWorldObject extends WorldObject {
         // 如果没有，再从 config 获取，最后才是 type
         const spriteKey = sprite.userData.spriteKey || this.config.spriteKey || this.type;
         const config = spriteFactory.unitConfig[spriteKey] || { col: 1 };
+        const baseVisualY = 0; // 由于基类 getElevation 已经抬高了整个 mesh，sprite 相对坐标设为 0
 
         if (this.isMoving) {
             const distanceMoved = this.mesh.position.distanceTo(this.lastPos);
@@ -271,7 +275,7 @@ export class MovableWorldObject extends WorldObject {
 
             // 跳动
             const bob = Math.abs(Math.sin(this.moveAnimTime));
-            sprite.position.y = bob * 0.12;
+            sprite.position.y = baseVisualY + bob * 0.12;
 
             // 挤压伸展
             const stretch = 1 + bob * 0.06;
@@ -358,12 +362,6 @@ export class TreeObject extends WorldObject {
         const group = new THREE.Group();
         const sprite = spriteFactory.createUnitSprite(this.spriteKey);
         this.mainSprite = sprite;
-        
-        // 核心修复：确保 Sprite 在 Group 内的锚点和偏移正确
-        // 由于 WorldObject.spawn 会设置 Group 的 position，Sprite 保持局部 (0,0,0) 即可
-        if (sprite instanceof THREE.Sprite) {
-            sprite.center.set(0.5, 0.1); // 保持和 WorldObject.spawn 一致的锚点逻辑
-        }
         
         group.add(sprite);
         return group;

@@ -346,13 +346,14 @@ class SpriteFactory {
         });
     }
 
-    createUnitSprite(key, anchorY = 0.5) {
+    createUnitSprite(key, anchorY = 0.1) {
         const config = ASSET_REGISTRY.UNITS[key];
         const material = this.getMaterial(key);
         const sprite = new THREE.Sprite(material);
         const s = config ? config.scale : 1.4;
         sprite.scale.set(s, s, 1);
-        // 恢复默认：除非指定，否则使用中心锚点 (0.5)
+        
+        // 统一使用传入的锚点，默认为 0.1 (脚部)
         sprite.center.set(0.5, anchorY); 
         
         // 核心修复：将真实身份注入 userData，供后续翻转动画精确识别

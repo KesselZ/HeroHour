@@ -267,8 +267,8 @@ export class BaseUnit extends THREE.Group {
 
     initVisual() {
         // 1. 侠客 Sprite
-        // 核心修复：将 anchorY 设为 0.1 (脚部)，这样 position.y = 0 时脚就在地上
-        this.unitSprite = spriteFactory.createUnitSprite(this.type, 0.1);
+        // 核心修复：根据配置表或默认值 (0.1) 自动设置锚点
+        this.unitSprite = spriteFactory.createUnitSprite(this.type);
         this.add(this.unitSprite);
 
         // --- 核心修复：初始朝向同步 ---
