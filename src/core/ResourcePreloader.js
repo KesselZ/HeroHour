@@ -1,103 +1,49 @@
+import { audioManager } from './AudioManager.js';
+
 /**
- * 全局资源预加载器
- * 在游戏启动时预加载所有图片和音频资源，避免运行时延迟
+ * 资源预加载器 (Singleton)
+ * 职责：在游戏开始前加载所有核心图片和音频，并提供进度反馈
  */
 class ResourcePreloader {
     constructor() {
-        this.loadedImages = new Set();
-        this.loadedAudios = new Set();
-        this.totalResources = 0;
+        this.totalCount = 0;
         this.loadedCount = 0;
-        this.isPreloading = false;
         this.onProgress = null;
         this.onComplete = null;
-        this.currentLoadingFile = null; // 当前正在加载的文件
+        this.isStarted = false;
+        this.loadedImages = new Set();
+        this.loadedAudios = new Set();
+        this.currentLoadingFile = '';
     }
 
     /**
-     * 预加载所有游戏资源
-     * @param {Function} onProgress - 进度回调函数 (loadedCount, totalCount)
-     * @param {Function} onComplete - 完成回调函数
+     * 获取所有需要预加载的资源路径
+     * @returns {Object} { images: [], audios: [] }
      */
-    async preloadAll(onProgress = null, onComplete = null) {
-        if (this.isPreloading) return;
-
-        this.onProgress = onProgress;
-        this.onComplete = onComplete;
-        this.isPreloading = true;
-
+    async fetchResourceList() {
         try {
-            // 从生成的资源清单中获取路径
-            console.log('%c[资源预加载] 正在获取资源清单...', 'color: #5b8a8a; font-weight: bold');
-            
-            // 使用 import.meta.env.BASE_URL 处理 GitHub Pages 等子目录部署的情况
-            const baseUrl = import.meta.env.BASE_URL || '/';
-            const manifestUrl = `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}resource-list.json`.replace(/\/+/g, '/');
-            
-            const response = await fetch(manifestUrl);
-            if (!response.ok) {
-                throw new Error('无法加载 resource-list.json');
+            // 尝试加载生成的资源列表
+            const response = await fetch('/resource-list.json');
+            if (response.ok) {
+                const data = await response.json();
+                return {
+                    images: data.images || [],
+                    audios: data.audios || []
+                };
             }
-            const manifest = await response.json();
-            
-            // 提取路径并处理基础 URL
-            const processPaths = (paths) => (paths || []).map(path => {
-                // 如果路径已经是绝对路径（以 http 开头），则不处理
-                if (path.startsWith('http')) return path;
-                // 确保路径以 baseUrl 开头，并处理重复的斜杠
-                const fullPath = `${baseUrl}/${path}`.replace(/\/+/g, '/');
-                return fullPath;
-            });
-
-            const imagePaths = processPaths(manifest.images);
-            const audioPaths = processPaths(manifest.audios);
-
-            this.totalResources = imagePaths.length + audioPaths.length;
-            this.loadedCount = 0;
-
-            console.log(`%c[资源预加载] 开始预加载 ${this.totalResources} 个资源文件 (清单生成时间: ${manifest.generatedAt})`, 'color: #5b8a8a; font-weight: bold');
-
-            // 并行预加载图片和音频
-            const imagePromises = imagePaths.map(path => this.preloadImage(path));
-            const audioPromises = audioPaths.map(path => this.preloadAudio(path));
-
-            await Promise.all([...imagePromises, ...audioPromises]);
-            console.log('%c[资源预加载] 所有资源预加载完成', 'color: #5b8a8a; font-weight: bold');
-            if (this.onComplete) this.onComplete();
         } catch (error) {
-            console.error('资源预加载过程中出错:', error);
-            // 如果清单加载失败，则回退到硬编码的基础资源（可选，或者直接提示错误）
-            console.warn('正在尝试回退到基础资源加载...');
-            
-            const imagePaths = this.getAllImagePaths();
-            const audioPaths = this.getAllAudioPaths();
-            this.totalResources = imagePaths.length + audioPaths.length;
-            this.loadedCount = 0;
-            
-            const imagePromises = imagePaths.map(path => this.preloadImage(path));
-            const audioPromises = audioPaths.map(path => this.preloadAudio(path));
-            
-            try {
-                await Promise.all([...imagePromises, ...audioPromises]);
-                if (this.onComplete) this.onComplete();
-            } catch (fallbackError) {
-                console.error('回退加载也失败了:', fallbackError);
-                if (this.onComplete) this.onComplete();
-            }
+            console.warn('无法获取 resource-list.json，将使用硬编码备用列表:', error);
         }
 
-        this.isPreloading = false;
+        // 备用硬编码列表 (如果 fetch 失败)
+        return {
+            images: this.getBackupImagePaths(),
+            audios: this.getBackupAudioPaths()
+        };
     }
 
-    /**
-     * 获取所有图片资源路径
-     */
-    getAllImagePaths() {
+    getBackupImagePaths() {
         const imagePaths = [
-            // UI资源
-            '/assets/ui/主界面背景图.png',
-            '/assets/ui/clan.png',
-
             // 角色图片
             '/assets/characters/character.png',
             '/assets/characters/character2.png',
@@ -114,10 +60,15 @@ class ResourcePreloader {
             '/assets/characters/tiance4.png',
             '/assets/characters/tiance5.png',
 
-            // 建筑
+            // 建筑 (合并后的路径)
             '/assets/buildings/building.png',
             '/assets/buildings/building2.png',
             '/assets/buildings/building3.png',
+            '/assets/buildings/building4.png',
+            '/assets/buildings/building5.png',
+            '/assets/buildings/building6.png',
+            '/assets/buildings/building7.png',
+            '/assets/buildings/building8.png',
 
             // 敌人
             '/assets/enemies/enemy.png',
@@ -126,54 +77,43 @@ class ResourcePreloader {
             '/assets/enemies/enemy4.png',
             '/assets/enemies/enemy5.png',
 
-            // 物品
-            '/assets/items/items.png',
-            '/assets/items/items2.png',
-
-            // 技能图标
-            '/assets/skills/skill.png',
-            '/assets/skills/skill2.png',
-            '/assets/skills/skill3.png',
-            '/assets/skills/skill4.png',
-            '/assets/skills/skill5.png',
-            '/assets/skills/skill6.png',
-            '/assets/skills/skill7.png',
-            '/assets/skills/skill8.png',
-
-            // 天赋
-            '/assets/talents/talent.png',
-            '/assets/talents/talent2.png',
-            '/assets/talents/talent3.png',
-            '/assets/talents/talent4.png',
-            '/assets/talents/talent5.png',
-            '/assets/talents/talent6.png',
-            '/assets/talents/talent7.png',
-            '/assets/talents/talent8.png',
-            '/assets/talents/talent_tiance.png',
-            '/assets/talents/talent_tiance2.png'
+            // 能力图标 (技能与奇穴合并后)
+            '/assets/abilities/common1.png',
+            '/assets/abilities/common2.png',
+            '/assets/abilities/common3.png',
+            '/assets/abilities/common4.png',
+            '/assets/abilities/common5.png',
+            '/assets/abilities/common6.png',
+            '/assets/abilities/common7.png',
+            '/assets/abilities/common8.png',
+            '/assets/abilities/tiance1.png',
+            '/assets/abilities/tiance2.png',
+            '/assets/abilities/tiance3.png',
+            '/assets/abilities/tiance4.png',
+            '/assets/abilities/cangjian1.png',
+            '/assets/abilities/cangjian2.png',
+            '/assets/abilities/cangjian3.png',
+            '/assets/abilities/cangjian4.png',
+            '/assets/abilities/chunyang1.png',
+            '/assets/abilities/chunyang2.png',
+            '/assets/abilities/chunyang3.png',
+            '/assets/abilities/chunyang4.png',
+            '/assets/abilities/wanhua1.png'
         ];
 
         return imagePaths;
     }
 
-    /**
-     * 获取所有音频资源路径
-     */
-    getAllAudioPaths() {
-        const audioPaths = [
-            // BGM
+    getBackupAudioPaths() {
+        return [
             '/audio/bgm/如寄.mp3',
             '/audio/bgm/天赋界面.mp3',
-
-            // UI音效
             '/audio/click/清脆按钮.mp3',
             '/audio/click/按下音效.mp3',
             '/audio/click/无效按钮音效.mp3',
             '/audio/click/铃铛.mp3',
             '/audio/click/胜利音效.mp3',
             '/audio/click/战斗失败音效.mp3',
-
-            // 攻击音效
             '/audio/attack/挥砍1.mp3',
             '/audio/attack/交战_兵器碰撞1.mp3',
             '/audio/attack/交战_兵器碰撞2.mp3',
@@ -181,13 +121,9 @@ class ResourcePreloader {
             '/audio/attack/挥拳击中1.mp3',
             '/audio/attack/气剑1.mp3',
             '/audio/attack/气剑2.mp3',
-
-            // 受击音效
             '/audio/onhit/被击中1.mp3',
             '/audio/onhit/被砍中1.mp3',
             '/audio/onhit/被砍中2.mp3',
-
-            // 技能音效
             '/audio/skill/切砍声音.mp3',
             '/audio/skill/破空声.mp3',
             '/audio/skill/突刺.mp3',
@@ -200,18 +136,12 @@ class ResourcePreloader {
             '/audio/skill/啸如虎.mp3',
             '/audio/skill/践踏.mp3',
             '/audio/skill/万箭齐发.mp3',
-
-            // 战斗音效
             '/audio/fight/进入战斗.mp3',
             '/audio/fight/士兵呐喊.mp3',
-
-            // 脚步声
             '/audio/walk/草地奔跑.mp3',
             '/audio/walk/草地奔跑脚步1.mp3',
             '/audio/walk/草地奔跑脚步2.mp3',
             '/audio/walk/草地奔跑脚步3.mp3',
-
-            // 资源获得音效
             '/audio/sources/升级音效.mp3',
             '/audio/sources/点天赋.mp3',
             '/audio/sources/获得木材.mp3',
@@ -219,14 +149,42 @@ class ResourcePreloader {
             '/audio/sources/获得木材厂.mp3',
             '/audio/sources/获得金矿厂.mp3',
             '/audio/sources/获得金钱.mp3',
-            
-            // 农活/砍树音效
             '/audio/farm/砍树声音1.mp3',
             '/audio/farm/砍树声音2.mp3',
             '/audio/farm/砍断了树.mp3'
         ];
+    }
 
-        return audioPaths;
+    /**
+     * 开始预加载流程
+     */
+    async preloadAll(onProgress, onComplete) {
+        if (this.isStarted) return;
+        this.isStarted = true;
+        this.onProgress = onProgress;
+        this.onComplete = onComplete;
+
+        console.log('%c[资源预加载] %c开始扫描资源...', 'color: #5b8a8a; font-weight: bold', 'color: #333');
+
+        // 1. 获取资源列表
+        const { images, audios } = await this.fetchResourceList();
+        
+        this.totalCount = images.length + audios.length;
+        this.loadedCount = 0;
+
+        // 2. 并行加载所有资源
+        const imagePromises = images.map(path => this.preloadImage(path));
+        const audioPromises = audios.map(path => this.preloadAudio(path));
+
+        try {
+            await Promise.all([...imagePromises, ...audioPromises]);
+            console.log('%c[资源预加载] %c全部加载完成！', 'color: #5b8a8a; font-weight: bold', 'color: #4CAF50');
+            if (this.onComplete) this.onComplete();
+        } catch (error) {
+            console.error('资源预加载失败:', error);
+            // 即使失败也尝试继续游戏
+            if (this.onComplete) this.onComplete();
+        }
     }
 
     /**
@@ -239,7 +197,7 @@ class ResourcePreloader {
         }
 
         this.currentLoadingFile = path;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => {
                 this.loadedImages.add(path);
@@ -248,8 +206,8 @@ class ResourcePreloader {
             };
             img.onerror = () => {
                 console.warn(`图片加载失败: ${path}`);
-                this.updateProgress(path);
-                resolve(); // 不阻断其他资源加载
+                this.updateProgress(path); // 失败也算进度，防止卡死
+                resolve();
             };
             img.src = path;
         });
@@ -265,54 +223,30 @@ class ResourcePreloader {
         }
 
         this.currentLoadingFile = path;
-        return new Promise((resolve, reject) => {
-            const audio = new Audio();
-            audio.oncanplaythrough = () => {
-                this.loadedAudios.add(path);
-                this.updateProgress(path);
-                resolve();
-            };
-            audio.onerror = () => {
-                console.warn(`音频加载失败: ${path}`);
-                this.updateProgress(path);
-                resolve(); // 不阻断其他资源加载
-            };
-            audio.preload = 'auto';
-            audio.src = path;
-        });
+        try {
+            await audioManager.preload(path);
+            this.loadedAudios.add(path);
+            this.updateProgress(path);
+        } catch (error) {
+            console.warn(`音频加载失败: ${path}`);
+            this.updateProgress(path);
+            return;
+        }
     }
 
-    /**
-     * 更新加载进度
-     */
-    updateProgress(fileName = null) {
+    updateProgress(path) {
         this.loadedCount++;
         if (this.onProgress) {
-            this.onProgress(this.loadedCount, this.totalResources, fileName || this.currentLoadingFile);
+            this.onProgress(this.loadedCount, this.totalCount, path);
         }
-        this.currentLoadingFile = null; // 重置当前文件
     }
 
-    /**
-     * 检查资源是否已预加载
-     */
     isImageLoaded(path) {
         return this.loadedImages.has(path);
     }
 
     isAudioLoaded(path) {
         return this.loadedAudios.has(path);
-    }
-
-    /**
-     * 获取加载状态
-     */
-    getLoadingStats() {
-        return {
-            total: this.totalResources,
-            loaded: this.loadedCount,
-            progress: this.totalResources > 0 ? (this.loadedCount / this.totalResources) * 100 : 0
-        };
     }
 }
 

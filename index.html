@@ -6,19 +6,11 @@
     <title>稻香村发展计划 - 武侠像素大战略</title>
     <link rel="stylesheet" href="./src/style.css">
 
-    <!-- 预加载关键资源：主界面背景图 -->
-    <link rel="preload" href="./public/assets/ui/主界面背景图.png" as="image" type="image/png">
+    <!-- 预加载关键资源：主界面背景图 (修正路径，去除 ./public) -->
+    <link rel="preload" href="/assets/ui/主界面背景图.png" as="image" type="image/png">
 
-    <!-- 预加载角色肖像图 -->
-    <link rel="preload" href="./public/assets/characters/chunyang3.png" as="image" type="image/png">
-    <link rel="preload" href="./public/assets/characters/tiance4.png" as="image" type="image/png">
-    <link rel="preload" href="./public/assets/characters/cangjian.png" as="image" type="image/png">
-
-    <!-- 预加载关键音频资源 -->
-    <link rel="preload" href="./public/audio/bgm/如寄.mp3" as="audio" type="audio/mpeg">
-    <link rel="preload" href="./public/audio/click/清脆按钮.mp3" as="audio" type="audio/mpeg">
-    <link rel="preload" href="./public/audio/click/按下音效.mp3" as="audio" type="audio/mpeg">
-</head>
+    <!-- 预加载核心脚本 -->
+    <script type="module" src="./src/main.js" defer></script>
 <body oncontextmenu="return false;">
     <div id="app">
         <!-- 全局通知容器 -->

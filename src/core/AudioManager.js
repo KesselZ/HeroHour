@@ -288,6 +288,27 @@ class AudioManager {
         }, stepTime);
     }
 
+    /**
+     * 预加载音频资源
+     * @param {string} file 文件路径
+     */
+    async preload(file) {
+        if (this.sounds.has(file)) return;
+        
+        return new Promise((resolve, reject) => {
+            const audio = new Audio();
+            audio.oncanplaythrough = () => {
+                this.sounds.set(file, true); // 标记已预加载
+                resolve();
+            };
+            audio.onerror = () => {
+                reject(new Error(`音频加载失败: ${file}`));
+            };
+            audio.src = file;
+            audio.load(); // 显式触发加载
+        });
+    }
+
     setSFXVolume(v) {
         this.sfxVolume = Math.max(0, Math.min(1, v));
         localStorage.setItem('jx3_sfx_volume', this.sfxVolume.toString());

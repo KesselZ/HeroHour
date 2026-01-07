@@ -1469,7 +1469,16 @@ export class WorldManager {
                     entitiesList.push({ id: `tree_${x}_${z}`, type: 'tree', spriteKey: 'tree', x: worldX, z: worldZ });
                     placed = true;
                 } else if (roll < 0.0047 + enemyProb + 0.009) {
-                    entitiesList.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: 'house_1', x: worldX, z: worldZ });
+                    // 居民建筑多样化：从 1, 2, 3 中随机选一个
+                    const houseKeys = ['house_1', 'house_2', 'house_3'];
+                    const spriteKey = houseKeys[Math.floor(Math.random() * houseKeys.length)];
+                    entitiesList.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: spriteKey, x: worldX, z: worldZ });
+                    placed = true;
+                } else if (roll < 0.0047 + enemyProb + 0.011) {
+                    // 新增环境装饰：木箱、杂物、演武木人等
+                    const propKeys = ['boxes', 'items', 'dummy_training'];
+                    const spriteKey = propKeys[Math.floor(Math.random() * propKeys.length)];
+                    entitiesList.push({ id: `prop_${x}_${z}`, type: 'decoration', spriteKey: spriteKey, x: worldX, z: worldZ });
                     placed = true;
                 }
 
