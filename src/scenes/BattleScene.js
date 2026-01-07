@@ -278,7 +278,7 @@ export class BattleScene {
         this.heroUnit = new HeroUnit('player', -1, this.projectileManager);
         
         // 英雄初始位置：己方半场后方中央 (X: -15, Z: 0)
-        this.heroUnit.position.set(-15, 0.6, 0);
+        this.heroUnit.position.set(-15, 0, 0);
         
         this.playerUnits.push(this.heroUnit);
         this.scene.add(this.heroUnit);
@@ -509,7 +509,7 @@ export class BattleScene {
             }
 
             const zPos = (Math.random() - 0.5) * 18;
-            unit.position.set(zoneX, 0.6, zPos);
+            unit.position.set(zoneX, 0, zPos);
             unit.visible = true; 
             this.enemyUnits.push(unit);
             this.scene.add(unit);
@@ -666,7 +666,7 @@ export class BattleScene {
         if (Cls) unit = new Cls('player', idx, this.projectileManager);
 
         if (unit) {
-            unit.position.set(position.x, 0.6, position.z);
+            unit.position.set(position.x, 0, position.z);
             this.playerUnits.push(unit);
             this.scene.add(unit);
             this.unitCounts[type]--;
@@ -692,7 +692,7 @@ export class BattleScene {
             const unit = new Cls('player', idx, this.projectileManager);
             const offset = new THREE.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2);
             unit.position.copy(position).add(offset);
-            unit.position.y = 0.6;
+            unit.position.y = 0;
             this.playerUnits.push(unit);
             this.scene.add(unit);
         }
@@ -1120,6 +1120,7 @@ export class BattleScene {
         // 核心优化：智能方向补全
         const finalDir = dir || (unit ? unit.getForwardVector() : null);
         const vfxPos = unit ? new THREE.Vector3(0, 0, 0) : pos;
+        const vfxBodyPos = unit ? new THREE.Vector3(0, unit.visualScale * 0.4, 0) : pos;
         const parent = unit || this.scene;
 
         switch (type) {
@@ -1156,12 +1157,12 @@ export class BattleScene {
                 break;
             case 'vfx_sparkle':
                 this.vfxLibrary.createParticleSystem({
-                    pos: vfxPos, parent, color, duration, density,
+                    pos: vfxBodyPos, parent, color, duration, density,
                     spawnRate: 100,
                     initFn: p => {
                         const r = radius * 0.8;
-                        // 初始高度稍微拉高一点，方便颗粒向下掉落
-                        p.position.set((Math.random()-0.5)*r, 1.2 + Math.random()*0.3, (Math.random()-0.5)*r);
+                        // 基于身体中心点，向上偏移一点
+                        p.position.set((Math.random()-0.5)*r, 0.6 + Math.random()*0.3, (Math.random()-0.5)*r);
                     },
                     updateFn: (p, prg) => { 
                         // 颗粒向下移动，且重力感逐渐增加
@@ -1173,7 +1174,7 @@ export class BattleScene {
                 });
                 break;
             case 'shield': 
-                this.vfxLibrary.createShieldVFX(parent, vfxPos, radius, color, duration); 
+                this.vfxLibrary.createShieldVFX(parent, vfxBodyPos, radius, color, duration); 
                 break;
             case 'stomp': 
                 this.vfxLibrary.createStompVFX(vfxPos, radius, color, duration, parent); 
@@ -1550,7 +1551,7 @@ export class BattleScene {
                 // 2. 垂直位移 (抛物线)
                 // y = baseHeight + 4 * jumpHeight * progress * (1 - progress)
                 const jumpY = jumpHeight > 0 ? (4 * jumpHeight * progress * (1 - progress)) : 0;
-                unit.position.y = 0.6 + jumpY;
+                unit.position.y = 0 + jumpY;
 
                 // 3. 碰撞检测：增加判定半径至 2.0，且传入 isHeroSource 触发流血等天赋
                 if (damage > 0 || knockback > 0 || onHit) {
@@ -1566,7 +1567,7 @@ export class BattleScene {
                 
                 if (progress < 1) requestAnimationFrame(animate); 
                 else {
-                    unit.position.y = 0.6; // 落地校准
+                    unit.position.y = 0; // 落地校准
                     // 核心修复：不再区分英雄，位移结束后全员强制触发重新索敌
                     unit.target = null; 
                     if (unit.updateAI) {
@@ -1579,7 +1580,7 @@ export class BattleScene {
             animate();
         } else if (type === 'blink') {
             unit.position.copy(targetPos);
-            unit.position.y = 0.6;
+            unit.position.y = 0;
             // 核心修复：瞬移结束后同样强制触发重新索敌
             unit.target = null;
             if (unit.updateAI) {

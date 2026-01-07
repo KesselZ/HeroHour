@@ -67,7 +67,7 @@ export const UNIT_STATS_DATA = {
     'tianyi_apothecary': { name: '天一药师', hp: 180, atk: 12, range: 8.0, rangeType: '毒瓶', speed: 3.8, attackSpeed: 1500, targets: 1.0, allowedZones: ['middle'] },
     'tianyi_venom_zombie': { name: '天一毒尸', hp: 350, atk: 10, range: 1.2, rangeType: '近战', speed: 2.5, attackSpeed: 1000, targets: 1.0, allowedZones: ['front'] },
     'tianyi_priest': { name: '天一祭司', hp: 200, atk: 20, range: 10.0, rangeType: '咒术', speed: 3.2, attackSpeed: 2000, targets: 2.0, allowedZones: ['middle'] },
-    'tianyi_abomination': { name: '缝合巨怪', hp: 800, atk: 35, range: 2.0, rangeType: '重击', speed: 2.5, attackSpeed: 2500, mass: 5.0, targets: 3.0, allowedZones: ['front'] },
+    'tianyi_abomination': { name: '缝合巨怪', hp: 800, atk: 35, range: 3.0, rangeType: '重击', speed: 2.5, attackSpeed: 2500, mass: 100.0, targets: 8.0, allowedZones: ['front'] },
     'tianyi_elder': { name: '天一长老', hp: 450, atk: 45, range: 12.0, rangeType: '法术', speed: 3.8, attackSpeed: 2200, targets: 1.5, allowedZones: ['middle'] },
     'tianyi_shadow_guard': { name: '天一影卫', hp: 260, atk: 22, range: 1.2, rangeType: '暗杀', speed: 6.5, attackSpeed: 800, targets: 1.0, allowedZones: ['middle'] },
 
@@ -79,7 +79,7 @@ export const UNIT_STATS_DATA = {
     'shence_cavalry': { name: '神策精骑', hp: 500, atk: 35, range: 2.0, rangeType: '冲锋', speed: 6.0, attackSpeed: 1500, mass: 4.0, targets: 2.0, allowedZones: ['front'] },
     'shence_overseer': { name: '神策督军', hp: 720, atk: 58, range: 1.8, rangeType: '精英', speed: 3.2, attackSpeed: 1800, mass: 2.5, targets: 1.5, allowedZones: ['front'] },
     'shence_assassin': { name: '神策暗刺', hp: 200, atk: 28, range: 1.2, rangeType: '爆发', speed: 7.0, attackSpeed: 600, targets: 1.0, allowedZones: ['middle'] },
-    'shence_iron_pagoda': { name: '铁甲神策', hp: 1440, atk: 75, range: 2.2, rangeType: '重装', speed: 2.5, attackSpeed: 2500, mass: 10.0, targets: 3.0, allowedZones: ['front'] },
+    'shence_iron_pagoda': { name: '铁甲神策', hp: 1440, atk: 75, range: 2.5, rangeType: '重装', speed: 2.5, attackSpeed: 2500, mass: 50.0, targets: 6.0, allowedZones: ['front'] },
 
     // --- 红衣教势力 (来自 enemy5.png) ---
     'red_cult_priestess': { name: '红衣教祭司', hp: 280, atk: 32, range: 10.0, rangeType: '法术', speed: 3.2, attackSpeed: 2000, targets: 1.0, allowedZones: ['middle'], description: '红衣教的中坚力量，能够释放灼热的惩戒。' },

@@ -31,6 +31,21 @@ export class WorldObject {
             // 核心修复：仅在大世界物体生成时，将锚点设为底部偏上 (0.1)
             if (this.mesh instanceof THREE.Sprite) {
                 this.mesh.center.set(0.5, 0.1);
+                // 优雅同步：在 spawn 时直接获取配置缩放
+                const spriteKey = this.mesh.userData.spriteKey || this.type;
+                const config = spriteFactory.unitConfig[spriteKey];
+                if (config && config.scale) {
+                    this.baseScale = config.scale;
+                }
+            } else if (this.mesh instanceof THREE.Group) {
+                const sprite = this.mesh.children.find(c => c instanceof THREE.Sprite && c.name !== 'shadow');
+                if (sprite) {
+                    const spriteKey = sprite.userData.spriteKey || this.type;
+                    const config = spriteFactory.unitConfig[spriteKey];
+                    if (config && config.scale) {
+                        this.baseScale = config.scale;
+                    }
+                }
             }
             this.mesh.position.set(this.x, this.getElevation(), this.z);
             scene.add(this.mesh);
@@ -100,7 +115,7 @@ export class MovableWorldObject extends WorldObject {
         // 视觉组件参考
         this.mainSprite = null; // 真正的角色 Sprite
         this.shadow = null;     // 影子 (如果有)
-        this.baseScale = data.baseScale || 1.0;
+        this.baseScale = data.baseScale || 1.4;
         
         this.footstepTimer = 0;
         this.footstepInterval = 650;

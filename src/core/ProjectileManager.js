@@ -171,7 +171,7 @@ class Projectile extends THREE.Group {
         // --- 核心改进：穿刺弹道锁定初始方向，实现贯穿效果 ---
         this.direction = null;
         if (this.penetration > 0 && target) {
-            const tPos = target.position.clone().add(new THREE.Vector3(0, 0.3, 0));
+            const tPos = target.position.clone().add(new THREE.Vector3(0, target.visualScale * 0.4, 0));
             this.direction = new THREE.Vector3().subVectors(tPos, startPos).normalize();
         }
         this.distanceTraveled = 0;
@@ -218,7 +218,7 @@ class Projectile extends THREE.Group {
                 this.isDone = true;
                 return;
             }
-            targetPos = this.target.position.clone().add(new THREE.Vector3(0, 0.3, 0));
+            targetPos = this.target.position.clone().add(new THREE.Vector3(0, this.target.visualScale * 0.4, 0));
 
             if (this.arcHeight > 0) {
                 // --- 核心新增：抛物线 (LOB) 逻辑 ---
@@ -291,7 +291,7 @@ class Projectile extends THREE.Group {
             // 穿透逻辑：使用 isPiercing 判定运动模式
             for (const unit of units) {
                 if (unit.isDead || this.hitUnits.has(unit)) continue;
-                const unitPos = unit.position.clone().add(new THREE.Vector3(0, 0.3, 0));
+                const unitPos = unit.position.clone().add(new THREE.Vector3(0, unit.visualScale * 0.4, 0));
                 if (this.position.distanceTo(unitPos) < 0.5) {
                     this.hit(unit);
                     if (this.isDone) break;

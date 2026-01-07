@@ -521,10 +521,10 @@ export const SkillRegistry = {
         cooldown: 2000,
         audio: 'skill_slash',
         targeting: { type: 'instant', shape: 'sector', radius: 2.5, angle: Math.PI / 2 },
-        description: '【问水决】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害',
+        description: '【问水决】轻盈一击，对前方扇形区域敌人造成 {damage} 点伤害,伤害取决于【身法】。',
         actions: [
             { type: 'vfx', name: 'advanced_sweep', params: { color: 0xffcc00, duration: 200, radius: 2.5, angle: Math.PI / 2 } },
-            { type: 'damage_aoe', value: 45, knockback: 0 }
+            { type: 'damage_aoe', value: 30, applyPowerToDamage: true, knockback: 0 }
         ]
     }),
     'quanningyue': new Skill('quanningyue', {

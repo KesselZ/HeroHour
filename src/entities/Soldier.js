@@ -267,7 +267,8 @@ export class BaseUnit extends THREE.Group {
 
     initVisual() {
         // 1. 侠客 Sprite
-        this.unitSprite = spriteFactory.createUnitSprite(this.type);
+        // 核心修复：将 anchorY 设为 0.1 (脚部)，这样 position.y = 0 时脚就在地上
+        this.unitSprite = spriteFactory.createUnitSprite(this.type, 0.1);
         this.add(this.unitSprite);
 
         // --- 核心修复：初始朝向同步 ---
@@ -287,10 +288,10 @@ export class BaseUnit extends THREE.Group {
         });
         this.influenceRing = new THREE.Mesh(ringGeo, ringMat);
         this.influenceRing.rotation.x = -Math.PI / 2;
-        this.influenceRing.position.y = -0.38; // 稍微调低一点避免与地面重叠太近
+        this.influenceRing.position.y = 0.01; // 略高于地面
         this.add(this.influenceRing);
 
-        this.position.y = 0.6;
+        this.position.y = 0; // 踩在地上
 
         // --- 新增：目标预选指示器 ---
         this.initTargetIndicator();
@@ -311,7 +312,7 @@ export class BaseUnit extends THREE.Group {
         });
         this.targetIndicator = new THREE.Mesh(geo, mat);
         this.targetIndicator.rotation.x = -Math.PI / 2;
-        this.targetIndicator.position.y = -0.37; // 略高于阵营环 (-0.38)
+        this.targetIndicator.position.y = 0.02; // 略高于阵营环 (0.01)
         this.add(this.targetIndicator);
     }
 
@@ -365,8 +366,13 @@ export class BaseUnit extends THREE.Group {
         
         dir.y = 0;
         
+        // --- 核心优化：引入基于质量的非线性击退抗性 ---
+        // 公式：有效力度 = 原始力度 / 质量的平方根
+        // 这样质量为 1 的单位不受影响，而高质量单位(如 BOSS)会表现出明显的定力，但仍保留受击顿挫感
+        const effectiveForce = force / Math.sqrt(this.mass || 1.0);
+        
         // 注入初速度
-        this.knockbackVelocity.addScaledVector(dir, force);
+        this.knockbackVelocity.addScaledVector(dir, effectiveForce);
         
         // 受击视觉反馈：记录时间，由 updateVisualState 统一处理
         this.hitFlashUntil = Date.now() + 150;
@@ -799,9 +805,12 @@ export class BaseUnit extends THREE.Group {
                 }
 
                 // 核心逻辑：立即校正重叠位移 (Constraint Correction)
-                // 两个单位平分重叠距离，不考虑质量
+                // 基于质量分配位移权重：质量越大，受到的推力越小
+                const totalMass = this.mass + other.mass;
+                const ratioThis = other.mass / totalMass; // 对方质量占比越大，我移动越多
+                
                 const overlap = minAllowedDist - dist;
-                this.position.addScaledVector(pushDir, overlap * 0.5);
+                this.position.addScaledVector(pushDir, overlap * ratioThis);
             }
         }
     }
@@ -1221,7 +1230,7 @@ export class BaseUnit extends THREE.Group {
     die() {
         this.isDead = true;
         this.unitSprite.rotation.z = Math.PI / 2; // 倒下
-        this.position.y = 0.3;
+        this.position.y = 0.1; // 贴地
         
         // 核心修复：死亡时立即从 ModifierManager 中移除该单位的所有修正器
         // 彻底解决死亡单位 Modifier 堆积导致的内存泄漏与 $O(N)$ 计算性能崩溃问题
@@ -2310,7 +2319,7 @@ export class TianyiAbomination extends BaseUnit {
     static displayName = '缝合巨怪';
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('tianyi_abomination');
-        super({ side, index, type: 'tianyi_abomination', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, mass: 5.0, projectileManager });
+        super({ side, index, type: 'tianyi_abomination', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, mass: stats.mass || 100.0, projectileManager });
     }
     performAttack(enemies) {
         const now = Date.now();
@@ -2321,12 +2330,12 @@ export class TianyiAbomination extends BaseUnit {
             
             // 范围重击
             this.executeAOE(enemies, {
-                radius: 2.5,
+                radius: 8.0,
                 damage: this.attackDamage,
-                knockbackForce: 0.2
+                knockbackForce: 0.4
             });
             if (window.battle && window.battle.playVFX) {
-                window.battle.playVFX('stomp', { pos: this.position, radius: 2.5, color: 0x664422, duration: 400 });
+                window.battle.playVFX('stomp', { pos: this.position, radius: 8.0, color: 0x664422, duration: 600 });
             }
         }
     }
@@ -2502,7 +2511,7 @@ export class ShenceIronPagoda extends BaseUnit {
     static displayName = '铁甲神策';
     constructor(side, index, projectileManager) {
         const stats = worldManager.getUnitBlueprint('shence_iron_pagoda');
-        super({ side, index, type: 'shence_iron_pagoda', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, cost: stats.cost, mass: 10.0, projectileManager });
+        super({ side, index, type: 'shence_iron_pagoda', hp: stats.hp, speed: stats.speed, attackRange: stats.range, attackDamage: stats.atk, attackSpeed: stats.attackSpeed, cost: stats.cost, mass: stats.mass || 50.0, projectileManager });
     }
     performAttack(enemies) {
         const now = Date.now();
@@ -2513,12 +2522,12 @@ export class ShenceIronPagoda extends BaseUnit {
             
             // 大范围地裂击
             this.executeAOE(enemies, {
-                radius: 3.5,
+                radius: 5.5,
                 damage: this.attackDamage,
-                knockbackForce: 0.3
+                knockbackForce: 0.4
             });
             if (window.battle && window.battle.playVFX) {
-                window.battle.playVFX('stomp', { pos: this.position, radius: 3.5, color: 0x333333, duration: 600 });
+                window.battle.playVFX('stomp', { pos: this.position, radius: 5.5, color: 0x333333, duration: 800 });
             }
         }
     }
