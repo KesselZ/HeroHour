@@ -1435,17 +1435,16 @@ export class WorldManager {
                 const enemyProb = 0.0025 * density;
 
                 let placed = false;
-                if (roll < 0.002) {
+                if (roll < 0.001) {
                     entitiesList.push({ id: `gold_${x}_${z}`, type: 'pickup', pickupType: 'gold_pile', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.003) {
+                } else if (roll < 0.00125) {
                     entitiesList.push({ id: `chest_${x}_${z}`, type: 'pickup', pickupType: 'chest', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.0042) {
-                    // 核心调整：木材刷新率降低 40% (从 0.002 降至 0.0012)
+                } else if (roll < 0.00185) {
                     entitiesList.push({ id: `wood_${x}_${z}`, type: 'pickup', pickupType: 'wood_pile', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.0047) {
+                } else if (roll < 0.0021) {
                     const bType = Math.random() > 0.5 ? 'gold_mine' : 'sawmill';
                     entitiesList.push({ 
                         id: `${bType}_${x}_${z}`, type: 'captured_building', 
@@ -1454,7 +1453,7 @@ export class WorldManager {
                         config: { owner: 'none', type: bType }
                     });
                     placed = true;
-                } else if (roll < 0.0047 + enemyProb) {
+                } else if (roll < 0.0021 + enemyProb) {
                     const tId = this.getDynamicEnemyType(worldX, worldZ);
                     const template = this.enemyTemplates[tId];
                     if (template) {
@@ -1465,18 +1464,18 @@ export class WorldManager {
                         });
                         placed = true;
                     }
-                } else if (roll < 0.0047 + enemyProb + 0.007) {
+                } else if (roll < 0.0021 + enemyProb + 0.007) {
                     entitiesList.push({ id: `tree_${x}_${z}`, type: 'tree', spriteKey: 'tree', x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.0047 + enemyProb + 0.009) {
+                } else if (roll < 0.0021 + enemyProb + 0.009) {
                     // 居民建筑多样化：从 1, 2, 3 中随机选一个
                     const houseKeys = ['house_1', 'house_2', 'house_3'];
                     const spriteKey = houseKeys[Math.floor(Math.random() * houseKeys.length)];
                     entitiesList.push({ id: `house_${x}_${z}`, type: 'decoration', spriteKey: spriteKey, x: worldX, z: worldZ });
                     placed = true;
-                } else if (roll < 0.0047 + enemyProb + 0.011) {
-                    // 新增环境装饰：木箱、杂物、演武木人等
-                    const propKeys = ['boxes', 'items', 'dummy_training'];
+                } else if (roll < 0.0021 + enemyProb + 0.010) {
+                    // 环境装饰概率减半 (跨度从 0.002 降至 0.001)
+                    const propKeys = ['boxes'];
                     const spriteKey = propKeys[Math.floor(Math.random() * propKeys.length)];
                     entitiesList.push({ id: `prop_${x}_${z}`, type: 'decoration', spriteKey: spriteKey, x: worldX, z: worldZ });
                     placed = true;

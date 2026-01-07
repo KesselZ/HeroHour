@@ -481,6 +481,9 @@ export class PickupObject extends WorldObject {
     }
 
     onInteract(worldScene) {
+        if (this.isPickedUp) return false;
+        this.isPickedUp = true;
+        
         worldManager.handlePickup(this.pickupType);
         worldManager.removeEntity(this.id);
         this.removeFromScene(worldScene.scene);
