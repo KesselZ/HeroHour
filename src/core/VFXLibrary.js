@@ -1369,6 +1369,49 @@ export class VFXLibrary {
     }
 
     /**
+     * 移动提示：在主角头顶显示 WASD 提示
+     */
+    createMoveHintVFX(parent) {
+        if (!parent || parent.isDead || parent.userData.moveHintActive) return;
+        parent.userData.moveHintActive = true;
+
+        const group = new THREE.Group();
+        parent.add(group);
+
+        // 1. 创建文字 Sprite
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 128; // 加宽一点
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 60px Arial';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 6;
+        ctx.strokeText('W/A/S/D', 128, 64); ctx.fillText('W/A/S/D', 128, 64);
+        
+        const sprite = new THREE.Sprite(this._createMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }, THREE.SpriteMaterial));
+        sprite.scale.set(1.6, 0.8, 1);
+        group.add(sprite);
+
+        const startTime = Date.now();
+        const anim = () => {
+            const isActive = parent.userData.moveHintActive;
+            
+            if (isActive && !parent.isDead) {
+                const elapsed = Date.now() - startTime;
+                const floatY = 2.0 + Math.sin(elapsed * 0.003) * 0.15; // 稍微高一点，浮动慢一点
+                
+                this._applyHeadUITrick(sprite, floatY);
+                requestAnimationFrame(anim);
+            } else {
+                if (group.parent) group.parent.remove(group);
+                sprite.material.map.dispose();
+                sprite.material.dispose();
+            }
+        };
+        anim();
+    }
+
+    /**
      * 减速特效：在单位脚下显示一个粘稠的暗影圆环或拖尾
      */
     createSlowVFX(parent) {

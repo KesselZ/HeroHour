@@ -1409,6 +1409,10 @@ export class HeroUnit extends BaseUnit {
         this.scale.set(1.5, 1.5, 1.5);
         this.updateHealthBar();
         if (this.hpSprite) this.hpSprite.visible = true;
+
+        // --- 新增：闲置移动提示逻辑 ---
+        this.idleTimer = 0;
+        this.moveHintActive = false;
     }
 
     /**
@@ -1462,6 +1466,22 @@ export class HeroUnit extends BaseUnit {
             const actualSpeed = this.moveSpeed * deltaTime;
             this.position.addScaledVector(moveDir, actualSpeed);
             this.isActuallyMoving = true;
+
+            // 如果玩家开始移动，重置计时器并隐藏提示
+            this.idleTimer = 0;
+            if (this.moveHintActive) {
+                this.moveHintActive = false;
+                this.userData.moveHintActive = false;
+            }
+        } else {
+            // 如果没在移动，累计闲置时间
+            this.idleTimer += deltaTime;
+            if (this.idleTimer > 3.0 && !this.moveHintActive) {
+                this.moveHintActive = true;
+                if (window.battle) {
+                    window.battle.playVFX('move_hint', { unit: this });
+                }
+            }
         }
 
         // 4. 处理特殊技能状态 (如旋风斩期间依然可以 WASD 移动)

@@ -1213,6 +1213,9 @@ export class BattleScene {
             case 'flee':
                 this.vfxLibrary.createFleeVFX(parent);
                 break;
+            case 'move_hint':
+                this.vfxLibrary.createMoveHintVFX(parent);
+                break;
             case 'damage_number':
                 this.vfxLibrary.createDamageNumberVFX(pos || (unit ? unit.position.clone() : new THREE.Vector3()), options.value, color, options.scale || 1.0);
                 break;
