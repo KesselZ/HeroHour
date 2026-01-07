@@ -203,15 +203,16 @@ export class MovableWorldObject extends WorldObject {
             const moveStep = this.moveSpeed * deltaTime;
             const nextPos = this.mesh.position.clone().addScaledVector(moveDir, moveStep);
             
-            // 简单碰撞检测
-            if (mapGenerator.isPassable(nextPos.x, nextPos.z, 0.5)) {
+            // 严格物理碰撞检测
+            if (mapGenerator.isPassable(nextPos.x, nextPos.z, 0.25)) {
                 this.mesh.position.copy(nextPos);
-            } else if (this.manualMoveDir) {
-                // 玩家手动移动时的侧滑处理
-                this._applySliding(moveDir, moveStep);
             } else {
-                // 寻路补偿
-                this.mesh.position.copy(nextPos);
+                // 撞墙即停止：玩家手动移动或 AI 寻路均适用
+                // 对于 AI，清空路径防止持续撞墙；对于玩家，单纯停止位移
+                if (!this.manualMoveDir) {
+                    this.currentPath = [];
+                }
+                this.isMoving = false;
             }
             
             this.x = this.mesh.position.x;
@@ -222,20 +223,6 @@ export class MovableWorldObject extends WorldObject {
         this._updateVisuals(deltaTime, moveDir);
         
         this.lastPos.copy(this.mesh.position);
-    }
-
-    /**
-     * 简单的侧滑逻辑
-     */
-    _applySliding(moveDir, moveStep) {
-        const nextPosX = this.mesh.position.clone().add(new THREE.Vector3(moveDir.x * moveStep, 0, 0));
-        if (mapGenerator.isPassable(nextPosX.x, nextPosX.z, 0.5)) {
-            this.mesh.position.copy(nextPosX);
-        }
-        const nextPosZ = this.mesh.position.clone().add(new THREE.Vector3(0, 0, moveDir.z * moveStep));
-        if (mapGenerator.isPassable(nextPosZ.x, nextPosZ.z, 0.5)) {
-            this.mesh.position.copy(nextPosZ);
-        }
     }
 
     _updateVisuals(deltaTime, moveDir) {

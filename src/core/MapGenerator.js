@@ -16,9 +16,8 @@ export const TILE_TYPES = {
 export class MapGenerator {
     constructor() {
         this.size = 100;
-        this.scale = 0.02; // 进一步降低基础频率，追求更长的地貌线条
         this.grid = [];
-        this.heightMap = []; // 新增：记录原始噪声高度
+        this.heightMap = []; 
         this.offsetX = 0;
         this.offsetY = 0;
     }
@@ -31,7 +30,6 @@ export class MapGenerator {
         this.grid = [];
         this.heightMap = [];
         
-        // 如果提供了强制偏移量（通常用于加载存档），则使用它，否则随机生成
         if (forcedOffsets) {
             this.offsetX = forcedOffsets.x;
             this.offsetY = forcedOffsets.y;
@@ -40,19 +38,15 @@ export class MapGenerator {
             this.offsetY = Math.random() * 5000;
         }
 
-        const offsetX = this.offsetX;
-        const offsetY = this.offsetY;
-
         const baseFreq = 0.0125; 
-        const border = 50; // 边缘山脉屏障的宽度
+        const border = 50; 
 
         for (let z = 0; z < size; z++) {
             this.grid[z] = [];
             this.heightMap[z] = [];
             for (let x = 0; x < size; x++) {
-                // 1. 基础噪声计算 (全图坐标一致)
-                const nx = x * baseFreq + offsetX;
-                const nz = z * baseFreq + offsetY;
+                const nx = x * baseFreq + this.offsetX;
+                const nz = z * baseFreq + this.offsetY;
 
                 const qx = rng.noise2D(nx, nz);
                 const qz = rng.noise2D(nx + 5.2, nz + 1.3);
@@ -64,11 +58,8 @@ export class MapGenerator {
                 const contrast = 1.4; 
                 noise = Math.max(-1, Math.min(1, noise * contrast));
 
-                // 2. 边缘抬升逻辑 (Border Push)
-                // 不再硬编码，而是通过给噪声加权让边缘“自然”变高成山
                 const distFromEdge = Math.min(x, z, size - 1 - x, size - 1 - z);
                 if (distFromEdge < border) {
-                    // 增加抬升强度到 1.5，确保即使深水也能被推高成山脉
                     const pushFactor = Math.pow((border - distFromEdge) / border, 1.2);
                     noise += pushFactor * 1.5; 
                 }
@@ -85,27 +76,42 @@ export class MapGenerator {
             }
         }
 
-        // 寻找并标记聚落兴趣点 (POIs)
-        const pois = this.findPOICandidates(10);
-        this.pois = pois; 
-
+        this.pois = this.findPOICandidates(10); 
         return this.grid;
     }
 
     /**
      * 根据世界坐标获取地形类型
-     * 假设地图中心在 (0,0)
+     * 实现“所见即所得”：基于三角形面片的精确判定
      */
     getTileType(worldX, worldZ) {
-        // 使用 Math.round 将碰撞中心与视觉顶点对齐，修复半格偏移导致的穿模/空气墙
-        const gridX = Math.round(worldX + this.size / 2);
-        const gridZ = Math.round(worldZ + this.size / 2);
+        const x = worldX + this.size / 2;
+        const z = worldZ + this.size / 2;
 
-        if (gridX < 0 || gridX >= this.size || gridZ < 0 || gridZ >= this.size) {
-            return TILE_TYPES.MOUNTAIN; // 越界视为墙
+        const x1 = Math.floor(x);
+        const z1 = Math.floor(z);
+        const x2 = x1 + 1;
+        const z2 = z1 + 1;
+
+        if (x1 < 0 || x2 >= this.size || z1 < 0 || z2 >= this.size) {
+            return TILE_TYPES.MOUNTAIN;
         }
 
-        return this.grid[gridZ][gridX];
+        const fx = x - x1;
+        const fz = z - z1;
+
+        let triangleVertices = [];
+        // 这里的逻辑必须与 TerrainManager 生成 Geometry 的方式严格一致 (Three.js 默认切分方式)
+        if (fx + fz < 1) {
+            triangleVertices = [this.grid[z1][x1], this.grid[z1][x2], this.grid[z2][x1]];
+        } else {
+            triangleVertices = [this.grid[z2][x2], this.grid[z1][x2], this.grid[z2][x1]];
+        }
+
+        if (triangleVertices.includes(TILE_TYPES.MOUNTAIN)) return TILE_TYPES.MOUNTAIN;
+        if (triangleVertices.includes(TILE_TYPES.WATER)) return TILE_TYPES.WATER;
+
+        return TILE_TYPES.GRASS;
     }
 
     /**
@@ -119,55 +125,46 @@ export class MapGenerator {
                 const nx = gridX + dx;
                 const nz = gridZ + dz;
                 if (nx < 0 || nx >= this.size || nz < 0 || nz >= this.size) return false;
-                const type = this.grid[nz][nx];
-                // 仅允许在普通草地上生成物体
-                if (type !== TILE_TYPES.GRASS) return false;
+                if (this.grid[nz][nx] !== TILE_TYPES.GRASS) return false;
             }
         }
         return true;
     }
 
     /**
-     * 检查坐标是否可通行
-     * 进一步增大默认 radius 到 0.7，配合 Math.round，让碰撞边界更向外扩张
-     * 确保角色在斜坡边缘有明显的缓冲区，彻底杜绝穿模感
+     * 检查坐标是否可通行 (支持 2.5D 非对称半径)
      */
-    isPassable(worldX, worldZ, radius = 0.7) {
-        // 检查以中心点为圆心的四个边缘点（前、后、左、右）
-        // 以及中心点本身，确保整个身体都在草地上
+    isPassable(worldX, worldZ, radius = 0.25) {
+        const r_side = radius;
+        const r_up = radius * 1.2;
+        const r_down = radius * 0.4;
+
         const points = [
             { x: worldX, z: worldZ },
-            { x: worldX + radius, z: worldZ },
-            { x: worldX - radius, z: worldZ },
-            { x: worldX, z: worldZ + radius },
-            { x: worldX, z: worldZ - radius }
+            { x: worldX + r_side, z: worldZ },
+            { x: worldX - r_side, z: worldZ },
+            { x: worldX, z: worldZ - r_up },
+            { x: worldX, z: worldZ + r_down }
         ];
 
         for (const p of points) {
-            const type = this.getTileType(p.x, p.z);
-            // 仅草地可通行
-            if (type !== TILE_TYPES.GRASS) {
-                return false;
-            }
+            if (this.getTileType(p.x, p.z) !== TILE_TYPES.GRASS) return false;
         }
-        
         return true;
     }
 
     /**
-     * 重构后的 POI 寻找逻辑：寻找真正的平原重心 (Local Maxima + NMS)
+     * 寻找兴趣点 (POI)
      */
     findPOICandidates(count = 15) {
         const candidates = [];
-        const step = 4; // 缩小步长，提高精度
-        const border = 55; // 稍微收缩边界范围
+        const step = 4;
+        const border = 55;
 
-        // 第一步：密集采样，计算每个点的“深度”（即到最近障碍的距离）
         for (let z = border; z < this.size - border; z += step) {
             for (let x = border; x < this.size - border; x += step) {
                 if (this.grid[z][x] !== TILE_TYPES.GRASS) continue;
 
-                // 计算该点能支持的真实最大半径 (不封顶，直到碰到非草地)
                 let r = 2;
                 let isSafe = true;
                 while (isSafe && r < 120) { 
@@ -185,34 +182,21 @@ export class MapGenerator {
                     if (isSafe) r += 2;
                     else break;
                 }
-
-                if (r >= 8) {
-                    candidates.push({ x, z, radius: r, score: r });
-                }
+                if (r >= 8) candidates.push({ x, z, radius: r, score: r });
             }
         }
 
-        // 第二步：非极大值抑制 (NMS) - 确保选中的点是其局部范围内“最中心”的
-        // 只有当一个点的半径大于等于它周围一定范围内所有点的半径时，它才保留
-        const localPeaks = candidates.filter(cand => {
-            return !candidates.some(other => {
-                if (cand === other) return false;
-                const dist = Math.sqrt(Math.pow(cand.x - other.x, 2) + Math.pow(cand.z - other.z, 2));
-                // 抑制半径设为 12，如果 12 米内有比我分数更高（更中心）的点，我就被剔除
-                // 如果分数一样，则保留先扫描到的，防止大平原中心点全军覆没
-                return dist < 12 && (other.score > cand.score);
-            });
-        });
+        const localPeaks = candidates.filter(cand => !candidates.some(other => {
+            if (cand === other) return false;
+            const dist = Math.sqrt(Math.pow(cand.x - other.x, 2) + Math.pow(cand.z - other.z, 2));
+            return dist < 12 && (other.score > cand.score);
+        }));
 
-        // 第三步：按半径（即中心化程度）从大到小排序
         localPeaks.sort((a, b) => b.score - a.score);
 
-        // 第四步：最终筛选，确保 POI 之间有足够的战略间距
         const finalPois = [];
         for (const cand of localPeaks) {
-            // 基础间距，防止聚落挤在一起
-            const minDist = 40; 
-            if (!finalPois.some(p => Math.sqrt(Math.pow(p.x - cand.x, 2) + Math.pow(p.z - cand.z, 2)) < minDist)) {
+            if (!finalPois.some(p => Math.sqrt(Math.pow(p.x - cand.x, 2) + Math.pow(p.z - cand.z, 2)) < 40)) {
                 finalPois.push(cand);
                 if (finalPois.length >= count) break;
             }
@@ -221,7 +205,7 @@ export class MapGenerator {
     }
 
     /**
-     * 将当前的噪声图导出为 Canvas 预览
+     * 调试绘制
      */
     debugDraw(canvas) {
         const ctx = canvas.getContext('2d');
@@ -234,21 +218,17 @@ export class MapGenerator {
             for (let x = 0; x < size; x++) {
                 const val = this.heightMap[z][x];
                 const type = this.grid[z][x];
-                const gray = Math.floor((val + 1) / 2 * 255);
                 const idx = (z * size + x) * 4;
                 
                 if (type === TILE_TYPES.MOUNTAIN) {
-                    // 山脉：深褐色/灰色
                     imgData.data[idx] = 100 + val * 50;
                     imgData.data[idx + 1] = 80 + val * 40;
                     imgData.data[idx + 2] = 60 + val * 30;
                 } else if (type === TILE_TYPES.WATER) {
-                    // 湖泊：深蓝色
                     imgData.data[idx] = 30;
                     imgData.data[idx + 1] = 60;
                     imgData.data[idx + 2] = 150 + val * 50;
                 } else {
-                    // 草地 (包含 POI)：翠绿色
                     imgData.data[idx] = 60 + val * 20;
                     imgData.data[idx + 1] = 120 + val * 40;
                     imgData.data[idx + 2] = 60 + val * 20;
