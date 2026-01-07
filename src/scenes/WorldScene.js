@@ -1195,10 +1195,18 @@ export class WorldScene {
         this.playerGroup.add(this.playerShadow);
 
         // 3. 创建主角精灵并存入容器
-        this.playerHero = spriteFactory.createUnitSprite(this.heroId, 0); // 锚点设为底部 (0)
+        // 核心改动：将遮挡判定锚点从底部(0)移至腰部(0.2)，使主角能更自然地“走进”物体根部而不被立即遮挡
+        const visualAnchorY = 0.2;
+        this.playerHero = spriteFactory.createUnitSprite(this.heroId, visualAnchorY); 
         const config = spriteFactory.unitConfig[this.heroId];
         this.baseScale = config.scale || 1.4;
         this.playerHero.scale.set(this.baseScale, this.baseScale, 1);
+        
+        // 补偿位移：确保精灵图脚底依然对齐 Group 的中心（即地面点）
+        this.playerHero.position.y = this.baseScale * visualAnchorY;
+        // 深度微调：确保位置完全重叠时主角优先渲染，解决闪烁问题
+        this.playerHero.position.z = 0.01;
+        
         this.playerGroup.add(this.playerHero);
 
         this.scene.add(this.playerGroup);

@@ -119,6 +119,7 @@ export class MovableWorldObject extends WorldObject {
         this.mainSprite = null; // 真正的角色 Sprite
         this.shadow = null;     // 影子 (如果有)
         this.baseScale = data.baseScale || 1.4;
+        this.visualAnchorY = data.visualAnchorY || 0; // 新增：记录视觉锚点偏移
         
         this.footstepTimer = 0;
         this.footstepInterval = 650;
@@ -245,7 +246,7 @@ export class MovableWorldObject extends WorldObject {
         // 如果没有，再从 config 获取，最后才是 type
         const spriteKey = sprite.userData.spriteKey || this.config.spriteKey || this.type;
         const config = spriteFactory.unitConfig[spriteKey] || { col: 1 };
-        const baseVisualY = 0; // 由于基类 getElevation 已经抬高了整个 mesh，sprite 相对坐标设为 0
+        const baseVisualY = this.baseScale * this.visualAnchorY; // 使用缩放后的锚点高度作为基础视觉高度
 
         if (this.isMoving) {
             const distanceMoved = this.mesh.position.distanceTo(this.lastPos);
@@ -297,7 +298,7 @@ export class MovableWorldObject extends WorldObject {
         } else {
             // 停止时的状态恢复
             this.moveAnimTime = 0;
-            sprite.position.y = THREE.MathUtils.lerp(sprite.position.y, 0, 0.2);
+            sprite.position.y = THREE.MathUtils.lerp(sprite.position.y, baseVisualY, 0.2);
             sprite.rotation.z = THREE.MathUtils.lerp(sprite.rotation.z, 0, 0.2);
             const breath = Math.sin(Date.now() * 0.003) * 0.02;
             sprite.scale.set(this.baseScale * (1 - breath), this.baseScale * (1 + breath), 1);
@@ -988,6 +989,7 @@ export class PlayerObject extends MovableWorldObject {
         super(data);
         this.type = 'player';
         this.baseScale = data.baseScale || 1.4;
+        this.visualAnchorY = 0.2; // 显式同步主角的视觉锚点设置 (腰部判定)
     }
 
     /**
