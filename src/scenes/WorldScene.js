@@ -130,6 +130,9 @@ export class WorldScene {
         this.camera.position.set(this.playerGroup.position.x, 15, this.playerGroup.position.z + 12);
         this.camera.lookAt(this.playerGroup.position);
 
+        // 核心改动：将场景实例挂载到全局，方便 AI 调用 onInteract (如果不喜欢全局，也可以在实体创建时传入)
+        window.worldScene = this;
+
         this.initUI();
         
         // --- 核心改动：监听势力怪物清除事件 ---
@@ -151,6 +154,19 @@ export class WorldScene {
             console.log(`%c[视觉更新] 已清除地图上属于该势力的 ${toRemoveIndices.length} 个野怪点`, "color: #44aa44");
         };
         window.addEventListener('sect-monsters-cleared', this._onSectMonstersCleared);
+
+        // --- 核心改动：监听实体逻辑移除事件 (同步 AI 拾取行为) ---
+        window.removeEventListener('entity-logic-removed', this._onEntityLogicRemoved);
+        this._onEntityLogicRemoved = (e) => {
+            const { entityId } = e.detail;
+            const existing = this.worldObjects.get(entityId);
+            if (existing) {
+                existing.removeFromScene(this.scene);
+                this.worldObjects.delete(entityId);
+                this.interactables = this.interactables.filter(obj => obj.id !== entityId);
+            }
+        };
+        window.addEventListener('entity-logic-removed', this._onEntityLogicRemoved);
 
         // --- 英雄大世界属性应用 ---
         // 核心修正：行军速度直接读取“最终修正后”的轻功属性，不再使用 0.6 缩放

@@ -939,20 +939,91 @@ export class WorldManager {
     }
 
     /**
-     * 判断玩家是否物理处于某个城市的位置
-     * 职责：统一的地理位置校验，用于决定是否能进行“领兵”、“直接入队”等亲临操作
+     * 核心：统一实体交互接口
+     * 无论是玩家还是 AI，触发交互最终都走这里
+     * @param {string} entityId 实体 ID
+     * @param {string} actorSide 触发者势力 (如 'player' 或 'ai_faction_1')
      */
-    isPlayerAtCity(cityId) {
-        const city = this.cities[cityId];
-        if (!city) return false;
-        
-        const pPos = this.mapState.playerPos;
-        if (!pPos) return false;
+    /**
+     * 核心：统一实体交互接口
+     * 无论是玩家还是 AI，触发交互最终都走这里
+     */
+    interactWithEntity(entityId, actorSide = 'player') {
+        const entity = this.mapState.entities.find(e => e.id === entityId && !e.isRemoved);
+        if (!entity) return false;
 
-        const dist = Math.sqrt(Math.pow(pPos.x - city.x, 2) + Math.pow(pPos.z - city.z, 2));
+        const isPlayer = actorSide === 'player';
+        // 统一识别实体的功能类型 (拾取物 vs 建筑)
+        const keyType = entity.pickupType || entity.buildingType || entity.type;
+
+        // 1. 资源类 (拾取)
+        if (entity.type === 'pickup' || keyType.includes('pile') || keyType === 'chest') {
+            const resType = (keyType.includes('gold') || keyType === 'chest') ? 'gold' : 'wood';
+            return this._handleResourcePickup(entity, actorSide, isPlayer, resType);
+        }
+
+        // 2. 建筑类 (占领)
+        if (entity.type === 'captured_building' || keyType.includes('mine') || keyType.includes('sawmill')) {
+            return this._handleBuildingCapture(entity, actorSide, isPlayer);
+        }
+
+        return false;
+    }
+
+    /**
+     * 处理建筑占领 (金矿/伐木场)
+     */
+    _handleBuildingCapture(entity, factionId, isPlayer) {
+        // 兼容处理 owner 的存放位置
+        const config = entity.config || entity;
+        if (config.owner === factionId) return false;
+
+        config.owner = factionId;
+        entity.owner = factionId; // 同步冗余字段
         
-        // 5.0 为标准交互半径
-        return dist <= 5.0; 
+        // 更新季度结算缓存
+        const existing = this.capturedBuildings.find(b => b.id === entity.id);
+        if (existing) {
+            existing.owner = factionId;
+        } else {
+            this.capturedBuildings.push({
+                id: entity.id,
+                type: entity.buildingType || entity.type,
+                owner: factionId
+            });
+        }
+
+        if (isPlayer) {
+            const typeLabel = (entity.buildingType || entity.type).includes('gold') ? '金矿' : '伐木场';
+            this.showNotification(`已占领：${typeLabel}`);
+            audioManager.play('capture'); 
+        }
+
+        this.syncBuildingsToModifiers();
+        return true;
+    }
+
+    /**
+     * 处理地面资源拾取
+     */
+    _handleResourcePickup(entity, factionId, isPlayer, resType) {
+        const amount = entity.config?.amount || 50;
+        
+        if (resType === 'gold') this.addGold(amount, factionId);
+        else this.addWood(amount, factionId);
+
+        entity.isRemoved = true;
+
+        // 核心修复：派发事件通知表现层，某个实体已被逻辑移除 (无论是谁捡走的)
+        window.dispatchEvent(new CustomEvent('entity-logic-removed', { 
+            detail: { entityId: entity.id } 
+        }));
+        
+        if (isPlayer) {
+            const icon = resType === 'gold' ? '💰' : '🪵';
+            console.log(`%c[拾取] %c获得 ${amount} ${icon}`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
+        }
+        return true;
     }
 
     /**
@@ -3005,6 +3076,33 @@ export class WorldManager {
             isHero: true,
             type: this.heroData.id
         };
+    }
+
+    /**
+     * 判断某个势力是否物理处于某个实体的交互半径内
+     */
+    isActorAtEntity(entityId, actorPos, radius = 1.5) {
+        const entity = this.mapState.entities.find(e => e.id === entityId);
+        if (!entity || !actorPos) return false;
+
+        const dist = Math.sqrt(Math.pow(actorPos.x - entity.x, 2) + Math.pow(actorPos.z - entity.z, 2));
+        return dist <= radius;
+    }
+
+    /**
+     * 判断玩家是否物理处于某个城市的位置
+     */
+    isPlayerAtCity(cityId) {
+        const city = this.cities[cityId];
+        if (!city) return false;
+        
+        const pPos = this.mapState.playerPos;
+        if (!pPos) return false;
+
+        const dist = Math.sqrt(Math.pow(pPos.x - city.x, 2) + Math.pow(pPos.z - city.z, 2));
+        
+        // 5.0 为标准交互半径
+        return dist <= 5.0; 
     }
 
     /**

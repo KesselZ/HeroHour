@@ -73,11 +73,18 @@ export class WorldObject {
     }
 
     /**
-     * 交互触发时的逻辑
-     * @param {WorldScene} worldScene 传入场景实例以便调用其方法
+     * 统一交互入口
+     * @param {WorldScene} worldScene 场景引用
+     * @param {string} actorSide 发起者阵营 (默认 player)
      */
-    onInteract(worldScene) {
-        // 子类实现
+    onInteract(worldScene, actorSide = 'player') {
+        const isPlayer = actorSide === 'player';
+        
+        // 1. 核心：调用 WorldManager 执行数值和所有权逻辑
+        // 这一步会触发 entity-logic-removed 事件，WorldScene 会自动清理模型
+        const success = worldManager.interactWithEntity(this.id, actorSide);
+        
+        return success;
     }
 
     /**
@@ -493,14 +500,10 @@ export class PickupObject extends WorldObject {
         return spriteFactory.createUnitSprite(this.pickupType);
     }
 
-    onInteract(worldScene) {
-        if (this.isPickedUp) return false;
-        this.isPickedUp = true;
-        
-        worldManager.handlePickup(this.pickupType);
-        worldManager.removeEntity(this.id);
-        this.removeFromScene(worldScene.scene);
-        return true; // 表示已移除
+    onInteract(worldScene, actorSide = 'player') {
+        // 调用父类的统一逻辑
+        const success = super.onInteract(worldScene, actorSide);
+        return success; // 拾取类物体需要返回 true 告知场景移除交互监听
     }
 
     getTooltipData() {
@@ -955,28 +958,22 @@ export class CapturedBuildingObject extends WorldObject {
         return 0;
     }
 
-    onInteract(worldScene) {
-        // 1. 处理占领逻辑 (如果未占领会触发通知和音效)
-        worldManager.handleCapture({
-            id: this.id,
-            type: 'captured_building',
-            config: this.config,
-            mesh: this.mesh
-        });
-
-        // 2. 如果是神行祭坛，额外开启传送界面
-        if (this.buildingType === 'teleport_altar') {
-            // 核心修复：防止重复开启传送菜单导致按钮失效 (DOM 刷新频率过快)
+    onInteract(worldScene, actorSide = 'player') {
+        const isPlayer = actorSide === 'player';
+        
+        // 核心：调用统一逻辑
+        const success = worldManager.interactWithEntity(this.id, actorSide);
+        
+        // 2. 玩家特有的视觉逻辑：开启传送界面
+        if (success && isPlayer && this.buildingType === 'teleport_altar') {
             if (worldScene.activeAltarId !== this.id) {
-                worldScene.activeAltarId = this.id; // 立即标记，防止在 100ms 延迟期间重复进入
-                // 延迟一小会儿，确保占领通知能被看到
-                setTimeout(() => {
-                    worldScene.openTeleportMenu(this.id);
-                }, 100);
+                worldScene.activeAltarId = this.id;
+                setTimeout(() => worldScene.openTeleportMenu(this.id), 100);
             }
         }
         
-        return false;
+        // 注意：不再手动调用 removeFromScene，全部交给事件监听器处理
+        return false; // 占领类建筑不需要立即从 interactables 移除，因为所有权变了还能继续交互（比如查看）
     }
 
     onExitRange(worldScene) {
