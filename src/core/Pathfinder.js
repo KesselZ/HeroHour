@@ -1,3 +1,5 @@
+import { mapGenerator } from './MapGenerator.js';
+
 /**
  * 极简 A* 寻路算法实现
  * 专为 HeroHour 的 grid 地图设计
@@ -6,6 +8,7 @@ export class Pathfinder {
     constructor(grid, size) {
         this.grid = grid;
         this.size = size;
+        this.halfSize = size / 2;
     }
 
     /**
@@ -95,9 +98,15 @@ export class Pathfinder {
 
     _isPassable(x, z) {
         if (x < 0 || x >= this.size || z < 0 || z >= this.size) return false;
+        
+        // 1. 基础地形检查
         const type = this.grid[z][x];
-        // 允许 GRASS 和 POI
-        return type === 'grass' || type === 'poi';
+        if (type !== 'grass' && type !== 'poi') return false;
+
+        // 2. 物理一致性检查：确保该网格中心在世界坐标下也是可通行的 (带 0.25 的半径)
+        const worldX = x - this.halfSize;
+        const worldZ = z - this.halfSize;
+        return mapGenerator.isPassable(worldX, worldZ, 0.25);
     }
 
     _getNeighbors(pos) {
@@ -107,7 +116,16 @@ export class Pathfinder {
                 if (dx === 0 && dz === 0) continue;
                 const nx = pos.x + dx;
                 const nz = pos.z + dz;
+
                 if (this._isPassable(nx, nz)) {
+                    // --- 核心修复：防止对角线切角 ---
+                    // 如果是斜向移动，必须保证两侧的直角边也都是可通行的
+                    // 这样可以防止主角尝试钻过两块斜向相连的山体缝隙
+                    if (dx !== 0 && dz !== 0) {
+                        if (!this._isPassable(pos.x + dx, pos.z) || !this._isPassable(pos.x, pos.z + dz)) {
+                            continue;
+                        }
+                    }
                     neighbors.push({ x: nx, z: nz });
                 }
             }
