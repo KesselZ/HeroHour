@@ -105,7 +105,7 @@ export class AIController {
             if (distToHome > currentRadius) continue;
 
             // 识别感兴趣的类型
-            const isResource = entity.type === 'pickup' || entity.type === 'captured_building';
+            const isResource = entity.type === 'pickup' || entity.type === 'captured_building' || entity.type === 'tree';
             if (!isResource) continue;
 
             // 检查所有权 (矿产类)
@@ -133,8 +133,11 @@ export class AIController {
             if (targetObj && !targetObj.isRemoved) {
                 if (this._getDistTo(targetObj.x, targetObj.z) < 1.5) {
                     // 【核心统一】：让 AI 也调用物体的 onInteract
-                    targetObj.onInteract(worldScene, this.factionId);
-                    this._switchState('IDLE');
+                    // 如果是即时拾取(返回true)，则进入待机；如果是持续交互(如砍树返回false)，则保持当前状态
+                    const success = targetObj.onInteract(worldScene, this.factionId);
+                    if (success) {
+                        this._switchState('IDLE');
+                    }
                 }
             } else {
                 this._switchState('WANDER');

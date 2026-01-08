@@ -1011,10 +1011,15 @@ export class WorldManager {
             });
         }
 
+        const soundKey = (entity.buildingType || entity.type).includes('gold') ? 'capture_gold_mine' : 'capture_sawmill';
+
         if (isPlayer) {
             const typeLabel = (entity.buildingType || entity.type).includes('gold') ? '金矿' : '伐木场';
             this.showNotification(`已占领：${typeLabel}`);
-            audioManager.play('capture'); 
+            audioManager.play(soundKey); 
+        } else {
+            // AI 占领时播放空间音效
+            this._playSpatialResourceSound(soundKey, { x: entity.x, z: entity.z });
         }
 
         this.syncBuildingsToModifiers();
@@ -1058,8 +1063,9 @@ export class WorldManager {
         }
 
         // 执行资源增加
-        if (reward.gold > 0) this.addGold(reward.gold, factionId);
-        if (reward.wood > 0) this.addWood(reward.wood, factionId);
+        const pos = { x: entity.x, z: entity.z };
+        if (reward.gold > 0) this.addGold(reward.gold, factionId, pos);
+        if (reward.wood > 0) this.addWood(reward.wood, factionId, pos);
 
         entity.isRemoved = true;
 
@@ -2382,116 +2388,96 @@ export class WorldManager {
      * @param {number} scaledPoints 敌人战力
      * @returns {Object} { isVictory: true, settlementChanges, xpGained, xpBefore, xpMaxBefore, levelBefore, xpAfter, xpMaxAfter, levelAfter }
      */
-    simulateSimpleBattle(enemyConfig, scaledPoints) {
-        const playerPower = this.getPlayerTotalPower();
-        const ratio = playerPower / (scaledPoints || 1);
+    /**
+     * 核心：统一战斗模拟算法 (包含碾压与势均力敌)
+     * 采用指数衰减模型：WinnerLossRate = 0.5 * 5^-(ratio-1)
+     * @param {Object} enemyConfig 敌人配置
+     * @param {number} enemyPower 敌人总战力
+     */
+    simulateSimpleBattle(enemyConfig, enemyPower) {
+        // 1. 获取玩家实际战力并加入随机扰动 (±10%)
+        const playerBasePower = this.getPlayerTotalPower();
+        const playerEffPower = playerBasePower * (0.9 + Math.random() * 0.2);
+        const enemyEffPower = (enemyPower || 1) * (0.9 + Math.random() * 0.2);
 
-        // 1. 计算总兵力
-        let totalCount = 0;
-        const armyList = []; // [{type, count, cost}]
+        const isPlayerWinner = playerEffPower >= enemyEffPower;
+        const winnerPower = isPlayerWinner ? playerEffPower : enemyEffPower;
+        const loserPower = isPlayerWinner ? enemyEffPower : playerEffPower;
+        const ratio = winnerPower / (loserPower || 1);
+
+        // 2. 计算获胜方基础损失率 (指数模型)
+        // 1:1 -> 50%, 2:1 -> 10%, 3:1 -> 2%, 4:1 -> 0.4%
+        let baseLossRate = 0.5 * Math.pow(5, -(ratio - 1));
+        
+        // 玩家特权：手动选择“跳过战斗”时，意味着有一定的策略优势，损失减半
+        if (isPlayerWinner) {
+            baseLossRate *= 0.5;
+        }
+
+        // 3. 计算并应用损失
+        const armyChanges = {};
+        const settlementChanges = [];
+        
+        // 准备兵力列表 (按价格从低到高排序，保护精锐)
+        const armyList = [];
         for (const type in this.heroArmy) {
             const count = this.heroArmy[type];
             if (count > 0) {
-                totalCount += count;
-                // 核心重构：使用统御占用 (Leadership Cost) 而不是招募金币
-                const cost = this.getUnitCost(type);
-                armyList.push({ type, count, cost });
+                armyList.push({ type, count, cost: this.getUnitCost(type) });
             }
         }
-
-        // 2. 计算浮动损失 (最高 5%)
-        // 线性浮动逻辑：比值为 1.5 (判定简单的门槛) 时损失 5%，比值达到 5.0 (绝对压制) 时损失 0%
-        const minRatio = 1.5;
-        const maxRatio = 5.0;
-        const maxLossRate = 0.05;
-        
-        const t = Math.max(0, Math.min(1, (ratio - minRatio) / (maxRatio - minRatio)));
-        const lossRate = maxLossRate * (1 - t);
-
-        // 核心重构：基于“统御价值”的确定性损失逻辑 (反向取整)
-        // 1. 先计算出队伍的总统御价值和理论损失的统御量
-        let totalArmyValue = 0;
-        let minUnitCost = Infinity;
-        for (const item of armyList) {
-            totalArmyValue += item.count * item.cost;
-            if (item.cost < minUnitCost) minUnitCost = item.cost;
-        }
-
-        const theoreticalLeadershipLoss = totalArmyValue * lossRate;
-
-        // 2. 如果理论损失的统御量，连队伍里统御占用最少的兵都“扣不起”，则直接判定为零损耗
-        let targetLoss = 0;
-        if (theoreticalLeadershipLoss >= minUnitCost) {
-            // 如果够扣，则按照比例计算具体的损失人数
-            targetLoss = Math.round(totalCount * lossRate);
-        } else {
-            console.log(`%c[自动战斗] %c理论损失统御(${theoreticalLeadershipLoss.toFixed(2)}) 低于最小单位占用(${minUnitCost})，判定为无损！`, 'color: #4CAF50', 'color: #888');
-        }
-
-        const armyChanges = {};
-        const settlementChanges = []; // [{type, loss, gain}]
-        
-        // 按价格从低到高排序
         armyList.sort((a, b) => a.cost - b.cost);
 
+        // 如果玩家赢了，计算玩家损耗；如果玩家输了，则是全损(由于是简化模拟，这里假设玩家失败也是重创)
+        const finalLossRate = isPlayerWinner ? baseLossRate : 0.9; // 失败方损失 90%
         const survivalRate = modifierManager.getModifiedValue({ side: 'player' }, 'survival_rate', 0);
 
+        let totalInitialCount = armyList.reduce((sum, item) => sum + item.count, 0);
+        // 核心修改：使用 Math.floor。如果损失不足 1 人，则判定为零损耗，保护高战力碾压体验
+        let targetLossCount = Math.floor(totalInitialCount * finalLossRate);
+
         for (const item of armyList) {
-            if (targetLoss <= 0) break;
+            if (targetLossCount <= 0) break;
 
-            const lossAmount = Math.min(item.count, targetLoss);
-            targetLoss -= lossAmount;
+            const lossAmount = Math.min(item.count, targetLossCount);
+            targetLossCount -= lossAmount;
 
-            // 医疗救回逻辑
+            // 医疗救回
             let saved = 0;
             for (let i = 0; i < lossAmount; i++) {
-                if (Math.random() < survivalRate) {
-                    saved++;
-                }
+                if (Math.random() < survivalRate) saved++;
             }
 
-            const finalLoss = lossAmount - saved;
-            
+            const actualLoss = lossAmount - saved;
             if (lossAmount > 0) {
-                settlementChanges.push({
-                    type: item.type,
-                    loss: -lossAmount,
-                    gain: saved
-                });
+                settlementChanges.push({ type: item.type, loss: -lossAmount, gain: saved });
             }
-
-            if (finalLoss > 0) {
-                armyChanges[item.type] = -finalLoss;
+            if (actualLoss > 0) {
+                armyChanges[item.type] = -actualLoss;
             }
         }
 
-        // 3. 更新兵力
+        // 4. 应用结果
         this.updateHeroArmy(armyChanges);
 
-        // 4. 计算阅历 (参考 BattleScene.js 逻辑)
-        const xpGained = Math.floor(scaledPoints * 4);
-        
+        // 5. 计算阅历 (保持原有逻辑)
+        const xpGained = Math.floor((enemyPower || 1) * 4);
         const data = this.heroData;
         const xpBefore = data.xp;
         const xpMaxBefore = data.xpMax;
         const levelBefore = data.level;
-        
         this.gainXP(xpGained);
 
-        const xpAfter = data.xp;
-        const xpMaxAfter = data.xpMax;
-        const levelAfter = data.level;
-
         return {
-            isVictory: true,
+            isVictory: isPlayerWinner,
             settlementChanges,
             xpGained,
             xpBefore,
             xpMaxBefore,
             levelBefore,
-            xpAfter,
-            xpMaxAfter,
-            levelAfter,
+            xpAfter: data.xp,
+            xpMaxAfter: data.xpMax,
+            levelAfter: data.level,
             enemyConfig
         };
     }
@@ -2641,8 +2627,9 @@ export class WorldManager {
      * 增加金钱接口
      * @param {number} amount 增加数量
      * @param {string} factionId 势力 ID
+     * @param {Object} spatialPos 可选：触发交互的位置 {x, z}，用于播放 3D 音效
      */
-    addGold(amount, factionId = 'player') {
+    addGold(amount, factionId = 'player', spatialPos = null) {
         if (amount <= 0) return;
         
         const faction = this.factions[factionId];
@@ -2650,7 +2637,7 @@ export class WorldManager {
 
         faction.resources.gold += amount;
 
-        // 仅对玩家执行 HUD 更新和动画
+        // 1. 玩家主视角音效与动画
         if (faction.isPlayer) {
             this.updateHUD();
             this.triggerResourceAnimation('gold');
@@ -2660,6 +2647,10 @@ export class WorldManager {
             window.dispatchEvent(new CustomEvent('resource-gained', { 
                 detail: { type: 'gold', amount: amount } 
             }));
+        } 
+        // 2. 敌方/中立触发的空间音效
+        else if (spatialPos) {
+            this._playSpatialResourceSound('source_gold', spatialPos);
         }
     }
 
@@ -2667,8 +2658,9 @@ export class WorldManager {
      * 增加木材接口
      * @param {number} amount 增加数量
      * @param {string} factionId 势力 ID
+     * @param {Object} spatialPos 可选：触发交互的位置 {x, z}，用于播放 3D 音效
      */
-    addWood(amount, factionId = 'player') {
+    addWood(amount, factionId = 'player', spatialPos = null) {
         if (amount <= 0) return;
         
         const faction = this.factions[factionId];
@@ -2676,7 +2668,7 @@ export class WorldManager {
 
         faction.resources.wood += amount;
 
-        // 仅对玩家执行 HUD 更新和动画
+        // 1. 玩家主视角音效与动画
         if (faction.isPlayer) {
             this.updateHUD();
             this.triggerResourceAnimation('wood');
@@ -2685,6 +2677,41 @@ export class WorldManager {
             window.dispatchEvent(new CustomEvent('resource-gained', { 
                 detail: { type: 'wood', amount: amount } 
             }));
+        }
+        // 2. 敌方/中立触发的空间音效
+        else if (spatialPos) {
+            this._playSpatialResourceSound('source_wood', spatialPos);
+        }
+    }
+
+    /**
+     * 内部辅助：播放基于距离衰减的资源音效
+     */
+    _playSpatialResourceSound(key, pos) {
+        // 同样改进：直接从全局场景获取实时位置
+        const worldScene = window.worldScene;
+        let px, pz;
+
+        if (worldScene && worldScene.playerObject && worldScene.playerObject.mesh) {
+            px = worldScene.playerObject.mesh.position.x;
+            pz = worldScene.playerObject.mesh.position.z;
+        } else if (this.mapState.playerPos) {
+            px = this.mapState.playerPos.x;
+            pz = this.mapState.playerPos.z;
+        } else {
+            return;
+        }
+
+        const dx = pos.x - px;
+        const dz = pos.z - pz;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const maxDist = 20;
+
+        if (dist < maxDist) {
+            const volume = Math.max(0, 1 - dist / maxDist);
+            if (volume > 0.05) {
+                audioManager.play(key, { volume: volume * 0.8 }); 
+            }
         }
     }
 

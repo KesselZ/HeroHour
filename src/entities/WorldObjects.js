@@ -94,6 +94,50 @@ export class WorldObject {
         return dist < this.interactionRadius;
     }
 
+    /**
+     * 播放基于距离的 3D 线性衰减音效
+     * @param {string} key 音效键名
+     * @param {Object} options 音效选项
+     * @param {number} maxDist 最大听觉距离，默认 20 米
+     */
+    playSpatialSound(key, options = {}, maxDist = 20) {
+        // 核心改进：直接从全局场景获取玩家位置，确保绝对实时
+        const worldScene = window.worldScene;
+        if (!worldScene || !worldScene.playerObject || !worldScene.playerObject.mesh) {
+            // 兜底：如果拿不到场景，尝试用 worldManager 的备份
+            const backupPos = worldManager.mapState.playerPos;
+            if (!backupPos) return;
+            this._executeSpatialPlay(key, backupPos.x, backupPos.z, options, maxDist);
+            return;
+        }
+
+        const pPos = worldScene.playerObject.mesh.position;
+        this._executeSpatialPlay(key, pPos.x, pPos.z, options, maxDist);
+    }
+
+    /**
+     * 内部执行：计算距离并播放
+     */
+    _executeSpatialPlay(key, px, pz, options, maxDist) {
+        const dx = this.x - px;
+        const dz = this.z - pz;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        
+        if (dist > maxDist) return;
+
+        // 线性衰减
+        const distanceFactor = Math.max(0, 1 - dist / maxDist);
+        const baseVolume = options.volume ?? 1.0;
+        const finalVolume = baseVolume * distanceFactor;
+
+        if (finalVolume > 0.01) {
+            audioManager.play(key, {
+                ...options,
+                volume: finalVolume
+            });
+        }
+    }
+
     removeFromScene(scene) {
         if (this.mesh) {
             scene.remove(this.mesh);
@@ -322,6 +366,20 @@ export class MovableWorldObject extends WorldObject {
             
             this.moveAnimTime += finalDelta;
 
+            // --- 统一足音逻辑 ---
+            if (this.footstepTimer === 0) {
+                if (this.type === 'player') {
+                    audioManager.play('footstep_grass', { volume: 0.6, pitchVar: 0.2 });
+                } else {
+                    // 非玩家物体使用空间衰减音效，基础音量设为 0.35
+                    this.playSpatialSound('footstep_grass', { volume: 0.35, pitchVar: 0.2 });
+                }
+            }
+            this.footstepTimer += deltaTime * 1000;
+            if (this.footstepTimer >= this.footstepInterval) {
+                this.footstepTimer = 0;
+            }
+
             // 跳动
             const bob = Math.abs(Math.sin(this.moveAnimTime));
             sprite.position.y = baseVisualY + bob * 0.12;
@@ -361,6 +419,7 @@ export class MovableWorldObject extends WorldObject {
         } else {
             // 停止时的状态恢复
             this.moveAnimTime = 0;
+            this.footstepTimer = 0;
             sprite.position.y = THREE.MathUtils.lerp(sprite.position.y, baseVisualY, 0.2);
             sprite.rotation.z = THREE.MathUtils.lerp(sprite.rotation.z, 0, 0.2);
             const breath = Math.sin(Date.now() * 0.003) * 0.02;
@@ -433,7 +492,7 @@ export class TreeObject extends WorldObject {
     }
 
     update(deltaTime, playerPos) {
-        if (!this.mesh || !playerPos || this.durability <= 0) return;
+        if (!this.mesh || this.durability <= 0) return;
 
         // 寻找主体 Sprite (如果还没找到)
         if (!this.mainSprite) {
@@ -444,14 +503,34 @@ export class TreeObject extends WorldObject {
             }
         }
 
-        // 自动砍树逻辑：距离检测
-        const dist = playerPos.distanceTo(this.mesh.position);
-        const chopRadius = 1.3; // 稍微大一点，提高体验
-
-        if (dist < chopRadius) {
+        // 自动砍树逻辑：多目标检测 (玩家 + AI 英雄)
+        const chopRadius = 1.5; // 稍微调大一点检测半径，增加容错
+        
+        // 1. 检测玩家
+        if (playerPos && playerPos.distanceTo(this.mesh.position) < chopRadius) {
             if (this.chopTimer <= 0) {
-                this.chop();
+                this.chop('player');
                 this.chopTimer = this.chopCooldown;
+            }
+        } 
+        // 2. 如果玩家不在砍，检测附近的 AI 英雄
+        else {
+            // 从当前场景的所有物体中寻找英雄
+            const worldScene = window.worldScene; // 引用全局场景
+            if (worldScene && worldScene.worldObjects) {
+                for (const [id, obj] of worldScene.worldObjects) {
+                    // 寻找 AI 英雄物体 (注意类型是 'ai_hero')
+                    if (obj.type === 'ai_hero' && obj.mesh) {
+                        const dist = obj.mesh.position.distanceTo(this.mesh.position);
+                        if (dist < chopRadius) {
+                            if (this.chopTimer <= 0) {
+                                this.chop(obj.factionId);
+                                this.chopTimer = this.chopCooldown;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
         
@@ -471,23 +550,29 @@ export class TreeObject extends WorldObject {
         }
     }
 
-    chop() {
+    chop(factionId = 'player') {
         if (this.durability <= 0) return; // 再次确保安全
         
+        const isPlayer = factionId === 'player';
         this.durability--;
         this.chopCount++;
         this.shakeTime = 300; // 抖动 0.3s
         
+        const side = isPlayer ? 'player' : factionId;
+
         // 耐久耗尽逻辑
         if (this.durability <= 0) {
-            // 播放砍断音效
-            audioManager.play('farm_tree_down', { volume: 0.8 });
+            // 使用空间音效：任何人砍断都有声音，但音量取决于离玩家多远
+            this.playSpatialSound('farm_tree_down', { volume: 0.8 });
+
+            if (isPlayer) {
+                worldManager.showNotification(`树木倒下了！额外获得 🪵`);
+            }
 
             // 核心修改：砍断树木直接获得 30-50 木材
             const baseFinalAmount = Math.floor(Math.random() * 21) + 30; // 30-50 随机
-            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', baseFinalAmount));
-            worldManager.addWood(finalAmount);
-            worldManager.showNotification(`树木倒下了！额外获得 🪵${finalAmount}`);
+            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side }, 'wood_income', baseFinalAmount));
+            worldManager.addWood(finalAmount, factionId, { x: this.x, z: this.z });
             
             worldManager.removeEntity(this.id);
             // 核心修复：确保从场景中彻底消失
@@ -497,19 +582,15 @@ export class TreeObject extends WorldObject {
             // 立即触发全图实体的视觉同步
             window.dispatchEvent(new CustomEvent('map-entities-updated'));
         } else {
-            // 还没断，播放普通砍树音效 (1, 2 随机由 AudioManager 处理)
-            audioManager.play('farm_chop', { volume: 0.6, pitchVar: 0.2 });
+            // 使用空间音效：任何人砍树都有声音
+            this.playSpatialSound('farm_chop', { volume: 0.6, pitchVar: 0.2 });
         }
 
-        // 每砍三下获得随机木材，并随季度增长
+        // 每砍三下获得随机木材
         if (this.chopCount % 3 === 0 && this.durability > 0) {
-            // 核心修改：降低每三下的收益为 15-25
             const baseAmount = Math.floor(Math.random() * 11) + 15; // 15-25 随机
-            
-            // 接入全局资源成长系统：使用 ModifierManager 计算最终收益
-            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', baseAmount));
-            
-            worldManager.addWood(finalAmount);
+            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side }, 'wood_income', baseAmount));
+            worldManager.addWood(finalAmount, factionId, { x: this.x, z: this.z });
         }
     }
 }
@@ -822,8 +903,8 @@ export class EnemyGroupObject extends MovableWorldObject {
         const playerPower = worldManager.getPlayerTotalPower();
         const ratio = playerPower / scaledPoints;
 
-        // 如果难度为“简单” (ratio > 1.5)，弹出跳过确认
-        if (ratio > 1.5) {
+        // 如果难度为“简单” (ratio > 2.0)，弹出跳过确认
+        if (ratio > 2.0) {
             worldScene.showSkipBattleDialog(scaledConfig, scaledPoints, 
                 // 取消：正常开战
                 () => {
@@ -1094,19 +1175,6 @@ export class PlayerObject extends MovableWorldObject {
      */
     _updateVisuals(deltaTime, moveDir) {
         super._updateVisuals(deltaTime, moveDir);
-        
-        // 特有的足音逻辑
-        if (this.isMoving) {
-            if (this.footstepTimer === 0) {
-                audioManager.play('footstep_grass', { volume: 0.6, pitchVar: 0.2 });
-            }
-            this.footstepTimer += deltaTime * 1000;
-            if (this.footstepTimer >= this.footstepInterval) {
-                this.footstepTimer = 0;
-            }
-        } else {
-            this.footstepTimer = 0;
-        }
     }
 }
 
