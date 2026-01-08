@@ -704,13 +704,7 @@ export class WorldManager {
                              heroId === 'lichengen';
 
         if (useDebugArmy) {
-            const godArmy = {};
-            for (const type in UNIT_STATS_DATA) {
-                if (!['liwangsheng', 'lichengen', 'yeying'].includes(type)) {
-                    godArmy[type] = 2;
-                }
-            }
-            return godArmy;
+            return { 'tc_mounted_crossbow': 100 };
         } else {
             return { ...standardStart };
         }

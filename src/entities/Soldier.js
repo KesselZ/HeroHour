@@ -303,20 +303,9 @@ export class BaseUnit extends THREE.Group {
         // 规则：玩家单位默认看右，敌人单位默认看左
         this.setSpriteFacing(this.side === 'player' ? 'right' : 'left');
 
-        // 2. 阵营环（Influence Ring）- 进一步增强可见度
-        const ringGeo = new THREE.PlaneGeometry(2.5, 2.5);
-        const ringColor = this.side === 'player' ? 0x4488ff : 0xff4444;
-        const ringMat = new THREE.MeshBasicMaterial({
-            color: ringColor,
-            transparent: true,
-            opacity: 0.4, // 提升透明度，让颜色更实
-            depthWrite: false, 
-            map: this.createRingTexture()
-        });
-        this.influenceRing = new THREE.Mesh(ringGeo, ringMat);
-        this.influenceRing.rotation.x = -Math.PI / 2;
-        this.influenceRing.position.y = 0.01; // 略高于地面
-        this.add(this.influenceRing);
+        // 2. 阵营环（Influence Ring）数据初始化 (由 BattleScene 统一实例化渲染)
+        this.ringScale = 1.0;
+        this.ringOpacity = 0.4;
 
         this.position.y = 0; // 踩在地上
 
@@ -361,22 +350,6 @@ export class BaseUnit extends THREE.Group {
             this.targetIndicator.scale.set(finalScale, finalScale, 1);
         }
     }
-
-    createRingTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        
-        // 绘制纯色实心圆，不包含渐变，边缘清晰
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(64, 64, 62, 0, Math.PI * 2);
-        ctx.fill();
-        
-        return new THREE.CanvasTexture(canvas);
-    }
-
 
     /**
      * 击退效果：注入瞬时速度，由 update 逐帧平滑消化
@@ -473,6 +446,11 @@ export class BaseUnit extends THREE.Group {
      */
     updateVisualState() {
         if (this.isDead || !this.unitSprite) return;
+
+        // 部署阶段或无目标时，也要维持环的状态
+        if (window.battle && (window.battle.isDeployment || !this.target)) {
+            this.updateInfluenceRing(999);
+        }
 
         let targetColor = this.baseColor;
 
@@ -732,6 +710,8 @@ export class BaseUnit extends THREE.Group {
             const nearestEnemy = this.findNearestEnemy(enemies, true); // 视觉光环需要绝对最近，防止闪烁
             if (nearestEnemy) {
                 this.updateInfluenceRing(this.position.distanceTo(nearestEnemy.position));
+            } else {
+                this.updateInfluenceRing(999); // 远处，恢复默认大小
             }
             if (perf) perf.visual += performance.now() - start;
         }
@@ -957,19 +937,18 @@ export class BaseUnit extends THREE.Group {
 
 
     updateInfluenceRing(targetDist) {
-        if (!this.influenceRing) return;
-        
         const minSize = 0.4;
         const maxSize = 1.0;
-        let scale = maxSize;
+        let targetScale = maxSize;
         
-        // 当敌人进入 3.0 范围时开始挤压（因为环变大了，感应范围也相应变大）
+        // 当敌人进入 3.0 范围时开始挤压
         if (targetDist < 3.0) {
-            scale = minSize + (targetDist / 3.0) * (maxSize - minSize);
+            targetScale = minSize + (targetDist / 3.0) * (maxSize - minSize);
         }
         
-        this.influenceRing.scale.lerp(new THREE.Vector3(scale, scale, 1), 0.1);
-        this.influenceRing.material.opacity = 0.15 + (this.health / this.maxHealth) * 0.15;
+        // 平滑插值
+        this.ringScale = THREE.MathUtils.lerp(this.ringScale, targetScale, 0.1);
+        this.ringOpacity = 0.15 + (this.health / this.maxHealth) * 0.15;
     }
 
 
@@ -1354,9 +1333,7 @@ export class BaseUnit extends THREE.Group {
         modifierManager.removeModifiersByTarget(this);
 
         // 死亡时立即隐藏阵营环
-        if (this.influenceRing) {
-            this.influenceRing.visible = false;
-        }
+        this.ringOpacity = 0;
 
         this.onDieCleanup();
     }

@@ -259,7 +259,110 @@ export class BattleScene {
         window.addEventListener('contextmenu', this.onContextMenu); // 核心：拦截右键
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
+        this.initInstancedRings();
         this.updateUI();
+    }
+
+    /**
+     * 初始化阵营环实例化渲染
+     */
+    initInstancedRings() {
+        if (this.ringInstance) return; // 防止重复初始化
+        
+        // 1. 创建共享纹理
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(64, 64, 62, 0, Math.PI * 2);
+        ctx.fill();
+        const ringTexture = new THREE.CanvasTexture(canvas);
+
+        // 2. 创建实例化材质
+        const material = new THREE.MeshBasicMaterial({
+            map: ringTexture,
+            transparent: true,
+            depthWrite: false
+        });
+
+        // 3. 注入 Alpha 通道支持 (GLSL 修改)
+        material.onBeforeCompile = (shader) => {
+            shader.vertexShader = `
+                attribute float instanceAlpha;
+                varying float vInstanceAlpha;
+                ${shader.vertexShader}
+            `.replace(
+                `void main() {`,
+                `void main() {
+                    vInstanceAlpha = instanceAlpha;`
+            );
+            shader.fragmentShader = `
+                varying float vInstanceAlpha;
+                ${shader.fragmentShader}
+            `.replace(
+                `vec4 diffuseColor = vec4( diffuse, opacity );`,
+                `vec4 diffuseColor = vec4( diffuse, opacity * vInstanceAlpha );`
+            );
+        };
+
+        const geometry = new THREE.PlaneGeometry(2.5, 2.5);
+        // 初始化 Alpha 属性
+        const alphas = new Float32Array(1000);
+        geometry.setAttribute('instanceAlpha', new THREE.InstancedBufferAttribute(alphas, 1));
+
+        this.ringInstance = new THREE.InstancedMesh(geometry, material, 1000);
+        this.ringInstance.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.ringInstance.renderOrder = -1; // 确保在地面之上，角色之下
+        this.scene.add(this.ringInstance);
+    }
+
+    /**
+     * 每帧更新实例化阵营环的状态
+     */
+    updateInstancedRings() {
+        if (!this.ringInstance) return;
+
+        const allUnits = [...this.playerUnits, ...this.enemyUnits];
+        const count = allUnits.length;
+        const dummy = new THREE.Object3D();
+        const alphas = this.ringInstance.geometry.attributes.instanceAlpha.array;
+        const tempColor = new THREE.Color();
+
+        for (let i = 0; i < 1000; i++) {
+            if (i < count) {
+                const u = allUnits[i];
+                // 存活单位或正在淡出的死亡单位显示环
+                if (u.ringOpacity > 0.001) {
+                    dummy.position.set(u.position.x, 0.01, u.position.z);
+                    dummy.rotation.x = -Math.PI / 2;
+                    dummy.scale.set(u.ringScale, u.ringScale, 1);
+                    dummy.updateMatrix();
+                    this.ringInstance.setMatrixAt(i, dummy.matrix);
+                    
+                    const colorHex = u.side === 'player' ? 0x4488ff : 0xff4444;
+                    tempColor.setHex(colorHex);
+                    this.ringInstance.setColorAt(i, tempColor);
+                    alphas[i] = u.ringOpacity;
+                } else {
+                    this.hideRingInstance(i, dummy, alphas);
+                }
+            } else {
+                this.hideRingInstance(i, dummy, alphas);
+            }
+        }
+
+        this.ringInstance.instanceMatrix.needsUpdate = true;
+        if (this.ringInstance.instanceColor) this.ringInstance.instanceColor.needsUpdate = true;
+        this.ringInstance.geometry.attributes.instanceAlpha.needsUpdate = true;
+    }
+
+    hideRingInstance(index, dummy, alphas) {
+        dummy.scale.set(0, 0, 0);
+        dummy.updateMatrix();
+        this.ringInstance.setMatrixAt(index, dummy.matrix);
+        alphas[index] = 0;
     }
 
     /**
@@ -1758,6 +1861,9 @@ export class BattleScene {
             });
             if (this.perf.subTimings) this.perf.subTimings.visual += performance.now() - start;
         }
+
+        // 统一更新实例化阵营环
+        this.updateInstancedRings();
 
         if (this.isDeployment || !this.isActive) return;
 
