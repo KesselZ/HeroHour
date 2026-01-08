@@ -90,7 +90,10 @@ export class VFXLibrary {
             
             if (isActive && !parent.isDead) {
                 const elapsed = Date.now() - startTime;
-                const floatY = 1.5 + Math.sin(elapsed * 0.005) * 0.1;
+                
+                // 核心修复：根据单位视觉缩放动态调整状态文字高度
+                const unitHeight = parent.visualScale || 1.4;
+                const floatY = unitHeight * 1.1 + Math.sin(elapsed * 0.005) * 0.1;
                 
                 this._applyHeadUITrick(sprite, floatY);
                 

@@ -153,10 +153,12 @@ export class BaseUnit extends THREE.Group {
         this.add(this.hpGroup);
         
         if (window.battle && window.battle.vfxLibrary) {
-            window.battle.vfxLibrary._applyHeadUITrick(this.hpSprite, 1.3);
+            // 核心修复：根据单位视觉缩放动态调整血条高度 (0.95 为经验偏移系数)
+            const headHeight = this.visualScale * 0.95;
+            window.battle.vfxLibrary._applyHeadUITrick(this.hpSprite, headHeight);
         } else {
             // 回退方案
-            this.hpSprite.position.y = 1.3;
+            this.hpSprite.position.y = this.visualScale * 0.95;
         }
         
         this.updateHealthBar();
