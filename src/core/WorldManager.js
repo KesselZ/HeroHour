@@ -944,14 +944,24 @@ export class WorldManager {
             if (prodData.gold > 0) this.addGold(prodData.gold, factionId);
             if (prodData.wood > 0) this.addWood(prodData.wood, factionId);
             
-            // 核心改动：仅对玩家执行季节更替回复内力 (奇穴效果)
+            // 核心改动：仅对玩家执行季节更替回复内力与生命 (奇穴效果)
             if (faction.isPlayer) {
                 const mpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_mp_regen', 0);
+                const hpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_hp_regen', 0);
+                
                 if (mpRegenMult > 0) {
                     const recoverAmount = Math.floor(this.heroData.mpMax * mpRegenMult);
                     this.modifyHeroMana(recoverAmount);
-                    this.showNotification(`气吞山河：由于时节更替，内力恢复了 ${recoverAmount} 点`);
                 }
+                
+                if (hpRegenMult > 0) {
+                    this.modifyHeroHealth(this.heroData.hpMax);
+                }
+
+                if (mpRegenMult > 0 || hpRegenMult > 0) {
+                    this.showNotification(`千里袭远：由于时节更替，状态已补满`);
+                }
+                
                 console.log(`%c[季度结算] %c总收入金钱 +${prodData.gold}, 木材 +${prodData.wood}`, 'color: #557755; font-weight: bold', 'color: #fff');
             }
         });
@@ -1091,8 +1101,8 @@ export class WorldManager {
         // 核心修复：明确传出 isHero: false，确保 army 目标的修正能准确匹配
         const minus = modifierManager.getModifiedValue({ side: 'player', type: type, isHero: false }, 'elite_cost_minus', 0);
         
-        // 规则：只有基础占用 >= 4 的精锐单位享受减费
-        if (baseCost >= 4 && minus > 0) {
+        // 规则：只有基础占用 >= 6 的精锐单位享受减费
+        if (baseCost >= 6 && minus > 0) {
             return Math.max(1, baseCost - Math.floor(minus));
         }
         return baseCost;

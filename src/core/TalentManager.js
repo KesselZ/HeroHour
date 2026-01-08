@@ -117,7 +117,7 @@ class TalentManager {
                                 ...action.params,
                                 stat: ['tigerHeart', 'tiger_heart_lock_percent'],
                                 multiplier: [1, 1],
-                                offset: [1, 0.5]
+                                offset: [1, 0.8]
                             }
                         };
                     }
@@ -169,7 +169,7 @@ class TalentManager {
                             { 
                                 type: 'damage_aoe', 
                                 delay: 500, // 与特效同步延迟
-                                value: 35, 
+                                value: 50, 
                                 targeting: { radius: 5.0 }, 
                                 color: 0xff8800,
                                 // 不设置 applyPowerToDamage: true，默认使用 totalSkillMult (受功法影响)

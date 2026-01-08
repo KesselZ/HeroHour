@@ -144,14 +144,19 @@ export const ASSET_REGISTRY = {
         'talent_spell_epic':  { name: '功参造化', sheet: 'COMMON4', rows: 4, cols: 4, r: 2, c: 1 },
 
         // 将道/兵流系列 (COMMON5)
-        'talent_army_hp':   { name: '军队气血', sheet: 'COMMON5', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_army_def':  { name: '军队防御', sheet: 'COMMON5', rows: 4, cols: 4, r: 1, c: 2 },
-        'talent_elite_cost': { name: '精锐减费', sheet: 'COMMON5', rows: 4, cols: 4, r: 1, c: 3 },
-        'talent_martyrdom':  { name: '哀兵存续', sheet: 'COMMON5', rows: 4, cols: 4, r: 2, c: 1 },
+        'talent_army_hp':   { name: '士气气血', sheet: 'COMMON5', rows: 4, cols: 4, r: 1, c: 1 },
+
+        // 将道·铁骑专属图标 (Tiance 系列)
+        'talent_military_zhangu':   { name: '意气风发图标', sheet: 'TIANCE2', rows: 4, cols: 4, r: 3, c: 1 },
+        'talent_military_guangmu':  { name: '名满江湖图标', sheet: 'TIANCE1', rows: 4, cols: 4, r: 2, c: 3 },
+        'talent_military_qianli':   { name: '千里袭远图标', sheet: 'TIANCE2', rows: 4, cols: 4, r: 2, c: 1 },
+        'talent_military_wanli':    { name: '威震四海图标', sheet: 'TIANCE1', rows: 4, cols: 4, r: 1, c: 3 },
+        'talent_military_mingjiang': { name: '贤能毕至图标', sheet: 'TIANCE3', rows: 4, cols: 4, r: 2, c: 2 },
+        'talent_military_pofuchenzhou': { name: '百战不屈图标', sheet: 'TIANCE3', rows: 4, cols: 4, r: 4, c: 1 },
+        'talent_military_budongrushan': { name: '万众一心图标', sheet: 'TIANCE1', rows: 4, cols: 4, r: 1, c: 4 },
 
         // 侠道/游历系列 (COMMON6)
         'talent_world_speed': { name: '地图神行', sheet: 'COMMON6', rows: 4, cols: 4, r: 1, c: 1 },
-        'talent_mp_regen':    { name: '内力恢复', sheet: 'COMMON6', rows: 4, cols: 4, r: 1, c: 2 },
         'talent_reveal':      { name: '迷雾揭开', sheet: 'COMMON6', rows: 4, cols: 4, r: 1, c: 3 },
 
         // 基础属性与爆发 (COMMON7 & COMMON8)

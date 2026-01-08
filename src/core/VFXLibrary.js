@@ -1164,21 +1164,45 @@ export class VFXLibrary {
 
         const swords = [];
         const swordCount = 5;
-        const swordGeo = new THREE.BoxGeometry(0.05, 0.05, 0.8);
-        const swordMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
+        // 1. 剑身尺寸微调：变长变厚，增加存在感
+        const swordGeo = new THREE.BoxGeometry(0.08, 0.08, 1.1); 
+        // 2. 核心材质：改为亮青色 (Cyan)，并开启发光感
+        const mainColor = 0x00ffff; // 青色
+        const swordMat = this._createMaterial({ 
+            color: mainColor, 
+            transparent: true, 
+            opacity: 0.9,
+            emissive: mainColor,
+            emissiveIntensity: 1.5 
+        }, THREE.MeshStandardMaterial);
+
+        // 3. 增加光晕外壳材质：通过透明度和尺寸模拟 Glow
+        const glowGeo = new THREE.BoxGeometry(0.15, 0.15, 1.2);
+        const glowMat = this._createMaterial({
+            color: mainColor,
+            transparent: true,
+            opacity: 0.2,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide
+        });
 
         for (let i = 0; i < swordCount; i++) {
             const swordGroup = new THREE.Group();
+            
+            // 主剑身
             const mesh = new THREE.Mesh(swordGeo, swordMat);
-            // 核心修正：Pivot 设在剑柄末端 (0,0,0)，+Z 轴指向剑尖。
-            // 剑身中心在 0.4，覆盖 0 到 0.8
-            mesh.position.z = 0.4; 
+            mesh.position.z = 0.55; 
             swordGroup.add(mesh);
 
-            // 护手放在靠近剑柄的位置
-            const hiltGeo = new THREE.BoxGeometry(0.25, 0.05, 0.05);
+            // 光晕壳
+            const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+            glowMesh.position.z = 0.55;
+            swordGroup.add(glowMesh);
+
+            // 护手也改为青色，并稍微加大
+            const hiltGeo = new THREE.BoxGeometry(0.35, 0.08, 0.08);
             const hilt = new THREE.Mesh(hiltGeo, swordMat);
-            hilt.position.z = 0.2; // 留出 0.2 的剑柄空间
+            hilt.position.z = 0.25; 
             swordGroup.add(hilt);
 
             group.add(swordGroup);
@@ -1187,7 +1211,9 @@ export class VFXLibrary {
                 baseAngle: (i / swordCount) * Math.PI * 2,
                 state: 'follow', // follow, attack, return
                 targetUnit: null,
-                attackStartTime: 0
+                attackStartTime: 0,
+                startPos: new THREE.Vector3(),
+                trailTimer: 0 // 新增：用于控制拖尾产生频率
             });
         }
 
@@ -1197,12 +1223,29 @@ export class VFXLibrary {
             if (elapsed > duration || parent.isDead) {
                 this.scene.remove(group);
                 swordGeo.dispose();
+                glowGeo.dispose();
                 swordMat.dispose();
+                glowMat.dispose();
                 return;
             }
 
             const time = elapsed * 0.002;
             swords.forEach((s, i) => {
+                // 4. 飞行中的拖尾逻辑：使用通用的 createGhostTrail
+                if (s.state === 'attack' || s.state === 'return') {
+                    s.trailTimer++;
+                    if (s.trailTimer % 2 === 0) { // 每 2 帧产生一个残影
+                        this.createGhostTrail({
+                            pos: s.obj.position.clone(),
+                            quat: s.obj.quaternion.clone(),
+                            geometry: swordGeo, // 直接复用主剑身的几何体
+                            color: mainColor,
+                            opacity: 0.3,
+                            duration: 300
+                        });
+                    }
+                }
+
                 if (s.state === 'follow') {
                     // 环绕逻辑
                     const angle = s.baseAngle + time;
@@ -1220,31 +1263,33 @@ export class VFXLibrary {
                     const downPos = s.obj.position.clone().add(new THREE.Vector3(0, -1, 0));
                     s.obj.lookAt(downPos);
                 } else if (s.state === 'attack' && s.targetUnit) {
-                    // 攻击冲刺逻辑
-                    const attackProgress = (Date.now() - s.attackStartTime) / 400; 
+                    // 攻击冲刺逻辑：250ms 飞向目标
+                    const attackProgress = (Date.now() - s.attackStartTime) / 250; 
                     if (attackProgress < 1) {
                         const targetPos = s.targetUnit.position.clone().add(new THREE.Vector3(0, 0.5, 0));
-                        
-                        // 重置旋转以允许 lookAt 正常工作（或者 lookAt 会自动覆盖）
                         s.obj.lookAt(targetPos);
                         
-                        // 为了让剑尖 (z=0.8) 恰好刺中敌人，剑柄 (Pivot) 应该停在距离敌人 0.8 的位置
-                        const direction = targetPos.clone().sub(s.obj.position).normalize();
+                        const direction = targetPos.clone().sub(s.startPos).normalize();
                         const hiltTarget = targetPos.clone().sub(direction.multiplyScalar(0.8));
                         
-                        s.obj.position.lerp(hiltTarget, attackProgress);
+                        // 使用正确的线性插值：从 startPos 到 hiltTarget
+                        s.obj.position.copy(s.startPos.clone().lerp(hiltTarget, attackProgress));
                     } else {
                         s.state = 'return';
                         s.attackStartTime = Date.now();
+                        s.startPos.copy(s.obj.position); // 记录返回起点
                     }
                 } else if (s.state === 'return') {
-                    // 返回逻辑
-                    const returnProgress = (Date.now() - s.attackStartTime) / 400;
+                    // 返回逻辑：550ms 飞回英雄
+                    // 使用 ease-out 曲线增加力量感 (1 - (1-x)^3)
+                    const rawProgress = Math.min(1, (Date.now() - s.attackStartTime) / 550);
+                    const returnProgress = 1 - Math.pow(1 - rawProgress, 3); 
+                    
                     const targetPos = parent.position.clone().add(new THREE.Vector3(0, 0.5, 0));
-                    if (returnProgress < 1) {
-                        // 返回时剑尖指向英雄
+                    if (rawProgress < 1) {
                         s.obj.lookAt(targetPos);
-                        s.obj.position.lerp(targetPos, returnProgress);
+                        // 从攻击终点平滑返回到英雄位置
+                        s.obj.position.copy(s.startPos.clone().lerp(targetPos, returnProgress));
                     } else {
                         s.state = 'follow';
                     }
@@ -1264,6 +1309,7 @@ export class VFXLibrary {
                     s.state = 'attack';
                     s.targetUnit = target;
                     s.attackStartTime = Date.now();
+                    s.startPos.copy(s.obj.position); // 记录攻击起点
                 }
             }
         };
@@ -1666,6 +1712,42 @@ export class VFXLibrary {
         bounceAnim();
 
         return sprite;
+    }
+
+    /**
+     * 创建通用的残影 (Ghost Trail)
+     * @param {Object} options { pos, quat, geometry, color, opacity, duration }
+     */
+    createGhostTrail(options) {
+        const { pos, quat, geometry, color = 0xffffff, opacity = 0.3, duration = 300 } = options;
+        if (!geometry) return;
+
+        const mat = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: opacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        
+        const mesh = new THREE.Mesh(geometry, mat);
+        mesh.position.copy(pos);
+        mesh.quaternion.copy(quat);
+        this.scene.add(mesh);
+
+        const startTime = Date.now();
+        const fade = () => {
+            const prg = (Date.now() - startTime) / duration;
+            if (prg < 1) {
+                mat.opacity = opacity * (1 - prg);
+                requestAnimationFrame(fade);
+            } else {
+                this.scene.remove(mesh);
+                // 注意：由于 geometry 通常是共享的，这里只销毁材质
+                mat.dispose();
+            }
+        };
+        fade();
     }
 
     /**

@@ -1341,13 +1341,13 @@ export class BattleScene {
                     // 触发视觉攻击
                     vfxCtrl.attack(i, target);
                     
-                    // 400ms 后造成伤害（对应 VFX 中的冲刺时间）
+                    // 250ms 后造成伤害（对应 VFX 中的冲刺时间）
                     setTimeout(() => {
                         if (!target || target.isDead || !this.isActive) return;
                         target.takeDamage(damage, true);
                         // 播放击中音效
                         audioManager.play('attack_air_sword', { volume: 0.15, pitchVar: 0.2 });
-                    }, 400);
+                    }, 250);
                     
                 }, i * 200); // 每把剑间隔 200ms 发射
             }

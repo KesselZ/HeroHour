@@ -1272,33 +1272,31 @@ export class BaseUnit extends THREE.Group {
         
         if (this.health <= 0) {
             // --- 核心：处理“哀兵必胜”天赋 ---
-            const hasMartyrdom = modifierManager.getModifiedValue(this, 'martyrdom_enabled', 0) > 0;
-            if (hasMartyrdom && !this._martyrdomTriggered && !this.isHero) {
+            // --- 核心：处理“百战不屈”天赋 ---
+            const martyrdomDuration = modifierManager.getModifiedValue(this, 'martyrdom_enabled', 0);
+            if (martyrdomDuration > 0 && !this._martyrdomTriggered) {
                 this._martyrdomTriggered = true;
                 this.health = 1; // 强行锁 1 血
                 
                 // 视觉反馈：变为半透明，增加紧迫感
                 if (this.unitSprite) this.unitSprite.material.opacity = 0.6;
                 
-                // 添加 2 秒无敌 Modifier
+                // 添加无敌 Modifier (持续时间由天赋等级决定)
                 modifierManager.addModifier({
                     id: `martyr_${this.side}_${this.type}_${this.index}`,
                     stat: 'invincible',
                     value: 1,
                     type: 'add',
-                    duration: 2000,
+                    duration: martyrdomDuration,
                     targetUnit: this,
                     source: 'talent',
                     onCleanup: () => {
-                        // 哀兵结束时，如果是被英雄打进这个状态的，依然算英雄击杀吗？
-                        // 通常这种锁血状态结束后的自然死亡较难判定来源，这里简化处理：
-                        // 如果在死亡瞬间判定
-                        this.die(); // 2 秒后强行死亡
+                        this.die(); // 结束后强行死亡
                     }
                 });
                 
                 if (window.battle && window.battle.playVFX) {
-                    window.battle.playVFX('vfx_sparkle', { unit: this, color: 0xff4444, duration: 2000, radius: 1.0 });
+                    window.battle.playVFX('vfx_sparkle', { unit: this, color: 0xff4444, duration: martyrdomDuration, radius: 1.0 });
                 }
             } else {
                 // --- 核心：触发英雄击杀相关天赋 ---

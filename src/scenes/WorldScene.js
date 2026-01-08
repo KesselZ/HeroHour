@@ -558,7 +558,7 @@ export class WorldScene {
         const levelDisplay = document.getElementById('hero-level-val');
         if (levelDisplay) levelDisplay.innerText = data.level;
 
-        // 军队显示
+        // 士气显示
         const moraleVal = document.getElementById('attr-morale');
         if (moraleVal) {
             const realMorale = Math.floor(modifierManager.getModifiedValue(dummy, 'morale', data.stats.morale));
@@ -594,7 +594,7 @@ export class WorldScene {
         
         const moraleAtkBonus = (realMorale).toFixed(0);
         const moraleHpBonus = (realMorale).toFixed(0);
-        this.bindAttrTooltip('attr-box-morale', '军队', `统御三军，使帐下士兵的<span class="skill-term-highlight">攻击力</span>提升 <span class="skill-num-highlight">${moraleAtkBonus}%</span>，<span class="skill-term-highlight">气血上限</span>提升 <span class="skill-num-highlight">${moraleHpBonus}%</span>。`);
+        this.bindAttrTooltip('attr-box-morale', '士气', `统御三军，使帐下士兵的<span class="skill-term-highlight">攻击力</span>提升 <span class="skill-num-highlight">${moraleAtkBonus}%</span>，<span class="skill-term-highlight">气血上限</span>提升 <span class="skill-num-highlight">${moraleHpBonus}%</span>。`);
         
         const powerAtkBonus = (realPower * (cb.atkScaling || 0.05) * 100).toFixed(0);
         const powerHpBonus = (realPower * cb.hpScaling).toFixed(0);
