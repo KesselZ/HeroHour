@@ -494,16 +494,43 @@ function enterGameState(state, config = null) {
 }
 
 const clock = new THREE.Clock();
+let frameCount = 0;
+let lastFpsUpdate = 0;
+
 function animate() {
     requestAnimationFrame(animate);
     const deltaTime = clock.getDelta();
+    
+    // 性能采集 (仅开发模式)
+    if (import.meta.env.DEV) {
+        frameCount++;
+        const now = performance.now();
+        if (now - lastFpsUpdate > 1000) {
+            window.perf_fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+            frameCount = 0;
+            lastFpsUpdate = now;
+        }
+        window.perf_drawCalls = renderer.info.render.calls;
+        window.perf_triangles = renderer.info.render.triangles;
+    }
+
     if (timeManager.isLogicPaused) {
         renderer.render(scene, camera);
         return;
     }
     if (currentState === GameState.WORLD && worldInstance) worldInstance.update(deltaTime);
     else if (currentState === GameState.BATTLE && battleInstance) battleInstance.update(deltaTime);
+    
     renderer.render(scene, camera);
+
+    // 基础性能面板更新 (非战斗场景也显示基础指标)
+    if (import.meta.env.DEV && currentState !== GameState.BATTLE) {
+        uiManager.updatePerfPanel({
+            fps: window.perf_fps || 0,
+            drawCalls: window.perf_drawCalls || 0,
+            triangles: window.perf_triangles || 0
+        });
+    }
 }
 
 if (import.meta.env.DEV) {

@@ -93,6 +93,16 @@ export class BaseUnit extends THREE.Group {
 
         this.initVisual();
         
+        // --- 核心优化：逻辑分帧调度与属性快照 ---
+        this.logicTimer = Math.random() * 0.1; // 随机偏移，错开所有单位的思考帧
+        this.logicInterval = 0.1; // AI 每 0.1 秒思考一次
+        this.statsCache = {
+            moveSpeed: 0,
+            attackRange: 0,
+            attackDamage: 0,
+            attackInterval: 0
+        };
+
         // 保存视觉缩放比例，用于计算碰撞半径
         const unitCfg = spriteFactory.unitConfig[this.type];
         this.visualScale = unitCfg ? (unitCfg.scale || 1.4) : 1.4;
@@ -148,16 +158,30 @@ export class BaseUnit extends THREE.Group {
     updateHealthBar() {
         if (!this.hpCtx || !this.hpCanvas) return;
         
+        const w = this.hpCanvas.width;
+        const h = this.hpCanvas.height;
+        const maxFillW = w - 2;
+
         // 核心逻辑：总显示量 = Max(最大生命值, 当前生命值 + 护盾值)
         const totalValue = Math.max(this.maxHealth, this.health + this.shield);
         
         // 计算各项占比 (基于 totalValue)
         const hpPct = Math.max(0, this.health / totalValue);
         const shieldPct = Math.max(0, this.shield / totalValue);
+
+        // 性能优化：转换为像素宽度进行比较。只有当像素发生变化时才重绘，
+        // 彻底解决 HpRegen 每帧微小变动导致的昂贵重绘压力。
+        const hpW = Math.floor(maxFillW * hpPct);
+        const shieldW = Math.ceil(maxFillW * shieldPct);
+
+        if (this._lastHpW === hpW && this._lastShieldW === shieldW && this._lastTotalValue === totalValue) {
+            return;
+        }
+        this._lastHpW = hpW;
+        this._lastShieldW = shieldW;
+        this._lastTotalValue = totalValue;
         
         const ctx = this.hpCtx;
-        const w = this.hpCanvas.width;
-        const h = this.hpCanvas.height;
         const isPlayer = this.side === 'player';
         
         // 1. 完全清空
@@ -171,23 +195,19 @@ export class BaseUnit extends THREE.Group {
         ctx.fillStyle = isPlayer ? 'rgba(0, 40, 0, 0.9)' : 'rgba(100, 20, 20, 0.9)';
         ctx.fillRect(1, 1, w - 2, h - 2);
         
-        const maxFillW = w - 2;
-        
         // 4. 绘制血量部分
         ctx.fillStyle = isPlayer ? '#44ff44' : '#ff4444';
-        const hpW = Math.floor(maxFillW * hpPct);
         if (hpW > 0) {
             ctx.fillRect(1, 1, hpW, h - 2);
         }
 
         // 5. 绘制护盾部分 (白色，紧跟在当前血量后面)
-        if (shieldPct > 0) {
+        if (shieldW > 0) {
             ctx.fillStyle = '#ffffff';
             const shieldStartX = 1 + hpW;
-            const shieldW = Math.ceil(maxFillW * shieldPct); // 使用 ceil 确保哪怕很小的盾也能看到 1 像素
-            if (shieldW > 0) {
-                // 护盾宽度不会超出整个槽
-                const finalShieldW = Math.min(shieldW, w - 1 - shieldStartX);
+            // 护盾宽度不会超出整个槽
+            const finalShieldW = Math.min(shieldW, w - 1 - shieldStartX);
+            if (finalShieldW > 0) {
                 ctx.fillRect(shieldStartX, 1, finalShieldW, h - 2);
             }
         }
@@ -513,8 +533,18 @@ export class BaseUnit extends THREE.Group {
     update(enemies, allies, deltaTime) {
         if (this.isDead) return;
 
+        const perf = window.battle?.perf?.subTimings;
+        let start;
+
         this.lastPosition.copy(this.position); // 记录位移前的位置
         this.isActuallyMoving = false; // 每帧重置移动状态
+
+        // --- 核心优化：属性快照 (Stat Caching) ---
+        // 每帧开始前一次性计算好，避免 Getter 内部 ModifierManager 的多次重复遍历
+        this.statsCache.moveSpeed = this.moveSpeed;
+        this.statsCache.attackRange = this.attackRange;
+        this.statsCache.attackDamage = this.attackDamage;
+        this.statsCache.attackInterval = this.attackCooldownTime;
 
         // --- 核心修复：自动恢复逻辑 (HpRegen / MpRegen) ---
         // 1. 生命恢复 (对所有单位生效，如果拥有 hpRegen Modifier)
@@ -522,7 +552,11 @@ export class BaseUnit extends THREE.Group {
         if (currentHpRegen !== 0) {
             const healAmount = currentHpRegen * deltaTime;
             this.health = Math.min(this.maxHealth, this.health + healAmount);
-            if (this.updateHealthBar) this.updateHealthBar();
+            if (this.updateHealthBar) {
+                if (perf) start = performance.now();
+                this.updateHealthBar();
+                if (perf) perf.visual += performance.now() - start;
+            }
         }
 
         // 2. 内力恢复 (仅对英雄生效，通过属性修正器驱动)
@@ -530,9 +564,9 @@ export class BaseUnit extends THREE.Group {
             const currentMpRegen = this.mpRegen;
             if (currentMpRegen !== 0) {
                 const recoverAmount = currentMpRegen * deltaTime;
-                if (Math.abs(recoverAmount) > 0.001) { // 避免微小数值刷屏
-                    console.log(`%c[属性恢复] %c${this.type} 当前 mpRegen: ${currentMpRegen.toFixed(2)}, 本帧回蓝: ${recoverAmount.toFixed(4)}`, 'color: #4488ff', 'color: #fff');
-                }
+                // if (Math.abs(recoverAmount) > 0.001) { // 避免微小数值刷屏
+                //    console.log(`%c[属性恢复] %c${this.type} 当前 mpRegen: ${currentMpRegen.toFixed(2)}, 本帧回蓝: ${recoverAmount.toFixed(4)}`, 'color: #4488ff', 'color: #fff');
+                // }
                 worldManager.modifyHeroMana(recoverAmount);
             }
         }
@@ -541,7 +575,9 @@ export class BaseUnit extends THREE.Group {
         this.updateShields();
 
         // 0. 统一视觉状态更新
+        if (perf) start = performance.now();
         this.updateVisualState();
+        if (perf) perf.visual += performance.now() - start;
         
         // 0. 攻击冲刺动画更新
         this.updateLunge(deltaTime);
@@ -553,14 +589,20 @@ export class BaseUnit extends THREE.Group {
             this.position.x -= fleeSpeed * deltaTime;
             this.isActuallyMoving = true;
             this.updateFacing(); // 确保面向左边
+            
+            if (perf) start = performance.now();
             this.applySeparation(allies, enemies, deltaTime);
+            if (perf) perf.physics += performance.now() - start;
             
             // 逃跑时显示减速特效和专门的“逃”字特效
             if (window.battle && window.battle.playVFX) {
                 window.battle.playVFX('slow', { unit: this });
                 window.battle.playVFX('flee', { unit: this });
             }
+            
+            if (perf) start = performance.now();
             this.updateProceduralAnimation(deltaTime);
+            if (perf) perf.visual += performance.now() - start;
             return;
         }
 
@@ -570,8 +612,14 @@ export class BaseUnit extends THREE.Group {
             this.position.x += moveDir * this.moveSpeed * deltaTime;
             this.isActuallyMoving = true;
             this.setSpriteFacing(this.side === 'player' ? 'right' : 'left');
+            
+            if (perf) start = performance.now();
             this.applySeparation(allies, enemies, deltaTime);
+            if (perf) perf.physics += performance.now() - start;
+            
+            if (perf) start = performance.now();
             this.updateProceduralAnimation(deltaTime);
+            if (perf) perf.visual += performance.now() - start;
             return;
         }
 
@@ -590,8 +638,13 @@ export class BaseUnit extends THREE.Group {
                 this.knockbackVelocity.multiplyScalar(this.knockbackFriction);
             }
             // 处理碰撞挤压
+            if (perf) start = performance.now();
             this.applySeparation(allies, enemies, deltaTime);
+            if (perf) perf.physics += performance.now() - start;
+
+            if (perf) start = performance.now();
             this.updateProceduralAnimation(deltaTime);
+            if (perf) perf.visual += performance.now() - start;
             return;
         } 
 
@@ -604,50 +657,82 @@ export class BaseUnit extends THREE.Group {
             
             // 如果冲力还很大，暂时打断 AI 寻路 (硬直感)
             if (this.knockbackVelocity.length() > 0.05) {
+                if (perf) start = performance.now();
                 this.applySeparation(allies, enemies, deltaTime); // 击退过程中也要处理碰撞
+                if (perf) perf.physics += performance.now() - start;
+
+                if (perf) start = performance.now();
                 this.updateProceduralAnimation(deltaTime);
+                if (perf) perf.visual += performance.now() - start;
                 return; 
             }
         }
 
         // 处理特殊状态（如旋风斩）
         if (this.type === 'cangjian' && this.isSpinning) {
+            if (perf) start = performance.now();
             this.updateWhirlwind(enemies);
+            if (perf) perf.ai += performance.now() - start;
+
             // 旋风斩期间可以缓慢移动或静止，这里保持原地旋转并处理碰撞
+            if (perf) start = performance.now();
             this.applySeparation(allies, enemies, deltaTime);
+            if (perf) perf.physics += performance.now() - start;
+
+            if (perf) start = performance.now();
             this.updateProceduralAnimation(deltaTime);
+            if (perf) perf.visual += performance.now() - start;
             return; 
         }
 
-        // 1. 寻找目标逻辑 (可被子类覆盖)
-        this.updateAI(enemies, allies);
+        // 1. 寻找目标逻辑 (核心优化：分帧调度)
+        this.logicTimer += deltaTime;
+        if (this.logicTimer >= this.logicInterval) {
+            if (perf) start = performance.now();
+            this.updateAI(enemies, allies);
+            if (perf) perf.ai += performance.now() - start;
+            this.logicTimer = 0;
+        }
 
         if (this.target) {
-            const distance = this.position.distanceTo(this.target.position);
+            // 使用平方距离进行判定，省去开方运算
+            const distSq = this.position.distanceToSquared(this.target.position);
+            const rangeSq = this.statsCache.attackRange * this.statsCache.attackRange;
             
             // 实时翻转面向逻辑
             this.updateFacing();
 
-            if (distance > this.attackRange) {
+            if (distSq > rangeSq) {
+                if (perf) start = performance.now();
                 this.moveTowardsTarget(deltaTime);
+                if (perf) perf.physics += performance.now() - start; // 移动也算物理位移相关
                 this.isActuallyMoving = true;
             } else {
                 this.footstepTimer = 0; // 停止移动时归零
+                if (perf) start = performance.now();
                 this.performAttack(enemies, allies);
+                // 攻击逻辑内部可能包含 AI 决策，记录耗时
+                if (perf) perf.ai += performance.now() - start; 
             }
             
             // 2. 碰撞挤压逻辑：防止单位完全重叠
+            if (perf) start = performance.now();
             this.applySeparation(allies, enemies, deltaTime);
+            if (perf) perf.physics += performance.now() - start;
             
             // 3. 动态光环逻辑
+            if (perf) start = performance.now();
             const nearestEnemy = this.findNearestEnemy(enemies, true); // 视觉光环需要绝对最近，防止闪烁
             if (nearestEnemy) {
                 this.updateInfluenceRing(this.position.distanceTo(nearestEnemy.position));
             }
+            if (perf) perf.visual += performance.now() - start;
         }
 
         // 最后统一调用程序化动画更新 (包括闲置呼吸)
+        if (perf) start = performance.now();
         this.updateProceduralAnimation(deltaTime);
+        if (perf) perf.visual += performance.now() - start;
 
         // 核心改动：边界钳制 (解耦视觉 Mesh 与 逻辑活动区)
         // 范围：X轴 [-40, 40] (长80), Z轴 [-15, 15] (宽30)
@@ -780,11 +865,25 @@ export class BaseUnit extends THREE.Group {
      * 不再使用质量分配，而是强制推开重叠部分，保证单位间有最小间距
      */
     applySeparation(allies, enemies, deltaTime) {
-        const allUnits = [...allies, ...enemies];
+        // --- 核心优化：从全量扫描改为局部空间查询 (Spatial Hash) ---
+        let nearbyUnits;
+        if (window.battle && window.battle.spatialHash) {
+            // 查找半径 = 我的半径 + 预估最大单位半径 (1.5)
+            nearbyUnits = window.battle.spatialHash.query(this.position.x, this.position.z, this.collisionRadius + 1.5);
+        } else {
+            nearbyUnits = [...allies, ...enemies];
+        }
+
         const myRadius = this.collisionRadius;
 
-        for (const other of allUnits) {
+        for (let i = 0; i < nearbyUnits.length; i++) {
+            const other = nearbyUnits[i];
             if (other === this || other.isDead) continue;
+
+            // 统计碰撞检测次数
+            if (window.battle && window.battle.perf) {
+                window.battle.perf.collisionChecks++;
+            }
 
             const dist = this.position.distanceTo(other.position);
             const minAllowedDist = myRadius + other.collisionRadius;
@@ -877,11 +976,29 @@ export class BaseUnit extends THREE.Group {
      * @param {boolean} strict 是否强制返回绝对最近的 (用于视觉/光环)
      */
     findNearestEnemy(enemies, strict = false) {
-        const aliveEnemies = enemies.filter(e => !e.isDead);
-        if (aliveEnemies.length === 0) return null;
+        // --- 核心优化：利用空间哈希进行分层搜索 (Layered Search) ---
+        let candidatesPool = [];
+        
+        if (window.battle && window.battle.spatialHash) {
+            // 1. 第一层：搜索附近 15 距离单位 (覆盖大部分近战和远程交火线)
+            // 注意：enemies 已经是预过滤过的存活目标列表
+            candidatesPool = window.battle.spatialHash.query(this.position.x, this.position.z, 15.0)
+                .filter(u => u.side !== this.side && !u.isDead);
+            
+            // 2. 第二层：如果附近没人，进行全图搜索
+            if (candidatesPool.length === 0) {
+                // 核心优化：直接使用外部传入的存活列表，不再重复执行 .filter()
+                candidatesPool = enemies;
+            }
+        } else {
+            // 核心优化：直接使用外部传入的存活列表
+            candidatesPool = enemies;
+        }
+
+        if (candidatesPool.length === 0) return null;
 
         // 1. 计算所有距离并排序
-        const candidates = aliveEnemies.map(enemy => ({
+        const candidates = candidatesPool.map(enemy => ({
             enemy,
             dist: this.position.distanceTo(enemy.position)
         })).sort((a, b) => a.dist - b.dist);

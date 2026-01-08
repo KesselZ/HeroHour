@@ -99,6 +99,7 @@ import { terrainManager, TERRAIN_STYLES } from '../core/TerrainManager.js';
 import { weatherManager } from '../core/WeatherManager.js';
 import { ProjectileManager } from '../core/ProjectileManager.js';
 import { VFXLibrary } from '../core/VFXLibrary.js';
+import { SpatialHash } from '../core/SpatialHash.js';
 import { rng, setSeed } from '../core/Random.js';
 
 import { uiManager } from '../core/UIManager.js';
@@ -153,6 +154,30 @@ export class BattleScene {
         this.activeSkill = null; // 当前正在准备释放的技能 (针对 location 类型)
         this.worldManager = worldManager; // 挂载管理器方便组件访问
         this.isFleeing = false; // 新增：战斗是否处于撤退逃跑状态
+
+        // 性能监控
+        this.perf = {
+            lastLogTime: 0,
+            collisionChecks: 0,
+            spatialHashBuildTime: 0,
+            unitUpdateTime: 0,
+            renderTime: 0,
+            totalFrameTime: 0,
+            subTimings: {
+                physics: 0,
+                ai: 0,
+                visual: 0
+            }
+        };
+
+        // 性能优化：空间哈希系统
+        this.spatialHash = new SpatialHash(4.0); // 网格大小设为 4.0，适配 80x30 战场与寻敌/碰撞平衡
+
+        // 战略重心缓存
+        this.strategicCenters = {
+            player: new THREE.Vector3(),
+            enemy: new THREE.Vector3()
+        };
 
         // 移动控制
         this.keys = { w: false, a: false, s: false, d: false };
@@ -930,9 +955,16 @@ export class BattleScene {
         const text = document.getElementById('battle-mp-text');
         if (!fill || !text) return;
         const data = this.worldManager.heroData;
+
+        // 性能优化：内力数值没有实质变化时跳过 DOM 操作
+        const mpInt = Math.floor(data.mpCurrent);
+        if (this._lastMP === mpInt && this._lastMaxMP === data.mpMax) return;
+        this._lastMP = mpInt;
+        this._lastMaxMP = data.mpMax;
+        
         const pct = (data.mpCurrent / data.mpMax) * 100;
         fill.style.width = `${pct}%`;
-        text.innerText = `内力: ${Math.floor(data.mpCurrent)}/${data.mpMax}`;
+        text.innerText = `内力: ${mpInt}/${data.mpMax}`;
     }
 
     onSkillBtnClick(skillId) {
@@ -1418,11 +1450,24 @@ export class BattleScene {
 
     getUnitsInArea(center, config, targetSide = 'enemy') {
         const { shape = 'circle', radius = 1 } = config;
-        const potentialTargets = [];
-        if (targetSide === 'enemy' || targetSide === 'all') potentialTargets.push(...this.enemyUnits);
-        if (targetSide === 'player' || targetSide === 'all') potentialTargets.push(...this.playerUnits);
+        
+        // --- 核心优化：利用空间哈希进行范围查询 ---
+        let potentialTargets;
+        if (this.spatialHash) {
+            potentialTargets = this.spatialHash.query(center.x, center.z, radius);
+        } else {
+            potentialTargets = [];
+            if (targetSide === 'enemy' || targetSide === 'all') potentialTargets.push(...this.enemyUnits);
+            if (targetSide === 'player' || targetSide === 'all') potentialTargets.push(...this.playerUnits);
+        }
+
         return potentialTargets.filter(unit => {
             if (unit.isDead) return false;
+            
+            // 阵营过滤
+            if (targetSide === 'enemy' && unit.side !== 'enemy') return false;
+            if (targetSide === 'player' && unit.side !== 'player') return false;
+
             if (shape === 'circle') return unit.position.distanceTo(center) < radius;
             if (shape === 'square') return Math.abs(unit.position.x - center.x) < radius && Math.abs(unit.position.z - center.z) < radius;
             if (shape === 'sector') {
@@ -1628,6 +1673,13 @@ export class BattleScene {
     }
 
     update(deltaTime) {
+        const frameStart = performance.now();
+        let start;
+        this.perf.collisionChecks = 0; // 重置碰撞计数
+        this.perf.subTimings.physics = 0;
+        this.perf.subTimings.ai = 0;
+        this.perf.subTimings.visual = 0;
+
         // 驱动 ModifierManager 的自动计时系统 (Point 4)
         modifierManager.update(deltaTime);
 
@@ -1641,7 +1693,9 @@ export class BattleScene {
         this.camera.lookAt(0, 0, 0);
         
         // --- 核心新增：悬停显示血条逻辑 ---
+        if (this.perf.subTimings) start = performance.now();
         this.updateHoverHealthBar();
+        if (this.perf.subTimings) this.perf.subTimings.visual += performance.now() - start;
 
         // 实时更新技能栏状态 (内力不足或主角阵亡时禁用)
         this.updateSkillUIState();
@@ -1696,15 +1750,80 @@ export class BattleScene {
         }
         
         // --- 核心修复：无论是否在部署阶段，都必须更新单位的视觉状态(血条对齐) ---
-        [...this.playerUnits, ...this.enemyUnits].forEach(u => {
-            if (u.updateVisualState) u.updateVisualState();
-        });
+        // 优化：如果是战斗中，BaseUnit.update 已经包含了 updateVisualState，这里可以跳过
+        if (this.isDeployment || !this.isActive) {
+            if (this.perf.subTimings) start = performance.now();
+            [...this.playerUnits, ...this.enemyUnits].forEach(u => {
+                if (u.updateVisualState) u.updateVisualState();
+            });
+            if (this.perf.subTimings) this.perf.subTimings.visual += performance.now() - start;
+        }
 
         if (this.isDeployment || !this.isActive) return;
-        this.playerUnits.forEach(u => u.update(this.enemyUnits, this.playerUnits, deltaTime));
-        this.enemyUnits.forEach(u => u.update(this.playerUnits, this.enemyUnits, deltaTime));
+
+        // --- 核心优化：构建空间哈希表 ---
+        const hashStart = performance.now();
+        this.spatialHash.clear();
+        
+        // 预先准备好存活列表，避免 100+ 个单位各自 filter 产生 O(N^2) 开销
+        const alivePlayerUnits = [];
+        const aliveEnemyUnits = [];
+        
+        const playerCenter = this.strategicCenters.player.set(0, 0, 0);
+        const enemyCenter = this.strategicCenters.enemy.set(0, 0, 0);
+
+        for (let i = 0; i < this.playerUnits.length; i++) {
+            const u = this.playerUnits[i];
+            if (!u.isDead) {
+                this.spatialHash.insert(u);
+                alivePlayerUnits.push(u);
+                playerCenter.add(u.position);
+            }
+        }
+        for (let i = 0; i < this.enemyUnits.length; i++) {
+            const u = this.enemyUnits[i];
+            if (!u.isDead) {
+                this.spatialHash.insert(u);
+                aliveEnemyUnits.push(u);
+                enemyCenter.add(u.position);
+            }
+        }
+
+        if (alivePlayerUnits.length > 0) playerCenter.divideScalar(alivePlayerUnits.length);
+        if (aliveEnemyUnits.length > 0) enemyCenter.divideScalar(aliveEnemyUnits.length);
+
+        this.perf.spatialHashBuildTime = performance.now() - hashStart;
+
+        const unitStart = performance.now();
+        // 传入预过滤的存活列表
+        this.playerUnits.forEach(u => u.update(aliveEnemyUnits, alivePlayerUnits, deltaTime));
+        this.enemyUnits.forEach(u => u.update(alivePlayerUnits, aliveEnemyUnits, deltaTime));
+        this.perf.unitUpdateTime = performance.now() - unitStart;
+
         this.projectileManager.update(deltaTime);
         this.checkWinCondition();
+
+        // 性能统计更新至 UI 面板 (仅开发模式)
+        if (import.meta.env.DEV) {
+            const alivePlayer = alivePlayerUnits.length;
+            const aliveEnemy = aliveEnemyUnits.length;
+            const now = performance.now();
+            this.perf.totalFrameTime = now - frameStart;
+            
+            uiManager.updatePerfPanel({
+                fps: window.perf_fps || 0,
+                drawCalls: window.perf_drawCalls || 0,
+                triangles: window.perf_triangles || 0,
+                totalFrameTime: this.perf.totalFrameTime,
+                spatialHashBuildTime: this.perf.spatialHashBuildTime,
+                unitUpdateTime: this.perf.unitUpdateTime,
+                subTimings: this.perf.subTimings,
+                collisionChecks: this.perf.collisionChecks,
+                totalUnits: alivePlayer + aliveEnemy,
+                playerUnits: alivePlayer,
+                enemyUnits: aliveEnemy
+            });
+        }
     }
 
     /**
@@ -1747,6 +1866,12 @@ export class BattleScene {
         
         const heroData = this.worldManager.heroData;
         const isHeroDead = this.heroUnit ? this.heroUnit.isDead : true;
+
+        // 性能优化：只有当内力值（整数部分）或英雄生死状态发生变化时，才更新技能栏状态
+        const mpInt = Math.floor(heroData.mpCurrent);
+        if (this._lastSkillUpdateMP === mpInt && this._lastHeroDeadState === isHeroDead) return;
+        this._lastSkillUpdateMP = mpInt;
+        this._lastHeroDeadState = isHeroDead;
         
         heroData.skills.forEach(skillId => {
             const btn = document.getElementById(`skill-${skillId}`);

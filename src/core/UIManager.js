@@ -32,7 +32,73 @@ class UIManager {
         this.initGameStartEvents();
         this.initBattleEscapeEvents();
         
+        // 性能监控面板 (仅开发模式)
+        if (import.meta.env.DEV) {
+            this.initPerfPanel();
+        }
+        
         this.gameStartWindowShown = false; // 记录开局窗口是否已显示
+    }
+
+    /**
+     * 初始化性能监控面板
+     */
+    initPerfPanel() {
+        this.perfPanel = document.createElement('div');
+        this.perfPanel.id = 'perf-panel';
+        this.perfPanel.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ff00;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            border-radius: 4px;
+            z-index: 9999;
+            pointer-events: none;
+            line-height: 1.4;
+            min-width: 200px;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        `;
+        document.body.appendChild(this.perfPanel);
+    }
+
+    /**
+     * 更新性能监控数据
+     */
+    updatePerfPanel(data) {
+        if (!this.perfPanel) return;
+        
+        let html = `<div style="font-weight: bold; border-bottom: 1px solid #00ff00; margin-bottom: 5px;">PERFORMANCE MONITOR</div>`;
+        
+        // 1. 基础运行指标
+        html += `FPS: ${data.fps || 0}<br>`;
+        html += `DrawCalls: ${data.drawCalls || 0}<br>`;
+        html += `Triangles: ${data.triangles || 0}<br>`;
+        
+        // 2. 战斗逻辑拆解 (如果是战斗中)
+        if (data.totalFrameTime !== undefined) {
+            const isWarning = data.totalFrameTime > 16.6;
+            const color = isWarning ? '#ff4444' : '#00ff00';
+            html += `<div style="margin-top: 5px; color: ${color}">FrameTime: ${data.totalFrameTime.toFixed(2)}ms</div>`;
+            html += `&nbsp;&nbsp;SpatialHash: ${data.spatialHashBuildTime?.toFixed(2)}ms<br>`;
+            html += `&nbsp;&nbsp;UnitLogic: ${data.unitUpdateTime?.toFixed(2)}ms<br>`;
+            if (data.subTimings) {
+                html += `&nbsp;&nbsp;&nbsp;&nbsp;* Physics: ${data.subTimings.physics.toFixed(2)}ms<br>`;
+                html += `&nbsp;&nbsp;&nbsp;&nbsp;* AI/Target: ${data.subTimings.ai.toFixed(2)}ms<br>`;
+                html += `&nbsp;&nbsp;&nbsp;&nbsp;* Visual: ${data.subTimings.visual.toFixed(2)}ms<br>`;
+            }
+            html += `CollisionChecks: ${data.collisionChecks || 0}<br>`;
+        }
+        
+        // 3. 单位统计
+        if (data.totalUnits !== undefined) {
+            html += `<div style="margin-top: 5px;">Units: ${data.totalUnits} (P:${data.playerUnits} E:${data.enemyUnits})</div>`;
+        }
+
+        this.perfPanel.innerHTML = html;
     }
 
     /**
