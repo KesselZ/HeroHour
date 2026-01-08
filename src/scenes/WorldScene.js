@@ -8,6 +8,7 @@ import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
 import { terrainManager, TERRAIN_STYLES } from '../core/TerrainManager.js';
 import { createWorldObject, PlayerObject } from '../entities/WorldObjects.js';
 import { VFXLibrary } from '../core/VFXLibrary.js'; // 核心引入
+import { instancedVFXManager } from '../core/InstancedVFXManager.js';
 import { Pathfinder } from '../core/Pathfinder.js';
 import { weatherManager } from '../core/WeatherManager.js';
 
@@ -26,6 +27,7 @@ export class WorldScene {
         this.renderer = renderer;
         
         this.vfxLibrary = new VFXLibrary(this.scene); // 初始化特效库
+        instancedVFXManager.init(this.scene);
         weatherManager.init(this.scene, this.camera); // 初始化天气系统
         
         this.playerHero = null;
@@ -1865,6 +1867,9 @@ export class WorldScene {
         const targetCamPos = this.playerGroup.position.clone().add(new THREE.Vector3(0, 15, 12));
         this.camera.position.lerp(targetCamPos, 0.1);
         this.camera.lookAt(this.playerGroup.position);
+
+        // 5. 更新实例化特效 (如升级、点击反馈)
+        instancedVFXManager.update();
     }
 
     spawnFloatingText(type, amount) {

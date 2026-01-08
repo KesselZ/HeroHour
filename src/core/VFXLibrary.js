@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { instancedVFXManager } from './InstancedVFXManager.js';
 
 /**
  * VFXLibrary: 集中管理所有战场视觉特效的底层实现
@@ -113,13 +114,13 @@ export class VFXLibrary {
     }
 
     /**
-     * 通用粒子系统发射器
+     * 通用粒子系统发射器 (已重构为实例化渲染)
      * 支持基于时间的发射、自定义几何体、初始状态和逐帧更新
      */
     createParticleSystem(options) {
         const { 
             pos = new THREE.Vector3(), 
-            parent = null, // 新增：支持指定父容器（如单位自身）
+            parent = null,
             color = 0xffffff, 
             duration = 1000, 
             density = 1,
@@ -130,43 +131,46 @@ export class VFXLibrary {
         } = options;
 
         const actualParent = parent || this.scene;
-        const group = new THREE.Group();
-        group.position.copy(pos);
-        actualParent.add(group);
+        
+        // 计算 Group 的世界坐标，用于偏移粒子
+        const groupPos = pos.clone();
+        if (parent) {
+            // 如果是在单位身上，需要实时更新位置，这里我们先记录初始偏移
+            // 为了简化，我们在 spawn 时计算当前父级的世界坐标
+        }
 
-        const pGeo = geometry || new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        // 处理几何体尺寸
+        let geometryScale = new THREE.Vector3(0.1, 0.1, 0.1); // 默认原本的 BoxGeometry(0.1, 0.1, 0.1)
+        if (geometry && geometry.parameters) {
+            const p = geometry.parameters;
+            geometryScale.set(p.width || 0.1, p.height || 0.1, p.depth || 0.1);
+        }
+
         const startTime = Date.now();
-
         const interval = setInterval(() => {
             if (Date.now() - startTime > duration) {
                 clearInterval(interval);
-                setTimeout(() => {
-                    actualParent.remove(group);
-                    if (!geometry) pGeo.dispose();
-                }, 1500);
                 return;
+            }
+
+            // 计算当前的 group 世界位置
+            const currentGroupPos = pos.clone();
+            // 【核心修复】只有当 parent 存在且不是场景时才进行坐标转换
+            if (parent && parent.localToWorld && !parent.isScene) {
+                parent.localToWorld(currentGroupPos);
             }
 
             const count = Math.ceil(2 * density);
             for (let i = 0; i < count; i++) {
-                const pMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
-                const p = new THREE.Mesh(pGeo, pMat);
-                initFn(p);
-                group.add(p);
-
-                const pStart = Date.now();
-                const pDur = 500 + Math.random() * 500;
-                const anim = () => {
-                    const progress = (Date.now() - pStart) / pDur;
-                    if (progress < 1) {
-                        updateFn(p, progress);
-                        requestAnimationFrame(anim);
-                    } else {
-                        group.remove(p);
-                        pMat.dispose();
-                    }
-                };
-                anim();
+                instancedVFXManager.spawnParticle({
+                    duration: 500 + Math.random() * 500,
+                    color,
+                    initFn,
+                    updateFn,
+                    // 【核心修复】显式传递计算后的世界位置，并确保管理器不重复转换
+                    groupPos: currentGroupPos,
+                    geometryScale
+                });
             }
         }, spawnRate);
     }
@@ -498,31 +502,25 @@ export class VFXLibrary {
         });
     }
 
+    /**
+     * 创建脉冲波特效 (已重构为实例化渲染)
+     */
     createPulseVFX(pos, radius, color, duration, parent = null) {
-        const actualParent = parent || this.scene;
+        // 使用实例化管理器，消除重复创建 Mesh 的开销
         for (let i = 0; i < 3; i++) {
             setTimeout(() => {
-                const geo = new THREE.RingGeometry(0.1, 0.15, 64);
-                const mat = this._createMaterial({ color, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
-                const ring = new THREE.Mesh(geo, mat);
-                ring.rotation.x = -Math.PI / 2;
-                ring.position.copy(pos).y = 0.1 + i * 0.05;
-                actualParent.add(ring);
-
-                const start = Date.now();
-                const anim = () => {
-                    const prg = (Date.now() - start) / (duration * 0.8);
-                    if (prg < 1) {
-                        const s = 1 + prg * radius;
-                        ring.scale.set(s, s, 1);
-                        mat.opacity = 0.8 * (1 - prg);
-                        requestAnimationFrame(anim);
-                    } else {
-                        actualParent.remove(ring);
-                        geo.dispose(); mat.dispose();
-                    }
-                };
-                anim();
+                instancedVFXManager.spawnEphemeralRing({
+                    pos,
+                    parent: (parent && !parent.isScene) ? parent : null, // 【核心修复】过滤场景父级
+                    radius: 0.45, // 【暴力还原】大幅提升基础尺寸 (原本是 0.15)
+                    color,
+                    duration: duration * 0.8,
+                    opacity: 0.8,
+                    type: 'pulse',
+                    yOffset: 0.1 + i * 0.05,
+                    isHollow: true,
+                    expansion: radius * 1.5 // 【暴力还原】大幅提升扩散感
+                });
             }, i * 200);
         }
     }
@@ -589,26 +587,18 @@ export class VFXLibrary {
 
     createStompVFX(pos, radius, color, duration, parent = null) {
         const actualParent = parent || this.scene;
-        const ringGeo = new THREE.RingGeometry(radius * 0.1, radius, 32);
-        const ringMat = this._createMaterial({ color: 0x554433, transparent: true, opacity: 0.6, depthWrite: false });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.copy(pos).y = 0.05;
-        actualParent.add(ring);
-
-        const start = Date.now();
-        const anim = () => {
-            const prg = (Date.now() - start) / 400;
-            if (prg < 1) {
-                ring.scale.set(0.1 + prg * 0.9, 0.1 + prg * 0.9, 1);
-                ringMat.opacity = 0.6 * (1 - prg);
-                requestAnimationFrame(anim);
-            } else {
-                actualParent.remove(ring);
-                ringGeo.dispose(); ringMat.dispose();
-            }
-        };
-        anim();
+        
+        // 1. 地面震荡环 (使用实例化渲染 - 实心圆)
+        instancedVFXManager.spawnEphemeralRing({
+            pos,
+            parent: (parent && !parent.isScene) ? parent : null,
+            radius, // 【回归逻辑】严格对齐逻辑半径，不再随意放大
+            color: 0x554433,
+            duration: 400,
+            opacity: 0.6,
+            isHollow: false,
+            expansion: 0 
+        });
 
         // 核心修复：添加地震践踏的渣渣粒子效果
         this.createParticleSystem({
@@ -1277,87 +1267,70 @@ export class VFXLibrary {
     }
 
     /**
-     * 仙女/蝴蝶粒子效果：
+     * 仙女/蝴蝶粒子效果：(已重构为实例化渲染)
      * 粒子紧随英雄，但在移动时会留下平滑的延迟轨迹
      */
     createButterflyVFX(parent, color, duration) {
         if (!parent) return;
 
         const startTime = Date.now();
-        const pGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+        // 对应原本的 BoxGeometry(0.08, 0.08, 0.08)
+        const geometryScale = new THREE.Vector3(0.08, 0.08, 0.08);
 
-        // 提高发射频率 (30ms)，确保高速移动下轨迹平滑连贯
         const interval = setInterval(() => {
-            // 如果英雄死亡或效果到期，停止发射
             if (Date.now() - startTime > duration || parent.isDead) {
                 clearInterval(interval);
-                pGeo.dispose();
                 return;
             }
 
             // 每一跳生成 1 个精细粒子
-            const pMat = this._createMaterial({ color, transparent: true, opacity: 0.8 });
-            const p = new THREE.Mesh(pGeo, pMat);
-            
-            // 初始位置：覆盖整个身体范围，并增加水平散布
             const angle = Math.random() * Math.PI * 2;
-            const r = 0.2 + Math.random() * 0.8; // 增加水平范围
-            p.position.set(
-                parent.position.x + Math.cos(angle) * r,
-                parent.position.y + Math.random() * 1.2, // 覆盖从脚到头的高度 (假设单位高约 1.2)
-                parent.position.z + Math.sin(angle) * r
-            );
+            const r = 0.2 + Math.random() * 0.8;
             
-            // 为每个粒子分配一个独立的追随高度偏置，并增加一个水平轨道偏置，防止其完全汇聚到一点
-            p.userData.targetYOffset = 0.2 + Math.random() * 1.0;
-            const orbitAngle = Math.random() * Math.PI * 2;
-            const orbitR = 0.3 + Math.random() * 0.7; // 粒子会趋向于角色周围的这个点，而不是角色中心
-            p.userData.orbitX = Math.cos(orbitAngle) * orbitR;
-            p.userData.orbitZ = Math.sin(orbitAngle) * orbitR;
-            
-            // 直接加入场景，使其拥有独立的世界坐标
-            this.scene.add(p);
+            // 初始世界坐标
+            const startPos = parent.position.clone().add(new THREE.Vector3(
+                Math.cos(angle) * r,
+                Math.random() * 1.2,
+                Math.sin(angle) * r
+            ));
 
-            const pStart = Date.now();
-            const pDur = 800 + Math.random() * 400; // 粒子寿命稍长一些，让轨迹更明显
-            
-            // 粒子个体的摆动相位
-            const phase = Math.random() * Math.PI * 2;
-
-            const anim = () => {
-                const elapsed = Date.now() - pStart;
-                const prg = elapsed / pDur;
-                
-                if (prg < 1 && !parent.isDead) {
+            instancedVFXManager.spawnParticle({
+                duration: 800 + Math.random() * 400,
+                color,
+                geometryScale,
+                initFn: (p) => {
+                    p.position.copy(startPos);
+                    p.userData.targetYOffset = 0.2 + Math.random() * 1.0;
+                    const orbitAngle = Math.random() * Math.PI * 2;
+                    const orbitR = 0.3 + Math.random() * 0.7;
+                    p.userData.orbitX = Math.cos(orbitAngle) * orbitR;
+                    p.userData.orbitZ = Math.sin(orbitAngle) * orbitR;
+                    p.userData.phase = Math.random() * Math.PI * 2;
+                },
+                updateFn: (p, prg) => {
+                    if (parent.isDead) return;
+                    
                     // 1. 追随逻辑：向角色周围的“舒适区”缓慢汇聚
                     const targetPos = parent.position.clone().add(new THREE.Vector3(
                         p.userData.orbitX, 
                         p.userData.targetYOffset, 
                         p.userData.orbitZ
                     ));
-                    
-                    // 降低系数至 0.03，产生极强的滞后感和丝滑感
                     p.position.lerp(targetPos, 0.03);
                     
-                    // 2. 浮动逻辑：更大幅度的随机晃动
+                    // 2. 浮动逻辑
                     const time = Date.now() * 0.003;
-                    p.position.x += Math.sin(time + phase) * 0.02;
-                    p.position.y += Math.cos(time * 0.7 + phase) * 0.02;
-                    p.position.z += Math.sin(time * 1.2 + phase) * 0.02;
+                    p.position.x += Math.sin(time + p.userData.phase) * 0.02;
+                    p.position.y += Math.cos(time * 0.7 + p.userData.phase) * 0.02;
+                    p.position.z += Math.sin(time * 1.2 + p.userData.phase) * 0.02;
                     
                     // 3. 视觉演变
                     p.rotation.x += 0.1;
                     p.rotation.z += 0.1;
-                    p.material.opacity = 0.8 * (1 - prg); // 逐渐透明
-                    p.scale.setScalar(1 - prg * 0.8);      // 逐渐变小
-                    
-                    requestAnimationFrame(anim);
-                } else {
-                    this.scene.remove(p);
-                    pMat.dispose();
+                    p.material.opacity = 0.8 * (1 - prg);
+                    p.scale.setScalar(1 - prg * 0.8);
                 }
-            };
-            anim();
+            });
         }, 30);
     }
 
@@ -1419,24 +1392,23 @@ export class VFXLibrary {
         if (parent.userData.slowVFXActive) return;
         parent.userData.slowVFXActive = true;
 
+        // 1. 使用实例化管理器创建圆环 (替代原本的 RingGeometry Mesh)
+        const slotIdx = instancedVFXManager.spawnEphemeralRing({
+            parent: (parent && !parent.isScene) ? parent : null,
+            radius: 0.5,
+            color: 0x220033,
+            duration: 0, // 0 表示手动控制生命周期，直到 slowVFXActive 为 false
+            opacity: 0.5,
+            type: 'breathe',
+            yOffset: 0.01,
+            isHollow: true // 减速特效是空心环
+        });
+
         const group = new THREE.Group();
-        group.position.y = -0.35; // 贴近地面
+        group.position.y = -0.35; // 仅用于粒子容器
         parent.add(group);
 
-        // 1. 创建地面的粘稠阴影圈
-        const ringGeo = new THREE.RingGeometry(0.3, 0.5, 32);
-        const ringMat = this._createMaterial({ 
-            color: 0x220033, 
-            transparent: true, 
-            opacity: 0.5,
-            side: THREE.DoubleSide,
-            depthWrite: false 
-        });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = -Math.PI / 2;
-        group.add(ring);
-
-        // 2. 创建向上冒出的虚弱气息 (粒子)
+        // 2. 创建向上冒出的虚弱气息 (粒子) - 暂时保持现状，后续可进一步实例化
         const particleInterval = setInterval(() => {
             if (!parent.userData.slowVFXActive || parent.isDead) {
                 clearInterval(particleInterval);
@@ -1475,16 +1447,13 @@ export class VFXLibrary {
             const isSlowed = parent.moveSpeed < parent.baseMoveSpeed * 0.95; // 给一点容差
             
             if (isSlowed && !parent.isDead) {
-                // 呼吸效果
-                const scale = 1 + Math.sin(Date.now() * 0.005) * 0.1;
-                ring.scale.set(scale, scale, 1);
                 requestAnimationFrame(anim);
             } else {
                 parent.userData.slowVFXActive = false;
                 clearInterval(particleInterval);
                 parent.remove(group);
-                ringGeo.dispose();
-                ringMat.dispose();
+                // 停止实例化圆环
+                instancedVFXManager.stopEffect(slotIdx);
             }
         };
         anim();
@@ -1632,52 +1601,20 @@ export class VFXLibrary {
     }
 
     /**
-     * 创建点击地面时的即时像素反馈 (Scheme C)
+     * 创建点击地面时的即时像素反馈 (已重构为实例化渲染)
      */
     createClickRippleVFX(pos) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 32; canvas.height = 32;
-        const ctx = canvas.getContext('2d');
-        // 使用哑光金 (Matte Gold)
-        ctx.fillStyle = 'rgba(197, 160, 89, 0.8)';
-        ctx.beginPath();
-        ctx.arc(16, 16, 10, 0, Math.PI * 2);
-        ctx.fill();
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.magFilter = THREE.NearestFilter;
-        
-        const mat = new THREE.MeshBasicMaterial({ 
-            map: texture, 
-            transparent: true, 
-            depthWrite: false,
-            side: THREE.DoubleSide
+        instancedVFXManager.spawnEphemeralRing({
+            pos,
+            radius: 0.8, // 翻倍尺寸
+            color: 0xc5a059, // 哑光金
+            duration: 400,
+            opacity: 0.8,
+            type: 'pulse',
+            yOffset: 0.1,
+            isHollow: true,
+            expansion: 2.5 // 增强扩张
         });
-        const geo = new THREE.PlaneGeometry(0.8, 0.8);
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.position.copy(pos);
-        mesh.position.y = 0.1;
-        mesh.renderOrder = 1000;
-        this.scene.add(mesh);
-
-        const startTime = Date.now();
-        const duration = 400;
-        const anim = () => {
-            const elapsed = Date.now() - startTime;
-            const prg = elapsed / duration;
-            if (prg < 1) {
-                mesh.scale.set(1 + prg * 2, 1 + prg * 2, 1);
-                mat.opacity = 0.8 * (1 - prg);
-                requestAnimationFrame(anim);
-            } else {
-                if (mesh.parent) this.scene.remove(mesh);
-                geo.dispose();
-                mat.dispose();
-                texture.dispose();
-            }
-        };
-        anim();
     }
 
     /**
