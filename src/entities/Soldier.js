@@ -6,6 +6,13 @@ import { worldManager } from '../core/WorldManager.js';
 import { audioManager } from '../core/AudioManager.js';
 import { UNIT_STATS_DATA } from '../data/UnitStatsData.js';
 
+// --- 工业级优化：静态临时向量 (零分配模式) ---
+// 为不同模块分配专属变量，防止在复杂调用链中产生状态污染
+const _vMath = new THREE.Vector3();    // 通用数学计算
+const _vPhys = new THREE.Vector3();    // 专门用于物理碰撞
+const _vMove = new THREE.Vector3();    // 专门用于移动逻辑
+const _vForward = new THREE.Vector3(); // 专门用于获取面向
+
 /**
  * 基础战斗单位类
  */
@@ -885,31 +892,27 @@ export class BaseUnit extends THREE.Group {
                 window.battle.perf.collisionChecks++;
             }
 
-            const dist = this.position.distanceTo(other.position);
+            // 使用 distanceToSquared 省去开方运算
+            const distSq = this.position.distanceToSquared(other.position);
             const minAllowedDist = myRadius + other.collisionRadius;
 
-            if (dist < minAllowedDist) {
-                // 计算排斥方向
-                const pushDir = new THREE.Vector3();
+            if (distSq < minAllowedDist * minAllowedDist) {
+                const dist = Math.sqrt(distSq);
                 
-                // 解决重合死穴：如果距离极小，随机分配一个排斥方向
-                if (dist < 0.001) {
-                    pushDir.set(
-                        Math.random() - 0.5,
-                        Math.random() - 0.5,
-                        0
-                    ).normalize();
-                } else {
-                    pushDir.subVectors(this.position, other.position).normalize();
-                }
-
                 // 核心逻辑：立即校正重叠位移 (Constraint Correction)
                 // 基于质量分配位移权重：质量越大，受到的推力越小
                 const totalMass = this.mass + other.mass;
                 const ratioThis = other.mass / totalMass; // 对方质量占比越大，我移动越多
-                
                 const overlap = minAllowedDist - dist;
-                this.position.addScaledVector(pushDir, overlap * ratioThis);
+
+                // 优化：使用物理专用向量 _vPhys，避免 new
+                if (dist < 0.001) {
+                    _vPhys.set(Math.random() - 0.5, Math.random() - 0.5, 0).normalize();
+                } else {
+                    _vPhys.subVectors(this.position, other.position).normalize();
+                }
+                
+                this.position.addScaledVector(_vPhys, overlap * ratioThis);
             }
         }
     }
@@ -1025,23 +1028,21 @@ export class BaseUnit extends THREE.Group {
     }
 
     moveTowardsTarget(deltaTime) {
-        const dir = new THREE.Vector3()
-            .subVectors(this.target.position, this.position)
-            .normalize();
-        
-        const moveDist = this.moveSpeed * deltaTime;
-        this.position.addScaledVector(dir, moveDist);
-
-        // 战斗中暂时取消个体的草地脚步声，由环境音或集体音效代替（可选）
-        /*
-        if (this.footstepTimer === 0) {
-            audioManager.play('footstep_grass', { 
-                volume: 0.4,   
-                pitchVar: 0.3, 
-                chance: 0.5    
-            });
+        let targetPos;
+        if (this.target) {
+            targetPos = this.target.position;
+        } else if (window.battle && window.battle.strategicCenters) {
+            // 走向敌方大部队重心
+            targetPos = (this.side === 'player') ? 
+                window.battle.strategicCenters.enemy : 
+                window.battle.strategicCenters.player;
         }
-        */
+        
+        if (targetPos) {
+            // 优化：使用移动专用向量 _vMove，避免 new
+            _vMove.subVectors(targetPos, this.position).normalize();
+            this.position.addScaledVector(_vMove, this.statsCache.moveSpeed * deltaTime);
+        }
 
         this.footstepTimer += deltaTime * 1000;
         if (this.footstepTimer >= this.footstepInterval) {
@@ -1176,13 +1177,12 @@ export class BaseUnit extends THREE.Group {
      */
     getForwardVector() {
         if (this.target && !this.target.isDead) {
-            return new THREE.Vector3().subVectors(this.target.position, this.position).normalize().setY(0);
+            // 优化：使用面向专用向量 _vForward，避免 new
+            return _vForward.subVectors(this.target.position, this.position).normalize().setY(0);
         }
         // 如果没有目标，则根据 Sprite 翻转状态返回左或右
-        // 注意：repeat.x 为正则面朝右（对应 standard），为负正面朝左（对应 flipped）
-        // 但我们要根据 spriteFactory.cols 来精确判断，这里简化处理：
         const isFlipped = this.unitSprite.material.map.repeat.x < 0;
-        return new THREE.Vector3(isFlipped ? -1 : 1, 0, 0);
+        return _vForward.set(isFlipped ? -1 : 1, 0, 0);
     }
 
     /**
