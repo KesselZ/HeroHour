@@ -374,15 +374,25 @@ export class WorldManager {
             };
         }
 
-        this.factions = {}; // 记录所有势力数据 { factionId: { heroId, cities: [], army: {} } }
+        this.factions = {}; // 记录所有势力数据 { factionId: { heroId, cities: [], army: {}, resources: {} } }
 
         // 1. 基础资源 (初始资源调低，增加探索动力)
         // 调试模式下大幅提升初始资源
         const isCheat = WorldManager.DEBUG.ENABLED && WorldManager.DEBUG.START_RESOURCES;
-        this.resources = {
-            gold: isCheat ? 10000 : 1000,
-            wood: isCheat ? 5000 : 500
+        
+        // --- 核心初始化：预先建立玩家势力，防止 HUD 更新报错 ---
+        this.factions['player'] = {
+            id: 'player',
+            name: '玩家',
+            isPlayer: true,
+            cities: ['main_city_1'],
+            resources: { gold: isCheat ? 10000 : 1000, wood: isCheat ? 5000 : 500 },
+            army: {} 
         };
+
+        // 核心引用同步：确保全局访问点永远指向玩家势力数据
+        this.resources = this.factions['player'].resources;
+        this.heroArmy = this.factions['player'].army;
 
         // 2. 英雄数据 (持久化状态 - 初始值仅作为结构定义)
         this.heroData = {
@@ -409,7 +419,8 @@ export class WorldManager {
             }
         };
 
-        this.heroArmy = {}; // 初始为空，由 initHeroArmy 初始化
+        // 核心：玩家军队现在存储在势力数据中，this.heroArmy 仅作为便捷引用
+        this.heroArmy = {}; 
 
         // 3. 城镇中的兵力与建设
         this.cities = {
@@ -677,8 +688,11 @@ export class WorldManager {
      * 初始化英雄起始兵力
      * 职责：确保不同英雄、不同模式下的开局兵力配置高度统一且数据驱动
      */
-    initHeroArmy(heroId) {
-        // 1. 定义标准开局 (Source of Truth for normal gameplay)
+    /**
+     * 创建初始军队 (统一逻辑)
+     */
+    createInitialArmy(heroId) {
+        // 1. 定义标准开局
         const standardStart = {
             'melee': 4,
             'ranged': 3
@@ -690,23 +704,34 @@ export class WorldManager {
                              heroId === 'lichengen';
 
         if (useDebugArmy) {
-            console.log("%c[DEBUG] %c李承恩神将模式激活：获得全兵种各 2 名，统御上限解锁", "color: #ff4444; font-weight: bold", "color: #fff");
-            
             const godArmy = {};
-            // 遍历所有合法兵种
             for (const type in UNIT_STATS_DATA) {
-                // 排除非战斗兵种的 ID (即排除英雄本人)
                 if (!['liwangsheng', 'lichengen', 'yeying'].includes(type)) {
                     godArmy[type] = 2;
                 }
             }
-            this.heroArmy = godArmy;
-            
-            // 暴力解锁统御上限，保证能带下
-            this.heroData.stats.leadership = 999;
+            return godArmy;
         } else {
-            // 正常逻辑：应用标准开局
-            this.heroArmy = { ...standardStart };
+            return { ...standardStart };
+        }
+    }
+
+    initHeroArmy(heroId) {
+        const army = this.createInitialArmy(heroId);
+        
+        // 核心修复：清空并重新填充，保持引用一致，防止外部引用失效
+        Object.keys(this.heroArmy).forEach(key => delete this.heroArmy[key]);
+        Object.assign(this.heroArmy, army);
+        
+        // 同步到势力数据 (由于 constructor 中已建立引用，此步理论上已自动完成，但显式赋值更安全)
+        if (this.factions['player']) {
+            this.factions['player'].army = this.heroArmy;
+        }
+
+        // 李承恩神将模式的特殊逻辑：暴力解锁统御上限
+        if (WorldManager.DEBUG.ENABLED && WorldManager.DEBUG.LICHENGEN_GOD_MODE && heroId === 'lichengen') {
+            console.log("%c[DEBUG] %c李承恩神将模式激活：获得全兵种各 2 名，统御上限解锁", "color: #ff4444; font-weight: bold", "color: #fff");
+            this.heroData.stats.leadership = 999;
         }
     }
 
@@ -1202,25 +1227,16 @@ export class WorldManager {
         
         const entities = [];
         const halfSize = size / 2;
-        const isCheat = WorldManager.DEBUG.ENABLED && WorldManager.DEBUG.START_RESOURCES;
 
         // --- 1. 势力初始化逻辑 ---
         const playerHeroId = this.heroData.id;
         const playerHeroInfo = this.availableHeroes[playerHeroId] || { name: '未知侠客' };
         
-        // 初始化玩家势力
-        this.factions['player'] = {
-            id: 'player',
-            name: playerHeroInfo.name, // 直接使用人名
-            heroId: playerHeroId,
-            isPlayer: true,
-            cities: ['main_city_1'],
-            resources: { gold: isCheat ? 10000 : 1000, wood: isCheat ? 5000 : 500 }
-        };
-
-        // 核心同步：让 this.resources 引用玩家势力的资源，保持向后兼容
-        this.resources = this.factions['player'].resources;
-
+        // 核心修复：更新玩家势力数据，但不覆盖整个对象以保留 initHeroArmy 已填充的兵力
+        const playerFaction = this.factions['player'];
+        playerFaction.name = playerHeroInfo.name;
+        playerFaction.heroId = playerHeroId;
+        
         // 识别潜在对手 (排除玩家选中的)
         const opponentPool = Object.keys(this.availableHeroes).filter(id => id !== playerHeroId);
         
@@ -1246,7 +1262,8 @@ export class WorldManager {
                 heroId: aiHeroId,
                 isPlayer: false,
                 cities: [cityId],
-                resources: { gold: 1000, wood: 500 } // AI 初始资源
+                resources: { gold: 1000, wood: 500 }, // AI 初始资源
+                army: this.createInitialArmy(aiHeroId) // AI 英雄携带的真实军队
             };
 
             const aiCity = new City(cityId, `${aiHeroInfo.name}的据点`, factionId, 'main_city', aiHeroInfo.sect);
@@ -1754,35 +1771,44 @@ export class WorldManager {
     /**
      * 处理攻城战胜利后的城市占领
      * @param {string} cityId 
+     * @param {string} newOwner 新的占领者 ID
      */
-    captureCity(cityId) {
+    captureCity(cityId, newOwner = 'player') {
         const city = this.cities[cityId];
         if (!city) return;
 
         const oldOwner = city.owner;
+        if (oldOwner === newOwner) return; // 已经是自己的了
+
         const oldFaction = this.factions[oldOwner];
         const oldHeroId = oldFaction ? oldFaction.heroId : null;
 
-        city.owner = 'player';
-        city.side = 'player'; // 核心修复：同步更新 side，确保 ModifierManager 能正确匹配该城市的产出修正
+        city.owner = newOwner;
+        city.side = newOwner; // 核心同步更新 side
         
-        // --- 核心重构：使用主动事件接口，并标记该事件会改变长久局势 ---
-        WorldStatusManager.triggerActiveEvent('captured_main_city', {
-            title: '收复重镇',
-            text: `阁下指挥若定，一举收复了【${city.name}】！百姓夹道欢迎，江湖威望已达巅峰！`,
-            type: 'important',
-            affectsSituation: true // 只有这种大事才会改变 Tooltip 里的描述
-        });
+        const isPlayer = newOwner === 'player';
+        const ownerName = isPlayer ? '玩家' : (this.factions[newOwner]?.name || '敌方');
 
-        // 备注：学院建筑会自动随 owner 变更而动态切换显示逻辑
-        
+        if (isPlayer) {
+            // 核心重构：使用主动事件接口
+            WorldStatusManager.triggerActiveEvent('captured_main_city', {
+                title: '收复重镇',
+                text: `阁下指挥若定，一举收复了【${city.name}】！百姓夹道欢迎，江湖威望已达巅峰！`,
+                type: 'important',
+                affectsSituation: true
+            });
+        } else {
+            console.log(`%c[城池陷落] %c${city.name} 已被 ${ownerName} 占领`, 'color: #ff4444; font-weight: bold', 'color: #fff');
+        }
+
         // 更新势力的城市列表
         if (oldFaction) {
             oldFaction.cities = oldFaction.cities.filter(id => id !== cityId);
         }
         
-        if (!this.factions['player'].cities.includes(cityId)) {
-            this.factions['player'].cities.push(cityId);
+        const newFaction = this.factions[newOwner];
+        if (newFaction && !newFaction.cities.includes(cityId)) {
+            newFaction.cities.push(cityId);
         }
 
         // --- 核心改动 1：移除地图上对应门派的弟子野怪 ---
@@ -1859,23 +1885,30 @@ export class WorldManager {
     /**
      * 获取玩家当前队伍的总战斗力
      */
-    getPlayerTotalPower() {
+    /**
+     * 计算任意军队的总战力评估
+     * @param {Object} army 兵力对象 {type: count}
+     * @param {number} level 英雄等级 (可选)
+     */
+    getArmyTotalPower(army, level = 1) {
         let total = 0;
         
-        // 1. 计算士兵战力
-        for (const type in this.heroArmy) {
-            const count = this.heroArmy[type];
+        // 1. 士兵战力
+        for (const type in army) {
+            const count = army[type];
             if (count > 0 && this.unitCosts[type]) {
-                // 核心修复：使用 getUnitCost 以包含天赋减费
-                total += count * this.getUnitCost(type);
+                total += count * (this.unitCosts[type].cost || 0);
             }
         }
 
-        // 2. 计算主将战力：根据等级动态计算 (等级 * 3)
-        const heroLevel = this.heroData ? (this.heroData.level || 1) : 1;
-        total += heroLevel * 3;
+        // 2. 主将战力
+        total += level * 3;
 
         return total;
+    }
+
+    getPlayerTotalPower() {
+        return this.getArmyTotalPower(this.heroArmy, this.heroData?.level || 1);
     }
 
     /**

@@ -1939,21 +1939,30 @@ export class WorldScene {
                 // 刷新 HUD 以显示新占领的城市
                 this.refreshWorldHUD();
             } else {
-                // 普通野怪胜利：移除怪物
-                const entity = worldManager.mapState.entities.find(e => e.id === enemyId);
-                if (entity && entity.templateId) {
-                    // 检查是否属于邪恶势力的小怪 (天一、神策、红衣)
-                    const evilFactions = ['tianyi', 'shence', 'red_cult'];
-                    const faction = evilFactions.find(f => entity.templateId.startsWith(f));
-                    if (faction) {
-                        // 触发首次击败通报 (内部会处理去重)
-                        WorldStatusManager.broadcastFirstKill(faction);
+                // 普通实体处理
+                const entityObj = this.worldObjects.get(enemyId);
+                
+                // 核心逻辑：如果是 AI 英雄，不移除，而是让其回城休养
+                if (entityObj && entityObj.type === 'ai_hero') {
+                    console.log(`%c[AI] 英雄 ${enemyId} 战败，正在撤回据点休养...`, "color: #ffaa00");
+                    entityObj.rest(); // 调用休养逻辑
+                } else {
+                    // 普通野怪胜利：移除怪物
+                    const entity = worldManager.mapState.entities.find(e => e.id === enemyId);
+                    if (entity && entity.templateId) {
+                        // 检查是否属于邪恶势力的小怪 (天一、神策、红衣)
+                        const evilFactions = ['tianyi', 'shence', 'red_cult'];
+                        const faction = evilFactions.find(f => entity.templateId.startsWith(f));
+                        if (faction) {
+                            // 触发首次击败通报 (内部会处理去重)
+                            WorldStatusManager.broadcastFirstKill(faction);
+                        }
                     }
+                    worldManager.removeEntity(enemyId);
+                    const item = this.interactables.find(i => i.id === enemyId);
+                    if (item) this.scene.remove(item.mesh);
+                    this.interactables = this.interactables.filter(i => i.id !== enemyId);
                 }
-                worldManager.removeEntity(enemyId);
-                const item = this.interactables.find(i => i.id === enemyId);
-                if (item) this.scene.remove(item.mesh);
-                this.interactables = this.interactables.filter(i => i.id !== enemyId);
             }
         } else {
             // 输了或逃了：锁定怪物/城镇，防止连续触发

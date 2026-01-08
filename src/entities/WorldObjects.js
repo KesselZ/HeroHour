@@ -1116,6 +1116,10 @@ export class AIHeroObject extends MovableWorldObject {
         
         this.moveSpeed = 3.5; // 稍微比玩家慢一点点，或者持平
 
+        // 核心接口：AI 英雄也拥有真实的兵力数据，从势力数据中同步
+        const faction = worldManager.factions[this.factionId];
+        this.army = faction ? faction.army : {};
+
         // 核心改动：注入大脑
         this.brain = new AIController(this);
     }
@@ -1150,11 +1154,63 @@ export class AIHeroObject extends MovableWorldObject {
         super.update(deltaTime, playerPos);
         // 让大脑驱动行为
         this.brain.update(deltaTime);
+        
+        // 核心改动：休养期间不可交互
+        this.isInteractable = (this.brain.state !== 'REST');
+    }
+
+    /**
+     * 进入休养模式 (被打败后调用)
+     */
+    rest() {
+        if (this.brain) {
+            this.brain.enterRestMode(60); // 默认休养 60 秒
+        }
     }
 
     onInteract(worldScene) {
+        if (worldManager.mapState.pendingBattleEnemyId) return false;
+        
         console.log(`%c[遭遇] %c与英雄【${this.config.name}】狭路相逢！`, 'color: #ff4444; font-weight: bold', 'color: #fff');
         worldManager.showNotification(`遭遇了敌方英雄：${this.config.name}`);
+
+        worldManager.mapState.pendingBattleEnemyId = this.id;
+
+        // 核心接口改动：封装真实的 AI 军队配置
+        const aiPower = worldManager.getArmyTotalPower(this.army, 1); // 暂时按 1 级算
+        const battleConfig = {
+            id: this.id,
+            name: this.config.name,
+            heroId: this.heroId,
+            factionId: this.factionId,
+            army: this.army, 
+            totalPoints: aiPower,
+            isAIHero: true
+        };
+
+        const playerPower = worldManager.getPlayerTotalPower();
+        const ratio = playerPower / aiPower;
+
+        // 镜像野怪逻辑：如果玩家很强，也支持跳过
+        if (ratio > 2.0) {
+            worldScene.showSkipBattleDialog(battleConfig, aiPower, 
+                () => {
+                    this._startBattle(worldScene, battleConfig);
+                },
+                () => {
+                    const result = worldManager.simulateSimpleBattle(battleConfig, aiPower);
+                    worldScene.showSimpleSettlement(result);
+                }
+            );
+            return false;
+        }
+
+        return this._startBattle(worldScene, battleConfig);
+    }
+
+    _startBattle(worldScene, battleConfig) {
+        window.dispatchEvent(new CustomEvent('start-battle', { detail: battleConfig }));
+        worldScene.stop();
         return false;
     }
 
@@ -1162,12 +1218,43 @@ export class AIHeroObject extends MovableWorldObject {
         const faction = worldManager.factions[this.factionId];
         const factionColor = worldManager.getFactionColor(this.factionId);
         
+        // 核心改动：检查休养状态
+        const isResting = this.brain && this.brain.state === 'REST';
+        if (isResting) {
+            return {
+                name: this.config.name,
+                level: '正在休养',
+                maxLevel: Math.ceil(this.brain.restTimer) + '秒后重返',
+                color: '#888888',
+                description: `所属势力：${faction ? faction.name : '中立'}`
+            };
+        }
+
+        // 计算战力对比
+        const aiPower = worldManager.getArmyTotalPower(this.army, 1);
+        const playerPower = worldManager.getPlayerTotalPower();
+        const ratio = playerPower / aiPower;
+
+        let difficulty = '惊世骇俗';
+        let diffColor = '#ff0000';
+        
+        if (ratio > 1.5) {
+            difficulty = '略有小成';
+            diffColor = '#00ff00';
+        } else if (ratio >= 1.1) {
+            difficulty = '旗鼓相当';
+            diffColor = '#ffff00';
+        } else if (ratio >= 0.8) {
+            difficulty = '深不可测';
+            diffColor = '#ffaa00';
+        }
+
         return {
             name: this.config.name,
-            level: '敌方英雄',
-            maxLevel: faction ? faction.name : '未知势力',
-            color: factionColor,
-            description: '一位正在巡视江湖的敌方侠客。'
+            level: '实力评价',
+            maxLevel: difficulty,
+            color: diffColor,
+            description: `所属势力：${faction ? faction.name : '中立'}`
         };
     }
 }

@@ -21,6 +21,8 @@ export class AIController {
         this.baseRadius = 50; 
         this.growthRate = 10; // 每个季度领地扩张 10 米
         
+        this.restTimer = 0; // 新增：休养计时器
+        
         this.memory = {
             targetEntityId: null
         };
@@ -47,6 +49,16 @@ export class AIController {
     update(deltaTime) {
         if (worldManager.constructor.DEBUG.DISABLE_AI) return;
         if (!this.owner || !this.owner.mesh) return;
+
+        // 处理休养状态
+        if (this.state === 'REST') {
+            this.restTimer -= deltaTime;
+            if (this.restTimer <= 0) {
+                console.log(`%c[AI] 英雄 ${this.owner.id} 休养结束，重返江湖`, "color: #00ff00");
+                this._switchState('WANDER');
+            }
+            return; // REST 状态下不进行决策
+        }
 
         this.decisionTimer -= deltaTime;
         if (this.decisionTimer <= 0) {
@@ -135,6 +147,16 @@ export class AIController {
         this.state = newState;
         
         switch (newState) {
+            case 'REST':
+                this.memory.targetEntityId = null;
+                this.owner.currentPath = [];
+                // 传送回主城坐标
+                this.owner.x = this.homePos.x;
+                this.owner.z = this.homePos.z;
+                if (this.owner.mesh) {
+                    this.owner.mesh.position.set(this.homePos.x, 0, this.homePos.z);
+                }
+                break;
             case 'FLEE':
                 this.memory.targetEntityId = null;
                 this._startFlee();
@@ -193,5 +215,14 @@ export class AIController {
 
     _getDistTo(tx, tz) {
         return Math.sqrt(Math.pow(this.owner.x - tx, 2) + Math.pow(this.owner.z - tz, 2));
+    }
+
+    /**
+     * 外部接口：强制进入休养模式
+     * @param {number} duration 休养时长(秒)
+     */
+    enterRestMode(duration = 60) {
+        this.restTimer = duration;
+        this._switchState('REST');
     }
 }

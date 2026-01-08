@@ -416,6 +416,13 @@ export class BattleScene {
     }
 
     spawnEnemiesDynamic(totalPoints) {
+        // --- 核心改动：如果传入了具体的 army 对象，则直接按照该兵力生成，不再随机购买 ---
+        if (this.enemyConfig && this.enemyConfig.army) {
+            console.log("%c[战斗系统] %c检测到敌方固定编制，正在按实名部署...", "color: #ffcc00; font-weight: bold", "color: #fff");
+            this._spawnFixedArmy(this.enemyConfig.army);
+            return;
+        }
+
         let availableClasses = [];
         
         if (this.enemyConfig && this.enemyConfig.unitPool) {
@@ -517,6 +524,36 @@ export class BattleScene {
 
         console.log(`%c[敌军生成] %c总预算: ${totalPoints}, 实际消耗: ${totalPoints - remainingPoints}, 兵力: ${armyList.length}`, 
             'color: #ff4444; font-weight: bold', 'color: #fff');
+    }
+
+    _spawnFixedArmy(armyData) {
+        let idx = 0;
+        for (const [type, count] of Object.entries(armyData)) {
+            const Cls = UnitTypeMap[type];
+            if (!Cls) continue;
+
+            for (let i = 0; i < count; i++) {
+                const unit = new Cls('enemy', idx++, this.projectileManager);
+                const blueprint = this.worldManager.getUnitBlueprint(unit.type);
+                const allowedZones = blueprint.allowedZones || ['front']; 
+                const selectedZone = allowedZones[Math.floor(Math.random() * allowedZones.length)];
+                
+                let zoneX; 
+                switch (selectedZone) {
+                    case 'front': zoneX = 2 + Math.random() * 8; break;
+                    case 'middle': zoneX = 12 + Math.random() * 8; break;
+                    case 'back': zoneX = 22 + Math.random() * 6; break;
+                    default: zoneX = 2 + Math.random() * 8;
+                }
+                const zPos = (Math.random() - 0.5) * 18; 
+                
+                unit.position.set(zoneX, 0, zPos);
+                unit.visible = true; 
+                this.enemyUnits.push(unit);
+                this.scene.add(unit);
+            }
+        }
+        console.log(`%c[战斗系统] %c固定编制部署完成，共计 ${idx} 名单位`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
     }
 
     onPointerDown(event) {
