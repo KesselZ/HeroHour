@@ -267,7 +267,7 @@ export class BaseUnit extends THREE.Group {
 
     initVisual() {
         // 1. 侠客 Sprite
-        // 核心修复：根据配置表或默认值 (0.1) 自动设置锚点
+        // 核心方案：利用 SpriteFactory 自动探测该单位脚底像素，实现零硬编码完美对齐
         this.unitSprite = spriteFactory.createUnitSprite(this.type);
         this.add(this.unitSprite);
 

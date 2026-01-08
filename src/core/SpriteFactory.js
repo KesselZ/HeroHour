@@ -314,6 +314,7 @@ class SpriteFactory {
     constructor() {
         this.textureLoader = new THREE.TextureLoader();
         this.cache = new Map();
+        this.anchorsCache = new Map(); // 核心：缓存自动探测的锚点
         this.isLoaded = true;
         this.cols = 4; // 向后兼容旧代码中的硬编码 cols
         this.rows = 4;
@@ -334,9 +335,13 @@ class SpriteFactory {
             this.cache.set(path, texture);
         }
 
-        const texture = this.cache.get(path).clone();
+        const cachedTexture = this.cache.get(path);
+        const texture = cachedTexture.clone();
         texture.repeat.set(1 / cols, 1 / rows);
         texture.offset.set((c - 1) / cols, (rows - r) / rows);
+        
+        // 核心修复：确保克隆后的纹理也能访问到原始 image，供锚点探测使用
+        texture.source = cachedTexture.source;
 
         return new THREE.SpriteMaterial({ 
             map: texture, 
@@ -346,20 +351,95 @@ class SpriteFactory {
         });
     }
 
-    createUnitSprite(key, anchorY = 0.1) {
+    createUnitSprite(key, overrideAnchorY = null) {
         const config = ASSET_REGISTRY.UNITS[key];
         const material = this.getMaterial(key);
         const sprite = new THREE.Sprite(material);
         const s = config ? config.scale : 1.4;
         sprite.scale.set(s, s, 1);
         
-        // 统一使用传入的锚点，默认为 0.1 (脚部)
+        // 核心方案：如果没传入覆盖值，则自动探测脚底
+        let anchorY = 0;
+        if (overrideAnchorY !== null) {
+            anchorY = overrideAnchorY;
+        } else {
+            anchorY = this.getFeetAnchor(key);
+        }
+        
+        // 统一使用探测到的脚底作为旋转中心
         sprite.center.set(0.5, anchorY); 
         
         // 核心修复：将真实身份注入 userData，供后续翻转动画精确识别
         sprite.userData.spriteKey = key;
         
         return sprite;
+    }
+
+    /**
+     * 获取或计算脚底锚点 (归一化 0-1)
+     */
+    getFeetAnchor(key) {
+        if (this.anchorsCache.has(key)) return this.anchorsCache.get(key);
+        
+        const anchor = this._calculateFeetAnchor(key);
+        this.anchorsCache.set(key, anchor);
+        return anchor;
+    }
+
+    /**
+     * 鲁棒算法：探测从底部往上第一个非透明像素作为“脚底”
+     */
+    _calculateFeetAnchor(key) {
+        const config = ASSET_REGISTRY.UNITS[key];
+        if (!config || !config.sheet) return 0.1; // 兜底
+        
+        const path = ASSET_REGISTRY.SHEETS[config.sheet];
+        const texture = this.cache.get(path);
+        if (!texture || !texture.image || !texture.image.complete) {
+            return 0.1; // 图片未就绪时返回默认值
+        }
+
+        const image = texture.image;
+        const { rows, cols, r, c } = config;
+        
+        const frameW = Math.floor(image.width / cols);
+        const frameH = Math.floor(image.height / rows);
+        
+        // 计算该单位在图集中的像素位置
+        const sx = (c - 1) * frameW;
+        const sy = (r - 1) * frameH;
+
+        // 使用 Canvas 离屏扫描
+        const canvas = document.createElement('canvas');
+        canvas.width = frameW;
+        canvas.height = frameH;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, sx, sy, frameW, frameH, 0, 0, frameW, frameH);
+        
+        try {
+            const pixels = ctx.getImageData(0, 0, frameW, frameH).data;
+            
+            // 从底部往上扫描
+            // imageData 布局: [r,g,b,a, r,g,b,a ...]
+            for (let y = frameH - 1; y >= 0; y--) {
+                for (let x = 0; x < frameW; x++) {
+                    const alpha = pixels[(y * frameW + x) * 4 + 3];
+                    if (alpha > 30) { // 找到有实质像素的一行 (阈值 30 防止杂色)
+                        // 计算该点相对于 frame 底部的归一化位置
+                        // Three.js center.y 为 0 代表底部，1 为顶部
+                        const distFromBottom = (frameH - 1 - y);
+                        const normalizedAnchor = distFromBottom / frameH;
+                        
+                        // console.log(`[自动对齐] 单位 ${key} 脚底探测完成: ${normalizedAnchor.toFixed(3)}`);
+                        return normalizedAnchor;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn(`[自动对齐] 无法扫描单位 ${key} 的像素数据 (跨域或未加载)`);
+        }
+        
+        return 0.1;
     }
 
     /**

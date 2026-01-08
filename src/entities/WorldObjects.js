@@ -58,11 +58,9 @@ export class WorldObject {
     }
 
     getElevation() {
-        // 统一高度补偿：为了让 0.1 锚点的底边贴地，需要抬升 scale * 0.1
-        const spriteKey = (this.mesh && this.mesh.userData && this.mesh.userData.spriteKey) || this.type;
-        const config = spriteFactory.unitConfig[spriteKey];
-        const scale = config ? config.scale : 1.4;
-        return scale * 0.1;
+        // 核心改动：既然实现了自动脚底探测，所有物体都在 position.y = 0 处对齐
+        // 视觉偏移已由 SpriteFactory.getFeetAnchor 解决
+        return 0;
     }
 
     /**
@@ -127,7 +125,6 @@ export class MovableWorldObject extends WorldObject {
         this.mainSprite = null; // 真正的角色 Sprite
         this.shadow = null;     // 影子 (如果有)
         this.baseScale = data.baseScale || 1.4;
-        this.visualAnchorY = data.visualAnchorY || 0; // 新增：记录视觉锚点偏移
         
         this.footstepTimer = 0;
         this.footstepInterval = 650;
@@ -184,6 +181,33 @@ export class MovableWorldObject extends WorldObject {
         } else {
             this.currentPath = [];
         }
+    }
+
+    /**
+     * 重写高度补偿：可移动物体自带阴影，Group 节点必须贴地 (y=0)
+     */
+    getElevation() {
+        return 0;
+    }
+
+    /**
+     * 创建标准化的阴影 Mesh
+     * 解决穿模、渲染层级和缩放一致性问题
+     */
+    _createStandardShadow() {
+        const shadowGeom = new THREE.CircleGeometry(0.35, 16);
+        const shadowMat = new THREE.MeshBasicMaterial({ 
+            color: 0x000000, 
+            transparent: true, 
+            opacity: 0.3,
+            depthWrite: false, // 核心：关闭深度写入，防止与地面闪烁
+        });
+        const shadow = new THREE.Mesh(shadowGeom, shadowMat);
+        shadow.name = 'shadow';
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.position.y = 0.01; // 极小偏移即可，不再需要 0.05
+        shadow.renderOrder = -1;  // 核心：确保在角色本体之前渲染，永远在脚下
+        return shadow;
     }
 
     /**
@@ -280,7 +304,10 @@ export class MovableWorldObject extends WorldObject {
         // 如果没有，再从 config 获取，最后才是 type
         const spriteKey = sprite.userData.spriteKey || this.config.spriteKey || this.type;
         const config = spriteFactory.unitConfig[spriteKey] || { col: 1 };
-        const baseVisualY = this.baseScale * this.visualAnchorY; // 使用缩放后的锚点高度作为基础视觉高度
+        
+        // 核心方案：由于 SpriteFactory 已经自动将中心点（Pivot）对齐到了脚底像素，
+        // 这里的视觉基础 y 始终为 0 即可实现完美对齐且不滑步。
+        const baseVisualY = 0; 
 
         if (this.isMoving) {
             const distanceMoved = this.mesh.position.distanceTo(this.lastPos);
@@ -306,9 +333,11 @@ export class MovableWorldObject extends WorldObject {
 
             // 影子表现
             if (this.shadow) {
-                const shadowScale = 1 - bob * 0.2;
-                this.shadow.scale.set(shadowScale, shadowScale, 1);
-                this.shadow.material.opacity = 0.3 * (1 - bob * 0.2);
+                const bobScale = 1 - bob * 0.2;
+                // 核心修复：阴影缩放需乘以基准缩放 baseScale，确保大体型单位阴影也大
+                const finalShadowScale = this.baseScale * bobScale;
+                this.shadow.scale.set(finalShadowScale, finalShadowScale, 1);
+                this.shadow.material.opacity = 0.3 * bobScale;
             }
 
             // 倾斜
@@ -338,8 +367,8 @@ export class MovableWorldObject extends WorldObject {
             sprite.scale.set(this.baseScale * (1 - breath), this.baseScale * (1 + breath), 1);
             
             if (this.shadow) {
-                this.shadow.scale.x = THREE.MathUtils.lerp(this.shadow.scale.x, 1, 0.2);
-                this.shadow.scale.y = THREE.MathUtils.lerp(this.shadow.scale.y, 1, 0.2);
+                this.shadow.scale.x = THREE.MathUtils.lerp(this.shadow.scale.x, this.baseScale, 0.2);
+                this.shadow.scale.y = THREE.MathUtils.lerp(this.shadow.scale.y, this.baseScale, 0.2);
                 this.shadow.material.opacity = THREE.MathUtils.lerp(this.shadow.material.opacity, 0.3, 0.2);
             }
         }
@@ -744,7 +773,30 @@ export class EnemyGroupObject extends MovableWorldObject {
     createMesh() {
         const template = worldManager.enemyTemplates[this.templateId || 'bandits'];
         const icon = template ? template.overworldIcon : 'bandit';
-        return spriteFactory.createUnitSprite(icon);
+        
+        const group = new THREE.Group();
+        
+        // 统一添加阴影
+        const shadow = this._createStandardShadow();
+        group.add(shadow);
+        
+        // 创建精灵：自动探测脚底
+        const sprite = spriteFactory.createUnitSprite(icon);
+        const config = spriteFactory.unitConfig[icon] || { scale: 1.4 };
+        this.baseScale = config.scale || 1.4;
+        
+        sprite.scale.set(this.baseScale, this.baseScale, 1);
+        sprite.position.y = 0; // 脚底贴地
+        
+        // 同步阴影缩放
+        shadow.scale.set(this.baseScale, this.baseScale, 1);
+        
+        group.add(sprite);
+        
+        this.mainSprite = sprite;
+        this.shadow = shadow;
+        
+        return group;
     }
 
     onInteract(worldScene) {
@@ -1013,7 +1065,6 @@ export class PlayerObject extends MovableWorldObject {
         super(data);
         this.type = 'player';
         this.baseScale = data.baseScale || 1.4;
-        this.visualAnchorY = 0.2; // 显式同步主角的视觉锚点设置 (腰部判定)
     }
 
     /**
@@ -1070,26 +1121,21 @@ export class AIHeroObject extends MovableWorldObject {
     createMesh() {
         const group = new THREE.Group();
         
-        // 创建影子
-        const shadowGeom = new THREE.CircleGeometry(0.35, 16);
-        const shadowMat = new THREE.MeshBasicMaterial({ 
-            color: 0x000000, 
-            transparent: true, 
-            opacity: 0.3 
-        });
-        const shadow = new THREE.Mesh(shadowGeom, shadowMat);
-        shadow.name = 'shadow';
-        shadow.rotation.x = -Math.PI / 2;
-        shadow.position.y = 0.05;
+        // 使用基类标准阴影，解决穿模和缩放问题
+        const shadow = this._createStandardShadow();
         group.add(shadow);
 
-        // 创建英雄精灵
-        const visualAnchorY = 0.2;
-        const sprite = spriteFactory.createUnitSprite(this.heroId, visualAnchorY);
+        // 创建英雄精灵：自动探测脚底
+        const sprite = spriteFactory.createUnitSprite(this.heroId);
         const config = spriteFactory.unitConfig[this.heroId] || { scale: 1.4 };
         this.baseScale = config.scale || 1.4;
+        
         sprite.scale.set(this.baseScale, this.baseScale, 1);
-        sprite.position.y = this.baseScale * visualAnchorY;
+        sprite.position.y = 0; // 脚底贴地
+        
+        // 同步初始阴影缩放
+        shadow.scale.set(this.baseScale, this.baseScale, 1);
+        
         group.add(sprite);
 
         this.mainSprite = sprite;

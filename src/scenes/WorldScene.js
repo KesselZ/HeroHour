@@ -112,14 +112,15 @@ export class WorldScene {
         this.setupLights();
         this.createGround(mapData);
         this.createWater(mapGenerator.size);
-        this.createPlayer();
-        
+
         // 初始化玩家移动封装对象
         this.playerObject = new PlayerObject({ 
             id: 'player', 
             baseScale: this.baseScale,
             moveSpeed: this.moveSpeed
         });
+
+        this.createPlayer();
         this.playerObject.setMesh(this.playerGroup);
 
         // 设置背景色，增加武侠大世界的沉浸感
@@ -1197,29 +1198,19 @@ export class WorldScene {
         const pos = worldManager.mapState.playerPos;
         this.playerGroup.position.set(pos.x, 0, pos.z);
 
-        // 2. 创建脚下影子
-        const shadowGeom = new THREE.CircleGeometry(0.35, 16);
-        const shadowMat = new THREE.MeshBasicMaterial({ 
-            color: 0x000000, 
-            transparent: true, 
-            opacity: 0.3 
-        });
-        this.playerShadow = new THREE.Mesh(shadowGeom, shadowMat);
-        this.playerShadow.name = 'shadow';
-        this.playerShadow.rotation.x = -Math.PI / 2;
-        this.playerShadow.position.y = 0.05; // 略高于地面
+        // 2. 使用基类提供的标准化阴影
+        this.playerShadow = this.playerObject._createStandardShadow();
         this.playerGroup.add(this.playerShadow);
 
         // 3. 创建主角精灵并存入容器
-        // 核心改动：将遮挡判定锚点从底部(0)移至腰部(0.2)，使主角能更自然地“走进”物体根部而不被立即遮挡
-        const visualAnchorY = 0.2;
-        this.playerHero = spriteFactory.createUnitSprite(this.heroId, visualAnchorY); 
+        // 核心方案：不再手动指定锚点，利用 SpriteFactory 自动探测脚底位置
+        this.playerHero = spriteFactory.createUnitSprite(this.heroId); 
         const config = spriteFactory.unitConfig[this.heroId];
         this.baseScale = config.scale || 1.4;
         this.playerHero.scale.set(this.baseScale, this.baseScale, 1);
         
-        // 补偿位移：确保精灵图脚底依然对齐 Group 的中心（即地面点）
-        this.playerHero.position.y = this.baseScale * visualAnchorY;
+        // 核心修复：既然锚点已自动对齐脚底像素，position.y 直接设为 0 即可实现完美落地
+        this.playerHero.position.y = 0;
         // 深度微调：确保位置完全重叠时主角优先渲染，解决闪烁问题
         this.playerHero.position.z = 0.01;
         
