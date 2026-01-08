@@ -977,8 +977,7 @@ export class WorldManager {
 
         // 1. 资源类 (拾取)
         if (entity.type === 'pickup' || keyType.includes('pile') || keyType === 'chest') {
-            const resType = (keyType.includes('gold') || keyType === 'chest') ? 'gold' : 'wood';
-            return this._handleResourcePickup(entity, actorSide, isPlayer, resType);
+            return this._handleResourcePickup(entity, actorSide, isPlayer);
         }
 
         // 2. 建筑类 (占领)
@@ -1025,22 +1024,54 @@ export class WorldManager {
     /**
      * 处理地面资源拾取
      */
-    _handleResourcePickup(entity, factionId, isPlayer, resType) {
-        const amount = entity.config?.amount || 50;
-        
-        if (resType === 'gold') this.addGold(amount, factionId);
-        else this.addWood(amount, factionId);
+    _handleResourcePickup(entity, factionId, isPlayer) {
+        let reward = { gold: 0, wood: 0 };
+        let msg = "";
+        const itemType = entity.pickupType || entity.type;
+
+        // 获取英雄影子对象用于计算加成
+        const dummyHero = isPlayer ? this.getPlayerHeroDummy() : { side: factionId };
+
+        switch (itemType) {
+            case 'gold_pile':
+                const rawGold = Math.floor(Math.random() * 51) + 200; // 200-250 金币
+                reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawGold));
+                msg = `捡到了一堆金币，获得 ${reward.gold} 💰`;
+                break;
+            case 'chest':
+                // 宝箱给金币和木材
+                const rawChestGold = Math.floor(Math.random() * 101) + 400; // 400-500
+                const rawChestWood = Math.floor(Math.random() * 101) + 200; // 200-300
+                reward.gold = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestGold));
+                reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawChestWood));
+                msg = `开启了宝箱，获得 ${reward.gold} 💰 和 ${reward.wood} 🪵`;
+                break;
+            case 'wood_pile':
+                const rawWood = Math.floor(Math.random() * 61) + 90; // 90-150
+                reward.wood = Math.floor(modifierManager.getModifiedValue(dummyHero, 'world_loot', rawWood));
+                msg = `捡到了木材堆，获得 ${reward.wood} 🪵`;
+                break;
+            default:
+                // 极少数特殊情况下的兜底
+                if (itemType.includes('gold')) reward.gold = 50;
+                else if (itemType.includes('wood')) reward.wood = 50;
+        }
+
+        // 执行资源增加
+        if (reward.gold > 0) this.addGold(reward.gold, factionId);
+        if (reward.wood > 0) this.addWood(reward.wood, factionId);
 
         entity.isRemoved = true;
 
-        // 核心修复：派发事件通知表现层，某个实体已被逻辑移除 (无论是谁捡走的)
+        // 派发事件通知表现层
         window.dispatchEvent(new CustomEvent('entity-logic-removed', { 
             detail: { entityId: entity.id } 
         }));
         
-        if (isPlayer) {
-            const icon = resType === 'gold' ? '💰' : '🪵';
-            console.log(`%c[拾取] %c获得 ${amount} ${icon}`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
+        if (isPlayer && msg) {
+            console.log(`%c[拾取] %c${msg}`, 'color: #ffcc00; font-weight: bold', 'color: #fff');
+            // 核心修复：显示在 UI 通知栏
+            this.showNotification(msg);
         }
         return true;
     }

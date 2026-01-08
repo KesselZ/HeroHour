@@ -541,10 +541,15 @@ export class PickupObject extends WorldObject {
             'chest': '宝箱',
             'wood_pile': '木材堆'
         };
+        const descriptions = {
+            'gold_pile': '包含大量金币',
+            'chest': '包含金币和木材',
+            'wood_pile': '包含大量木材'
+        };
         return {
             name: names[this.pickupType] || '未知物品',
             level: '类别',
-            maxLevel: '可收集资源'
+            maxLevel: descriptions[this.pickupType] || '可收集资源'
         };
     }
 }
@@ -1015,19 +1020,22 @@ export class CapturedBuildingObject extends WorldObject {
     onInteract(worldScene, actorSide = 'player') {
         const isPlayer = actorSide === 'player';
         
-        // 核心：调用统一逻辑
+        // 1. 调用统一逻辑进行占领/交互
         const success = worldManager.interactWithEntity(this.id, actorSide);
         
         // 2. 玩家特有的视觉逻辑：开启传送界面
-        if (success && isPlayer && this.buildingType === 'teleport_altar') {
-            if (worldScene.activeAltarId !== this.id) {
+        // 修改：只要是传送阵，且当前没有开启该祭坛的界面，就尝试打开
+        if (isPlayer && this.buildingType === 'teleport_altar') {
+            const config = this.config || {};
+            const isOwner = config.owner === 'player';
+
+            if (isOwner && worldScene.activeAltarId !== this.id) {
                 worldScene.activeAltarId = this.id;
                 setTimeout(() => worldScene.openTeleportMenu(this.id), 100);
             }
         }
         
-        // 注意：不再手动调用 removeFromScene，全部交给事件监听器处理
-        return false; // 占领类建筑不需要立即从 interactables 移除，因为所有权变了还能继续交互（比如查看）
+        return false; 
     }
 
     onExitRange(worldScene) {
