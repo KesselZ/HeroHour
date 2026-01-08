@@ -625,16 +625,23 @@ export class EnemyGroupObject extends MovableWorldObject {
         this.emoteSprite = new THREE.Sprite(material);
         this.emoteSprite.renderOrder = 9999;
         
-        // --- 核心修复：基于局部坐标系的“头顶锚定”方案 ---
-        // 1. 图标大小：设定为 0.6 (缩小一半，使其更加精致)
-        const localIconSize = 0.6; 
+        // --- 核心修复：动态头顶锚定与尺寸同步方案 ---
+        const spriteKey = (this.mainSprite && this.mainSprite.userData) ? this.mainSprite.userData.spriteKey : 'bandit';
+        const scale = this.baseScale || 1.4;
+        
+        // 1. 获取像素级高度数据 (优化：使用合并后的探测方法)
+        const anchors = spriteFactory.getSpriteAnchors(spriteKey);
+        
+        // 2. 计算头顶真实世界高度 + 固定加法偏移 (确保图标悬浮在头顶上方一点)
+        // 逻辑：(头顶像素 - 脚底像素) * 缩放倍率 = 实际模型高度
+        const headPixelHeight = (anchors.head - anchors.feet) * scale;
+        const localVisualHeight = headPixelHeight + 0.3; // 0.3 是固定的悬浮间距
+        
+        // 3. 图标大小：做到动态变化，但使用 sqrt 防止在大体型怪身上过大
+        const localIconSize = 0.5 * Math.sqrt(scale); 
         this.emoteSprite.scale.set(localIconSize, localIconSize, 1);
         
-        // 2. 视觉高度偏移：锁定在局部坐标 1.2 处
-        // 算法：0.9 (头顶高度基准) + 0.3 (图标半径) = 1.2，确保图标底部精准踩在头顶
-        const localVisualHeight = 1.2; 
-        
-        // 3. 应用零畸变 Trick：
+        // 4. 应用零畸变 Trick：
         // 这里的公式会自动处理 3D 深度偏移，让 UI 永远置顶且不位移
         this.emoteSprite.center.y = 0.5 - (localVisualHeight / localIconSize);
         this.emoteSprite.position.set(0, 0, 0); 
@@ -776,9 +783,7 @@ export class EnemyGroupObject extends MovableWorldObject {
         
         const group = new THREE.Group();
         
-        // 统一添加阴影
-        const shadow = this._createStandardShadow();
-        group.add(shadow);
+        // --- 优化：普通小怪不再添加脚下阴影 ---
         
         // 创建精灵：自动探测脚底
         const sprite = spriteFactory.createUnitSprite(icon);
@@ -788,13 +793,10 @@ export class EnemyGroupObject extends MovableWorldObject {
         sprite.scale.set(this.baseScale, this.baseScale, 1);
         sprite.position.y = 0; // 脚底贴地
         
-        // 同步阴影缩放
-        shadow.scale.set(this.baseScale, this.baseScale, 1);
-        
         group.add(sprite);
         
         this.mainSprite = sprite;
-        this.shadow = shadow;
+        this.shadow = null; // 明确标记没有阴影
         
         return group;
     }

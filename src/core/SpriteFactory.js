@@ -314,7 +314,8 @@ class SpriteFactory {
     constructor() {
         this.textureLoader = new THREE.TextureLoader();
         this.cache = new Map();
-        this.anchorsCache = new Map(); // 核心：缓存自动探测的锚点
+        this.anchorsCache = new Map(); // 核心：缓存自动探测的脚底锚点
+        this.headAnchorsCache = new Map(); // 新增：缓存自动探测的头顶锚点
         this.isLoaded = true;
         this.cols = 4; // 向后兼容旧代码中的硬编码 cols
         this.rows = 4;
@@ -379,67 +380,88 @@ class SpriteFactory {
      * 获取或计算脚底锚点 (归一化 0-1)
      */
     getFeetAnchor(key) {
-        if (this.anchorsCache.has(key)) return this.anchorsCache.get(key);
-        
-        const anchor = this._calculateFeetAnchor(key);
-        this.anchorsCache.set(key, anchor);
-        return anchor;
+        return this.getSpriteAnchors(key).feet;
     }
 
     /**
-     * 鲁棒算法：探测从底部往上第一个非透明像素作为“脚底”
+     * 获取或计算头顶锚点 (归一化 0-1)
      */
-    _calculateFeetAnchor(key) {
+    getHeadAnchor(key) {
+        return this.getSpriteAnchors(key).head;
+    }
+
+    /**
+     * 核心优化：单次扫描探测脚底和头顶锚点
+     * 返回 { feet: number, head: number }
+     */
+    getSpriteAnchors(key) {
+        // 如果两个缓存都命中，直接返回
+        if (this.anchorsCache.has(key) && this.headAnchorsCache.has(key)) {
+            return {
+                feet: this.anchorsCache.get(key),
+                head: this.headAnchorsCache.get(key)
+            };
+        }
+
         const config = ASSET_REGISTRY.UNITS[key];
-        if (!config || !config.sheet) return 0.1; // 兜底
+        if (!config || !config.sheet) return { feet: 0.1, head: 0.9 };
         
         const path = ASSET_REGISTRY.SHEETS[config.sheet];
         const texture = this.cache.get(path);
         if (!texture || !texture.image || !texture.image.complete) {
-            return 0.1; // 图片未就绪时返回默认值
+            return { feet: 0.1, head: 0.9 };
         }
 
         const image = texture.image;
         const { rows, cols, r, c } = config;
-        
         const frameW = Math.floor(image.width / cols);
         const frameH = Math.floor(image.height / rows);
         
-        // 计算该单位在图集中的像素位置
-        const sx = (c - 1) * frameW;
-        const sy = (r - 1) * frameH;
-
-        // 使用 Canvas 离屏扫描
+        // 1. 绘制单帧到离屏 Canvas
         const canvas = document.createElement('canvas');
         canvas.width = frameW;
         canvas.height = frameH;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(image, sx, sy, frameW, frameH, 0, 0, frameW, frameH);
+        ctx.drawImage(image, (c - 1) * frameW, (r - 1) * frameH, frameW, frameH, 0, 0, frameW, frameH);
         
+        let feet = 0.1;
+        let head = 0.9;
+
         try {
             const pixels = ctx.getImageData(0, 0, frameW, frameH).data;
             
-            // 从底部往上扫描
-            // imageData 布局: [r,g,b,a, r,g,b,a ...]
-            for (let y = frameH - 1; y >= 0; y--) {
+            let minY = frameH;
+            let maxY = 0;
+            let found = false;
+
+            // 2. 单次遍历：找出最高和最低的非透明像素行
+            for (let y = 0; y < frameH; y++) {
                 for (let x = 0; x < frameW; x++) {
                     const alpha = pixels[(y * frameW + x) * 4 + 3];
-                    if (alpha > 30) { // 找到有实质像素的一行 (阈值 30 防止杂色)
-                        // 计算该点相对于 frame 底部的归一化位置
-                        // Three.js center.y 为 0 代表底部，1 为顶部
-                        const distFromBottom = (frameH - 1 - y);
-                        const normalizedAnchor = distFromBottom / frameH;
-                        
-                        // console.log(`[自动对齐] 单位 ${key} 脚底探测完成: ${normalizedAnchor.toFixed(3)}`);
-                        return normalizedAnchor;
+                    if (alpha > 30) {
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                        found = true;
                     }
                 }
             }
+
+            if (found) {
+                // Three.js 锚点计算公式：(frameH - 1 - y) / frameH
+                // minY 越小（越靠上），head 越大
+                // maxY 越大（越靠下），feet 越小
+                feet = (frameH - 1 - maxY) / frameH;
+                head = (frameH - 1 - minY) / frameH;
+            }
         } catch (e) {
-            console.warn(`[自动对齐] 无法扫描单位 ${key} 的像素数据 (跨域或未加载)`);
+            console.warn(`[SpriteFactory] 锚点探测失败: ${key}`, e);
         }
+
+        // 3. 存入缓存并返回
+        this.anchorsCache.set(key, feet);
+        this.headAnchorsCache.set(key, head);
         
-        return 0.1;
+        return { feet, head };
     }
 
     /**
