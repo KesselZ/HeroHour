@@ -1,4 +1,4 @@
-import { SkillRegistry } from '../core/SkillRegistry.js';
+import { SkillRegistry } from './SkillRegistry.js';
 
 /**
  * 视觉宽度补全工具：解决终端中中文字符对齐问题

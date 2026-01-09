@@ -1,9 +1,9 @@
-import { worldManager } from './WorldManager.js';
+import { worldManager } from '../core/WorldManager.js';
 import { talentManager } from './TalentManager.js';
 import { timeManager } from './TimeManager.js';
-import { audioManager } from './AudioManager.js';
+import { audioManager } from '../engine/AudioManager.js';
 
-import { WorldStatusManager } from './WorldStatusManager.js';
+import { WorldStatusManager } from '../world/WorldStatusManager.js';
 
 /**
  * SaveManager: 负责全局存档的序列化、持久化存储与分发

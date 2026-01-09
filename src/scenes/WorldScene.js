@@ -1,24 +1,24 @@
 import * as THREE from 'three';
-import { spriteFactory } from '../core/SpriteFactory.js';
-import { modifierManager } from '../core/ModifierManager.js';
+import { spriteFactory } from '../engine/SpriteFactory.js';
+import { modifierManager } from '../systems/ModifierManager.js';
 import { WorldManager, worldManager } from '../core/WorldManager.js'; // 引入数据管家
-import { SkillRegistry, SectSkills } from '../core/SkillSystem.js';
-import { timeManager } from '../core/TimeManager.js';
-import { mapGenerator, TILE_TYPES } from '../core/MapGenerator.js';
-import { terrainManager, TERRAIN_STYLES } from '../core/TerrainManager.js';
+import { SkillRegistry, SectSkills } from '../systems/SkillSystem.js';
+import { timeManager } from '../systems/TimeManager.js';
+import { mapGenerator, TILE_TYPES } from '../world/MapGenerator.js';
+import { terrainManager, TERRAIN_STYLES } from '../world/TerrainManager.js';
 import { createWorldObject, PlayerObject } from '../entities/WorldObjects.js';
-import { VFXLibrary } from '../core/VFXLibrary.js'; // 核心引入
-import { instancedVFXManager } from '../core/InstancedVFXManager.js';
-import { Pathfinder } from '../core/Pathfinder.js';
-import { weatherManager } from '../core/WeatherManager.js';
+import { VFXLibrary } from '../engine/VFXLibrary.js'; // 核心引入
+import { instancedVFXManager } from '../engine/InstancedVFXManager.js';
+import { Pathfinder } from '../utils/Pathfinder.js';
+import { weatherManager } from '../systems/WeatherManager.js';
 
 /**
  * 大世界场景类
  * 负责探索、移动、资源收集和城镇管理
  */
 import { uiManager } from '../core/UIManager.js';
-import { audioManager } from '../core/AudioManager.js';
-import { WorldStatusManager } from '../core/WorldStatusManager.js';
+import { audioManager } from '../engine/AudioManager.js';
+import { WorldStatusManager } from '../world/WorldStatusManager.js';
 
 export class WorldScene {
     constructor(scene, camera, renderer) {

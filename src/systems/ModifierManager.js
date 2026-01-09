@@ -15,7 +15,7 @@
  * ============================================================================
  * 
  * 1. 技能控制协议 (Skill Control Protocol)
- *    消费端: src/core/Skill.js -> getActualCooldown() / getActualDuration() / getActualRadius()
+ *    消费端: src/systems/Skill.js -> getActualCooldown() / getActualDuration() / getActualRadius()
  *    ------------------------------------------------------------------------
  *    - [skillId/category]_cooldown_multiplier: [倍率] 独立乘法修正
  *    - [skillId/category]_cooldown_override:   [绝对值] 强制覆盖 CD (ms)
@@ -37,7 +37,7 @@
  *    - cangjian_fengming_enabled: [开关] 1=开启凤鸣奇穴联动逻辑
  * 
  * 3. 基础状态协议 (Core Flag Protocol)
- *    消费端: src/core/ModifierManager.js -> getModifiedValue() 的 flagStats 列表
+ *    消费端: src/systems/ModifierManager.js -> getModifiedValue() 的 flagStats 列表
  *    ------------------------------------------------------------------------
  *    - stun: [开关] 1=眩晕，无法行动
  *    - invincible: [开关] 1=无敌，不接收伤害判定

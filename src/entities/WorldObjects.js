@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { spriteFactory } from '../core/SpriteFactory.js';
+import { spriteFactory } from '../engine/SpriteFactory.js';
 import { worldManager } from '../core/WorldManager.js';
-import { timeManager } from '../core/TimeManager.js';
-import { mapGenerator } from '../core/MapGenerator.js';
-import { Pathfinder } from '../core/Pathfinder.js';
-import { audioManager } from '../core/AudioManager.js';
-import { AIController } from '../core/AIController.js';
+import { timeManager } from '../systems/TimeManager.js';
+import { mapGenerator } from '../world/MapGenerator.js';
+import { Pathfinder } from '../utils/Pathfinder.js';
+import { audioManager } from '../engine/AudioManager.js';
+import { AIController } from '../utils/AIController.js';
 
 /**
  * 大世界物体的基类

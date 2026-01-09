@@ -4,4 +4,4 @@
  */
 
 export { Skill } from './Skill.js';
-export { SkillRegistry, SectSkills } from './SkillRegistry.js';
+export { SkillRegistry, SectSkills } from '../data/SkillRegistry.js';

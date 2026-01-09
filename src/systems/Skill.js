@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { audioManager } from './AudioManager.js';
+import { audioManager } from '../engine/AudioManager.js';
 import { modifierManager } from './ModifierManager.js';
 import { talentManager } from './TalentManager.js';
 

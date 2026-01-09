@@ -1,4 +1,4 @@
-import { mapGenerator } from './MapGenerator.js';
+import { mapGenerator } from '../world/MapGenerator.js';
 
 /**
  * 极简二叉堆实现，用于优化 A* 的 openSet

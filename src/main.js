@@ -1,20 +1,20 @@
 import * as THREE from 'three';
 import { BattleScene } from './scenes/BattleScene.js';
 import { WorldScene } from './scenes/WorldScene.js'; 
-import { spriteFactory } from './core/SpriteFactory.js';
-import { setSeed } from './core/Random.js';
-import { modifierManager } from './core/ModifierManager.js';
+import { spriteFactory } from './engine/SpriteFactory.js';
+import { setSeed } from './utils/Random.js';
+import { modifierManager } from './systems/ModifierManager.js';
 import { WorldManager, worldManager } from './core/WorldManager.js';
-import { SkillRegistry } from './core/SkillRegistry.js';
-import { talentManager } from './core/TalentManager.js';
+import { SkillRegistry } from './data/SkillRegistry.js';
+import { talentManager } from './systems/TalentManager.js';
 import { uiManager } from './core/UIManager.js';
-import { audioManager } from './core/AudioManager.js';
-import { timeManager } from './core/TimeManager.js';
-import { resourcePreloader } from './core/ResourcePreloader.js';
-import { saveManager } from './core/SaveManager.js';
-import { WorldStatusManager } from './core/WorldStatusManager.js';
-import { terrainManager, TERRAIN_STYLES } from './core/TerrainManager.js';
-import { weatherManager } from './core/WeatherManager.js';
+import { audioManager } from './engine/AudioManager.js';
+import { timeManager } from './systems/TimeManager.js';
+import { resourcePreloader } from './engine/ResourcePreloader.js';
+import { saveManager } from './systems/SaveManager.js';
+import { WorldStatusManager } from './world/WorldStatusManager.js';
+import { terrainManager, TERRAIN_STYLES } from './world/TerrainManager.js';
+import { weatherManager } from './systems/WeatherManager.js';
 
 import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
@@ -401,7 +401,7 @@ backToCharBtn.addEventListener('click', () => {
 confirmDiffBtn.addEventListener('click', async () => {
     if (!selectedHero || !selectedDifficulty) return;
     audioManager.play('ui_click');
-    import('./core/Random.js').then(m => m.setSeed(Math.floor(Math.random() * 1000000)));
+    import('./utils/Random.js').then(m => m.setSeed(Math.floor(Math.random() * 1000000)));
     diffSelectMenu.classList.add('hidden');
     if (menuBg) menuBg.classList.add('hidden');
     enterGameState(GameState.LOADING);
@@ -415,7 +415,7 @@ confirmDiffBtn.addEventListener('click', async () => {
     }
 });
 
-audioManager.playBGM('/audio/bgm_menu.mp3');
+audioManager.playBGM('/audio/bgm/如寄.mp3');
 
 window.addEventListener('load', () => {
     setTimeout(() => {

@@ -1,4 +1,4 @@
-import { Skill } from './Skill.js';
+import { Skill } from '../systems/Skill.js';
 
 /**
  * 技能注册表：存放所有技能的具体配置和动作

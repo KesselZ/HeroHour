@@ -1,6 +1,6 @@
-import { worldManager } from './WorldManager.js';
-import { mapGenerator } from './MapGenerator.js';
-import { timeManager } from './TimeManager.js';
+import { worldManager } from '../core/WorldManager.js';
+import { mapGenerator } from '../world/MapGenerator.js';
+import { timeManager } from '../systems/TimeManager.js';
 
 /**
  * AIController: 具备领地扩张意识的高性能大脑

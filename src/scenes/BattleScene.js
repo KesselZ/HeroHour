@@ -18,9 +18,9 @@ import {
 } from '../entities/Soldier.js';
 
 import { worldManager } from '../core/WorldManager.js';
-import { modifierManager } from '../core/ModifierManager.js';
-import { spriteFactory } from '../core/SpriteFactory.js';
-import { SkillRegistry } from '../core/SkillSystem.js';
+import { modifierManager } from '../systems/ModifierManager.js';
+import { spriteFactory } from '../engine/SpriteFactory.js';
+import { SkillRegistry } from '../systems/SkillSystem.js';
 
 // 建立类型映射表，方便动态调用
 const UnitTypeMap = {
@@ -95,16 +95,16 @@ const UnitTypeMap = {
 };
 
 import { GrasslandEnvironment, AutumnEnvironment, WinterEnvironment } from '../environment/Environments.js';
-import { terrainManager, TERRAIN_STYLES } from '../core/TerrainManager.js';
-import { weatherManager } from '../core/WeatherManager.js';
-import { ProjectileManager } from '../core/ProjectileManager.js';
-import { VFXLibrary } from '../core/VFXLibrary.js';
-import { instancedVFXManager } from '../core/InstancedVFXManager.js';
-import { SpatialHash } from '../core/SpatialHash.js';
-import { rng, setSeed } from '../core/Random.js';
+import { terrainManager, TERRAIN_STYLES } from '../world/TerrainManager.js';
+import { weatherManager } from '../systems/WeatherManager.js';
+import { ProjectileManager } from '../engine/ProjectileManager.js';
+import { VFXLibrary } from '../engine/VFXLibrary.js';
+import { instancedVFXManager } from '../engine/InstancedVFXManager.js';
+import { SpatialHash } from '../utils/SpatialHash.js';
+import { rng, setSeed } from '../utils/Random.js';
 
 import { uiManager } from '../core/UIManager.js';
-import { audioManager } from '../core/AudioManager.js';
+import { audioManager } from '../engine/AudioManager.js';
 
 export class BattleScene {
     constructor(scene, camera, enemyConfig = null) {
@@ -2040,7 +2040,7 @@ export class BattleScene {
 
         if (isVictory) {
             const totalPoints = this.enemyConfig ? this.enemyConfig.totalPoints : 0;
-            const { timeManager } = await import('../core/TimeManager.js');
+            const { timeManager } = await import('../systems/TimeManager.js');
             const xpGained = Math.floor(totalPoints * 4);
             
             // 记录升级前的状态，用于结算界面展示

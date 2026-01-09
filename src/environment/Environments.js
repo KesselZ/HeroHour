@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { rng } from '../core/Random.js';
+import { rng } from '../utils/Random.js';
 
 /**
  * 环境管理基类

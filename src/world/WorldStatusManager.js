@@ -5,11 +5,11 @@
  * 2. 处理“主动事件”（玩家行为触发，如攻城、击杀 BOSS）
  * 3. 处理“被动事件”（随时间/季节自动触发，分为氛围传闻和逻辑事件）
  */
-import { timeManager } from './TimeManager.js';
-import { audioManager } from './AudioManager.js';
-import { worldManager } from './WorldManager.js';
+import { timeManager } from '../systems/TimeManager.js';
+import { audioManager } from '../engine/AudioManager.js';
+import { worldManager } from '../core/WorldManager.js';
 import { terrainManager, TERRAIN_STYLES } from './TerrainManager.js';
-import { weatherManager } from './WeatherManager.js';
+import { weatherManager } from '../systems/WeatherManager.js';
 
 export class WorldStatusManager {
     // --- 0. 频率控制超参数 ---

@@ -6,7 +6,7 @@
  * 2. 黄色 (<span class="skill-num-highlight">): 影响程度/数值 (如：200点、12%、翻倍、永久)
  */
 
-import { HERO_IDENTITY } from '../data/UnitStatsData.js';
+import { HERO_IDENTITY } from './UnitStatsData.js';
 
 // 1. 最小天赋单位 (原子效果)
 export const TALENT_UNITS = {

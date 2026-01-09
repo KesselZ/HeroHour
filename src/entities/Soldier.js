@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { spriteFactory } from '../core/SpriteFactory.js';
-import { rng } from '../core/Random.js';
-import { modifierManager } from '../core/ModifierManager.js';
+import { spriteFactory } from '../engine/SpriteFactory.js';
+import { rng } from '../utils/Random.js';
+import { modifierManager } from '../systems/ModifierManager.js';
 import { worldManager } from '../core/WorldManager.js';
-import { audioManager } from '../core/AudioManager.js';
+import { audioManager } from '../engine/AudioManager.js';
 import { UNIT_STATS_DATA } from '../data/UnitStatsData.js';
 
 // --- 工业级优化：静态临时向量 (零分配模式) ---

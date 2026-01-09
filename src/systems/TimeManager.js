@@ -1,4 +1,4 @@
-import { worldManager } from './WorldManager.js';
+import { worldManager } from '../core/WorldManager.js';
 import { modifierManager } from './ModifierManager.js';
 
 /**

@@ -1,12 +1,12 @@
-import { spriteFactory } from './SpriteFactory.js';
-import { SkillRegistry, SectSkills } from './SkillRegistry.js';
+import { spriteFactory } from '../engine/SpriteFactory.js';
+import { SkillRegistry, SectSkills } from '../data/SkillRegistry.js';
 import { worldManager } from './WorldManager.js';
-import { modifierManager } from './ModifierManager.js';
-import { TALENT_UNITS, TALENT_GROUPS, HERO_TREE_CONFIG, getHeroTalentTree } from './TalentRegistry.js';
-import { talentManager } from './TalentManager.js';
-import { timeManager } from './TimeManager.js';
+import { modifierManager } from '../systems/ModifierManager.js';
+import { TALENT_UNITS, TALENT_GROUPS, HERO_TREE_CONFIG, getHeroTalentTree } from '../data/TalentRegistry.js';
+import { talentManager } from '../systems/TalentManager.js';
+import { timeManager } from '../systems/TimeManager.js';
 import { SECT_INTRO } from '../data/HowToPlayContent.js';
-import { audioManager } from './AudioManager.js';
+import { audioManager } from '../engine/AudioManager.js';
 
 /**
  * UIManager: 统一管理全局 UI 逻辑（如 Tooltip、面板切换等）
