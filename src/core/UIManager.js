@@ -31,6 +31,7 @@ class UIManager {
         this.initTalentEvents();
         this.initGameStartEvents();
         this.initBattleEscapeEvents();
+        this.initBuildingDraftEvents();
         
         // 性能监控面板 (仅开发模式)
         if (import.meta.env.DEV) {
@@ -146,6 +147,129 @@ class UIManager {
                 }
             };
         }
+    }
+
+    /**
+     * 初始化建筑抽卡事件监听
+     */
+    initBuildingDraftEvents() {
+        window.addEventListener('show-building-draft', (e) => {
+            this.showBuildingDraft(e.detail.options);
+        });
+    }
+
+    /**
+     * 显示季度建筑选择界面 (Hearthstone Style)
+     * @param {Array} options 建筑选项列表
+     */
+    showBuildingDraft(options) {
+        const overlay = document.getElementById('building-draft-overlay');
+        const container = document.getElementById('building-draft-cards');
+        if (!overlay || !container) return;
+
+        // 核心音效逻辑：如果有绝世建筑，播放点天赋音效，否则播放普通出现音效
+        const hasEpic = options.some(opt => opt.rarity === 'epic');
+        if (hasEpic) {
+            audioManager.play('ui_card_draft_epic');
+        } else {
+            audioManager.play('ui_card_draft');
+        }
+
+        container.innerHTML = '';
+        options.forEach((option, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'hs-card-wrapper';
+            
+            const card = document.createElement('div');
+            card.className = `hs-card rarity-${option.rarity || 'common'}`;
+            
+            const iconStyle = spriteFactory.getIconStyle(option.icon);
+            const rarityLabel = option.rarity === 'epic' ? '绝世' : (option.rarity === 'rare' ? '稀有' : '基础');
+
+            card.innerHTML = `
+                <div class="hs-card-icon-frame">
+                    <div class="hs-card-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
+                </div>
+                <div class="hs-card-name">${option.name}</div>
+                <div class="hs-card-rarity">${rarityLabel}</div>
+                <div class="hs-card-desc">${option.description}</div>
+            `;
+
+            card.onclick = () => {
+                audioManager.play('ui_card_select'); // 1. 选中时播放卡牌声音
+                
+                // 2. 获取所有卡牌
+                const allCards = container.querySelectorAll('.hs-card');
+                
+                // 3. 应用选中/未选中动画类
+                allCards.forEach(c => {
+                    if (c === card) {
+                        c.classList.add('is-selected');
+                    } else {
+                        c.classList.add('is-not-selected');
+                    }
+                });
+
+                // 4. 0.5 秒后触发洗牌音效
+                setTimeout(() => {
+                    audioManager.play('ui_card_shuffle');
+                }, 500);
+
+                // 5. 延迟执行后端解锁逻辑和 UI 关闭
+                setTimeout(() => {
+                    if (worldManager.buildingManager.selectDraftOption(option.id)) {
+                        overlay.classList.add('hidden');
+                        worldManager.showNotification(`已确立发展目标：${option.name}`);
+                    }
+                }, 600); // 匹配 cardSelectBurst 动画时长
+            };
+
+            // --- 悬停音效与高级动态 3D 倾斜 ---
+            card.onmouseenter = () => {
+                audioManager.play('ui_card_hover'); // 1. 悬停时播放轻微click声
+            };
+
+            card.onmousemove = (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                // 1. 计算旋转角度 (增加最大角度至 25 度)
+                const rotateX = ((y - centerY) / centerY) * -25; 
+                const rotateY = ((x - centerX) / centerX) * 25;
+                
+                // 2. 计算光影位置 (Glare position)
+                // 光影应该在鼠标的反方向移动，产生反光效果
+                const glareX = (x / rect.width) * 100;
+                const glareY = (y / rect.height) * 100;
+                
+                // 应用动态变换
+                card.style.transform = `translateY(-40px) scale(1.15) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                
+                // 找到或创建光影层
+                let glare = card.querySelector('.hs-glare');
+                if (!glare) {
+                    glare = document.createElement('div');
+                    glare.className = 'hs-glare';
+                    card.appendChild(glare);
+                }
+                glare.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255, 255, 255, 0.3) 0%, transparent 60%)`;
+            };
+
+            card.onmouseleave = () => {
+                card.style.transform = ''; 
+                const glare = card.querySelector('.hs-glare');
+                if (glare) glare.style.background = 'transparent';
+            };
+
+            wrapper.appendChild(card);
+            container.appendChild(wrapper);
+        });
+
+        overlay.classList.remove('hidden');
     }
 
     initGameStartEvents() {

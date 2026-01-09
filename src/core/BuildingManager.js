@@ -1,18 +1,102 @@
 import { modifierManager } from '../systems/ModifierManager.js';
+import { BUILDING_REGISTRY, BLUEPRINTS } from '../data/BuildingData.js';
+import { timeManager } from '../systems/TimeManager.js';
 
 /**
  * 建筑与科技管理器
- * 负责处理建筑效果的同步、科技解锁等逻辑
+ * 负责处理建筑效果的同步、科技解锁以及 Roguelike 抽卡逻辑
  */
 export class BuildingManager {
     constructor(worldManager) {
         this.worldManager = worldManager;
-        // 初始解锁的科技 (为后续 Roguelike 玩法预留)
-        this.unlockedTechs = new Set([
-            'town_hall', 
-            'market', 
-            'barracks'
-        ]);
+        
+        // 初始解锁的基础建筑
+        this.unlockedTechs = new Set();
+        this._initBaseTechs();
+
+        // 当前抽卡选项
+        this.currentDraftOptions = [];
+    }
+
+    /**
+     * 初始化基础科技
+     */
+    _initBaseTechs() {
+        for (const [id, data] of Object.entries(BUILDING_REGISTRY)) {
+            if (data.isDefault) {
+                this.unlockedTechs.add(id);
+            }
+        }
+    }
+
+    /**
+     * 生成三张季度选择卡
+     * @param {string} playerFaction 玩家所属门派 (e.g., 'chunyang')
+     * @returns {Array} 抽出的建筑 ID 列表
+     */
+    generateDraftOptions(playerFaction) {
+        // 1. 获取该门派蓝图中的所有建筑
+        const blueprint = BLUEPRINTS[playerFaction] || [];
+        
+        // 2. 过滤出：未解锁、满足前置要求、且不是基础建筑的候选项
+        const candidates = blueprint.filter(id => {
+            const data = BUILDING_REGISTRY[id];
+            if (!data || data.isDefault || this.unlockedTechs.has(id)) return false;
+
+            // 检查前置条件 (如果有)
+            if (data.requirements) {
+                return data.requirements.every(req => this.unlockedTechs.has(req.id));
+            }
+
+            return true;
+        });
+
+        // 3. 根据权重进行加权随机抽取
+        this.currentDraftOptions = this._weightedSample(candidates, 3);
+        return this.currentDraftOptions;
+    }
+
+    /**
+     * 加权随机抽取
+     * @private
+     */
+    _weightedSample(candidates, count) {
+        if (candidates.length <= count) return [...candidates];
+
+        const result = [];
+        const pool = [...candidates];
+
+        while (result.length < count && pool.length > 0) {
+            const totalWeight = pool.reduce((sum, id) => sum + (BUILDING_REGISTRY[id].weight || 50), 0);
+            let random = Math.random() * totalWeight;
+            
+            for (let i = 0; i < pool.length; i++) {
+                const id = pool[i];
+                const weight = BUILDING_REGISTRY[id].weight || 50;
+                if (random < weight) {
+                    result.push(id);
+                    pool.splice(i, 1);
+                    break;
+                }
+                random -= weight;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 玩家选择并解锁建筑
+     */
+    selectDraftOption(techId) {
+        if (this.currentDraftOptions.includes(techId)) {
+            this.unlockTech(techId);
+            this.currentDraftOptions = [];
+            
+            // 恢复游戏逻辑
+            timeManager.isLogicPaused = false;
+            return true;
+        }
+        return false;
     }
 
     /**

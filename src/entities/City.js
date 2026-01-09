@@ -166,9 +166,16 @@ export class City {
         const list = { economy: [], military: [], magic: [] };
         const blueprint = BLUEPRINTS[this.blueprintId] || BLUEPRINTS['chunyang'];
         
+        // 核心获取：当前全局已解锁的科技
+        const buildingManager = window.worldManager?.buildingManager;
+
         blueprint.forEach(id => {
             const meta = BUILDING_REGISTRY[id];
-            if (meta) {
+            
+            // 核心 Roguelike 过滤：只有基础建筑，或者已在全局解锁的建筑才显示在建设列表
+            const isUnlocked = buildingManager ? buildingManager.isTechUnlocked(id) : true;
+            
+            if (meta && (meta.isDefault || isUnlocked)) {
                 const currentLevel = this.buildingLevels[id] || 0;
                 const reqStatus = this.checkBuildingRequirements(id);
                 list[meta.category].push({ 

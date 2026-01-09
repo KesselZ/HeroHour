@@ -2507,6 +2507,225 @@ img {
     transition: background 0.3s ease;
 }
 
+/* --------------------------------------------------------- */
+/* 建筑抽卡专用 (Hearthstone Style) - 独立命名空间防止入侵 */
+/* --------------------------------------------------------- */
+
+#building-draft-overlay {
+    background: rgba(0, 0, 0, 0.4); /* 更加透明的背景 */
+    backdrop-filter: blur(12px); /* 保持模糊感 */
+    z-index: 12000;
+    flex-direction: column;
+}
+
+.draft-instruction {
+    color: #d4af37; /* 宣纸上的重金色 (Metallic Gold) */
+    font-size: 2.2rem;
+    letter-spacing: 20px;
+    margin-bottom: 60px;
+    text-shadow: 0 0 15px rgba(212, 175, 55, 0.4), 2px 2px 0px rgba(0,0,0,0.2);
+    animation: titleSharpEntry 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    font-family: '楷体', 'STKaiti', serif;
+    font-weight: 900;
+}
+
+@keyframes titleSharpEntry {
+    0% { opacity: 0; transform: scale(1.5) translateY(-50px); filter: blur(10px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+
+.building-cards-wrapper {
+    display: flex;
+    gap: 50px;
+    perspective: 2000px; /* 增强 3D 透视深度 */
+    padding: 20px;
+    transform: translateY(-30px); /* 整体向上平移 30px */
+}
+
+/* --- 选中后的特殊动画状态 --- */
+
+/* 1. 被选中的卡牌：爆裂放大并淡出 */
+.hs-card.is-selected {
+    animation: cardSelectBurst 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards !important;
+    z-index: 1000 !important;
+    pointer-events: none;
+}
+
+@keyframes cardSelectBurst {
+    0% { transform: translateY(-40px) scale(1.15); filter: brightness(1); }
+    40% { transform: translateY(-60px) scale(1.35); filter: brightness(2) contrast(1.5); }
+    100% { transform: translateY(-100px) scale(1.5); filter: brightness(3); opacity: 0; }
+}
+
+/* 2. 未被选中的卡牌：缩小并迅速消失 */
+.hs-card.is-not-selected {
+    animation: cardUnselectedFade 0.4s ease-in forwards !important;
+    pointer-events: none;
+}
+
+@keyframes cardUnselectedFade {
+    0% { transform: scale(1); opacity: 1; filter: blur(0); }
+    100% { transform: scale(0.8) translateY(20px); opacity: 0; filter: blur(10px); }
+}
+
+/* 扑克牌式基础结构 - 宣纸亮色风格 - 凌厉化 */
+.hs-card-wrapper {
+    perspective: 1000px;
+    animation: cardSharpEntry 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.5) forwards;
+    opacity: 0;
+}
+
+/* 极速阶梯入场 */
+.hs-card-wrapper:nth-child(1) { animation-delay: 0.05s; }
+.hs-card-wrapper:nth-child(2) { animation-delay: 0.15s; }
+.hs-card-wrapper:nth-child(3) { animation-delay: 0.25s; }
+
+.hs-card {
+    width: 260px;
+    height: 380px;
+    background: var(--jx3-paper);
+    border-radius: 8px; /* 减小圆角，显得更硬朗凌厉 */
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1); /* 加快响应速度 */
+    transform-style: preserve-3d;
+    border: 2px solid var(--jx3-celadon);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 25px 20px;
+    overflow: hidden;
+}
+
+@keyframes cardSharpEntry {
+    0% { transform: translateY(300px) rotateX(-60deg) scale(0.5); opacity: 0; }
+    100% { transform: translateY(0) rotateX(0) scale(1); opacity: 1; }
+}
+
+/* 悬停效果：更有力的 3D 浮动 - 基础变换 (动态倾斜由 JS 接管) */
+.hs-card:hover {
+    transform: translateY(-40px) scale(1.15); /* 仅保留基础位移和缩放 */
+    border-color: var(--jx3-gold-light);
+    box-shadow: 0 50px 100px rgba(0, 0, 0, 0.5), 0 0 40px rgba(166, 139, 68, 0.3);
+    z-index: 100;
+    transition: all 0.1s ease-out; /* 悬停时缩短响应时间，让鼠标跟踪更跟手 */
+}
+
+/* 装饰性背景纹理 - 极淡纹理 */
+.hs-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png');
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+.hs-card-icon-frame {
+    width: 120px;
+    height: 120px;
+    border: 4px solid var(--jx3-celadon-dark); /* 边框加粗 */
+    border-radius: 50%;
+    margin-bottom: 25px;
+    background: white;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    position: relative;
+    /* 移除之前的 transform 属性，确保跟随卡牌整体缩放 */
+}
+
+/* 移除之前的 .hs-card:hover .hs-card-icon-frame 规则 */
+
+.hs-card-icon {
+    width: 100%;
+    height: 100%;
+    background-size: 400% 400%;
+    image-rendering: pixelated;
+}
+
+.hs-card-name {
+    font-size: 1.7rem;
+    font-weight: 900;
+    color: var(--jx3-ink);
+    margin-bottom: 10px;
+    font-family: '楷体', 'STKaiti', serif;
+}
+
+.hs-card-rarity {
+    font-size: 0.85rem;
+    padding: 4px 16px;
+    border-radius: 4px; /* 统一硬朗风格 */
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: 3px;
+}
+
+.hs-card-desc {
+    font-size: 1rem;
+    color: #333;
+    line-height: 1.6;
+    text-align: center;
+    border-top: 2px double rgba(166, 139, 68, 0.3); /* 双线分隔，更凌厉 */
+    padding-top: 15px;
+    font-weight: bold;
+}
+
+/* 稀有度配色与浓郁光效增强 */
+.rarity-common .hs-card-rarity { background: rgba(100, 100, 100, 0.2); color: #555; border: 1px solid #888; }
+.rarity-rare .hs-card-rarity { background: rgba(0, 136, 204, 0.25); color: #0066aa; border: 1px solid #0088cc; }
+.rarity-epic .hs-card-rarity { background: rgba(184, 134, 11, 0.25); color: #8b4513; border: 1px solid #b8860b; }
+
+/* 浓郁的外发光 - 极大幅度强化爽快感 */
+.rarity-common { 
+    box-shadow: 0 0 20px rgba(100, 100, 100, 0.2); 
+}
+.rarity-common:hover {
+    box-shadow: 0 0 50px rgba(100, 100, 100, 0.5);
+}
+
+.rarity-rare { 
+    border-color: #0088cc !important;
+    box-shadow: 0 0 50px rgba(0, 136, 204, 0.6); 
+}
+.rarity-rare:hover {
+    box-shadow: 0 0 90px rgba(0, 136, 204, 0.9), 0 0 30px rgba(0, 136, 204, 0.4);
+}
+
+.rarity-epic { 
+    border-color: #ffaa00 !important;
+    box-shadow: 0 0 70px rgba(255, 170, 0, 0.7); 
+}
+.rarity-epic:hover {
+    box-shadow: 0 0 130px rgba(255, 170, 0, 1), 0 0 40px rgba(255, 255, 255, 0.6);
+}
+
+/* 绝世卡牌的凌厉流光效果 */
+.rarity-epic::after {
+    content: '';
+    position: absolute;
+    top: -100%; left: -100%; width: 300%; height: 300%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transform: rotate(45deg);
+    animation: epicSharpGlow 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes epicSharpGlow {
+    0% { transform: translate(-50%, -50%) rotate(45deg); }
+    100% { transform: translate(50%, 50%) rotate(45deg); }
+}
+
+@keyframes epicGlow {
+    0% { transform: translate(-30%, -30%) rotate(45deg); }
+    100% { transform: translate(30%, 30%) rotate(45deg); }
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .tooltip-container {
     position: fixed;
     background: rgba(0, 0, 0, 0.7); /* 降低透明度，从 0.85 降至 0.7 */
@@ -4342,4 +4561,18 @@ body.is-mobile {
     margin-top: 100px;
     text-align: center;
     font-size: 1.1rem;
+}
+
+/* 动态光影层 (Glare Effect) */
+.hs-glare {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+    mix-blend-mode: overlay;
+    transition: background 0.1s ease;
+    border-radius: inherit; /* 跟随父级圆角 */
 }

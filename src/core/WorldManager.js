@@ -8,6 +8,7 @@ import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsDat
 import { WorldStatusManager } from '../world/WorldStatusManager.js';
 import { City } from '../entities/City.js';
 import { BuildingManager } from './BuildingManager.js';
+import { BUILDING_REGISTRY } from '../data/BuildingData.js';
 import { HeroManager } from './HeroManager.js';
 import { worldGenerator } from '../world/WorldGenerator.js';
 import { terrainManager, TERRAIN_STYLES } from '../world/TerrainManager.js';
@@ -488,8 +489,37 @@ export class WorldManager {
                 }
                 
                 console.log(`%c[季度结算] %c总收入金钱 +${prodData.gold}, 木材 +${prodData.wood}`, 'color: #557755; font-weight: bold', 'color: #fff');
+
+                // --- Roguelike 建筑抽卡触发 ---
+                this.triggerBuildingDraft();
             }
         });
+    }
+
+    /**
+     * 触发建筑抽卡环节
+     */
+    triggerBuildingDraft() {
+        const faction = this.heroData.sect || 'chunyang';
+        const options = this.buildingManager.generateDraftOptions(faction);
+        
+        if (options.length > 0) {
+            console.log('%c[建筑抽卡] %c正在生成季度科技选择...', 'color: #ffcc00; font-weight: bold', 'color: #fff');
+            // 派发事件，由 UI 层监听并弹出选择界面
+            window.dispatchEvent(new CustomEvent('show-building-draft', { 
+                detail: { 
+                    options: options.map(id => ({
+                        id,
+                        ...BUILDING_REGISTRY[id]
+                    }))
+                } 
+            }));
+            
+            // 暂停大世界时间，等待玩家选择
+            timeManager.isLogicPaused = true;
+        } else {
+            console.log('%c[建筑抽卡] %c没有更多可解锁的科技了', 'color: #888', 'color: #fff');
+        }
     }
 
     /**

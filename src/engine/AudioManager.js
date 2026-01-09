@@ -105,6 +105,11 @@ class AudioManager {
             'battle_defeat': { files: ['/audio/click/战斗失败音效.mp3'], throttle: 1000 },
             'ui_bell': { files: ['/audio/click/铃铛.mp3'], throttle: 500 },
             'ui_teleport': { files: ['/audio/sources/传送.mp3'], throttle: 500 },
+            'ui_card_draft': { files: ['/audio/click/出现建筑选择.mp3'], throttle: 500 },
+            'ui_card_draft_epic': { files: ['/audio/sources/点天赋.mp3'], throttle: 500 },
+            'ui_card_hover': { files: ['/audio/click/轻微click声.mp3'], throttle: 30, pitchVar: 0.1 },
+            'ui_card_select': { files: ['/audio/click/卡牌声音.mp3'], throttle: 500 },
+            'ui_card_shuffle': { files: ['/audio/click/扑克洗牌.mp3'], throttle: 500 },
             
             // 砍树相关
             'farm_chop': { 
