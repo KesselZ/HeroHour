@@ -470,30 +470,55 @@ export class WorldManager {
             if (prodData.gold > 0) this.addGold(prodData.gold, factionId);
             if (prodData.wood > 0) this.addWood(prodData.wood, factionId);
             
-            // 核心改动：仅对玩家执行季节更替回复内力与生命 (奇穴效果)
+            // 情况 1：玩家势力
             if (faction.isPlayer) {
+                // 奇穴效果回复
                 const mpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_mp_regen', 0);
                 const hpRegenMult = modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'season_hp_regen', 0);
                 
-                if (mpRegenMult > 0) {
-                    const recoverAmount = Math.floor(this.heroData.mpMax * mpRegenMult);
-                    this.modifyHeroMana(recoverAmount);
-                }
-                
-                if (hpRegenMult > 0) {
-                    this.modifyHeroHealth(this.heroData.hpMax);
-                }
+                if (mpRegenMult > 0) this.modifyHeroMana(Math.floor(this.heroData.mpMax * mpRegenMult));
+                if (hpRegenMult > 0) this.modifyHeroHealth(this.heroData.hpMax);
 
-                if (mpRegenMult > 0 || hpRegenMult > 0) {
-                    this.showNotification(`千里袭远：由于时节更替，状态已补满`);
-                }
+                if (mpRegenMult > 0 || hpRegenMult > 0) this.showNotification(`千里袭远：由于时节更替，状态已补满`);
                 
                 console.log(`%c[季度结算] %c总收入金钱 +${prodData.gold}, 木材 +${prodData.wood}`, 'color: #557755; font-weight: bold', 'color: #fff');
 
-                // --- Roguelike 建筑抽卡触发 ---
-                this.triggerBuildingDraft();
+                // Roguelike 建筑抽卡触发
+                if (timeManager.getGlobalProgress() % 2 === 1) {
+                    this.triggerBuildingDraft();
+                }
+            } else {
+                // 情况 2：AI 势力 - 通知其大脑进行经济决策
+                // 找到对应的 AI 英雄控制器
+                this.mapState.entities.forEach(entity => {
+                    if (entity.type === 'ai_hero' && entity.config.factionId === factionId) {
+                        const scene = window.worldScene;
+                        const heroObj = scene?.worldObjects?.get(entity.id);
+                        if (heroObj && heroObj.controller && heroObj.controller.onQuarterlyUpdate) {
+                            heroObj.controller.onQuarterlyUpdate();
+                        }
+                    }
+                });
             }
         });
+
+        // --- 核心：季度末余额审计日志 ---
+        this._logAudit();
+    }
+
+    _logAudit() {
+        console.group(`%c[库房审计] 季度结算结束 (进度: ${timeManager.getGlobalProgress()})`, 'color: #d4af37; font-weight: bold');
+        Object.keys(this.factions).forEach(factionId => {
+            const f = this.factions[factionId];
+            const color = factionId === 'player' ? '#00ff00' : '#ff4444';
+            console.log(
+                `%c势力: ${f.name.padEnd(6)} | %c金钱: ${Math.floor(f.resources.gold).toString().padStart(6)} | %c木材: ${Math.floor(f.resources.wood).toString().padStart(6)}`,
+                `color: ${color}; font-weight: bold`,
+                'color: #ffd700',
+                'color: #deb887'
+            );
+        });
+        console.groupEnd();
     }
 
     /**
@@ -1089,8 +1114,117 @@ export class WorldManager {
         return this.heroManager.grantRandomSkill(options);
     }
 
-    simulateSimpleBattle(enemyConfig, enemyPower) {
-        return this.heroManager.simulateSimpleBattle(enemyConfig, enemyPower);
+    /**
+     * 核心：全能战斗模拟器 (支持 玩家/AI/野怪 任意两方对拼)
+     * @param {string} attackerId 发起者 ID (如 'player', 'ai_hero_1')
+     * @param {string} defenderId 防御者 ID (如 'city_1', 'enemy_group_123')
+     * @param {Object} defenderConfig 防御方的配置 (包含 army, totalPoints 等)
+     */
+    simulateSimpleBattle(attackerId, defenderId, defenderConfig) {
+        // 1. 获取双方的基础战力数据
+        const attackerFaction = this.factions[attackerId];
+        const isAttackerPlayer = attackerId === 'player';
+        
+        // 攻击方战力 (英雄等级 + 军队)
+        const attackerPower = isAttackerPlayer ? 
+            this.getPlayerTotalPower() : 
+            this.getArmyTotalPower(attackerFaction?.army || {}, 1);
+
+        // 防御方战力
+        const defenderPower = defenderConfig.totalPoints || defenderConfig.power || 0;
+        
+        // 2. 加入随机扰动 (±10%)
+        const attackerEff = attackerPower * (0.9 + Math.random() * 0.2);
+        const defenderEff = defenderPower * (0.9 + Math.random() * 0.2);
+
+        const isAttackerWinner = attackerEff >= defenderEff;
+        const winnerPower = isAttackerWinner ? attackerEff : defenderEff;
+        const loserPower = isAttackerWinner ? defenderEff : attackerEff;
+        const ratio = winnerPower / (loserPower || 1);
+
+        // 3. 计算损耗率 (使用你提供的指数模型)
+        // 1:1 -> 50%, 2:1 -> 10%, 3:1 -> 2%, 4:1 -> 0.4%
+        let winnerLossRate = 0.5 * Math.pow(5, -(ratio - 1));
+        if (isAttackerWinner && isAttackerPlayer) winnerLossRate *= 0.5; // 玩家主动跳过战斗有策略优势
+
+        const loserLossRate = 0.9; // 失败方损失 90%
+
+        // 4. 应用损失逻辑 (抽象化函数)
+        const processLosses = (sideId, armyObj, rate) => {
+            if (!armyObj) return { armyChanges: {}, settlement: [] };
+            
+            const changes = {};
+            const settlement = [];
+            const isSidePlayer = sideId === 'player';
+            const survivalRate = isSidePlayer ? modifierManager.getModifiedValue({ side: 'player' }, 'survival_rate', 0) : 0;
+
+            // 转换成列表并排序 (保护精锐)
+            const list = Object.entries(armyObj)
+                .map(([type, count]) => ({ type, count, cost: this.getUnitCost(type) }))
+                .filter(item => item.count > 0)
+                .sort((a, b) => a.cost - b.cost);
+
+            const totalCount = list.reduce((sum, i) => sum + i.count, 0);
+            let targetLoss = Math.floor(totalCount * rate);
+
+            for (const item of list) {
+                if (targetLoss <= 0) break;
+                const loss = Math.min(item.count, targetLoss);
+                targetLoss -= loss;
+
+                // 医疗救回 (仅玩家享受)
+                let saved = 0;
+                if (isSidePlayer) {
+                    for (let i = 0; i < loss; i++) {
+                        if (Math.random() < survivalRate) saved++;
+                    }
+                }
+
+                const actualLoss = loss - saved;
+                if (loss > 0) settlement.push({ type: item.type, loss: -loss, gain: saved });
+                if (actualLoss > 0) changes[item.type] = -actualLoss;
+            }
+            return { armyChanges: changes, settlement };
+        };
+
+        // 5. 执行双方损失结算
+        const attackerRes = processLosses(attackerId, isAttackerPlayer ? this.heroManager.heroArmy : attackerFaction?.army, isAttackerWinner ? winnerLossRate : loserLossRate);
+        
+        // 6. 应用变动
+        if (isAttackerPlayer) {
+            this.updateHeroArmy(attackerRes.armyChanges);
+        } else if (attackerFaction) {
+            // AI 英雄兵力扣除
+            for (const [type, amt] of Object.entries(attackerRes.armyChanges)) {
+                attackerFaction.army[type] = Math.max(0, (attackerFaction.army[type] || 0) + amt);
+            }
+        }
+
+        // 防御方如果是 AI 势力或城市，也需要扣除
+        if (defenderConfig.cityId) {
+            const defenderRes = processLosses(defenderId, defenderConfig.army, isAttackerWinner ? loserLossRate : winnerLossRate);
+            this.updateCityGarrison(defenderConfig.cityId, defenderRes.armyChanges);
+        }
+
+        // 7. 玩家特供：经验结算
+        let xpData = {};
+        if (isAttackerPlayer) {
+            const xpGained = Math.floor(defenderPower * 4);
+            const data = this.heroData;
+            const xpBefore = data.xp;
+            const levelBefore = data.level;
+            this.gainXP(xpGained);
+            xpData = { xpGained, xpBefore, levelBefore, xpAfter: data.xp, levelAfter: data.level };
+        }
+
+        console.log(`%c[全能模拟] %c${attackerId} vs ${defenderId} | 胜者: ${isAttackerWinner ? attackerId : defenderId} | 损耗率: ${(winnerLossRate*100).toFixed(1)}%`, 'color: #ffaa00; font-weight: bold', 'color: #fff');
+
+        return {
+            isVictory: isAttackerWinner,
+            settlementChanges: attackerRes.settlement,
+            ...xpData,
+            enemyConfig: defenderConfig
+        };
     }
 
     updateHUD() {
@@ -1330,6 +1464,25 @@ export class WorldManager {
         const finalInterval = baseInterval / speedMult;
         const dps = Math.ceil((finalAtk * baseBurst * baseTargets / finalInterval) * 1000);
         return { ...blueprint, hp: finalHP, atk: Math.ceil(finalAtk), range: baseRange, targets: baseTargets, speed: finalSpeed, qinggong: finalQinggong || finalSpeed, dps, cost: this.getUnitCost(type) };
+    }
+
+    /**
+     * 更新指定城市的驻军
+     * @param {string} cityId 城市ID
+     * @param {Object} changes 兵力变动对象 { 'melee': -2, 'ranged': 1 }
+     */
+    updateCityGarrison(cityId, changes) {
+        const city = this.cities[cityId];
+        if (!city) return;
+        
+        for (const [type, amount] of Object.entries(changes)) {
+            city.availableUnits[type] = Math.max(0, (city.availableUnits[type] || 0) + amount);
+        }
+        
+        // 触发 UI 刷新，如果当前正打开着该城市的管理界面
+        if (window.worldScene && window.worldScene.activeCityId === cityId) {
+            window.worldScene.updateTownManagementUI();
+        }
     }
 
     transferToCity(type, amount, cityId = 'main_city_1') {

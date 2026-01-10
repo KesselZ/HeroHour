@@ -15,6 +15,8 @@ export const ASSET_REGISTRY = {
         BUILDING6: '/assets/buildings/building6.png',
         BUILDING7: '/assets/buildings/building7.png',
         BUILDING8: '/assets/buildings/building8.png',
+        BUILDING9: '/assets/buildings/building9.png',
+        BUILDING10: '/assets/buildings/building10.png',
         ENEMY: '/assets/enemies/enemy.png',
         ENEMY3: '/assets/enemies/enemy3.png',
         ENEMY4: '/assets/enemies/enemy4.png',
@@ -218,6 +220,16 @@ export const ASSET_REGISTRY = {
         'weapon_forge_v2': { name: '神兵铸坊', sheet: 'BUILDING2', rows: 4, cols: 4, r: 3, c: 1, scale: 3.0 },
         'imperial_treasury': { name: '大唐内库', sheet: 'BUILDING2', rows: 4, cols: 4, r: 3, c: 4, scale: 3.5 },
         
+        // --- 天策府系列图标 ---
+        'sect_tiance_basic_icon': { name: '演武场', sheet: 'BUILDING2', rows: 4, cols: 4, r: 1, c: 3, scale: 3.5 },
+        'sect_tiance_advanced_icon': { name: '凌烟阁', sheet: 'BUILDING2', rows: 4, cols: 4, r: 2, c: 1, scale: 3.5 },
+        'sect_tiance_ultimate_icon': { name: '天策府', sheet: 'BUILDING', rows: 4, cols: 4, r: 1, c: 4, scale: 3.5 },
+        
+        // --- 纯阳宫系列图标 ---
+        'cy_array_pavilion_icon': { name: '玄门阵亭', sheet: 'BUILDING', rows: 4, cols: 4, r: 3, c: 3, scale: 3.5 },
+        'sect_chunyang_advanced_icon': { name: '太极殿', sheet: 'BUILDING', rows: 4, cols: 4, r: 1, c: 1, scale: 3.5 },
+        'sect_chunyang_ultimate_icon': { name: '纯阳宫', sheet: 'BUILDING', rows: 4, cols: 4, r: 4, c: 1, scale: 3.5 },
+        
         'merchant_guild': { name: '九州商行', sheet: 'BUILDING2', rows: 4, cols: 4, r: 4, c: 1, scale: 3.0 },
         'treasure_pavilion_v2': { name: '藏宝阁', sheet: 'BUILDING2', rows: 4, cols: 4, r: 4, c: 2, scale: 3.0 },
         'distillery_v2': { name: '杜康酒坊', sheet: 'BUILDING2', rows: 4, cols: 4, r: 4, c: 3, scale: 3.0 },
@@ -303,6 +315,10 @@ export const ASSET_REGISTRY = {
         'cy_zixia_disciple': { name: '紫霞功真传弟子', sheet: 'CHUNYANG_3', rows: 4, cols: 4, r: 3, c: 1, scale: 1.4, defaultFacing: 'right' },
         'cy_taixu_disciple': { name: '太虚剑意真传弟子', sheet: 'CHUNYANG_3', rows: 4, cols: 4, r: 2, c: 1, scale: 1.5, defaultFacing: 'right' },
         'cy_field_master': { name: '纯阳气场大师', sheet: 'CHUNYANG_2', rows: 4, cols: 4, r: 3, c: 4, scale: 1.6, defaultFacing: 'right' },
+
+        // --- 藏剑系列图标 ---
+        'sect_cangjian_advanced_icon': { name: '天泽楼', sheet: 'BUILDING10', rows: 4, cols: 4, r: 2, c: 2, scale: 3.5 },
+        'sect_cangjian_ultimate_icon': { name: '剑冢', sheet: 'BUILDING10', rows: 4, cols: 4, r: 2, c: 3, scale: 3.5 },
 
         // --- 天策扩充势力单位 ---
         'tc_crossbow': { name: '天策羽林弩手', sheet: 'TIANCE', rows: 4, cols: 4, r: 2, c: 4, scale: 1.4, defaultFacing: 'right' },

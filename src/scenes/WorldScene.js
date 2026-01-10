@@ -1267,8 +1267,8 @@ export class WorldScene {
 
         timeManager.updateUI();
 
-        // --- DEBUG: 开局模拟随机占领一座 AI 城市 ---
-        this.debugCaptureRandomCity();
+        // --- DEBUG: 开局模拟随机占领一座 AI 城市 (暂时关闭) ---
+        // this.debugCaptureRandomCity();
     }
 
     /**
@@ -1918,18 +1918,19 @@ export class WorldScene {
 
     onBattleEnd(result) {
         const ms = worldManager.mapState;
+        // 核心修复：立即提取并清空待处理 ID，防止多重触发 Bug
         const enemyId = ms.pendingBattleEnemyId;
+        ms.pendingBattleEnemyId = null; 
         
         if (!enemyId) return;
 
         console.log(`%c[战斗结束] 结果: ${result.winner}, 目标: ${enemyId}`, "color: #ffaa00");
 
         if (result && result.winner === 'player') {
-            // 核心改动：奇穴效果 - 战利清缴 (战后额外金钱)
-            // 优雅实现：传入敌人强度作为基础值，中转站会自动根据 50% 加成返还 1.5 倍结果
+            // ... 奖励逻辑保持不变 ...
             const enemyPower = result.enemyPower || 100;
             const totalGold = modifierManager.getModifiedValue(worldManager.getPlayerHeroDummy(), 'kill_gold', enemyPower);
-            const bonusGold = Math.floor(totalGold - enemyPower); // 差值即为额外奖励
+            const bonusGold = Math.floor(totalGold - enemyPower);
             
             if (bonusGold > 0) {
                 worldManager.addGold(bonusGold);
@@ -1939,30 +1940,17 @@ export class WorldScene {
             // 检查是否是城镇
             const cityData = worldManager.cities[enemyId];
             if (cityData) {
-                // 攻城战胜利
+                // 攻城战胜利：占领并锁定
                 worldManager.captureCity(enemyId);
-                // 刷新 HUD 以显示新占领的城市
+                ms.interactionLocks.add(enemyId); // 占领后也锁定，防止立即重触发
                 this.refreshWorldHUD();
             } else {
                 // 普通实体处理
                 const entityObj = this.worldObjects.get(enemyId);
-                
-                // 核心逻辑：如果是 AI 英雄，不移除，而是让其回城休养
                 if (entityObj && entityObj.type === 'ai_hero') {
                     console.log(`%c[AI] 英雄 ${enemyId} 战败，正在撤回据点休养...`, "color: #ffaa00");
-                    entityObj.rest(); // 调用休养逻辑
+                    entityObj.rest(); 
                 } else {
-                    // 普通野怪胜利：移除怪物
-                    const entity = worldManager.mapState.entities.find(e => e.id === enemyId);
-                    if (entity && entity.templateId) {
-                        // 检查是否属于邪恶势力的小怪 (天一、神策、红衣)
-                        const evilFactions = ['tianyi', 'shence', 'red_cult'];
-                        const faction = evilFactions.find(f => entity.templateId.startsWith(f));
-                        if (faction) {
-                            // 触发首次击败通报 (内部会处理去重)
-                            WorldStatusManager.broadcastFirstKill(faction);
-                        }
-                    }
                     worldManager.removeEntity(enemyId);
                     const item = this.interactables.find(i => i.id === enemyId);
                     if (item) this.scene.remove(item.mesh);
@@ -1971,10 +1959,19 @@ export class WorldScene {
             }
         } else {
             // 输了或逃了：锁定怪物/城镇，防止连续触发
-            ms.interactionLocks.add(enemyId);
+            const cityData = worldManager.cities[enemyId];
+            if (cityData && result.winner === 'enemy') {
+                const newOwner = result.attackerFactionId || 'none';
+                if (newOwner !== 'player') {
+                    worldManager.captureCity(enemyId, newOwner);
+                    ms.interactionLocks.add(enemyId); // 反向占领也要锁定
+                    this.refreshWorldHUD();
+                    worldManager.showNotification(`糟糕！【${cityData.name}】已被敌方夺回！`);
+                }
+            } else {
+                ms.interactionLocks.add(enemyId);
+            }
         }
-        
-        ms.pendingBattleEnemyId = null; 
     }
 
     /**

@@ -60,17 +60,22 @@
     "/audio/attack/交战_兵器碰撞1.mp3",
     "/audio/attack/交战_兵器碰撞2.mp3",
     "/audio/attack/射箭.mp3",
+    "/audio/attack/射箭2.mp3",
     "/audio/attack/挥拳击中1.mp3",
     "/audio/attack/挥砍1.mp3",
     "/audio/attack/气剑1.mp3",
     "/audio/attack/气剑2.mp3",
     "/audio/bgm/天赋界面.mp3",
     "/audio/bgm/如寄.mp3",
+    "/audio/click/出现建筑选择.mp3",
+    "/audio/click/卡牌声音.mp3",
     "/audio/click/战斗失败音效.mp3",
+    "/audio/click/扑克洗牌.mp3",
     "/audio/click/按下音效.mp3",
     "/audio/click/无效按钮音效.mp3",
     "/audio/click/清脆按钮.mp3",
     "/audio/click/胜利音效.mp3",
+    "/audio/click/轻微click声.mp3",
     "/audio/click/铃铛.mp3",
     "/audio/farm/砍断了树.mp3",
     "/audio/farm/砍树声音1.mp3",
@@ -104,7 +109,7 @@
     "/audio/walk/草地奔跑脚步2.mp3",
     "/audio/walk/草地奔跑脚步3.mp3"
   ],
-  "generatedAt": "2026-01-09T17:07:41.549Z",
+  "generatedAt": "2026-01-10T05:50:20.805Z",
   "totalImages": 55,
-  "totalAudios": 46
+  "totalAudios": 51
 }

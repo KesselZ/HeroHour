@@ -14,7 +14,8 @@ export class AIController {
         this.decisionTimer = Math.random(); 
         this.DECISION_INTERVAL = 1.0; 
         
-        // 核心：寻找据点位置
+        // 核心：记录初始据点 ID 和位置
+        this.homeCityId = this._initHomeCityId();
         this.homePos = this._findHomePos();
         
         // 领地参数
@@ -26,6 +27,120 @@ export class AIController {
         this.memory = {
             targetEntityId: null
         };
+    }
+
+    /**
+     * 季度经济决策：由 WorldManager 在季度结算后统一触发
+     */
+    onQuarterlyUpdate() {
+        if (worldManager.constructor.DEBUG.DISABLE_AI) return;
+
+        console.log(`%c[AI大脑] 英雄 ${this.owner.id} 正在进行季度经济审计...`, "color: #888");
+
+        // 1. 建筑研发决策 (每两个季度一次，与玩家同步)
+        const progress = timeManager.getGlobalProgress();
+        if (progress % 2 === 1) {
+            this._decideBuildingDraft();
+        }
+
+        // 2. 招兵买马决策 (每个季度都会尝试)
+        this._decideRecruitment();
+    }
+
+    /**
+     * AI 研发决策：选择一项最符合当前需求的科技
+     */
+    _decideBuildingDraft() {
+        const faction = worldManager.factions[this.factionId];
+        if (!faction) return;
+
+        const sect = worldManager.availableHeroes[faction.heroId]?.sect || 'chunyang';
+        const options = worldManager.buildingManager.generateDraftOptions(sect);
+
+        if (options.length > 0) {
+            // 基础策略：随机选一个 (未来可以根据倾向性权重选择)
+            const selected = options[Math.floor(Math.random() * options.length)];
+            worldManager.buildingManager.selectDraftOption(selected, this.factionId);
+            
+            const buildName = worldManager.buildingManager.BUILDING_REGISTRY?.[selected]?.name || selected;
+            console.log(`%c[AI科技] %c${faction.name} 成功研发：${buildName}`, 'color: #ffcc00; font-weight: bold');
+        }
+    }
+
+    /**
+     * AI 募兵决策：根据财力扩充据点驻军
+     */
+    _decideRecruitment() {
+        const faction = worldManager.factions[this.factionId];
+        if (!faction || !faction.cities || faction.cities.length === 0) return;
+
+        // 策略：保留 200 金币底金，剩下的全部用来买兵
+        let budget = faction.resources.gold - 200;
+        if (budget <= 0) return;
+
+        // 识别当前已解锁的可招募兵种
+        const recruitableTypes = this._getAvailableUnitTypes();
+        if (recruitableTypes.length === 0) return;
+
+        // 简单循环募兵
+        let attempts = 0;
+        const mainCityId = faction.cities[0];
+        while (budget > 0 && attempts < 20) {
+            const type = recruitableTypes[Math.floor(Math.random() * recruitableTypes.length)];
+            // AI 招募成本计算 (逻辑与 WorldManager 保持一致)
+            const cost = worldManager.getUnitCost(type) * 20; 
+            
+            if (budget >= cost) {
+                worldManager.updateCityGarrison(mainCityId, { [type]: 1 });
+                worldManager.spendGold(cost, this.factionId);
+                budget -= cost;
+            }
+            attempts++;
+        }
+    }
+
+    /**
+     * 辅助：获取当前已解锁的所有兵种类型
+     */
+    _getAvailableUnitTypes() {
+        const faction = worldManager.factions[this.factionId];
+        if (!faction || !faction.cities) return [];
+
+        const mainCity = worldManager.cities[faction.cities[0]];
+        if (!mainCity) return [];
+
+        const types = [];
+        for (const [buildId, level] of Object.entries(mainCity.buildingLevels)) {
+            if (level <= 0) continue;
+            
+            // 映射建筑到兵种 (解耦逻辑)
+            const map = {
+                'barracks': ['melee'],
+                'academy_changge': ['ranged'],
+                'archery_range': ['archer'],
+                'medical_pavilion': ['healer'],
+                'stable': ['tiance'],
+                'sword_forge': ['cangjian'],
+                'cy_array_pavilion': ['cy_sword_array'],
+                'cy_zixia_shrine': ['cy_zixia_disciple'],
+                'cy_field_shrine': ['cy_field_master'],
+                'tc_halberd_hall': ['tc_halberdier', 'tc_banner'],
+                'tc_iron_camp': ['tc_mounted_crossbow'],
+                'cj_spirit_pavilion': ['cj_wenshui'],
+                'cj_golden_hall': ['cj_golden_guard']
+            };
+            
+            if (map[buildId]) types.push(...map[buildId]);
+        }
+        return [...new Set(types)]; // 去重
+    }
+
+    _initHomeCityId() {
+        const faction = worldManager.factions[this.factionId];
+        if (faction && faction.cities && faction.cities.length > 0) {
+            return faction.cities[0];
+        }
+        return null;
     }
 
     /**
@@ -70,25 +185,65 @@ export class AIController {
     }
 
     _makeDecision() {
-        const playerPos = worldManager.mapState.playerPos; 
+        // 1. 感知增强：尝试获取最实时的玩家位置
+        const worldScene = window.worldScene;
+        const playerPos = worldScene?.playerObject?.mesh?.position || worldManager.mapState.playerPos; 
 
-        // 优先级 1：生存
+        // 战力评估
+        const playerPower = worldManager.getPlayerTotalPower();
+        const myPower = worldManager.getArmyTotalPower(this.owner.army || {}, 1);
+
+        // 优先级 1：生存与战力评估 (侦测半径 8 米内)
         if (this._isUnderThreat(playerPos)) {
-            this._switchState('FLEE');
+            // 情况 A：打不过 -> 逃跑 (玩家战力明显高于自己，或自己几乎没兵)
+            if (playerPower > myPower * 1.1 || myPower < 5) {
+                this._switchState('FLEE');
+                return;
+            }
+            
+            // 情况 B：优势大 -> 追逐开战 (自己战力是玩家 1.5 倍以上)
+            if (myPower > playerPower * 1.5) {
+                console.log(`%c[AI决策] 英雄 ${this.owner.id} 战力占优 (${Math.round(myPower)} vs ${Math.round(playerPower)})，开始猎杀玩家！`, "color: #ff0000; font-weight: bold;");
+                this._switchState('CHASE');
+                return;
+            }
+        }
+
+        // 优先级 2：收复失地 (如果没有据点，优先夺回初始据点)
+        if (this._needsToRetakeHome()) {
+            this._switchState('RETAKE_CITY');
             return;
         }
 
-        // 优先级 2：领地内资源采集
+        // 优先级 3：领地内资源采集
         const nearbyResource = this._scanNearbyInterests();
         if (nearbyResource) {
             this._switchState('SEEK_RESOURCE', nearbyResource);
             return;
         }
 
-        // 优先级 3：保底游走 (仅在领地内游走)
+        // 优先级 4：保底游走 (仅在领地内游走)
         if (this.state !== 'WANDER' || (!this.owner.isMoving && this.owner.currentPath.length === 0)) {
             this._switchState('WANDER');
         }
+    }
+
+    /**
+     * 检查是否需要夺回主城
+     */
+    _needsToRetakeHome() {
+        if (!this.homeCityId) return false;
+        
+        const faction = worldManager.factions[this.factionId];
+        if (!faction) return false;
+
+        // 如果主城 ID 不在自己势力的城市列表中，说明丢了
+        const hasHome = faction.cities.includes(this.homeCityId);
+        
+        // 只有当自己有一定战力（例如 > 10）时才敢去夺回，否则就是送人头
+        const myPower = worldManager.getArmyTotalPower(this.owner.army || {}, 1);
+        
+        return !hasHome && myPower > 10;
     }
 
     _scanNearbyInterests() {
@@ -122,7 +277,66 @@ export class AIController {
     }
 
     _executeState(deltaTime) {
-        if (this.state === 'SEEK_RESOURCE' && this.memory.targetEntityId) {
+        // --- 持续行为逻辑 ---
+        
+        // 核心保证：每一帧只能执行一种状态逻辑，防止多重任务冲突
+        
+        // 1. 逃跑过程中的实时转向
+        if (this.state === 'FLEE') {
+            const worldScene = window.worldScene;
+            const playerPos = worldScene?.playerObject?.mesh?.position || worldManager.mapState.playerPos; 
+            const dist = this._getDistTo(playerPos.x, playerPos.z);
+            
+            // 如果玩家还在威胁范围内，且自己快走完当前的逃跑路径了，就更新逃跑点
+            if (dist < 12 && (!this.owner.isMoving || this.owner.currentPath.length < 2)) {
+                this._startFlee(); 
+            }
+            
+            // 如果跑得足够远了，恢复正常
+            if (dist > 20) {
+                this._switchState('WANDER');
+            }
+        }
+
+        // 2. 追击玩家逻辑
+        else if (this.state === 'CHASE') {
+            const worldScene = window.worldScene;
+            const playerPos = worldScene?.playerObject?.mesh?.position || worldManager.mapState.playerPos;
+            const dist = this._getDistTo(playerPos.x, playerPos.z);
+
+            // 如果玩家跑得太远（例如 15 米开外），或者玩家已经消失，则放弃追逐
+            if (!playerPos || dist > 15) {
+                this._switchState('WANDER');
+            } else {
+                // 每帧更新目的地，moveTo 内部会有路径平滑和性能过滤
+                this.owner.moveTo(playerPos.x, playerPos.z);
+            }
+        }
+
+        // 3. 夺回据点逻辑
+        else if (this.state === 'RETAKE_CITY') {
+            const distToHome = this._getDistTo(this.homePos.x, this.homePos.z);
+            
+            // 如果已经到达据点附近
+            if (distToHome < 1.5) {
+                const worldScene = window.worldScene;
+                const cityObj = worldScene?.worldObjects?.get(this.homeCityId);
+                
+                // 核心：到达目的地，发起进攻/交互
+                if (cityObj) {
+                    cityObj.onInteract(worldScene, this.factionId);
+                }
+                this._switchState('IDLE');
+            } else {
+                // 持续向据点移动
+                if (!this.owner.isMoving || this.owner.currentPath.length < 2) {
+                    this.owner.moveTo(this.homePos.x, this.homePos.z);
+                }
+            }
+        }
+
+        // 4. 资源采集目标检测
+        else if (this.state === 'SEEK_RESOURCE' && this.memory.targetEntityId) {
             // 获取实体的 Object 实例（如果它还在场景中的话）
             const targetId = this.memory.targetEntityId;
             const worldScene = this.owner.worldScene || window.worldScene; // 确保能拿到场景引用
@@ -132,6 +346,12 @@ export class AIController {
             
             if (targetObj && !targetObj.isRemoved) {
                 if (this._getDistTo(targetObj.x, targetObj.z) < 1.5) {
+                    // 核心修正：当到达资源点并开始交互时，立即停止物理移动，避免产生逻辑摩擦
+                    if (this.owner.isMoving) {
+                        this.owner.currentPath = [];
+                        this.owner.isMoving = false;
+                    }
+
                     // 【核心统一】：让 AI 也调用物体的 onInteract
                     // 如果是即时拾取(返回true)，则进入待机；如果是持续交互(如砍树返回false)，则保持当前状态
                     const success = targetObj.onInteract(worldScene, this.factionId);
@@ -146,13 +366,20 @@ export class AIController {
     }
 
     _switchState(newState, targetData = null) {
-        if (this.state === newState && newState !== 'WANDER') return;
+        // 优雅重构：状态切换时，必须彻底清理旧状态的残留逻辑，防止“粘滞”
+        if (this.state !== newState) {
+            this.memory.targetEntityId = null;
+            // 切换状态时立即清空当前路径，确保新状态的移动指令能立刻获得控制权
+            this.owner.currentPath = [];
+            this.owner.isMoving = false;
+        }
+
+        // 允许特殊状态（如逃跑、追逐、收复或游走）在执行中重置路径
+        if (this.state === newState && newState !== 'WANDER' && newState !== 'FLEE' && newState !== 'CHASE' && newState !== 'RETAKE_CITY') return;
         this.state = newState;
         
         switch (newState) {
             case 'REST':
-                this.memory.targetEntityId = null;
-                this.owner.currentPath = [];
                 // 传送回主城坐标
                 this.owner.x = this.homePos.x;
                 this.owner.z = this.homePos.z;
@@ -161,25 +388,38 @@ export class AIController {
                 }
                 break;
             case 'FLEE':
-                this.memory.targetEntityId = null;
                 this._startFlee();
+                break;
+            case 'CHASE':
+                // 追逐状态初始化：立即尝试向玩家位置移动
+                const worldScene = window.worldScene;
+                const playerPos = worldScene?.playerObject?.mesh?.position || worldManager.mapState.playerPos;
+                if (playerPos) {
+                    this.owner.moveTo(playerPos.x, playerPos.z);
+                }
+                break;
+            case 'RETAKE_CITY':
+                // 收复据点初始化：立即向据点移动
+                this.owner.moveTo(this.homePos.x, this.homePos.z);
                 break;
             case 'SEEK_RESOURCE':
                 this.memory.targetEntityId = targetData.id;
                 this.owner.moveTo(targetData.x, targetData.z);
                 break;
             case 'WANDER':
-                this.memory.targetEntityId = null;
                 this._startWander();
                 break;
             case 'IDLE':
-                this.memory.targetEntityId = null;
-                this.owner.currentPath = [];
                 break;
         }
     }
 
     _isUnderThreat(playerPos) {
+        if (!playerPos) {
+            // 兜底：尝试获取最实时的
+            const worldScene = window.worldScene;
+            playerPos = worldScene?.playerObject?.mesh?.position || worldManager.mapState.playerPos;
+        }
         return playerPos ? this._getDistTo(playerPos.x, playerPos.z) < 8 : false;
     }
 
@@ -207,13 +447,29 @@ export class AIController {
     }
 
     _startFlee() {
-        const playerPos = worldManager.mapState.playerPos;
+        const worldScene = window.worldScene;
+        const playerPos = worldScene?.playerObject?.mesh?.position || worldManager.mapState.playerPos; 
+        if (!playerPos) return;
+
         const angle = Math.atan2(this.owner.z - playerPos.z, this.owner.x - playerPos.x);
-        const tx = this.owner.x + Math.cos(angle) * 15;
-        const tz = this.owner.z + Math.sin(angle) * 15;
-        if (mapGenerator.isPassable(tx, tz)) {
-            this.owner.moveTo(tx, tz);
+        
+        // 尝试逃跑的方向，如果正后方跑不通，尝试稍微偏转角度（扇形搜索逃生路径）
+        const fleeDist = 15;
+        const testAngles = [0, Math.PI/4, -Math.PI/4, Math.PI/2, -Math.PI/2];
+        
+        for (const offset of testAngles) {
+            const finalAngle = angle + offset;
+            const tx = this.owner.x + Math.cos(finalAngle) * fleeDist;
+            const tz = this.owner.z + Math.sin(finalAngle) * fleeDist;
+            
+            if (mapGenerator.isPassable(tx, tz)) {
+                this.owner.moveTo(tx, tz);
+                return;
+            }
         }
+        
+        // 如果扇形搜索都跑不通，最后尝试往主城（据点）跑
+        this.owner.moveTo(this.homePos.x, this.homePos.z);
     }
 
     _getDistTo(tx, tz) {

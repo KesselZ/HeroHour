@@ -540,8 +540,36 @@ if (import.meta.env.DEV) {
     window.terrainManager = terrainManager;
     window.TERRAIN_STYLES = TERRAIN_STYLES;
     window.weatherManager = weatherManager;
-    console.log('%c[Debug] 已挂载全局管理实例。使用 worldManager.debugSetTerrain("snow") 切换地形。', 'color: #ff00ff; font-weight: bold');
-    console.log('%c[Debug] 使用 weatherManager.setRain() 或 setSnow() 切换天气。', 'color: #3498db; font-weight: bold');
+
+    // --- 开发者作弊指令说明书 ---
+    const showDevCheatsHelp = () => {
+        console.group("%c🛠️ 开发者作弊指令说明书", "color: #ffcc00; font-weight: bold; font-size: 14px;");
+        console.log("%c使用方法：直接在浏览器控制台输入以下指令并回车", "color: #888; font-style: italic;");
+        
+        console.log("%c[ 建筑相关 ]", "color: #ffaa00; font-weight: bold;");
+        console.log("  worldManager.triggerBuildingDraft()      - %c立即触发一次季度建筑抽卡", "color: #aaa;");
+        
+        console.log("%c[ 资源/经验 ]", "color: #00ffaa; font-weight: bold;");
+        console.log("  worldManager.resources.gold += 100000    - %c增加 10万金钱", "color: #aaa;");
+        console.log("  worldManager.resources.wood += 50000     - %c增加 5万木材", "color: #aaa;");
+        console.log("  worldManager.heroManager.gainXP(5000)    - %c增加 5000 经验并自动处理升级", "color: #aaa;");
+        console.log("  worldManager.heroManager.heroData.talentPoints += 10 - %c增加 10点奇穴天赋点", "color: #aaa;");
+        
+        console.log("%c[ 战斗/军队 ]", "color: #ff5555; font-weight: bold;");
+        console.log("  worldManager.heroManager.updateHeroArmy({ 'tc_heavy_cavalry': 50 }) - %c获得 50名玄甲陷阵骑", "color: #aaa;");
+        console.log("  worldManager.heroManager.grantRandomSkill() - %c随机获得一个新的招式", "color: #aaa;");
+        
+        console.log("%c[ 全局调试 ]", "color: #55aaff; font-weight: bold;");
+        console.log("  WorldManager.DEBUG.REVEAL_MAP = true     - %c揭开地图迷雾 (需移动后生效)", "color: #aaa;");
+        console.log("  worldManager.debugSetTerrain('snow')     - %c一键切换地形风格", "color: #aaa;");
+        console.log("  weatherManager.setRain()                 - %c一键切换天气为雨天", "color: #aaa;");
+        
+        console.log("%c温馨提示：部分指令执行后需要手动调用 worldManager.updateHUD() 刷新界面显示。", "color: #ff8888;");
+        console.groupEnd();
+    };
+
+    // 延迟一秒显示，确保在其他启动日志之后
+    setTimeout(showDevCheatsHelp, 1500);
 }
 
 animate();

@@ -16,12 +16,13 @@ export class City {
         this.x = 0;
         this.z = 0;
         
-        // 只存储建筑的等级数据
-        this.buildingLevels = {
-            'town_hall': 1,
-            'market': 1,
-            'barracks': 1
-        };
+        // 核心简化：动态初始化建筑等级，不再硬编码建筑名
+        this.buildingLevels = {};
+        for (const [buildingId, data] of Object.entries(BUILDING_REGISTRY)) {
+            if (data.startingLevel !== undefined) {
+                this.buildingLevels[buildingId] = data.startingLevel;
+            }
+        }
 
         this.availableUnits = { 'melee': 8, 'ranged': 5 };
         
@@ -140,26 +141,6 @@ export class City {
     }
 
     /**
-     * 校验建筑是否满足解锁条件
-     */
-    checkBuildingRequirements(buildingId) {
-        const meta = BUILDING_REGISTRY[buildingId];
-        if (!meta || !meta.requirements) return { met: true };
-
-        for (const req of meta.requirements) {
-            const currentLevel = this.buildingLevels[req.id] || 0;
-            if (currentLevel < req.level) {
-                const reqMeta = BUILDING_REGISTRY[req.id];
-                return { 
-                    met: false, 
-                    reason: `需要 ${reqMeta ? reqMeta.name : req.id} 达到 Lv.${req.level}` 
-                    };
-            }
-        }
-        return { met: true };
-    }
-
-    /**
      * 动态获取当前城市所有的建筑列表
      */
     getAvailableBuildings() {
@@ -172,19 +153,18 @@ export class City {
         blueprint.forEach(id => {
             const meta = BUILDING_REGISTRY[id];
             
-            // 核心 Roguelike 过滤：只有基础建筑，或者已在全局解锁的建筑才显示在建设列表
+            // 核心 Roguelike 过滤：只要有 startingLevel，或者已在全局解锁的建筑才显示
             const isUnlocked = buildingManager ? buildingManager.isTechUnlocked(id) : true;
             
-            if (meta && (meta.isDefault || isUnlocked)) {
+            if (meta && (meta.startingLevel !== undefined || isUnlocked)) {
                 const currentLevel = this.buildingLevels[id] || 0;
-                const reqStatus = this.checkBuildingRequirements(id);
                 list[meta.category].push({ 
                     id, 
                     ...meta, 
                     maxLevel: this.getBuildingMaxLevel(id), // 使用动态最大等级
                     level: currentLevel,
                     cost: this.calculateUpgradeCost(id, currentLevel), // 动态计算升级成本
-                    unlockStatus: reqStatus // 包含解锁状态和原因
+                    unlockStatus: { met: true } // 不再有前置要求，默认为 true
                 });
             }
         });

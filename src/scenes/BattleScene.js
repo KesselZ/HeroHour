@@ -125,12 +125,39 @@ export class BattleScene {
         
         this.selectedType = null;
         
-        // 核心改动：从 worldManager 获取真实的英雄兵力
-        this.unitCounts = { ...worldManager.heroArmy };
-        // 记录初始上阵兵力，用于战后损耗统计
-        this.initialCounts = { ...worldManager.heroArmy };
-        this.deployedCounts = {}; // 记录本次战斗实际放下的兵力
+        // 核心重构：判断玩家是“进攻方”还是“防守方”来决定兵力分配
+        let playerArmyData = { ...worldManager.heroArmy };
+        let enemyArmyData = enemyConfig?.army || {};
+
+        if (enemyConfig && enemyConfig.isCitySiege) {
+            // 在攻城战中，我们需要明确谁在城里，谁在城外
+            if (enemyConfig.attackerFactionId === 'player') {
+                // 玩家进攻：玩家用英雄部队，敌人用城市驻军 (已由 enemyConfig.army 传入)
+                playerArmyData = { ...worldManager.heroArmy };
+                enemyArmyData = { ...enemyConfig.army };
+            } else {
+                // AI 进攻：玩家变成防御方，使用城市驻军
+                playerArmyData = { ...enemyConfig.army };
+                // 敌人变成发起进攻的 AI 英雄部队
+                const attackerFaction = worldManager.factions[enemyConfig.attackerFactionId];
+                enemyArmyData = { ...(attackerFaction?.army || {}) };
+                
+                console.log(`%c[战斗初始化] %c玩家作为防御方加入战斗！使用主城驻军：`, 'color: #44ccff; font-weight: bold', 'color: #fff', playerArmyData);
+            }
+        }
+
+        this.unitCounts = { ...playerArmyData };
+        this.initialCounts = { ...playerArmyData };
+        this.deployedCounts = {}; 
         Object.keys(this.unitCounts).forEach(type => this.deployedCounts[type] = 0);
+
+        // 如果是固定兵力（如攻城战或英雄对决），BattleScene 会在 spawnEnemiesDynamic 中直接处理 enemyArmyData
+        if (enemyConfig) {
+            // 重点修正：只有当真正有固定部队数据时才覆盖，否则保留 null 让 spawnEnemiesDynamic 动态生成
+            if (Object.keys(enemyArmyData).length > 0) {
+                enemyConfig.army = enemyArmyData;
+            }
+        }
 
         this.onPointerDown = this.onPointerDown.bind(this);
         this.onPointerMove = this.onPointerMove.bind(this);
@@ -2003,7 +2030,6 @@ export class BattleScene {
         Object.keys(this.deployedCounts).forEach(type => {
             const rawLoss = this.deployedCounts[type] - survivalCounts[type];
             if (rawLoss > 0) {
-                // --- 核心优化：概率救回模型 ---
                 let saved = 0;
                 for (let i = 0; i < rawLoss; i++) {
                     if (Math.random() < survivalRate) {
@@ -2012,22 +2038,27 @@ export class BattleScene {
                 }
 
                 const finalLoss = rawLoss - saved;
-
-                // 记录变动：现在将 loss 和 gain 合并在同一个对象里
                 settlementChanges.push({ 
                     type, 
                     loss: -rawLoss, 
                     gain: saved 
                 });
 
-                // 实际更新兵力池的数据 (净损失)
                 if (finalLoss > 0) {
                     armyChanges[type] = -finalLoss;
                 }
             }
         });
 
-        worldManager.updateHeroArmy(armyChanges);
+        // 核心修正：判断变动应该应用到英雄身上，还是城市驻军身上
+        if (this.enemyConfig && this.enemyConfig.isCitySiege && this.enemyConfig.attackerFactionId !== 'player') {
+            // 玩家作为防御方，损失应用到城市驻军
+            worldManager.updateCityGarrison(this.enemyConfig.cityId, armyChanges);
+            console.log(`%c[结算] %c防御战结束，城市驻军变动已同步至 ${this.enemyConfig.cityId}`, 'color: #44ccff', 'color: #fff');
+        } else {
+            // 玩家作为进攻方（或野外战斗），损失应用到英雄部队
+            worldManager.updateHeroArmy(armyChanges);
+        }
 
         // --- 核心重构：统一同步英雄战斗后的状态 (HP & MP) ---
         if (this.heroUnit) {
@@ -2207,7 +2238,9 @@ export class BattleScene {
                 window.dispatchEvent(new CustomEvent('battle-finished', { 
                     detail: { 
                         winner: isVictory ? 'player' : 'enemy',
-                        enemyPower: this.enemyPower 
+                        enemyPower: this.enemyPower,
+                        // 鲁棒性：回传战斗发起者，方便大世界判断归属权变动
+                        attackerFactionId: this.enemyConfig?.attackerFactionId || 'player'
                     } 
                 }));
             };

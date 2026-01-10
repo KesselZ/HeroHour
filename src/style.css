@@ -2675,7 +2675,7 @@ img {
 /* 稀有度配色与浓郁光效增强 */
 .rarity-common .hs-card-rarity { background: rgba(100, 100, 100, 0.2); color: #555; border: 1px solid #888; }
 .rarity-rare .hs-card-rarity { background: rgba(0, 136, 204, 0.25); color: #0066aa; border: 1px solid #0088cc; }
-.rarity-epic .hs-card-rarity { background: rgba(184, 134, 11, 0.25); color: #8b4513; border: 1px solid #b8860b; }
+.rarity-epic .hs-card-rarity { background: rgba(184, 134, 11, 0.25); color: #b8860b; border: 1px solid #b8860b; }
 
 /* 浓郁的外发光 - 极大幅度强化爽快感 */
 .rarity-common { 
@@ -2694,21 +2694,54 @@ img {
 }
 
 .rarity-epic { 
-    border-color: #ffaa00 !important;
-    box-shadow: 0 0 70px rgba(255, 170, 0, 0.7); 
+    border-color: #ffd700 !important; /* 纯金色边框 */
+    box-shadow: 0 0 70px rgba(255, 215, 0, 0.7); 
 }
 .rarity-epic:hover {
-    box-shadow: 0 0 130px rgba(255, 170, 0, 1), 0 0 40px rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 130px rgba(255, 215, 0, 1), 0 0 40px rgba(255, 255, 255, 0.6);
+}
+
+.rarity-legendary {
+    border-color: #ff0000 !important; /* 鲜红边框 */
+    box-shadow: 0 0 80px rgba(255, 0, 0, 0.8);
+    background: linear-gradient(135deg, #1a0000 0%, #3d0000 100%) !important; /* 深红背景 */
+}
+
+/* 传说级卡牌文字适配 - 增强暗色背景下的可读性 */
+.rarity-legendary .hs-card-name {
+    color: #ffffff; /* 白色标题，在暗色背景下最清晰 */
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.5); /* 淡淡的红晕，保持色调统一 */
+}
+
+.rarity-legendary .hs-card-desc {
+    color: #ffcccc; /* 浅色描述，易于阅读 */
+    border-top: 2px double rgba(255, 255, 255, 0.2); /* 浅色分割线 */
+}
+
+.rarity-legendary .hs-card-rarity {
+    background: rgba(255, 0, 0, 0.3);
+    color: #ff4444; 
+    border: 1px solid #ff4444;
+    text-shadow: 0 0 8px rgba(255, 0, 0, 0.6);
+}
+
+.rarity-legendary:hover {
+    box-shadow: 0 0 150px rgba(255, 0, 0, 1.2), 0 0 60px rgba(255, 100, 100, 0.8);
 }
 
 /* 绝世卡牌的凌厉流光效果 */
-.rarity-epic::after {
+.rarity-epic::after, .rarity-legendary::after {
     content: '';
     position: absolute;
     top: -100%; left: -100%; width: 300%; height: 300%;
     background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
     transform: rotate(45deg);
     animation: epicSharpGlow 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rarity-legendary::after {
+    background: linear-gradient(45deg, transparent, rgba(255, 100, 100, 0.4), transparent);
+    animation-duration: 1.2s; /* 传说级流光更快 */
 }
 
 @keyframes epicSharpGlow {

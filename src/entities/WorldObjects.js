@@ -891,13 +891,22 @@ export class EnemyGroupObject extends MovableWorldObject {
         // 核心修复：防止重复触发对话框 (特别是玩家不动时)
         if (worldManager.mapState.pendingBattleEnemyId) return false;
         
+        const template = worldManager.enemyTemplates[this.templateId || 'bandits'];
+        if (!template) {
+            console.error(`[战斗] 错误：找不到模板 ${this.templateId}`);
+            return false;
+        }
+
         worldManager.mapState.pendingBattleEnemyId = this.id;
         
         // 克隆配置并应用随时间增长的战力缩放
         const scaledPoints = Math.floor((this.config.totalPoints || 0) * timeManager.getPowerMultiplier());
         const scaledConfig = {
             ...this.config,
-            totalPoints: scaledPoints
+            name: template.name,
+            unitPool: template.unitPool, // 重点：修复缺失兵种池导致的“空怪”Bug
+            totalPoints: scaledPoints,
+            power: scaledPoints
         };
 
         const playerPower = worldManager.getPlayerTotalPower();
@@ -912,7 +921,7 @@ export class EnemyGroupObject extends MovableWorldObject {
                 },
                 // 确认：直接结算
                 () => {
-                    const result = worldManager.simulateSimpleBattle(scaledConfig, scaledPoints);
+                    const result = worldManager.simulateSimpleBattle('player', this.id, scaledConfig);
                     worldScene.showSimpleSettlement(result);
                 }
             );
@@ -981,47 +990,78 @@ export class CityObject extends WorldObject {
         return 0; // 城市贴地
     }
 
-    onInteract(worldScene) {
+    onInteract(worldScene, actorSide = 'player') {
         const cityData = worldManager.cities[this.id];
         if (!cityData) return false;
 
-        if (cityData.owner === 'player') {
-            // 访问自己的城市：补满侠客状态 (内力和气血)
-            const hero = worldManager.heroData;
-            if (hero.mpCurrent < hero.mpMax || hero.hpCurrent < hero.hpMax) {
-                worldManager.modifyHeroMana(hero.mpMax);
-                worldManager.modifyHeroHealth(hero.hpMax);
-                worldManager.showNotification(`回到 ${cityData.name}，侠客状态已补满`);
-                window.dispatchEvent(new CustomEvent('hero-stats-changed'));
-            }
+        // 情况 A：访问自己的城市 (补给/管理)
+        if (cityData.owner === actorSide) {
+            if (actorSide === 'player') {
+                // 玩家亲自访问：补满状态
+                const hero = worldManager.heroData;
+                if (hero.mpCurrent < hero.mpMax || hero.hpCurrent < hero.hpMax) {
+                    worldManager.modifyHeroMana(hero.mpMax);
+                    worldManager.modifyHeroHealth(hero.hpMax);
+                    worldManager.showNotification(`回到 ${cityData.name}，状态已补满`);
+                    window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+                }
 
-            // 核心修复：即使面板已经打开（可能是远程打开的），也要更新为“亲自访问”状态
-            if (worldScene.activeCityId !== this.id || !worldScene.isPhysicalVisit) {
-                worldScene.openTownManagement(this.id, true); // 亲自到场访问
-                worldScene.activeCityId = this.id;
+                if (worldScene.activeCityId !== this.id || !worldScene.isPhysicalVisit) {
+                    worldScene.openTownManagement(this.id, true);
+                    worldScene.activeCityId = this.id;
+                }
+            } else {
+                // AI 英雄回到自己城市：未来可以加入补兵/休整逻辑
+                // 目前暂时不做特殊处理
             }
-        } else {
-            // 敌方势力主城：触发攻城战
-            const faction = worldManager.factions[cityData.owner];
-            const heroInfo = worldManager.availableHeroes[faction?.heroId];
-            
-            worldManager.showNotification(`正在对 ${cityData.name} 发起攻城战！`);
+            return false;
+        } 
+
+        // 情况 B：敌对势力交互 (攻城战)
+        const attackerSide = actorSide;
+        const defenderSide = cityData.owner;
+        const faction = worldManager.factions[defenderSide];
+        
+        // 获取真实的守军数据
+        const garrisonArmy = cityData.availableUnits || {};
+        const armyPower = worldManager.getArmyTotalPower(garrisonArmy, 1);
+
+        // 1. 空城接管逻辑
+        if (armyPower <= 0) {
+            console.log(`%c[攻城] %c${cityData.name} 是一座空城，已被 ${attackerSide === 'player' ? '你' : '敌方'} 占领！`, 'color: #00ff00; font-weight: bold', 'color: #fff');
+            worldManager.captureCity(this.id, attackerSide);
+            if (attackerSide === 'player' || defenderSide === 'player') {
+                if (worldScene.refreshWorldHUD) worldScene.refreshWorldHUD();
+            }
+            return false;
+        }
+
+        // 2. 触发战斗场景 (仅当玩家是参与方之一时)
+        if (attackerSide === 'player' || defenderSide === 'player') {
+            worldManager.showNotification(`${attackerSide === 'player' ? '攻打' : '遭到进攻'}：${cityData.name}`);
             worldManager.mapState.pendingBattleEnemyId = this.id;
 
-            // 攻城战配置：极高战力，且兵种池固定为该门派
             const siegeConfig = {
-                name: `${cityData.name} 守军`,
-                // 核心重构：根据主城所属英雄，配置该门派的全系兵种池
-                unitPool: this._getSectUnitPool(faction?.heroId),
-                // 统一攻城战难度：基础战力由 200 上调至 250，并随时间系数缩放
-                totalPoints: Math.floor(250 * timeManager.getPowerMultiplier()), 
-                isCitySiege: true, // 标记为攻城战
+                id: this.id,
+                name: `${cityData.name} 攻防战`,
+                heroId: faction?.heroId, // 防御方英雄 ID (决定技能)
+                factionId: defenderSide,  // 防御方势力
+                attackerFactionId: attackerSide,
+                // 重点：如果是玩家守城，这些兵将成为玩家在战场上的可用单位
+                army: garrisonArmy, 
+                totalPoints: armyPower,
+                isCitySiege: true,
                 cityId: this.id
             };
 
             window.dispatchEvent(new CustomEvent('start-battle', { detail: siegeConfig }));
             worldScene.stop();
+        } else {
+            // AI vs AI 的攻城战：直接后台模拟结果 (鲁棒性保证)
+            console.log(`%c[宏观] %c${attackerSide} 正在围攻 ${defenderSide} 的 ${cityData.name}`, 'color: #888');
+            // TODO: 未来实现 worldManager.simulateFactionBattle()
         }
+
         return false;
     }
 
@@ -1059,7 +1099,9 @@ export class CityObject extends WorldObject {
 
     getTooltipData() {
         const cityData = worldManager.cities[this.id];
-        const owner = cityData ? cityData.owner : 'unknown';
+        if (!cityData) return null;
+
+        const owner = cityData.owner;
         const factionColor = worldManager.getFactionColor(owner);
         
         let ownerName = '未知势力';
@@ -1069,12 +1111,53 @@ export class CityObject extends WorldObject {
             ownerName = worldManager.factions[owner].name;
         }
 
-        return {
-            name: cityData ? cityData.name : '城镇',
+        const data = {
+            name: cityData.name,
             level: '归属势力',
             maxLevel: ownerName,
-            color: factionColor
+            color: factionColor,
+            description: `驻军情况：${this._getGarrisonSummary(cityData.availableUnits)}`
         };
+
+        // 如果是敌方主城，显示战力对比
+        if (owner !== 'player') {
+            const armyPower = worldManager.getArmyTotalPower(cityData.availableUnits, 1);
+            const playerPower = worldManager.getPlayerTotalPower();
+            const ratio = playerPower / Math.max(1, armyPower);
+
+            let difficulty = '惊世骇俗';
+            let diffColor = '#ff0000';
+            
+            if (ratio > 1.5) {
+                difficulty = '略有小成';
+                diffColor = '#00ff00';
+            } else if (ratio >= 1.1) {
+                difficulty = '旗鼓相当';
+                diffColor = '#ffff00';
+            } else if (ratio >= 0.8) {
+                difficulty = '深不可测';
+                diffColor = '#ffaa00';
+            }
+
+            data.extra = `攻城难度：<span style="color:${diffColor}">${difficulty}</span>`;
+        }
+
+        return data;
+    }
+
+    /**
+     * 简要描述驻军
+     */
+    _getGarrisonSummary(units = {}) {
+        const counts = Object.values(units).reduce((a, b) => a + b, 0);
+        if (counts === 0) return '空城一座';
+        
+        const summary = Object.entries(units)
+            .filter(([_, count]) => count > 0)
+            .map(([type, count]) => `${worldManager.getUnitDisplayName(type)}x${count}`)
+            .join(', ');
+        
+        return summary.length > 20 ? `${counts} 个单位` : summary;
     }
 }
 
@@ -1274,7 +1357,7 @@ export class AIHeroObject extends MovableWorldObject {
                     this._startBattle(worldScene, battleConfig);
                 },
                 () => {
-                    const result = worldManager.simulateSimpleBattle(battleConfig, aiPower);
+                    const result = worldManager.simulateSimpleBattle('player', this.id, battleConfig);
                     worldScene.showSimpleSettlement(result);
                 }
             );

@@ -167,9 +167,13 @@ class UIManager {
         const container = document.getElementById('building-draft-cards');
         if (!overlay || !container) return;
 
-        // 核心音效逻辑：如果有绝世建筑，播放点天赋音效，否则播放普通出现音效
+        // 核心音效逻辑：如果有传说/绝世建筑，播放相应音效，否则播放普通出现音效
+        const hasLegendary = options.some(opt => opt.rarity === 'legendary');
         const hasEpic = options.some(opt => opt.rarity === 'epic');
-        if (hasEpic) {
+        
+        if (hasLegendary) {
+            audioManager.play('ui_card_draft_legendary');
+        } else if (hasEpic) {
             audioManager.play('ui_card_draft_epic');
         } else {
             audioManager.play('ui_card_draft');
@@ -184,7 +188,13 @@ class UIManager {
             card.className = `hs-card rarity-${option.rarity || 'common'}`;
             
             const iconStyle = spriteFactory.getIconStyle(option.icon);
-            const rarityLabel = option.rarity === 'epic' ? '绝世' : (option.rarity === 'rare' ? '稀有' : '基础');
+            const rarityLabels = {
+                'legendary': '绝世',
+                'epic': '传说',
+                'rare': '稀有',
+                'common': '基础'
+            };
+            const rarityLabel = rarityLabels[option.rarity] || '基础';
 
             card.innerHTML = `
                 <div class="hs-card-icon-frame">

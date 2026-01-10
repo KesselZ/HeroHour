@@ -109,6 +109,7 @@ class AudioManager {
             'ui_teleport': { files: ['/audio/sources/传送.mp3'], throttle: 500 },
             'ui_card_draft': { files: ['/audio/click/出现建筑选择.mp3'], throttle: 500 },
             'ui_card_draft_epic': { files: ['/audio/sources/点天赋.mp3'], throttle: 500 },
+            'ui_card_draft_legendary': { files: ['/audio/sources/升级音效.mp3'], throttle: 500, pitch: 0.9 }, // 略微降低音调，显得更厚重
             'ui_card_hover': { files: ['/audio/click/轻微click声.mp3'], throttle: 30, pitchVar: 0.1 },
             'ui_card_select': { files: ['/audio/click/卡牌声音.mp3'], throttle: 500 },
             'ui_card_shuffle': { files: ['/audio/click/扑克洗牌.mp3'], throttle: 500 },
