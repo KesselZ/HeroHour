@@ -808,7 +808,6 @@ export class BattleScene {
     }
 
     startFighting() {
-        setSeed(888);
         this.isDeployment = false;
         this.isActive = true;
         

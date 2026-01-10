@@ -20,6 +20,13 @@ export class WorldGenerator {
     buildInitialWorld(worldManager, mapGenerator) {
         const { mapState, heroData, availableHeroes, factions, cities } = worldManager;
 
+        // 核心修复：如果网格数据已存在且有效，则直接返回，不要重新生成
+        // 这样可以防止从战斗场景切换回来时地形重绘
+        if (mapState.isGenerated && mapState.grid && mapState.grid.length > 0) {
+            console.log("%c[生成器] 江湖地形已存在，直接沿用旧地图", "color: #5b8a8a; font-weight: bold");
+            return mapState;
+        }
+
         // 如果标记为已生成但网格为空（说明是刚从存档载入），则使用保存的偏移量重新生成地形
         if (mapState.isGenerated) {
             console.log("%c[生成器] 正在从存档数据恢复江湖地形...", "color: #5b8a8a; font-weight: bold");
