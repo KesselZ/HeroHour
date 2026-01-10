@@ -43,7 +43,9 @@ class AudioManager {
                 ],
                 limit: 5 // 同一时间内最多播放 5 个
             },
-            'attack_arrow': { files: ['/audio/attack/射箭.mp3'] },
+            'attack_arrow': { 
+                files: ['/audio/attack/射箭.mp3', '/audio/attack/射箭2.mp3'] 
+            },
             'attack_unarmed': { files: ['/audio/attack/挥拳击中1.mp3'] },
             'attack_air_sword': { files: ['/audio/attack/气剑1.mp3', '/audio/attack/气剑2.mp3'] },
             

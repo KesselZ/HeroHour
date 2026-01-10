@@ -415,8 +415,6 @@ confirmDiffBtn.addEventListener('click', async () => {
     }
 });
 
-audioManager.playBGM('/audio/bgm/如寄.mp3');
-
 window.addEventListener('load', () => {
     setTimeout(() => {
         resourcePreloader.preloadAll((loaded, total, currentFile) => {
