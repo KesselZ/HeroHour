@@ -10,7 +10,9 @@ export class AIController {
         this.owner = owner;
         this.factionId = owner.factionId;
         
-        this.state = 'WANDER';
+        // 核心重构：确保数据层引用存在，实现单一事实来源
+        if (!this.owner.config) this.owner.config = {};
+        
         this.decisionTimer = Math.random(); 
         this.DECISION_INTERVAL = 1.0; 
         
@@ -22,12 +24,17 @@ export class AIController {
         this.baseRadius = 50; 
         this.growthRate = 10; // 每个季度领地扩张 10 米
         
-        this.restTimer = 0; // 新增：休养计时器
-        
         this.memory = {
             targetEntityId: null
         };
     }
+
+    // 优雅的代理：直接读写数据层 (owner.config)，确保场景重建、存档都能自动恢复
+    get state() { return this.owner.config.aiState || 'WANDER'; }
+    set state(v) { this.owner.config.aiState = v; }
+
+    get restTimer() { return this.owner.config.restTimer || 0; }
+    set restTimer(v) { this.owner.config.restTimer = v; }
 
     /**
      * 季度经济决策：由 WorldManager 在季度结算后统一触发
@@ -165,11 +172,17 @@ export class AIController {
         if (worldManager.constructor.DEBUG.DISABLE_AI) return;
         if (!this.owner || !this.owner.mesh) return;
 
-        // 处理休养状态
+        // 处理休养状态 (数据会自动同步到 worldManager.mapState.entities)
         if (this.state === 'REST') {
             this.restTimer -= deltaTime;
+
             if (this.restTimer <= 0) {
                 console.log(`%c[AI] 英雄 ${this.owner.id} 休养结束，重返江湖`, "color: #00ff00");
+                
+                // 清理持久化标记
+                delete this.owner.config.aiState;
+                delete this.owner.config.restTimer;
+                
                 this._switchState('WANDER');
             }
             return; // REST 状态下不进行决策

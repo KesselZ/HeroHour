@@ -24,6 +24,7 @@
     "/assets/abilities/wanhua2.png",
     "/assets/abilities/wanhua3.png",
     "/assets/buildings/building.png",
+    "/assets/buildings/building10.png",
     "/assets/buildings/building2.png",
     "/assets/buildings/building3.png",
     "/assets/buildings/building4.png",
@@ -31,6 +32,7 @@
     "/assets/buildings/building6.png",
     "/assets/buildings/building7.png",
     "/assets/buildings/building8.png",
+    "/assets/buildings/building9.png",
     "/assets/characters/cangjian.png",
     "/assets/characters/cangjian2.png",
     "/assets/characters/cangjian3.png",
@@ -109,7 +111,7 @@
     "/audio/walk/草地奔跑脚步2.mp3",
     "/audio/walk/草地奔跑脚步3.mp3"
   ],
-  "generatedAt": "2026-01-10T05:50:20.805Z",
-  "totalImages": 55,
+  "generatedAt": "2026-01-11T13:15:50.451Z",
+  "totalImages": 57,
   "totalAudios": 51
 }

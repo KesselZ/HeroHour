@@ -1425,16 +1425,12 @@ export class WorldScene {
                 panel.classList.add('hidden');
                 if (worldUI) worldUI.classList.remove('hidden');
 
-                // 处理敌人移除逻辑
                 const enemyId = worldManager.mapState.pendingBattleEnemyId;
                 if (enemyId) {
-                    const obj = this.interactables.find(o => o.id === enemyId);
-                    if (obj) {
-                        obj.removeFromScene(this.scene);
-                        this.interactables = this.interactables.filter(o => o.id !== enemyId);
-                    }
-                    worldManager.removeEntity(enemyId);
+                    // 使用统一的实体结算逻辑，确保碾压与手动战斗行为一致
+                    this.finalizeEntityBattleResult(enemyId, result);
                 }
+                
                 worldManager.mapState.pendingBattleEnemyId = null;
                 
                 // 恢复大世界背景音乐
@@ -1927,7 +1923,7 @@ export class WorldScene {
         console.log(`%c[战斗结束] 结果: ${result.winner}, 目标: ${enemyId}`, "color: #ffaa00");
 
         if (result && result.winner === 'player') {
-            // ... 奖励逻辑保持不变 ...
+            // 处理金钱奖励
             const enemyPower = result.enemyPower || 100;
             const totalGold = modifierManager.getModifiedValue(worldManager.getPlayerHeroDummy(), 'kill_gold', enemyPower);
             const bonusGold = Math.floor(totalGold - enemyPower);
@@ -1936,7 +1932,22 @@ export class WorldScene {
                 worldManager.addGold(bonusGold);
                 worldManager.showNotification(`战利清缴：额外获得 💰${bonusGold}`);
             }
+        }
 
+        // 统一调用实体结算逻辑
+        this.finalizeEntityBattleResult(enemyId, result);
+    }
+
+    /**
+     * 核心重构：统一处理战斗对大世界实体的后续影响
+     * 无论是手动战斗还是模拟碾压，最终的实体命运由这里决定
+     */
+    finalizeEntityBattleResult(enemyId, result) {
+        const ms = worldManager.mapState;
+        const isVictory = result.winner === 'player' || result.isVictory;
+        const enemyConfig = result.enemyConfig;
+        
+        if (isVictory) {
             // 检查是否是城镇
             const cityData = worldManager.cities[enemyId];
             if (cityData) {
@@ -1947,29 +1958,62 @@ export class WorldScene {
             } else {
                 // 普通实体处理
                 const entityObj = this.worldObjects.get(enemyId);
-                if (entityObj && entityObj.type === 'ai_hero') {
-                    console.log(`%c[AI] 英雄 ${enemyId} 战败，正在撤回据点休养...`, "color: #ffaa00");
-                    entityObj.rest(); 
+                // 识别 AI 英雄
+                const isAIHero = entityObj && (entityObj.type === 'ai_hero' || (enemyConfig && enemyConfig.isAIHero));
+                
+                if (isAIHero) {
+                    const factionId = entityObj ? entityObj.factionId : (enemyConfig ? enemyConfig.factionId : null);
+                    const faction = worldManager.factions[factionId];
+                    const hasNoCities = !faction || !faction.cities || faction.cities.length === 0;
+
+                    if (hasNoCities) {
+                        // 彻底失败逻辑：没有据点可退
+                        const heroName = (entityObj && entityObj.config) ? entityObj.config.name : (enemyConfig ? enemyConfig.name : "敌方领主");
+                        console.log(`%c[势力覆灭] 英雄 ${heroName} 因失去所有据点，已彻底退出江湖！`, "color: #ff0000; font-weight: bold");
+                        worldManager.showNotification(`【势力覆灭】${heroName} 失去了所有据点，从此销声匿迹！`);
+                        
+                        // 从世界彻底移除
+                        if (entityObj) {
+                            entityObj.removeFromScene(this.scene);
+                            this.interactables = this.interactables.filter(i => i.id !== enemyId);
+                        }
+                        worldManager.removeEntity(enemyId);
+                    } else {
+                        // 正常战败逻辑：撤回据点休养
+                        console.log(`%c[战斗结算] 英雄 ${enemyId} 战败，撤回据点休养...`, "color: #ffaa00");
+                        if (entityObj && entityObj.rest) {
+                            entityObj.rest(); 
+                        } else {
+                            // 如果物理对象刚好不在场景中，尝试通过 ID 恢复并调用 rest
+                            // (这种情况极少，但为了鲁棒性保留)
+                            const data = ms.entities.find(e => e.id === enemyId);
+                            if (data && data.config) {
+                                data.config.aiState = 'REST';
+                                data.config.restTimer = 60;
+                            }
+                        }
+                    }
                 } else {
+                    // 普通野怪或资源点，直接从世界移除
+                    if (entityObj) {
+                        entityObj.removeFromScene(this.scene);
+                        this.interactables = this.interactables.filter(i => i.id !== enemyId);
+                    }
                     worldManager.removeEntity(enemyId);
-                    const item = this.interactables.find(i => i.id === enemyId);
-                    if (item) this.scene.remove(item.mesh);
-                    this.interactables = this.interactables.filter(i => i.id !== enemyId);
                 }
             }
         } else {
             // 输了或逃了：锁定怪物/城镇，防止连续触发
+            ms.interactionLocks.add(enemyId);
+
             const cityData = worldManager.cities[enemyId];
             if (cityData && result.winner === 'enemy') {
                 const newOwner = result.attackerFactionId || 'none';
                 if (newOwner !== 'player') {
                     worldManager.captureCity(enemyId, newOwner);
-                    ms.interactionLocks.add(enemyId); // 反向占领也要锁定
                     this.refreshWorldHUD();
                     worldManager.showNotification(`糟糕！【${cityData.name}】已被敌方夺回！`);
                 }
-            } else {
-                ms.interactionLocks.add(enemyId);
             }
         }
     }

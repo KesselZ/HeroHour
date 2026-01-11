@@ -1323,7 +1323,8 @@ export class AIHeroObject extends MovableWorldObject {
      */
     rest() {
         if (this.brain) {
-            this.brain.enterRestMode(60); // 默认休养 60 秒
+            // 核心重构：只需调用大脑接口，大脑内部的代理会自动同步状态到数据层
+            this.brain.enterRestMode(60); 
         }
     }
 
