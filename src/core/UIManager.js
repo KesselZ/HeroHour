@@ -37,18 +37,17 @@ class UIManager {
     }
 
     /**
-     * 设置大世界 HUD 的可见性 (主要用于手机端打开面板时隐藏背景干扰)
+     * 设置大世界 HUD 的可见性 (现在主要通过 Zustand 驱动，此方法作为兼容层)
      */
     setHUDVisibility(visible) {
+        // 如果是隐藏，强制通过 Store 改为非 world 阶段是不合适的，
+        // 这里我们可以引入一个额外的 HUD 覆盖状态，或者简单的逻辑判定。
+        // 但目前 App.tsx 已经能很好地处理 Phase 切换。
+        // 为了兼容手机端打开面板时隐藏 HUD 的逻辑，我们保留这个 DOM 操作作为“覆盖层”
         const worldUI = document.getElementById('world-ui');
-        const minimap = document.querySelector('.minimap-container');
         if (worldUI) {
             if (visible) worldUI.classList.remove('hidden');
             else worldUI.classList.add('hidden');
-        }
-        if (minimap) {
-            if (visible) minimap.classList.remove('hidden');
-            else minimap.classList.add('hidden');
         }
     }
 
@@ -117,12 +116,6 @@ class UIManager {
     }
 
     initTooltipEvents() {
-        // 创建动作提示框 (Action Hint) - 待下次迁移
-        this.actionHint = document.createElement('div');
-        this.actionHint.id = 'action-hint';
-        this.actionHint.className = 'pixel-font hidden';
-        document.body.appendChild(this.actionHint);
-
         // 记录当前活跃的 Tooltip 触发源
         this.activeTooltipSource = null;
         
@@ -134,11 +127,8 @@ class UIManager {
             this.mouseX = e.clientX;
             this.mouseY = e.clientY;
 
-            // 更新 Action Hint 位置 (始终跟随鼠标，贴合右下方)
-            if (this.actionHint && !this.actionHint.classList.contains('hidden')) {
-                this.actionHint.style.left = `${e.clientX + 10}px`;
-                this.actionHint.style.top = `${e.clientY + 10}px`;
-            }
+            // 更新 Action Hint 位置 (通过 Store 同步)
+            useUIStore.getState().updateActionHintPos(e.clientX, e.clientY);
 
             // 如果 Tooltip 正在显示，同步更新位置 (React 会处理平滑移动)
             const { visible, data } = useUIStore.getState().tooltip;
@@ -236,13 +226,11 @@ class UIManager {
     }
 
     showActionHint(text) {
-        if (!this.actionHint) return;
-        this.actionHint.innerText = text;
-        this.actionHint.classList.remove('hidden');
+        useUIStore.getState().showActionHint(text, this.mouseX, this.mouseY);
     }
 
     hideActionHint() {
-        if (this.actionHint) this.actionHint.classList.add('hidden');
+        useUIStore.getState().hideActionHint();
     }
 
     /**

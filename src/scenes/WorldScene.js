@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { useUIStore } from '../store/uiStore';
 import { useGameStore } from '../store/gameStore';
 import { useBattleStore } from '../store/battleStore';
+import { useHeroStore } from '../store/heroStore';
 import { spriteFactory } from '../engine/SpriteFactory.js';
 import { modifierManager } from '../systems/ModifierManager.js';
 import { WorldManager, worldManager } from '../core/WorldManager.js'; // 引入数据管家
@@ -84,6 +85,13 @@ export class WorldScene {
 
         this.playerObject = null; // 封装后的玩家移动对象
 
+        // --- 核心：相机平滑与动态偏移系统 ---
+        this.cameraOffset = new THREE.Vector3(0, 15, 12);
+        this.currentCameraOffset = this.cameraOffset.clone();
+        this.cameraLookAtTarget = new THREE.Vector3();
+        this.cameraSwayX = 0; // 横向偏转量
+        this.cameraSwayZ = 0; // 纵向偏转量
+
         // --- 核心：江湖播报定时检查 ---
         this.eventCheckTimer = 0;
     }
@@ -101,10 +109,6 @@ export class WorldScene {
 
         // 同步英雄 ID 到数据管家，确保后续势力生成能正确匹配
         worldManager.heroData.id = heroId;
-
-        // 1. 显示主世界 UI 容器
-        const hud = document.getElementById('world-ui');
-        if (hud) hud.classList.remove('hidden');
 
         // 2. 从数据中心获取地图状态 (如果是新地图会在此生成)
         const mapState = worldManager.getOrGenerateWorld(mapGenerator);
@@ -251,8 +255,8 @@ export class WorldScene {
     initUI() {
         console.log("%c[UI] 正在初始化大世界 UI 监听器...", "color: #44aa44");
         
-        // 初始刷新一次 HUD (包含所有城市)
-        this.refreshWorldHUD();
+        // 初始同步一次数据到 Store
+        worldManager.updateHUD();
 
         // --- 核心改动：为左上角资源栏绑定收益明细 Tooltip ---
         const resourceBar = document.querySelector('.resource-bar');
@@ -398,29 +402,18 @@ export class WorldScene {
 
         // --- 侠客属性面板已由 React 接管，移除了原有的 DOM 事件绑定 ---
 
-        // 移除旧的监听器防止重复
-        window.removeEventListener('hero-stats-changed', this._onHeroStatsChanged);
-        this._onHeroStatsChanged = () => {
-            // 核心修复：属性变化时同步更新大世界移动速度
-            const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
-            this.moveSpeed = heroDetails.qinggong;
-        };
-        window.addEventListener('hero-stats-changed', this._onHeroStatsChanged);
+        // 核心修复：属性变化时同步更新大世界移动速度
+        // 优化：仅监听 speed 的变化，避免因 HP/MP/XP 波动导致的高频重算
+        this.heroStoreUnsubscribe = useHeroStore.subscribe(
+            (state) => state.hero.stats.speed,
+            (speed) => {
+                this.moveSpeed = speed;
+                console.log(`%c[属性同步] 移速已更新: ${speed.toFixed(3)}`, "color: #5b8a8a");
+            },
+            { fireImmediately: true }
+        );
 
-        // 监听奇穴更新，同步更新移动速度
-        window.removeEventListener('talents-updated', this._onTalentsUpdated);
-        this._onTalentsUpdated = () => {
-            const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
-            this.moveSpeed = heroDetails.qinggong;
-            console.log(`%c[属性同步] 奇穴已更新，当前大世界移速: ${this.moveSpeed.toFixed(3)}`, "color: #5b8a8a");
-
-            // 核心修复：奇穴更新后，如果城镇面板开着，也要刷新它，否则费用显示不更新
-            if (this.activeCityId) {
-                this.refreshTownUI(this.activeCityId);
-            }
-        };
-        window.addEventListener('talents-updated', this._onTalentsUpdated);
-
+        // 监听资源获得 (用于飘字)
         window.removeEventListener('resource-gained', this._onResourceGained);
         this._onResourceGained = (e) => {
             if (!this.isActive || !this.playerHero) return;
@@ -432,17 +425,9 @@ export class WorldScene {
         worldManager.updateHUD();
     }
 
-    updateHeroHUD() {
-        // --- 已迁移至 React (HeroMiniCard.tsx) ---
-    }
-
     openHeroStats() {
         // --- 已迁移至 React (HeroStatsPanel.tsx) ---
         useUIStore.getState().openPanel('heroStats');
-    }
-
-    updateHeroStatsUI() {
-        // --- 已由 React 接管 ---
     }
 
     bindAttrTooltip(id, name, desc) {
@@ -777,14 +762,9 @@ export class WorldScene {
             this.syncWorldEntities();
         });
 
-        const hud = document.getElementById('world-ui');
-        if (hud) {
-            hud.classList.remove('hidden');
-            worldManager.updateHUD();
-            this.updateHeroHUD();
-        }
+        worldManager.updateHUD();
 
-        // 显示小地图
+        // 驱动小地图显示
         const minimap = document.querySelector('.minimap-container');
         if (minimap) minimap.classList.remove('hidden');
 
@@ -807,7 +787,7 @@ export class WorldScene {
             worldManager.captureCity(randomCity.id);
             
             // 刷新 HUD 以显示新占领的城市
-            this.refreshWorldHUD();
+            worldManager.updateHUD();
             
             // 弹出一条系统通知告知结果
             worldManager.showNotification(`[Debug] 已自动收复：${randomCity.name}`);
@@ -854,21 +834,25 @@ export class WorldScene {
      * 显示模拟战斗的结算界面
      */
     showSimpleSettlement(result) {
-        const { isVictory, settlementChanges, xpGained, xpBefore, xpMaxBefore, levelBefore, xpAfter, xpMaxAfter, levelAfter, enemyConfig } = result;
+        const { isVictory, settlementChanges, xpGained, xpAfter, xpMaxAfter, levelAfter } = result;
 
         // 停止大世界背景音乐，播放胜利音效
         audioManager.play('battle_victory');
 
+        // 防御性编程：确保分母不为 0 或 undefined，防止 NaN 搞崩 React 渲染
+        const safeXpMax = xpMaxAfter || 100;
+        const progress = Math.min(100, Math.max(0, (xpAfter / safeXpMax) * 100)) || 0;
+
         const settlementData = {
-            title: isVictory ? "战斗胜利" : "战斗失败",
+            title: isVictory ? "大获全胜" : "惨遭败北",
             isVictory: isVictory,
             xpGained: xpGained,
-            level: levelBefore,
-            xpProgress: (xpBefore / xpMaxBefore) * 100,
-            losses: settlementChanges.map(c => ({
+            level: levelAfter,
+            xpProgress: progress,
+            losses: (settlementChanges || []).map(c => ({
                 type: c.type,
                 name: worldManager.getUnitDisplayName(c.type),
-                loss: c.loss,
+                loss: Math.abs(c.loss),
                 gain: c.gain,
                 icon: c.type
             }))
@@ -877,9 +861,12 @@ export class WorldScene {
         // 同步数据供后续清理使用
         this._lastSimpleResult = result;
 
-        // 同步到 React Store
-        useGameStore.getState().setSettlement(settlementData);
-        useUIStore.getState().openPanel('battleSettlement');
+        // 核心同步：使用微延迟避开 HeroManager 的 Proxy 同步高峰，彻底解决卡死
+        setTimeout(() => {
+            useGameStore.getState().setSettlement(settlementData);
+            useUIStore.getState().openPanel('battleSettlement');
+            console.log("%c[UI] 结算面板已唤起", "color: #00ff00");
+        }, 50);
     }
 
     /**
@@ -952,10 +939,7 @@ export class WorldScene {
             }
         });
 
-        // 隐藏大世界UI和小地图
-        const hud = document.getElementById('world-ui');
-        if (hud) hud.classList.add('hidden');
-
+        // 小地图自动隐藏
         const minimap = document.querySelector('.minimap-container');
         if (minimap) minimap.classList.add('hidden');
     }
@@ -1290,6 +1274,9 @@ export class WorldScene {
     update(deltaTime) {
         if (!this.isActive || !this.playerGroup) return;
 
+        // 记录逻辑开始时间 (用于监控面板)
+        const logicStart = performance.now();
+
         // 更新地形渐变动画 (例如季节变换)
         terrainManager.update(deltaTime);
         
@@ -1297,7 +1284,6 @@ export class WorldScene {
         weatherManager.update(deltaTime);
 
         // 核心修复：如果正在进行战斗结算或对话（如碾压对话框），暂停大世界逻辑更新
-        // 这不仅解决了重复触发交互的问题，也让怪物在对话时停止移动
         if (worldManager.mapState.pendingBattleEnemyId) return;
 
         this.lastPlayerPos.copy(this.playerGroup.position); // 记录位移前位置
@@ -1316,24 +1302,31 @@ export class WorldScene {
             if (obj.update) obj.update(deltaTime, playerPos);
         });
 
-        // 核心修复：全局交互检测（确保玩家站着不动被敌人撞到也能触发战斗）
+        // 核心修复：全局交互检测
         this.checkInteractions();
 
         // 4. 更新视觉同步 (相机、小地图、探索)
         this.updateExploration(); 
         this.updateMinimap();
+        this._updateCamera(deltaTime);
 
-        const targetCamPos = this.playerGroup.position.clone().add(new THREE.Vector3(0, 15, 12));
-        this.camera.position.lerp(targetCamPos, 0.1);
-        this.camera.lookAt(this.playerGroup.position);
+        // --- 性能防御：降低射线检测 (Hover) 频率 ---
+        const now = performance.now();
+        if (!this._lastHoverUpdate || now - this._lastHoverUpdate > 100) {
+            this.updateHover();
+            this._lastHoverUpdate = now;
+        }
 
         // 5. 更新实例化特效 (如升级、点击反馈)
         instancedVFXManager.update();
+
+        // 记录逻辑结束时间
+        if (import.meta.env.DEV) {
+            this._lastLogicTime = performance.now() - logicStart;
+        }
     }
 
     spawnFloatingText(type, amount) {
-        const textEl = document.createElement('div');
-        textEl.className = 'floating-text';
         this.floatingStack++;
         const currentStack = this.floatingStack;
         let color = '#ffffff';
@@ -1344,9 +1337,6 @@ export class WorldScene {
             case 'wood': color = '#deb887'; prefix = '🪵 +'; break;
             case 'xp': color = '#00ffcc'; prefix = '✨ XP +'; break;
         }
-        
-        textEl.style.color = color;
-        textEl.innerText = `${prefix}${amount}`;
         
         const vector = new THREE.Vector3();
         this.playerHero.getWorldPosition(vector);
@@ -1359,20 +1349,15 @@ export class WorldScene {
         const stackYOffset = (currentStack - 1) * 35; 
         const randomXOffset = (Math.random() - 0.5) * 40; 
         
-        textEl.style.left = `${x + randomXOffset}px`;
-        textEl.style.top = `${y - stackYOffset}px`;
-        
-        document.getElementById('ui-layer').appendChild(textEl);
+        const finalX = x + randomXOffset;
+        const finalY = y - stackYOffset;
+
+        // 同步给 React Store 渲染
+        useUIStore.getState().addFloatingText(`${prefix}${amount}`, finalX, finalY, color);
         
         setTimeout(() => {
             this.floatingStack = Math.max(0, this.floatingStack - 1);
         }, 800);
-        
-        setTimeout(() => {
-            if (textEl.parentNode) {
-                textEl.parentNode.removeChild(textEl);
-            }
-        }, 1500);
     }
 
     onBattleEnd(result) {
@@ -1417,7 +1402,7 @@ export class WorldScene {
                 // 攻城战胜利：占领并锁定
                 worldManager.captureCity(enemyId);
                 ms.interactionLocks.add(enemyId); // 占领后也锁定，防止立即重触发
-                this.refreshWorldHUD();
+                worldManager.updateHUD();
             } else {
                 // 普通实体处理
                 const entityObj = this.worldObjects.get(enemyId);
@@ -1474,22 +1459,11 @@ export class WorldScene {
                 const newOwner = result.attackerFactionId || 'none';
                 if (newOwner !== 'player') {
                     worldManager.captureCity(enemyId, newOwner);
-                    this.refreshWorldHUD();
+                    worldManager.updateHUD();
                     worldManager.showNotification(`糟糕！【${cityData.name}】已被敌方夺回！`);
                 }
             }
         }
-    }
-
-    /**
-     * 动态刷新左下角 HUD (已迁移至 React)
-     */
-    refreshWorldHUD() {
-        // --- 已由 React 接管 (CityMiniCard.tsx, HeroMiniCard.tsx) ---
-    }
-
-    updateHeroHUD() {
-        // --- 已由 React 接管 ---
     }
 
     checkInteractions() {
@@ -1630,15 +1604,13 @@ export class WorldScene {
             worldManager.revealFullMap();
         }
 
-        let container = document.querySelector('.minimap-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.className = 'minimap-container';
-            container.innerHTML = `<canvas id="minimap-canvas"></canvas>`;
-            document.body.appendChild(container);
-        }
-
+        // 直接获取 HTML 中预设的小地图 Canvas
         this.minimapCanvas = document.getElementById('minimap-canvas');
+        if (!this.minimapCanvas) {
+            console.warn("[WorldScene] 未找到 minimap-canvas，小地图将无法渲染。");
+            return;
+        }
+        
         this.minimapCtx = this.minimapCanvas.getContext('2d');
         
         const size = mapGenerator.size;
@@ -1866,5 +1838,47 @@ export class WorldScene {
             ctx.fill();
             ctx.stroke();
         }
+    }
+
+    /**
+     * 核心优化：丝滑相机追踪系统 (带动态偏转与 Lead Room)
+     * 解决“一抖一抖”的冲突感，并实现视角随走路方向自动偏移
+     */
+    _updateCamera(deltaTime) {
+        if (!this.playerGroup) return;
+
+        const playerPos = this.playerGroup.position;
+        // 计算真实的物理位移方向
+        const moveDir = new THREE.Vector3().subVectors(playerPos, this.lastPlayerPos);
+        const isMoving = moveDir.lengthSq() > 0.000001;
+
+        // --- 核心调整：利索、干脆的相机响应 ---
+        // 1. 计算目标偏移量 (降低强度，追求微调感而非大幅晃动)
+        const swayIntensityX = 1.2; 
+        const swayIntensityZ = 0.8; 
+        
+        const normalizedMoveDir = isMoving ? moveDir.clone().normalize() : new THREE.Vector3();
+        const targetSwayX = isMoving ? -normalizedMoveDir.x * swayIntensityX : 0;
+        const targetSwayZ = isMoving ? -normalizedMoveDir.z * swayIntensityZ : 0;
+
+        // 极大提升偏移量的插值速度 (从 0.05 提升到 0.0001 的响应级别)
+        const swayLerpFactor = 1 - Math.pow(0.0001, deltaTime); 
+        this.cameraSwayX = THREE.MathUtils.lerp(this.cameraSwayX, targetSwayX, swayLerpFactor);
+        this.cameraSwayZ = THREE.MathUtils.lerp(this.cameraSwayZ, targetSwayZ, swayLerpFactor);
+
+        // 2. 更新相机位置
+        const targetPos = playerPos.clone().add(this.cameraOffset);
+        targetPos.x += this.cameraSwayX;
+        targetPos.z += this.cameraSwayZ;
+
+        // 极大提高追踪硬度 (Snappiness)
+        // 使用 1e-15 这种极小的底数，确保相机几乎“瞬移”跟随，但保留极微小的边缘平滑防止锯齿感
+        const posLerpFactor = 1 - Math.pow(1e-15, deltaTime); 
+        this.camera.position.lerp(targetPos, Math.min(1, posLerpFactor));
+
+        // 3. 更新观察目标 (LookAt)
+        // 几乎瞬间锁定角色坐标，不再有拖拽感
+        this.cameraLookAtTarget.lerp(playerPos, Math.min(1, posLerpFactor * 2.0));
+        this.camera.lookAt(this.cameraLookAtTarget);
     }
 }

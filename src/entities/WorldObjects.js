@@ -1013,7 +1013,6 @@ export class CityObject extends WorldObject {
                     worldManager.modifyHeroMana(hero.mpMax);
                     worldManager.modifyHeroHealth(hero.hpMax);
                     worldManager.showNotification(`回到 ${cityData.name}，状态已补满`);
-                    window.dispatchEvent(new CustomEvent('hero-stats-changed'));
                 }
 
                 if (worldScene.activeCityId !== this.id || !worldScene.isPhysicalVisit) {

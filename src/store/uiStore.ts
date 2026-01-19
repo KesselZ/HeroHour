@@ -23,23 +23,30 @@ interface UIState {
   addNotification: (text: string) => void;
   removeNotification: (id: string) => void;
 
+  // Action Hint 状态 (跟随鼠标的操作提示)
+  actionHint: {
+    visible: boolean;
+    text: string;
+    x: number;
+    y: number;
+  };
+  showActionHint: (text: string, x?: number, y?: number) => void;
+  hideActionHint: () => void;
+  updateActionHintPos: (x: number, y: number) => void;
+
+  // Floating Text 状态
+  floatingTexts: Array<{ id: string; text: string; x: number; y: number; color: string }>;
+  addFloatingText: (text: string, x: number, y: number, color: string) => void;
+
   // Performance 状态 (仅开发模式有用)
   perfData: {
     fps: number;
     drawCalls: number;
     triangles: number;
-    totalFrameTime?: number;
-    spatialHashBuildTime?: number;
-    unitUpdateTime?: number;
-    subTimings?: {
-      physics: number;
-      ai: number;
-      visual: number;
-    };
-    collisionChecks?: number;
     totalUnits?: number;
-    playerUnits?: number;
-    enemyUnits?: number;
+    activeVFX?: number;
+    logicTime?: number;
+    renderTime?: number;
   };
   updatePerfData: (data: Partial<UIState['perfData']>) => void;
 }
@@ -93,6 +100,43 @@ export const useUIStore = create<UIState>((set) => ({
   removeNotification: (id) => set((state) => ({
     notifications: state.notifications.filter(n => n.id !== id)
   })),
+
+  // Action Hint 逻辑
+  actionHint: {
+    visible: false,
+    text: '',
+    x: 0,
+    y: 0
+  },
+  showActionHint: (text, x, y) => set((state) => ({
+    actionHint: { 
+      visible: true, 
+      text, 
+      x: x !== undefined ? x : state.actionHint.x, 
+      y: y !== undefined ? y : state.actionHint.y 
+    }
+  })),
+  hideActionHint: () => set((state) => ({
+    actionHint: { ...state.actionHint, visible: false }
+  })),
+  updateActionHintPos: (x, y) => set((state) => ({
+    actionHint: { ...state.actionHint, x, y }
+  })),
+
+  // Floating Text 逻辑
+  floatingTexts: [],
+  addFloatingText: (text, x, y, color) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    set((state) => ({
+      floatingTexts: [...state.floatingTexts, { id, text, x, y, color }]
+    }));
+    
+    setTimeout(() => {
+      set((state) => ({
+        floatingTexts: state.floatingTexts.filter(t => t.id !== id)
+      }));
+    }, 1500);
+  },
 
   // Performance 逻辑
   perfData: {

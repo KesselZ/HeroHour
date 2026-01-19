@@ -916,7 +916,6 @@ export class BattleScene {
         if (!skill) return;
         const success = skill.execute(this, this.heroUnit, targetPos);
         if (success) {
-            window.dispatchEvent(new CustomEvent('hero-stats-changed'));
             this.updateMPUI();
         }
         this.activeSkill = null;
@@ -1781,6 +1780,70 @@ export class BattleScene {
         }, 100);
     }
 
+    /**
+     * 彻底销毁战斗场景，释放 GPU 显存
+     */
+    stop() {
+        this.isActive = false;
+        
+        // 1. 清理所有单位
+        const allUnits = [...this.playerUnits, ...this.enemyUnits];
+        allUnits.forEach(unit => {
+            if (unit.dispose) unit.dispose();
+            if (unit.mesh) {
+                this.scene.remove(unit.mesh);
+                if (unit.mesh.geometry) unit.mesh.geometry.dispose();
+                if (unit.mesh.material) {
+                    if (Array.isArray(unit.mesh.material)) {
+                        unit.mesh.material.forEach(m => m.dispose());
+                    } else {
+                        unit.mesh.material.dispose();
+                    }
+                }
+            }
+        });
+        this.playerUnits = [];
+        this.enemyUnits = [];
+
+        // 2. 清理投射物
+        if (this.projectileManager && this.projectileManager.projectiles) {
+            this.projectileManager.projectiles.forEach(p => {
+                this.scene.remove(p.mesh);
+                if (p.mesh.geometry) p.mesh.geometry.dispose();
+                if (p.mesh.material) p.mesh.material.dispose();
+            });
+            this.projectileManager.projectiles = [];
+        }
+
+        // 3. 清理地面和装饰物
+        if (this.ground) {
+            this.scene.remove(this.ground);
+            this.ground.geometry.dispose();
+            this.ground.material.dispose();
+            this.ground = null;
+        }
+
+        if (this.rangeIndicator) {
+            this.scene.remove(this.rangeIndicator);
+            this.rangeIndicator.geometry.dispose();
+            this.rangeIndicator.material.dispose();
+            this.rangeIndicator = null;
+        }
+
+        if (this.skillIndicator) {
+            this.scene.remove(this.skillIndicator);
+            this.skillIndicator.geometry.dispose();
+            this.skillIndicator.material.dispose();
+            this.skillIndicator = null;
+        }
+
+        // 4. 强制移除战斗专用光源 (如果有)
+        const battleLights = this.scene.children.filter(c => c.isLight && c.name === 'battle-light');
+        battleLights.forEach(l => this.scene.remove(l));
+
+        console.log("%c[战斗场景] 资源已彻底释放 (MEM G/T 应当下降)", "color: #ffaa00");
+    }
+
     async endBattle(message, isVictory) {
         if (this.isPostBattleSequence) return;
         
@@ -1942,6 +2005,8 @@ export class BattleScene {
         // 恢复大世界 BGM (断点续播)
         audioManager.playBGM('/audio/bgm/如寄.mp3');
 
+        // 核心修复：彻底释放 GPU 资源
+        this.stop();
         window.battleScene = null; // 清理全局引用
         
         // 核心修复：返回大世界前，彻底清理所有战斗瞬时 Modifier

@@ -120,6 +120,49 @@ export class BaseUnit extends THREE.Group {
     }
 
     /**
+     * 销毁单位，释放显存
+     */
+    dispose() {
+        // 1. 释放 Sprite 资源 (单位本体)
+        if (this.unitSprite) {
+            this.remove(this.unitSprite);
+            if (this.unitSprite.geometry) this.unitSprite.geometry.dispose();
+            if (this.unitSprite.material) this.unitSprite.material.dispose();
+            this.unitSprite = null;
+        }
+
+        // 2. 释放血条资源 (CanvasTexture 和 Material)
+        if (this.hpSprite) {
+            this.remove(this.hpGroup || this.hpSprite);
+            if (this.hpSprite.geometry) this.hpSprite.geometry.dispose();
+            if (this.hpSprite.material) {
+                if (this.hpSprite.material.map) this.hpSprite.material.map.dispose();
+                this.hpSprite.material.dispose();
+            }
+            this.hpSprite = null;
+            this.hpCanvas = null;
+            this.hpCtx = null;
+        }
+
+        // 3. 释放内力条资源 (如果有)
+        if (this.mpSprite) {
+            if (this.mpSprite.geometry) this.mpSprite.geometry.dispose();
+            if (this.mpSprite.material) {
+                if (this.mpSprite.material.map) this.mpSprite.material.map.dispose();
+                this.mpSprite.material.dispose();
+            }
+            this.mpSprite = null;
+        }
+
+        // 4. 清理所有子物体
+        this.clear();
+        
+        // 5. 解除引用
+        this.target = null;
+        this.projectileManager = null;
+    }
+
+    /**
      * 创建头顶 精灵图血条 (基类通用版)
      */
     createHealthBar() {

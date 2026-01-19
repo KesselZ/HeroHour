@@ -84,6 +84,9 @@ export class WorldManager {
         // 核心引用同步：确保全局访问点永远指向玩家势力数据
         this.resources = this.factions['player'].resources;
 
+        // 6. 基础定义 (需在英雄初始化前完成)
+        this.unitCosts = UNIT_COSTS;
+
         // 2. 英雄数据 (由 HeroManager 接管)
         this.heroManager.init('liwangsheng', isCheat);
 
@@ -112,9 +115,6 @@ export class WorldManager {
         
         // 5.5 当前对手信息 (用于开局展示)
         this.currentAIFactions = [];
-
-        // 6. 兵种价格定义
-        this.unitCosts = UNIT_COSTS;
 
         // 5. 敌人组模板定义 (数据驱动模式)
         this.enemyTemplates = {
@@ -545,7 +545,7 @@ export class WorldManager {
             }));
             
             // 暂停大世界时间，等待玩家选择
-            timeManager.isLogicPaused = true;
+            useGameStore.getState().setPaused(true);
         } else {
             console.log('%c[建筑抽卡] %c没有更多可解锁的科技了', 'color: #888', 'color: #fff');
         }
@@ -1095,6 +1095,7 @@ export class WorldManager {
      * @param {Object} defenderConfig 防御方的配置 (包含 army, totalPoints 等)
      */
     simulateSimpleBattle(attackerId, defenderId, defenderConfig) {
+        console.log(`%c[碾压调试] 开始模拟战斗: ${attackerId} vs ${defenderId}`, "color: #ff00ff");
         // 1. 获取双方的基础战力数据
         const attackerFaction = this.factions[attackerId];
         const isAttackerPlayer = attackerId === 'player';
@@ -1187,18 +1188,31 @@ export class WorldManager {
             const data = this.heroData;
             const xpBefore = data.xp;
             const levelBefore = data.level;
+            const xpMaxBefore = data.xpMax;
+            
             this.gainXP(xpGained);
-            xpData = { xpGained, xpBefore, levelBefore, xpAfter: data.xp, levelAfter: data.level };
+            
+            xpData = { 
+                xpGained, 
+                xpBefore, 
+                levelBefore, 
+                xpMaxBefore,
+                xpAfter: data.xp, 
+                levelAfter: data.level,
+                xpMaxAfter: data.xpMax 
+            };
         }
 
         console.log(`%c[全能模拟] %c${attackerId} vs ${defenderId} | 胜者: ${isAttackerWinner ? attackerId : defenderId} | 损耗率: ${(winnerLossRate*100).toFixed(1)}%`, 'color: #ffaa00; font-weight: bold', 'color: #fff');
 
-        return {
+        const result = {
             isVictory: isAttackerWinner,
             settlementChanges: attackerRes.settlement,
             ...xpData,
             enemyConfig: defenderConfig
         };
+        console.log(`%c[碾压调试] 模拟战斗完成`, "color: #ff00ff", result);
+        return result;
     }
 
     /**
@@ -1245,13 +1259,9 @@ export class WorldManager {
 
     updateHUD() {
         this.syncBuildingsToModifiers();
-        const resources = ['gold', 'wood'];
-        resources.forEach(res => {
-            const el = document.getElementById(`world-${res}`);
-            if (el) el.innerText = this.resources[res];
-        });
 
         // --- 核心同步：将数据推送到 React Store ---
+        // React UI (ResourcesHUD) 会自动感知并重绘，不再需要手动操作 DOM
         useGameStore.getState().updateResources({
             gold: this.resources.gold,
             wood: this.resources.wood
@@ -1353,7 +1363,6 @@ export class WorldManager {
         faction.resources.gold += amount;
         if (faction.isPlayer) {
             this.updateHUD();
-            this.triggerResourceAnimation('gold');
             audioManager.play('source_gold');
             window.dispatchEvent(new CustomEvent('resource-gained', { detail: { type: 'gold', amount } }));
         } else if (spatialPos) {
@@ -1368,7 +1377,6 @@ export class WorldManager {
         faction.resources.wood += amount;
         if (faction.isPlayer) {
             this.updateHUD();
-            this.triggerResourceAnimation('wood');
             audioManager.play('source_wood');
             window.dispatchEvent(new CustomEvent('resource-gained', { detail: { type: 'wood', amount } }));
         } else if (spatialPos) {
@@ -1436,16 +1444,6 @@ export class WorldManager {
 
     getNextLevelXP(level) { return this.heroManager.getNextLevelXP(level); }
     gainXP(amount) { this.heroManager.gainXP(amount); }
-
-    triggerResourceAnimation(type) {
-        const el = document.getElementById(`world-${type}`);
-        if (!el) return;
-        const parent = el.closest('.res-item');
-        if (!parent) return;
-        parent.classList.remove('res-update-anim');
-        void parent.offsetWidth; 
-        parent.classList.add('res-update-anim');
-    }
 
     getHeroIdentity(heroId) { return this.heroManager.getHeroIdentity(heroId); }
     getHeroTraits(heroId) { return this.heroManager.getHeroTraits(heroId); }

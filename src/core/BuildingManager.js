@@ -1,6 +1,7 @@
 import { modifierManager } from '../systems/ModifierManager.js';
 import { BUILDING_REGISTRY, BLUEPRINTS } from '../data/BuildingData.js';
 import { timeManager } from '../systems/TimeManager.js';
+import { useGameStore } from '../store/gameStore';
 
 /**
  * 建筑与科技管理器
@@ -94,7 +95,7 @@ export class BuildingManager {
             if (!this.currentDraftOptions.includes(techId)) return false;
             this.unlockTech(techId);
             this.currentDraftOptions = [];
-            timeManager.isLogicPaused = false;
+            useGameStore.getState().setPaused(false);
         } else {
             // 对于 AI，直接解锁 (内部会同步 modifiers)
             this.unlockTech(techId);

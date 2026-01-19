@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useGameStore } from '../store/gameStore';
+import { useUIStore } from '../store/uiStore';
 
 // 全局服务 (挂载在根节点即可)
 import { Tooltip } from './components/Tooltip';
 import { Notification } from './components/Notification';
 import { LoadingScreen } from './components/LoadingScreen';
+import { ActionHint } from './components/ActionHint';
+import { FloatingTextLayer } from './components/FloatingTextLayer';
 import { PerfPanel } from './components/PerfPanel';
 
 // 游戏面板
@@ -39,12 +43,38 @@ const Mount: React.FC<{ id: string; children: React.ReactNode }> = ({ id, childr
 };
 
 const App: React.FC = () => {
+  const { currentPhase } = useGameStore();
+  const { activePanel } = useUIStore();
+
+  // --- 核心自动化：同步游戏阶段到 HTML 容器的显示隐藏 ---
+  useEffect(() => {
+    const worldUI = document.getElementById('world-ui');
+    const uiLayer = document.getElementById('ui-layer');
+    
+    if (currentPhase === 'world') {
+      worldUI?.classList.remove('hidden');
+      uiLayer?.classList.remove('hidden');
+    } else if (currentPhase === 'battle') {
+      worldUI?.classList.add('hidden');
+      uiLayer?.classList.remove('hidden');
+    } else if (currentPhase === 'loading') {
+      worldUI?.classList.add('hidden');
+      uiLayer?.classList.add('hidden');
+    } else {
+      // Menu 阶段
+      worldUI?.classList.add('hidden');
+      uiLayer?.classList.remove('hidden');
+    }
+  }, [currentPhase]);
+
   return (
     <div className="react-app-container">
       {/* 1. 全局底层服务 (直接挂载在 react-ui-root) */}
       <LoadingScreen />
       <Tooltip />
       <Notification />
+      <ActionHint />
+      <FloatingTextLayer />
       <PerfPanel />
 
       {/* 2. 游戏核心面板 (利用 Portal 挂载到 index.html 的指定 ID 容器中) */}

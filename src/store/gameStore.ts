@@ -83,6 +83,10 @@ interface GameState {
   draftOptions: DraftOption[];
   settlement: SettlementData | null;
   
+  // 游戏阶段控制
+  currentPhase: 'menu' | 'loading' | 'world' | 'battle';
+  setPhase: (phase: 'menu' | 'loading' | 'world' | 'battle') => void;
+  
   // Loading 状态
   loading: {
     visible: boolean;
@@ -91,6 +95,12 @@ interface GameState {
     tip: string;
   };
   setLoading: (loading: Partial<GameState['loading']>) => void;
+
+  // 游戏控制
+  isPaused: boolean;
+  timeScale: number;
+  setPaused: (paused: boolean) => void;
+  setTimeScale: (scale: number) => void;
 
   updateResources: (resources: GameResources) => void;
   // ... 其他方法保持不变
@@ -130,6 +140,12 @@ export const useGameStore = create<GameState>((set) => ({
     loading: { ...state.loading, ...loadingData }
   })),
 
+  // 游戏控制逻辑
+  isPaused: false,
+  timeScale: 1.0,
+  setPaused: (paused) => set({ isPaused: paused }),
+  setTimeScale: (scale) => set({ timeScale: scale }),
+
   updateResources: (resources) => set({ resources }),
   updateTime: (time) => set({ time }),
   updateWeather: (weatherData) => set((state) => ({
@@ -141,4 +157,7 @@ export const useGameStore = create<GameState>((set) => ({
   setStartEnemies: (enemies) => set({ startEnemies: enemies }),
   setDraftOptions: (options) => set({ draftOptions: options }),
   setSettlement: (data) => set({ settlement: data }),
+
+  currentPhase: 'menu',
+  setPhase: (phase) => set({ currentPhase: phase }),
 }));

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 
 interface HeroStats {
   hp: number;
@@ -35,13 +36,15 @@ interface HeroState {
   hero: HeroData;
   updateHero: (data: Partial<HeroData>) => void;
   updateStats: (stats: Partial<HeroStats>) => void;
+  updateArmy: (army: Record<string, number>) => void;
 }
 
 /**
  * 英雄状态中心 (Zustand)
  * 职责：管理英雄的实时战斗属性和 UI 表现数据
  */
-export const useHeroStore = create<HeroState>((set) => ({
+export const useHeroStore = create<HeroState>()(
+  subscribeWithSelector((set) => ({
   hero: {
     id: 'liwangsheng',
     name: '李忘生',
@@ -76,10 +79,16 @@ export const useHeroStore = create<HeroState>((set) => ({
     }
     return { hero: nextHero };
   }),
-  updateStats: (stats) => set((state) => ({
+    updateStats: (stats) => set((state) => ({
     hero: {
       ...state.hero,
       stats: { ...state.hero.stats, ...stats }
     }
+  })),
+  updateArmy: (army) => set((state) => ({
+    hero: {
+      ...state.hero,
+      stats: { ...state.hero.stats, army: { ...army } }
+    }
   }))
-}));
+})));

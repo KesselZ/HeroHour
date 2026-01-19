@@ -21,7 +21,7 @@ import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 import { useGameStore } from './store/gameStore';
 import { useUIStore } from './store/uiStore';
 
-// 游戏状态管理
+// 游戏状态管理已迁移至 gameStore.currentPhase
 const GameState = {
     MENU: 'menu',
     LOADING: 'loading',
@@ -29,13 +29,12 @@ const GameState = {
     BATTLE: 'battle'
 };
 
-let currentState = GameState.MENU;
 let worldInstance = null; 
 let battleInstance = null;
 
 function togglePause() {
-    if (currentState !== GameState.WORLD && currentState !== GameState.BATTLE) return;
-    const nextState = !timeManager.isLogicPaused;
+    if (useGameStore.getState().currentPhase !== GameState.WORLD && useGameStore.getState().currentPhase !== GameState.BATTLE) return;
+    const nextState = !useGameStore.getState().isPaused;
     
     if (nextState) {
         useUIStore.getState().openPanel('pauseMenu');
@@ -48,7 +47,7 @@ function togglePause() {
 }
 
 window.setGamePaused = (paused) => {
-    timeManager.isLogicPaused = paused;
+    useGameStore.getState().setPaused(paused);
     if (paused) {
         timeManager.pause();
     } else {
@@ -73,7 +72,7 @@ window.addEventListener('keydown', (e) => {
         }
 
         // 战斗内特殊逻辑
-        if (currentState === GameState.BATTLE && battleInstance) {
+        if (useGameStore.getState().currentPhase === GameState.BATTLE && battleInstance) {
             if (battleInstance.selectedType) {
                 battleInstance.selectedType = null;
                 battleInstance.updatePreviewSprite(null);
@@ -101,7 +100,7 @@ function closePanelWithHUD(panelId) {
         panel.classList.add('hidden');
         audioManager.play('ui_click');
         if (panelId === 'world-event-history-panel') {
-            WorldStatusManager.updateNotificationDot(false);
+            useWorldStore.getState().markAllRead();
         }
         if (uiManager.isMobile) {
             const panelsToCheck = ['hero-stats-panel', 'town-management-panel', 'talent-panel', 'skill-learn-panel', 'how-to-play-panel','load-save-panel','save-game-panel','world-event-history-panel'];
@@ -228,7 +227,7 @@ window.addEventListener('talents-updated', () => {
 // --- 核心桥梁：响应来自 React UI 的存档/读档请求 ---
 window.addEventListener('request-save', (e) => {
     const { slotId } = e.detail;
-    if (currentState === GameState.WORLD && worldInstance) {
+    if (useGameStore.getState().currentPhase === GameState.WORLD && worldInstance) {
         // 存档前同步实体的逻辑位置
         worldInstance.syncEntitiesToLogic();
     }
@@ -278,9 +277,9 @@ function applyHeroTraits(heroId) {
 }
 
 function enterGameState(state, config = null) {
-    currentState = state;
+    useGameStore.getState().setPhase(state);
     
-    // 使用 React Store 管理加载界面显隐
+    // 使用 React Store 管理加载界面显显 (不再需要根据 state 内部判断，因为 setPhase 已经改了状态)
     if (state === GameState.LOADING) {
         useGameStore.getState().setLoading({ visible: true, progress: 0, text: '加载中...' });
     } else {
@@ -319,6 +318,7 @@ let lastFpsUpdate = 0;
 
 function animate() {
     requestAnimationFrame(animate);
+    const startTime = performance.now();
     const deltaTime = clock.getDelta();
     
     // 性能采集 (仅开发模式)
@@ -334,22 +334,49 @@ function animate() {
         window.perf_triangles = renderer.info.render.triangles;
     }
 
-    if (timeManager.isLogicPaused) {
+    const isPaused = useGameStore.getState().isPaused;
+    const currentPhase = useGameStore.getState().currentPhase;
+
+    if (isPaused) {
         renderer.render(scene, camera);
         return;
     }
-    if (currentState === GameState.WORLD && worldInstance) worldInstance.update(deltaTime);
-    else if (currentState === GameState.BATTLE && battleInstance) battleInstance.update(deltaTime);
-    
-    renderer.render(scene, camera);
 
-    // 基础性能面板更新 (非战斗场景也显示基础指标)
-    if (import.meta.env.DEV && currentState !== GameState.BATTLE) {
-        uiManager.updatePerfPanel({
-            fps: window.perf_fps || 0,
-            drawCalls: window.perf_drawCalls || 0,
-            triangles: window.perf_triangles || 0
-        });
+    // 逻辑更新
+    if (currentPhase === GameState.WORLD && worldInstance) worldInstance.update(deltaTime);
+    else if (currentPhase === GameState.BATTLE && battleInstance) battleInstance.update(deltaTime);
+    
+    const logicEndTime = performance.now();
+
+    // 渲染更新
+    renderer.render(scene, camera);
+    const renderEndTime = performance.now();
+
+    // 基础性能面板更新 (500ms 一次)
+    if (import.meta.env.DEV) {
+        const now = performance.now();
+        if (!window._lastPerfUpdate || now - window._lastPerfUpdate > 500) {
+            // 收集数据
+            const perfPayload = {
+                fps: window.perf_fps || 0,
+                drawCalls: window.perf_drawCalls || 0,
+                triangles: window.perf_triangles || 0,
+                logicTime: logicEndTime - startTime,
+                renderTime: renderEndTime - logicEndTime
+            };
+
+            // 如果在大世界，补充大世界特有指标
+            if (currentPhase === GameState.WORLD && worldInstance) {
+                Object.assign(perfPayload, {
+                    totalUnits: worldInstance.interactables.length,
+                    activeVFX: 0, // 待实例化特效系统暴露接口
+                    logicTime: worldInstance._lastLogicTime || perfPayload.logicTime
+                });
+            }
+
+            uiManager.updatePerfPanel(perfPayload);
+            window._lastPerfUpdate = now;
+        }
     }
 }
 
