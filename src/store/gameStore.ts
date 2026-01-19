@@ -82,13 +82,18 @@ interface GameState {
   startEnemies: EnemyInfo[];
   draftOptions: DraftOption[];
   settlement: SettlementData | null;
+  
+  // Loading 状态
+  loading: {
+    visible: boolean;
+    progress: number;
+    text: string;
+    tip: string;
+  };
+  setLoading: (loading: Partial<GameState['loading']>) => void;
+
   updateResources: (resources: GameResources) => void;
-  updateTime: (time: GameTime) => void;
-  updateWeather: (weather: Partial<WeatherInfo>) => void;
-  updateCity: (city: Partial<CityInfo>) => void;
-  setStartEnemies: (enemies: EnemyInfo[]) => void;
-  setDraftOptions: (options: DraftOption[]) => void;
-  setSettlement: (data: SettlementData | null) => void;
+  // ... 其他方法保持不变
 }
 
 /**
@@ -113,6 +118,18 @@ export const useGameStore = create<GameState>((set) => ({
   startEnemies: [],
   draftOptions: [],
   settlement: null,
+
+  // Loading 初始状态
+  loading: {
+    visible: true, // 初始显示
+    progress: 0,
+    text: '0%',
+    tip: '首次访问需要下载游戏资源，请耐心等待'
+  },
+  setLoading: (loadingData) => set((state) => ({
+    loading: { ...state.loading, ...loadingData }
+  })),
+
   updateResources: (resources) => set({ resources }),
   updateTime: (time) => set({ time }),
   updateWeather: (weatherData) => set((state) => ({

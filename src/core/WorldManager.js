@@ -5,6 +5,7 @@ import { talentManager } from '../systems/TalentManager.js';
 import { timeManager } from '../systems/TimeManager.js';
 import { useGameStore } from '../store/gameStore';
 import { useHeroStore } from '../store/heroStore';
+import { useUIStore } from '../store/uiStore';
 import { rng, setSeed } from '../utils/Random.js';
 import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
 import { WorldStatusManager } from '../world/WorldStatusManager.js';
@@ -1003,40 +1004,10 @@ export class WorldManager {
     }
 
     /**
-     * 显示全局通知气泡
+     * 显示全局通知气泡 (已迁移至 React)
      */
     showNotification(message) {
-        const container = document.getElementById('notification-container');
-        if (!container) return;
-
-        const notification = document.createElement('div');
-        notification.className = 'game-notification';
-        notification.innerHTML = `<span class="game-notification-icon">◈</span><span>${message}</span>`;
-
-        if (container.children.length >= 3) {
-            const firstActive = Array.from(container.children).find(child => !child.classList.contains('removing'));
-            if (firstActive) {
-                this.removeNotification(firstActive);
-            }
-        }
-
-        container.appendChild(notification);
-
-        setTimeout(() => {
-            this.removeNotification(notification);
-        }, 3700);
-    }
-
-    removeNotification(notification) {
-        if (!notification || notification.classList.contains('removing')) return;
-        
-        notification.classList.add('removing');
-        
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 3000);
+        useUIStore.getState().addNotification(message);
     }
 
     /**

@@ -17,24 +17,6 @@
         <!-- React UI 挂载点 -->
         <div id="react-ui-root"></div>
 
-        <!-- 全局通知容器 -->
-        <div id="notification-container"></div>
-
-        <!-- 加载界面 -->
-        <div id="loading-screen" class="loading-screen">
-            <div class="loading-content">
-                <div class="loading-title">稻香村发展计划</div>
-                <div class="loading-subtitle">正在准备江湖世界...</div>
-                <div class="loading-progress">
-                    <div class="progress-bar-bg">
-                        <div id="loading-progress-fill" class="progress-bar-fill"></div>
-                    </div>
-                    <div id="loading-text" class="loading-text">0%</div>
-                </div>
-                <div class="loading-tip">首次访问需要下载游戏资源，请耐心等待</div>
-            </div>
-        </div>
-
         <!-- UI 层：主菜单、UI面板等 -->
         <div id="ui-layer" class="hidden">
             <!-- React 游戏启动流程挂载点 -->
@@ -43,120 +25,45 @@
             <!-- 大世界 HUD -->
             <div id="world-ui" class="hidden">
                 <div class="top-hud-bar">
-                    <!-- React 资源条挂载点 -->
                     <div id="react-resource-bar"></div>
-                    
                     <div class="top-hud-divider"></div>
-
-                    <!-- React 时间显示挂载点 -->
                     <div id="react-date-display"></div>
                 </div>
 
-                <!-- 江湖播报系统 (已迁移至 React BroadcastHorn.tsx & BroadcastBubble.tsx) -->
+                <!-- 江湖播报系统 -->
                 <div id="world-broadcast-system" class="broadcast-container">
                     <div id="react-broadcast-horn-mount"></div>
                     <div id="react-broadcast-bubble-mount"></div>
                 </div>
 
-                <!-- 大世界 HUD：左下角状态区 -->
+                <!-- 左下角状态区 -->
                 <div class="hud-bottom-left" id="world-hud-bottom-left">
-                    <!-- React 城市简卡挂载点 -->
                     <div id="react-city-mini-card"></div>
-
-                    <!-- React 英雄简卡挂载点 -->
                     <div id="react-hero-mini-card"></div>
                 </div>
             </div>
 
-            <!-- 侠客属性面板 (已迁移至 React HeroStatsPanel.tsx) -->
+            <!-- 面板挂载点 (由 App.tsx 统一传送) -->
             <div id="react-hero-stats-mount"></div>
-
-            <!-- 城镇管理面板 (已迁移至 React TownManagementPanel.tsx) -->
             <div id="react-town-management-mount"></div>
-
-            <!-- 神行千里传送面板 (已迁移至 React TeleportPanel.tsx) -->
             <div id="react-teleport-mount"></div>
-
-            <!-- 招式学习/指南面板 (已迁移至 React SkillLearnPanel.tsx) -->
             <div id="react-skill-learn-mount"></div>
-
-            <!-- 玩法指南面板 (已迁移至 React HowToPlayPanel.tsx) -->
             <div id="react-how-to-play-mount"></div>
-
-            <!-- 读取存档面板 (已迁移至 React SaveLoadPanel.tsx) -->
             <div id="react-load-save-mount"></div>
-
-            <!-- 保存存档面板 (已迁移至 React SaveLoadPanel.tsx) -->
             <div id="react-save-game-mount"></div>
-
-            <!-- 江湖传闻历史面板 (已迁移至 React WorldEventHistoryPanel.tsx) -->
             <div id="react-world-event-history-mount"></div>
-
-            <!-- 战场 HUD (已迁移至 React BattleHUD.tsx) -->
             <div id="react-battle-hud-mount"></div>
-
-            <!-- 战斗结算与弹窗 (已迁移至 React BattleSettlementPanel.tsx & BattleModals.tsx) -->
             <div id="react-settlement-mount"></div>
-
-            <!-- 游戏开始告示面板 (已迁移至 React GameStartPanel.tsx) -->
             <div id="react-game-start-mount"></div>
-
-            <!-- 季度建筑抽卡面板 (已迁移至 React BuildingDraftPanel.tsx) -->
             <div id="react-building-draft-mount"></div>
-
-            <!-- 暂停菜单面板 (已迁移至 React PauseMenuPanel.tsx) -->
             <div id="react-pause-menu-mount"></div>
         </div> <!-- End of ui-layer -->
 
-        <!-- Canvas 层：Three.js 渲染 -->
+        <!-- Canvas 层 -->
         <canvas id="game-canvas"></canvas>
 
-        <!-- 奇穴系统面板 (已迁移至 React TalentPanel.tsx) -->
         <div id="react-talent-mount"></div>
-
-        <!-- 全局提示框 (Tooltip) -->
-        <div id="game-tooltip" class="tooltip-container hidden">
-            <div class="tooltip-title"></div>
-            <div class="tooltip-level"></div>
-            <div class="tooltip-effect"></div>
-            <div class="tooltip-desc"></div>
-        </div>
     </div> <!-- End of app -->
-
-    <!-- UI 模板区域 -->
-    <template id="tpl-hud-city">
-        <div class="hud-card hud-card-city">
-            <div class="hud-portrait"></div>
-            <div class="hud-info">
-                <span class="hud-name"></span>
-                <span class="hud-sub"></span>
-            </div>
-        </div>
-    </template>
-
-    <template id="tpl-hud-hero">
-        <div class="hero-hud-unit-group">
-            <!-- 天赋气泡：独立按钮层 -->
-            <div id="talent-hint" class="talent-hint-wrapper hidden">
-                <div class="talent-hint-v1">
-                    <span class="hint-icon">✧</span>
-                    <span class="hint-text">星魄待悟</span>
-                </div>
-            </div>
-            <!-- 英雄卡片：独立按钮层 -->
-            <div class="hud-card hud-card-hero" id="hero-mini-card">
-                <div class="hud-portrait" id="world-hero-portrait">
-                    <div class="hud-level-badge" id="hud-hero-level"></div>
-                </div>
-                <div class="hud-info">
-                    <div class="hud-mini-bars">
-                        <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp"></div></div>
-                        <div class="mini-bar-bg"><div id="hud-hero-mp-bar" class="mini-bar-fill mp"></div></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </template>
 
 </body>
 </html>

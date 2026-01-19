@@ -3787,29 +3787,29 @@ body.is-mobile .save-details {
 }
 
 /* --- 全局通知系统 (画卷气泡风格) --- */
-#notification-container {
+/* 核心通知气泡样式 (React 驱动版) */
+.notification-container {
     position: fixed;
-    top: 15px; /* 与左上角 HUD 对齐 */
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 10000;
+    z-index: 11000;
+    pointer-events: none;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px; /* 稍微收紧间距 */
-    pointer-events: none;
+    gap: 8px;
 }
 
 .game-notification {
     background: linear-gradient(135deg, #fffcf3 0%, var(--jx3-paper) 100%);
-    border: 1px solid var(--jx3-gold); /* 统一使用金色边框 */
+    border: 1px solid var(--jx3-gold);
     padding: 0 30px; 
-    height: 44px;   /* 统一修正为 44px */
-    max-height: 60px; 
+    height: 44px;
     box-sizing: border-box;
-    border-radius: 22px; /* 完美的胶囊形状 (44px / 2) */
+    border-radius: 22px; 
     box-shadow: 
-        0 4px 20px rgba(0,0,0,0.3), /* 匹配 HUD 的深邃阴影 */
+        0 4px 20px rgba(0,0,0,0.3),
         inset 0 0 0 1px rgba(255,255,255,0.6);
     color: var(--jx3-ink);
     font-weight: bold;
@@ -3822,35 +3822,15 @@ body.is-mobile .save-details {
     white-space: nowrap;
     position: relative;
     overflow: hidden;
-    opacity: 0;
-    /* 核心改进：添加过渡，配合 JS 移除时的平滑收缩 */
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: notificationSlideIn 4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    pointer-events: none;
+    /* 动画直接写在 CSS 里 */
+    animation: notificationSlideIn 3.1s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
-/* 装饰性边缘 */
-.game-notification::before, .game-notification::after {
-    display: none; /* 胶囊形状下移除两侧的竖条装饰，保持圆润感 */
-}
-
-/* 内部小图标装饰 */
 .game-notification-icon {
     color: var(--jx3-gold);
     font-size: 0.9rem;
     filter: drop-shadow(0 0 2px rgba(166, 139, 68, 0.3));
-}
-
-/* 核心改进：平滑移除动画类 */
-.game-notification.removing {
-    opacity: 0 !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    margin-top: -8px !important; /* 抵消 gap */
-    border-width: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    transform: translateY(-20px) scale(0.9);
-    pointer-events: none;
 }
 
 @keyframes notificationSlideIn {

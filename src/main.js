@@ -146,6 +146,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.outputColorSpace = THREE.SRGBColorSpace; 
+window.renderer = renderer; // 暴露给 PerfPanel 访问渲染信息
 
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -157,9 +158,10 @@ document.addEventListener('selectstart', (e) => e.preventDefault());
 document.addEventListener('copy', (e) => e.preventDefault());
 document.addEventListener('dragstart', (e) => e.preventDefault());
 
-const loadingScreen = document.getElementById('loading-screen');
-const progressFill = document.getElementById('loading-progress-fill');
-const loadingText = document.getElementById('loading-text');
+// 移除原有的 DOM 引用，改用 React Store
+// const loadingScreen = document.getElementById('loading-screen');
+// const progressFill = document.getElementById('loading-progress-fill');
+// const loadingText = document.getElementById('loading-text');
 const uiLayer = document.getElementById('ui-layer');
 
 function initUIIcons() {
@@ -172,11 +174,15 @@ window.addEventListener('load', () => {
     setTimeout(() => {
         resourcePreloader.preloadAll((loaded, total, currentFile) => {
             const progress = Math.round((loaded / total) * 100);
-            if (progressFill) progressFill.style.width = `${progress}%`;
-            if (loadingText) loadingText.textContent = `${progress}%`;
+            // 同步进度到 React Store
+            useGameStore.getState().setLoading({
+                progress: progress,
+                text: `${progress}%`
+            });
         }, () => {
             setTimeout(() => {
-                if (loadingScreen) loadingScreen.classList.add('hidden');
+                // 隐藏加载界面，显示 UI 层
+                useGameStore.getState().setLoading({ visible: false });
                 if (uiLayer) uiLayer.classList.remove('hidden');
                 // 自动打开主菜单
                 useUIStore.getState().openPanel('mainMenu');
@@ -273,10 +279,14 @@ function applyHeroTraits(heroId) {
 
 function enterGameState(state, config = null) {
     currentState = state;
-    if (loadingScreen) {
-        if (state === GameState.LOADING) loadingScreen.classList.remove('hidden');
-        else loadingScreen.classList.add('hidden');
+    
+    // 使用 React Store 管理加载界面显隐
+    if (state === GameState.LOADING) {
+        useGameStore.getState().setLoading({ visible: true, progress: 0, text: '加载中...' });
+    } else {
+        useGameStore.getState().setLoading({ visible: false });
     }
+
     const objectsToRemove = [];
     scene.children.forEach(child => objectsToRemove.push(child));
     objectsToRemove.forEach(obj => {

@@ -15,12 +15,6 @@ import { audioManager } from '../engine/AudioManager.js';
  */
 class UIManager {
     constructor() {
-        this.tooltip = document.getElementById('game-tooltip');
-        this.tooltipTitle = this.tooltip?.querySelector('.tooltip-title');
-        this.tooltipLevel = this.tooltip?.querySelector('.tooltip-level');
-        this.tooltipEffect = this.tooltip?.querySelector('.tooltip-effect');
-        this.tooltipDesc = this.tooltip?.querySelector('.tooltip-desc');
-
         // 设备识别
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
                         (window.innerWidth <= 1024 && window.innerHeight <= 600);
@@ -29,77 +23,17 @@ class UIManager {
         }
 
         this.initTooltipEvents();
-        // this.initGameStartEvents(); // 已迁移至 React
         this.initBattleEscapeEvents();
         this.initBuildingDraftEvents();
         
-        // 性能监控面板 (仅开发模式)
-        if (import.meta.env.DEV) {
-            this.initPerfPanel();
-        }
-        
-        this.gameStartWindowShown = false; // 记录开局窗口是否已显示
+        this.gameStartWindowShown = false;
     }
 
     /**
-     * 初始化性能监控面板
-     */
-    initPerfPanel() {
-        this.perfPanel = document.createElement('div');
-        this.perfPanel.id = 'perf-panel';
-        this.perfPanel.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #00ff00;
-            padding: 10px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-            border-radius: 4px;
-            z-index: 9999;
-            pointer-events: none;
-            line-height: 1.4;
-            min-width: 200px;
-            border: 1px solid rgba(0, 255, 0, 0.3);
-        `;
-        document.body.appendChild(this.perfPanel);
-    }
-
-    /**
-     * 更新性能监控数据
+     * 更新性能监控数据 (已迁移至 React)
      */
     updatePerfPanel(data) {
-        if (!this.perfPanel) return;
-        
-        let html = `<div style="font-weight: bold; border-bottom: 1px solid #00ff00; margin-bottom: 5px;">PERFORMANCE MONITOR</div>`;
-        
-        // 1. 基础运行指标
-        html += `FPS: ${data.fps || 0}<br>`;
-        html += `DrawCalls: ${data.drawCalls || 0}<br>`;
-        html += `Triangles: ${data.triangles || 0}<br>`;
-        
-        // 2. 战斗逻辑拆解 (如果是战斗中)
-        if (data.totalFrameTime !== undefined) {
-            const isWarning = data.totalFrameTime > 16.6;
-            const color = isWarning ? '#ff4444' : '#00ff00';
-            html += `<div style="margin-top: 5px; color: ${color}">FrameTime: ${data.totalFrameTime.toFixed(2)}ms</div>`;
-            html += `&nbsp;&nbsp;SpatialHash: ${data.spatialHashBuildTime?.toFixed(2)}ms<br>`;
-            html += `&nbsp;&nbsp;UnitLogic: ${data.unitUpdateTime?.toFixed(2)}ms<br>`;
-            if (data.subTimings) {
-                html += `&nbsp;&nbsp;&nbsp;&nbsp;* Physics: ${data.subTimings.physics.toFixed(2)}ms<br>`;
-                html += `&nbsp;&nbsp;&nbsp;&nbsp;* AI/Target: ${data.subTimings.ai.toFixed(2)}ms<br>`;
-                html += `&nbsp;&nbsp;&nbsp;&nbsp;* Visual: ${data.subTimings.visual.toFixed(2)}ms<br>`;
-            }
-            html += `CollisionChecks: ${data.collisionChecks || 0}<br>`;
-        }
-        
-        // 3. 单位统计
-        if (data.totalUnits !== undefined) {
-            html += `<div style="margin-top: 5px;">Units: ${data.totalUnits} (P:${data.playerUnits} E:${data.enemyUnits})</div>`;
-        }
-
-        this.perfPanel.innerHTML = html;
+        useUIStore.getState().updatePerfData(data);
     }
 
     /**
@@ -183,7 +117,7 @@ class UIManager {
     }
 
     initTooltipEvents() {
-        // 创建动作提示框 (Action Hint)
+        // 创建动作提示框 (Action Hint) - 待下次迁移
         this.actionHint = document.createElement('div');
         this.actionHint.id = 'action-hint';
         this.actionHint.className = 'pixel-font hidden';
@@ -191,25 +125,35 @@ class UIManager {
 
         // 记录当前活跃的 Tooltip 触发源
         this.activeTooltipSource = null;
+        
+        // 记录最后一次鼠标位置，用于 showTooltip 时缺省坐标
+        this.mouseX = 0;
+        this.mouseY = 0;
 
         window.addEventListener('mousemove', (e) => {
-            if (this.tooltip && !this.tooltip.classList.contains('hidden')) {
-                this.updateTooltipPosition(e.clientX, e.clientY);
-            }
+            this.mouseX = e.clientX;
+            this.mouseY = e.clientY;
 
             // 更新 Action Hint 位置 (始终跟随鼠标，贴合右下方)
             if (this.actionHint && !this.actionHint.classList.contains('hidden')) {
                 this.actionHint.style.left = `${e.clientX + 10}px`;
                 this.actionHint.style.top = `${e.clientY + 10}px`;
             }
+
+            // 如果 Tooltip 正在显示，同步更新位置 (React 会处理平滑移动)
+            const { visible, data } = useUIStore.getState().tooltip;
+            if (visible) {
+                useUIStore.getState().showTooltip(data, e.clientX, e.clientY);
+            }
         });
 
-        // 全局点击/触摸隐藏逻辑：点击非 Tooltip 且非触发源的地方时隐藏
+        // 全局点击/触摸隐藏逻辑
         const hideHandler = (e) => {
-            if (!this.tooltip || this.tooltip.classList.contains('hidden')) return;
+            const tooltipVisible = useUIStore.getState().tooltip.visible;
+            if (!tooltipVisible) return;
             
-            // 如果点击的是 Tooltip 本身，或者点击的是当前的触发源，则不隐藏
-            if (this.tooltip.contains(e.target) || (this.activeTooltipSource && this.activeTooltipSource.contains(e.target))) {
+            // 如果点击的是当前的触发源，则不隐藏 (由触发源自己的 logic 处理)
+            if (this.activeTooltipSource && this.activeTooltipSource.contains(e.target)) {
                 return;
             }
             
@@ -221,44 +165,34 @@ class UIManager {
     }
 
     /**
-     * 更新 Tooltip 位置
+     * 更新 Tooltip 位置 (现在仅作为 React Store 的中转)
      */
     updateTooltipPosition(clientX, clientY) {
-        if (!this.tooltip || this.isMobile) return;
-        const x = clientX + 15;
-        const y = clientY + 15;
-        const tooltipWidth = this.tooltip.offsetWidth;
-        const tooltipHeight = this.tooltip.offsetHeight;
-        
-        const finalX = (x + tooltipWidth > window.innerWidth) ? (clientX - tooltipWidth - 15) : x;
-        const finalY = (y + tooltipHeight > window.innerHeight) ? (clientY - tooltipHeight - 15) : y;
-        
-        this.tooltip.style.left = `${finalX}px`;
-        this.tooltip.style.top = `${finalY}px`;
+        // React Tooltip 内部会自动处理位置，但我们需要把最新的鼠标坐标传给 Store
+        const { visible, data } = useUIStore.getState().tooltip;
+        if (visible) {
+            useUIStore.getState().showTooltip(data, clientX, clientY);
+        }
     }
 
     /**
      * 优雅的 Tooltip 绑定器：自动处理 PC 悬浮与手机长按
-     * @param {HTMLElement} element 目标 DOM 元素
-     * @param {Function|Object} dataGetter 返回提示数据的函数或直接的数据对象
      */
     bindTooltip(element, dataGetter) {
         if (!element) return;
 
         let longPressTimer = null;
-        let isLongPressActive = false;
         let startPos = { x: 0, y: 0 };
 
         const getData = () => (typeof dataGetter === 'function' ? dataGetter() : dataGetter);
 
         // --- PC 端：悬浮逻辑 ---
         element.onmouseenter = (e) => {
-            if (window.matchMedia("(pointer: coarse)").matches) return; // 触摸屏跳过悬浮
+            if (window.matchMedia("(pointer: coarse)").matches) return;
             const data = getData();
             if (data) {
                 this.activeTooltipSource = element;
-                this.showTooltip(data);
-                this.updateTooltipPosition(e.clientX, e.clientY);
+                this.showTooltip(data, e.clientX, e.clientY);
             }
         };
 
@@ -272,18 +206,13 @@ class UIManager {
         element.addEventListener('touchstart', (e) => {
             const touch = e.touches[0];
             startPos = { x: touch.clientX, y: touch.clientY };
-            isLongPressActive = false;
 
-            // 启动 500ms 长按计时
             longPressTimer = setTimeout(() => {
                 const data = getData();
                 if (data) {
-                    isLongPressActive = true;
                     this.activeTooltipSource = element;
-                    this.showTooltip(data);
                     // 手机端显示在手指上方一点
-                    this.updateTooltipPosition(touch.clientX, touch.clientY - 40);
-                    // 触发震动反馈（如果支持）
+                    this.showTooltip(data, touch.clientX, touch.clientY - 40);
                     if (navigator.vibrate) navigator.vibrate(20);
                 }
             }, 500);
@@ -292,13 +221,9 @@ class UIManager {
         element.addEventListener('touchmove', (e) => {
             const touch = e.touches[0];
             const dist = Math.sqrt(Math.pow(touch.clientX - startPos.x, 2) + Math.pow(touch.clientY - startPos.y, 2));
-            
-            // 如果手指移动超过 10 像素，取消长按计时
-            if (dist > 10) {
-                if (longPressTimer) {
+            if (dist > 10 && longPressTimer) {
                     clearTimeout(longPressTimer);
                     longPressTimer = null;
-                }
             }
         }, { passive: true });
 
@@ -307,7 +232,6 @@ class UIManager {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
             }
-            // 注意：长按触发后不立即消失，点击其他地方才消失
         });
     }
 
@@ -325,103 +249,56 @@ class UIManager {
      * 显示全局通知
      */
     showNotification(text) {
-        // 统一调用 WorldManager 的通知系统
         worldManager.showNotification(text);
     }
 
-
     /**
-     * 显示全局通用 Tooltip
+     * 显示全局通用 Tooltip (通过 React Store)
      * @param {Object} data 提示框数据
+     * @param {number} x 
+     * @param {number} y
      */
-    showTooltip(data) {
-        if (!this.tooltip || !this.tooltipTitle || !this.tooltipDesc) return;
-
-        // 核心记录：如果是技能提示，记录 ID 以便 update 中实时刷新
+    showTooltip(data, x, y) {
         if (data.type === 'skill' && data.skillId) {
             this.lastSkillTooltip = { skillId: data.skillId, heroData: data.heroData };
         }
 
-        // 1. 处理标题（支持技能等级标签）
-        if (data.level && (data.level === '初级' || data.level === '高级' || data.level === '绝技')) {
-            this.tooltipTitle.innerHTML = `
-                <span>${data.name}</span>
-                <span class="skill-level-tag level-${data.level}">${data.level}</span>
-            `;
-        } else {
-            this.tooltipTitle.innerText = data.name;
-        }
-
-        // 2. 处理副标题（消耗、冷却、等级、状态等）
-        if (data.mpCost || data.level !== undefined || data.cdText || data.status) {
-            if (data.mpCost || data.cdText) {
-                // 技能模式
-                this.tooltipLevel.innerHTML = `
-                    <span>${data.mpCost || ''}</span>
-                    <span>${data.cdText || ''}</span>
-                `;
-            } else if (typeof data.level === 'number' && data.maxLevel !== undefined && typeof data.maxLevel === 'number') {
-                // 建筑等级模式 (数字型)
-                this.tooltipLevel.innerText = `当前等级: ${data.level} / ${data.maxLevel}`;
-            } else if (data.status) {
-                // 状态模式
-                this.tooltipLevel.innerHTML = data.status;
-            } else if (data.level && data.maxLevel) {
-                // 通用双行模式 (例如：预计难度: 简单)
-                this.tooltipLevel.innerText = `${data.level}: ${data.maxLevel}`;
-            } else {
-                // 通用单文字模式
-                this.tooltipLevel.innerText = data.level || '';
-            }
-
-            this.tooltipLevel.style.color = data.color || '#ffffff';
-            this.tooltipLevel.classList.remove('hidden');
-        } else {
-            this.tooltipLevel.classList.add('hidden');
-        }
-
-        // 3. 处理描述正文
-        if (data.description) {
-            this.tooltipEffect.classList.add('hidden'); // 确保显眼的特效行被隐藏
-            this.tooltipDesc.innerHTML = data.description;
-            this.tooltipDesc.classList.remove('hidden');
-        } else {
-            this.tooltipDesc.classList.add('hidden');
-        }
-
-        this.tooltip.classList.remove('hidden');
+        // 如果没有提供坐标，使用最近一次记录的鼠标位置
+        const finalX = x !== undefined ? x : this.mouseX;
+        const finalY = y !== undefined ? y : this.mouseY;
+        
+        useUIStore.getState().showTooltip(data, finalX, finalY);
     }
 
     /**
      * 隐藏 Tooltip
      */
     hideTooltip() {
-        if (this.tooltip) this.tooltip.classList.add('hidden');
-        this.lastSkillTooltip = null; // 清除记录
+        useUIStore.getState().hideTooltip();
+        this.lastSkillTooltip = null;
     }
 
     /**
-     * 实时更新：如果当前正显示技能提示，则刷新其数值（实现所见即所得）
+     * 实时更新：如果当前正显示技能提示，则刷新其数值
      */
     update() {
-        if (this.lastSkillTooltip && !this.tooltip.classList.contains('hidden')) {
+        if (this.lastSkillTooltip) {
+            const tooltip = useUIStore.getState().tooltip;
+            if (tooltip.visible) {
             const { skillId, heroData } = this.lastSkillTooltip;
-            this.showSkillTooltip(skillId, heroData);
+                this.showSkillTooltip(skillId, heroData, tooltip.x, tooltip.y);
+            }
         }
     }
 
     /**
      * 便捷方法：显示技能提示
-     * @param {string} skillId 
-     * @param {Object} heroData 
      */
-    showSkillTooltip(skillId, heroData) {
+    showSkillTooltip(skillId, heroData, x, y) {
         const skill = SkillRegistry[skillId];
         if (!skill) return;
 
-        // 记录当前正在查看的技能，用于实时刷新
         this.lastSkillTooltip = { skillId, heroData };
-
         const actualCD = (skill.getActualCooldown(heroData) / 1000).toFixed(1);
         const actualCost = skill.getActualManaCost(heroData);
 
@@ -434,7 +311,7 @@ class UIManager {
             type: 'skill',
             skillId,
             heroData
-        });
+        }, x, y);
     }
 }
 
