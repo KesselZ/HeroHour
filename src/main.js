@@ -337,6 +337,13 @@ function animate() {
     const isPaused = useGameStore.getState().isPaused;
     const currentPhase = useGameStore.getState().currentPhase;
 
+    // 同步旧画布的透明度，确保 R3F 可见但旧画布仍能接收点击
+    const oldCanvas = document.querySelector('#game-canvas');
+    if (oldCanvas) {
+        oldCanvas.style.opacity = (currentPhase === GameState.BATTLE) ? '0' : '1';
+        // 只有大世界需要旧画布作为背景，战斗中我们看 R3F
+    }
+
     if (isPaused) {
         renderer.render(scene, camera);
         return;
@@ -348,8 +355,14 @@ function animate() {
     
     const logicEndTime = performance.now();
 
-    // 渲染更新
+    // 渲染更新 - 混合模式：旧引擎渲染地面/背景，R3F 渲染人
     renderer.render(scene, camera);
+    
+    if (oldCanvas) {
+        // 在战斗中，旧引擎只作为“地景”存在，单位会被原生逻辑隐藏或由 R3F 遮挡
+        oldCanvas.style.visibility = 'visible';
+        oldCanvas.style.opacity = '1';
+    }
     const renderEndTime = performance.now();
 
     // 基础性能面板更新 (500ms 一次)

@@ -34,6 +34,9 @@ import { WorldDateHUD } from './panels/WorldDateHUD';
 import { HeroMiniCard } from './panels/HeroMiniCard';
 import { CityMiniCard } from './panels/CityMiniCard';
 
+// R3F 核心引擎入口
+import { GameCanvas } from './components/engine/GameCanvas';
+
 /**
  * Portal 辅助组件：将内容渲染到指定的 HTML 容器中
  */
@@ -69,6 +72,9 @@ const App: React.FC = () => {
 
   return (
     <div className="react-app-container">
+      {/* 0. R3F 渲染底层 (取代原生的 main.js 渲染循环) */}
+      <GameCanvas />
+
       {/* 1. 全局底层服务 (直接挂载在 react-ui-root) */}
       <LoadingScreen />
       <Tooltip />

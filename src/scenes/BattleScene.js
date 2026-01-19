@@ -1789,17 +1789,26 @@ export class BattleScene {
         // 1. 清理所有单位
         const allUnits = [...this.playerUnits, ...this.enemyUnits];
         allUnits.forEach(unit => {
-            if (unit.dispose) unit.dispose();
-            if (unit.mesh) {
-                this.scene.remove(unit.mesh);
-                if (unit.mesh.geometry) unit.mesh.geometry.dispose();
-                if (unit.mesh.material) {
-                    if (Array.isArray(unit.mesh.material)) {
-                        unit.mesh.material.forEach(m => m.dispose());
-                    } else {
-                        unit.mesh.material.dispose();
+            // 确保从场景中移除单位
+            this.scene.remove(unit);
+            
+            // 如果单位有自定义销毁逻辑 (Soldier.js 中定义的 dispose)
+            if (unit.dispose) {
+                unit.dispose();
+            } else {
+                // 如果没有自定义 dispose，尝试手动清理其材质和几何体
+                unit.traverse(node => {
+                    if (node.isMesh || node.isSprite) {
+                        if (node.geometry) node.geometry.dispose();
+                        if (node.material) {
+                            if (Array.isArray(node.material)) {
+                                node.material.forEach(m => m.dispose());
+                            } else {
+                                node.material.dispose();
+                            }
+                        }
                     }
-                }
+                });
             }
         });
         this.playerUnits = [];
@@ -1808,9 +1817,17 @@ export class BattleScene {
         // 2. 清理投射物
         if (this.projectileManager && this.projectileManager.projectiles) {
             this.projectileManager.projectiles.forEach(p => {
-                this.scene.remove(p.mesh);
-                if (p.mesh.geometry) p.mesh.geometry.dispose();
-                if (p.mesh.material) p.mesh.material.dispose();
+                if (p.mesh) {
+                    this.scene.remove(p.mesh);
+                    if (p.mesh.geometry) p.mesh.geometry.dispose();
+                    if (p.mesh.material) {
+                        if (Array.isArray(p.mesh.material)) {
+                            p.mesh.material.forEach(m => m.dispose());
+                        } else {
+                            p.mesh.material.dispose();
+                        }
+                    }
+                }
             });
             this.projectileManager.projectiles = [];
         }
@@ -1818,22 +1835,40 @@ export class BattleScene {
         // 3. 清理地面和装饰物
         if (this.ground) {
             this.scene.remove(this.ground);
-            this.ground.geometry.dispose();
-            this.ground.material.dispose();
+            if (this.ground.geometry) this.ground.geometry.dispose();
+            if (this.ground.material) {
+                if (Array.isArray(this.ground.material)) {
+                    this.ground.material.forEach(m => m.dispose());
+                } else {
+                    this.ground.material.dispose();
+                }
+            }
             this.ground = null;
         }
 
         if (this.rangeIndicator) {
             this.scene.remove(this.rangeIndicator);
-            this.rangeIndicator.geometry.dispose();
-            this.rangeIndicator.material.dispose();
+            if (this.rangeIndicator.geometry) this.rangeIndicator.geometry.dispose();
+            if (this.rangeIndicator.material) {
+                if (Array.isArray(this.rangeIndicator.material)) {
+                    this.rangeIndicator.material.forEach(m => m.dispose());
+                } else {
+                    this.rangeIndicator.material.dispose();
+                }
+            }
             this.rangeIndicator = null;
         }
 
         if (this.skillIndicator) {
             this.scene.remove(this.skillIndicator);
-            this.skillIndicator.geometry.dispose();
-            this.skillIndicator.material.dispose();
+            if (this.skillIndicator.geometry) this.skillIndicator.geometry.dispose();
+            if (this.skillIndicator.material) {
+                if (Array.isArray(this.skillIndicator.material)) {
+                    this.skillIndicator.material.forEach(m => m.dispose());
+                } else {
+                    this.skillIndicator.material.dispose();
+                }
+            }
             this.skillIndicator = null;
         }
 

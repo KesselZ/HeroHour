@@ -366,6 +366,8 @@ export class ProjectileManager {
      */
     spawn(config) {
         const p = new Projectile(config);
+        // 核心重构：弹道对旧引擎不可见，渲染由 R3F 接管
+        p.visible = false;
         this.scene.add(p);
         this.projectiles.push(p);
     }

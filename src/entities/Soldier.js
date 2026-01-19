@@ -195,6 +195,10 @@ export class BaseUnit extends THREE.Group {
         this.hpGroup.add(this.hpSprite);
         this.add(this.hpGroup);
         
+        // 核心重构：逻辑单位在原生 Three.js 场景中设为不可见
+        // 渲染职责已交给 R3F 的 UnitInstances 组件
+        this.visible = false; 
+
         if (window.battle && window.battle.vfxLibrary) {
             // 核心修复：根据单位视觉缩放动态调整血条高度 (0.95 为经验偏移系数)
             const headHeight = this.visualScale * 0.95;
