@@ -7,13 +7,18 @@
     "generate-resources": "node scripts/generate-resource-list.js",
     "dev": "npm run generate-resources && vite",
     "build": "npm run generate-resources && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "diagnose": "vite --mode development --open --force"
   },
   "dependencies": {
     "three": "^0.160.0"
   },
   "devDependencies": {
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.182.0",
+    "@vitejs/plugin-react": "^5.1.2",
+    "typescript": "^5.9.3",
     "vite": "^5.0.0"
   }
 }
-

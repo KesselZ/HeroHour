@@ -105,6 +105,9 @@ import { rng, setSeed } from '../utils/Random.js';
 
 import { uiManager } from '../core/UIManager.js';
 import { audioManager } from '../engine/AudioManager.js';
+import { useUIStore } from '../store/uiStore';
+import { useGameStore } from '../store/gameStore';
+import { useBattleStore } from '../store/battleStore';
 
 export class BattleScene {
     constructor(scene, camera, enemyConfig = null) {
@@ -116,6 +119,8 @@ export class BattleScene {
         this.isActive = false;
         this.isDeployment = true; // 部署阶段标识
         this.environment = null;
+
+        window.battleScene = this; // 核心：挂载到全局供 React 访问
         this.projectileManager = new ProjectileManager(this.scene);
         this.vfxLibrary = new VFXLibrary(this.scene);
         
@@ -150,6 +155,29 @@ export class BattleScene {
         this.initialCounts = { ...playerArmyData };
         this.deployedCounts = {}; 
         Object.keys(this.unitCounts).forEach(type => this.deployedCounts[type] = 0);
+
+        // --- 同步到 React BattleStore ---
+        const battleUnits = {};
+        Object.entries(this.unitCounts).forEach(([type, count]) => {
+            if (count > 0) {
+                battleUnits[type] = {
+                    type,
+                    count,
+                    deployed: 0,
+                    icon: type // spriteFactory 会处理图标
+                };
+            }
+        });
+        useBattleStore.getState().setUnits(battleUnits);
+        useBattleStore.getState().setDeploymentPhase(true);
+        useBattleStore.getState().setBattleActive(true);
+        useBattleStore.getState().setSelectedUnitType(null);
+        
+        // 监听来自 React 的事件
+        this._onStartFight = () => this.startFighting();
+        this._onSkillClick = (e) => this.onSkillBtnClick(e.detail.skillId);
+        window.addEventListener('battle-start-fight', this._onStartFight);
+        window.addEventListener('battle-skill-click', this._onSkillClick);
 
         // 如果是固定兵力（如攻城战或英雄对决），BattleScene 会在 spawnEnemiesDynamic 中直接处理 enemyArmyData
         if (enemyConfig) {
@@ -277,10 +305,6 @@ export class BattleScene {
         this.enemyPower = totalPoints; // 记录敌人强度，用于战后奖励计算
         this.spawnEnemiesDynamic(totalPoints); 
         
-        // 显示部署 UI
-        document.getElementById('deployment-ui').classList.remove('hidden');
-        this.setupUIListeners();
-        
         window.addEventListener('pointerdown', this.onPointerDown);
         window.addEventListener('pointermove', this.onPointerMove);
         window.addEventListener('pointerup', this.onPointerUp);
@@ -288,7 +312,6 @@ export class BattleScene {
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         instancedVFXManager.init(this.scene);
-        this.updateUI();
     }
 
     /**
@@ -308,14 +331,6 @@ export class BattleScene {
         if (!this.activeSkill) return;
         console.log("%c[技能系统] %c已取消当前招式准备", "color: #aaa", "color: #fff");
         
-        // 【新功能】如果是从瞄准状态取消，让面板弹回来
-        const bottomUI = document.getElementById('battle-bottom-ui');
-        if (bottomUI && bottomUI.classList.contains('is-targeting')) {
-            bottomUI.classList.add('force-visible');
-            // 2秒后移除强制显示，恢复正常的自动感应
-            setTimeout(() => bottomUI.classList.remove('force-visible'), 2000);
-        }
-
         this.activeSkill = null;
         this.hideSkillIndicator();
         uiManager.hideActionHint();
@@ -357,69 +372,6 @@ export class BattleScene {
         // 中心点设在 -20，覆盖范围就是 -40 到 0
         this.placementZoneIndicator.position.set(-20, 0.01, 0); 
         this.scene.add(this.placementZoneIndicator);
-    }
-
-    setupUIListeners() {
-        const container = document.querySelector('.unit-slots');
-        if (!container) return;
-
-        // 1. 清空原有硬编码占位符
-        container.innerHTML = '';
-
-        // 2. 动态生成当前英雄拥有的所有兵种槽位
-        Object.keys(this.unitCounts).forEach(type => {
-            // 只显示数量大于 0 的兵种，避免 UI 过于拥挤
-            if (this.unitCounts[type] <= 0) return;
-
-            const slot = document.createElement('div');
-            slot.className = 'unit-slot';
-            slot.setAttribute('data-type', type);
-
-            const icon = document.createElement('div');
-            icon.className = 'slot-icon';
-            // 应用来自 SpriteFactory 的精灵图样式 (支持全兵种)
-            Object.assign(icon.style, spriteFactory.getIconStyle(type));
-            
-            const count = document.createElement('span');
-            count.className = 'slot-count';
-            count.innerText = `x${this.unitCounts[type]}`;
-
-            slot.appendChild(icon);
-            slot.appendChild(count);
-            container.appendChild(slot);
-
-            // 3. 绑定 Tooltip 绑定器
-            uiManager.bindTooltip(slot, () => {
-                const stats = worldManager.getUnitDetails(type, 'player');
-                const cost = worldManager.unitCosts[type]?.cost || 0;
-                return {
-                    name: stats.name,
-                    level: `气血:${stats.hp} | 伤害:${stats.dps} | 占用:${cost}`,
-                    description: stats.description || '精锐的大唐将士。',
-                    color: '#d4af37' // 友军金色
-                };
-            });
-
-            // 4. 绑定点击选择逻辑
-            slot.onclick = (e) => {
-                // 移除其他选中状态
-                document.querySelectorAll('.unit-slot').forEach(s => s.classList.remove('selected'));
-                if (this.unitCounts[type] > 0) {
-                    this.selectedType = type;
-                    slot.classList.add('selected');
-                    this.updatePreviewSprite(type);
-                } else {
-                    this.selectedType = null;
-                    this.updatePreviewSprite(null);
-                }
-            };
-        });
-
-        // 4. 绑定开战按钮
-        const fightBtn = document.getElementById('fight-btn');
-        if (fightBtn) {
-            fightBtn.onclick = () => this.startFighting();
-        }
     }
 
     updatePreviewSprite(type) {
@@ -612,7 +564,7 @@ export class BattleScene {
 
     onPointerDown(event) {
         if (!this.isActive && !this.isDeployment) return;
-        if (event.target.closest('#deployment-ui') || event.target.closest('.wuxia-btn')) return;
+        if (event.target.closest('#react-battle-hud-mount') || event.target.closest('.wuxia-btn')) return;
 
         // --- 手机端长按逻辑启动 ---
         const isTouch = event.pointerType === 'touch';
@@ -763,14 +715,16 @@ export class BattleScene {
             this.unitCounts[type]--;
             this.deployedCounts[type]++;
             
+            // 同步到 React Store
+            useBattleStore.getState().updateUnitDeployed(type, this.deployedCounts[type]);
+            
             // 部署士兵时播放点击音效 (使用配置中的默认 10ms throttle 和 pitchVar)
             audioManager.play('ui_click', { volume: 0.3 });
 
-            this.updateUI();
             if (this.unitCounts[type] <= 0) {
                 this.selectedType = null;
                 this.updatePreviewSprite(null);
-                document.querySelectorAll('.unit-slot').forEach(s => s.classList.remove('selected'));
+                useBattleStore.getState().setSelectedUnitType(null);
             }
         }
     }
@@ -789,25 +743,16 @@ export class BattleScene {
         }
     }
 
-    updateUI() {
-        Object.keys(this.unitCounts).forEach(type => {
-            const slot = document.querySelector(`.unit-slot[data-type="${type}"]`);
-            if (slot) {
-                slot.querySelector('.slot-count').innerText = `x${this.unitCounts[type]}`;
-                if (this.unitCounts[type] <= 0) {
-                    slot.classList.add('disabled');
-                    slot.style.opacity = '0.3';
-                    slot.style.pointerEvents = 'none';
-                } else {
-                    slot.classList.remove('disabled');
-                    slot.style.opacity = '1';
-                    slot.style.pointerEvents = 'auto';
-                }
-            }
-        });
-    }
-
     startFighting() {
+        if (!this.isDeployment) return;
+        
+        // 核心修复：如果没有部署任何单位，不允许开战
+        const totalDeployed = Object.values(this.deployedCounts).reduce((a, b) => a + b, 0);
+        if (totalDeployed === 0) {
+            uiManager.showNotification("请至少派遣一个侠客参与战斗！");
+            return;
+        }
+
         this.isDeployment = false;
         this.isActive = true;
         
@@ -818,8 +763,10 @@ export class BattleScene {
         // 播放士兵呐喊：配置已在 AudioManager 中定义 (维持 3s，淡出 5s)
         this._shoutAudio = audioManager.play('soldier_shout', { volume: 0.6 });
 
-        document.getElementById('deployment-ui').classList.add('hidden');
-        this.initSkillUI();
+        // --- 同步到 React BattleStore ---
+        useBattleStore.getState().setDeploymentPhase(false);
+        this.initSkillData();
+
         window.removeEventListener('pointerdown', this.onPointerDown);
         window.removeEventListener('pointerup', this.onPointerUp);
         window.addEventListener('pointerdown', this.handleSkillTargeting);
@@ -856,143 +803,48 @@ export class BattleScene {
         console.log("部署完成，江湖开战！");
     }
 
-    initSkillUI() {
-        const bottomUI = document.getElementById('battle-bottom-ui');
-        const filterContainer = document.getElementById('skill-category-filters');
-        
-        if (bottomUI) {
-            bottomUI.classList.remove('hidden');
-            bottomUI.classList.add('autohide'); // 启用自动收缩
-        }
-        
-        // 核心重构：隐藏过滤器，改为全显示并分组
-        if (filterContainer) filterContainer.style.display = 'none';
-        if (!bottomUI) return;
-
-        this.updateMPUI();
-        this.renderSkills();
-    }
-
-    renderSkills() {
-        const skillSlots = document.getElementById('skill-slots');
-        if (!skillSlots) return;
-
-        skillSlots.innerHTML = '';
+    initSkillData() {
         const heroData = this.worldManager.heroData;
         const heroSkills = heroData.skills;
+        
+        if (!heroSkills) return;
 
-        if (!heroSkills || heroSkills.length === 0) {
-            skillSlots.innerHTML = `
-                <div class="no-skills-msg">
-                    <div class="no-skills-icon">?</div>
-                    <span>暂无习得技能</span>
-                </div>
-            `;
-            return;
-        }
-
-        // 1. 按类别对技能进行分组
-        const groupedSkills = {};
-        heroSkills.forEach(skillId => {
+        const battleSkills = heroSkills.map(skillId => {
             const skill = SkillRegistry[skillId];
-            if (!skill) return;
-            const cat = skill.category || '基础';
-            if (!groupedSkills[cat]) groupedSkills[cat] = [];
-            groupedSkills[cat].push({ id: skillId, data: skill });
-        });
-
-        // 2. 遍历类别进行渲染
-        Object.entries(groupedSkills).forEach(([category, skills]) => {
-            // 创建分组容器
-            const groupWrap = document.createElement('div');
-            groupWrap.className = 'skill-group-wrap';
+            if (!skill) return null;
             
-            // 添加类别标签
-            const header = document.createElement('div');
-            header.className = 'skill-group-header';
-            header.innerText = category;
-            groupWrap.appendChild(header);
+            const caster = this.heroUnit || { side: 'player', isHero: true, type: heroData.id };
+            const mpMult = modifierManager.getModifiedValue(caster, 'mana_cost_multiplier', 1.0);
+            const actualCost = Math.floor(skill.cost * mpMult);
+            const actualCD = skill.getActualCooldown(caster);
 
-            // 添加技能列表容器
-            const list = document.createElement('div');
-            list.className = 'skill-group-list';
-            
-            skills.forEach(item => {
-                const skillId = item.id;
-                const skill = item.data;
-                const btn = document.createElement('div');
-                btn.className = 'skill-btn';
-                btn.id = `skill-${skillId}`;
-                const iconStyle = spriteFactory.getIconStyle(skill.icon);
-                
-                // 核心修复：优先使用实时的 heroUnit (包含战斗中的 Buff)
-                const caster = this.heroUnit || { side: 'player', isHero: true, type: heroData.id };
-                const mpMult = modifierManager.getModifiedValue(caster, 'mana_cost_multiplier', 1.0);
-                
-                const actualCost = Math.floor(skill.cost * mpMult);
-                const actualCD = skill.getActualCooldown(caster);
-                
-                btn.innerHTML = `
-                    <div class="skill-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
-                    <div class="skill-cost">内:${actualCost}</div>
-                    <div class="cooldown-overlay" id="cd-${skillId}"></div>
-                    <div class="skill-name-tag">${skill.name}</div>
-                `;
+            return {
+                id: skillId,
+                name: skill.name,
+                icon: skill.icon,
+                cost: actualCost,
+                cooldown: actualCD,
+                remainingCD: 0,
+                category: skill.category || '基础',
+                description: skill.getDescription(this.heroUnit || heroData),
+                isReady: true
+            };
+        }).filter(Boolean);
 
-                // 使用优雅的 Tooltip 绑定器
-                uiManager.bindTooltip(btn, () => {
-                    const skill = SkillRegistry[skillId];
-                    if (!skill) return null;
-                    const heroData = this.worldManager.heroData;
-                    const caster = this.heroUnit || { side: 'player', isHero: true, type: heroData.id };
-                    
-                    const mpMult = modifierManager.getModifiedValue(caster, 'mana_cost_multiplier', 1.0);
-                    const cost = Math.floor(skill.cost * mpMult);
-                    const cd = (skill.getActualCooldown(caster) / 1000).toFixed(1);
-                    
-                    return {
-                        name: skill.name,
-                        level: skill.level,
-                        mpCost: `消耗: ${cost} 内力`,
-                        cdText: `冷却: ${cd}s`,
-                        description: skill.getDescription(this.heroUnit || heroData),
-                        type: 'skill',
-                        skillId: skillId,
-                        heroData: this.heroUnit || heroData
-                    };
-                });
-
-                btn.onclick = (e) => { e.stopPropagation(); this.onSkillBtnClick(skillId); };
-                list.appendChild(btn);
-
-                // 如果技能正在冷却中，需要重新启动动画
-                const now = Date.now();
-                const elapsed = now - (skill.lastUsed || 0);
-                if (elapsed < actualCD) {
-                    this.startSkillCDAnimation(skillId, actualCD, elapsed);
-                }
-            });
-
-            groupWrap.appendChild(list);
-            skillSlots.appendChild(groupWrap);
-        });
+        useBattleStore.getState().setSkills(battleSkills);
+        this.updateMPUI();
     }
 
     updateMPUI() {
-        const fill = document.getElementById('battle-mp-fill');
-        const text = document.getElementById('battle-mp-text');
-        if (!fill || !text) return;
         const data = this.worldManager.heroData;
-
-        // 性能优化：内力数值没有实质变化时跳过 DOM 操作
         const mpInt = Math.floor(data.mpCurrent);
         if (this._lastMP === mpInt && this._lastMaxMP === data.mpMax) return;
+        
         this._lastMP = mpInt;
         this._lastMaxMP = data.mpMax;
         
-        const pct = (data.mpCurrent / data.mpMax) * 100;
-        fill.style.width = `${pct}%`;
-        text.innerText = `内力: ${mpInt}/${data.mpMax}`;
+        // 同步到 React Store
+        useBattleStore.getState().updateMp(data.mpCurrent, data.mpMax);
     }
 
     onSkillBtnClick(skillId) {
@@ -1066,52 +918,15 @@ export class BattleScene {
         if (success) {
             window.dispatchEvent(new CustomEvent('hero-stats-changed'));
             this.updateMPUI();
-            
-            // 核心修复：统一使用 ModifierManager 获取已截断的冷却倍率
-            const cdMult = modifierManager.getModifiedValue(this.heroUnit, 'cooldown_multiplier', 1.0);
-            const actualCD = skill.cooldown * cdMult;
-            
-            this.startSkillCDAnimation(skillId, actualCD);
         }
         this.activeSkill = null;
         this.hideSkillIndicator(); // 确保释放后隐藏指示器，同时也恢复 UI 展开（如果鼠标在的话）
-    }
-
-    startSkillCDAnimation(skillId, cooldown, initialElapsed = 0) {
-        const overlay = document.getElementById(`cd-${skillId}`);
-        if (!overlay) return;
-        
-        const update = () => {
-            // 检查元素是否还在 DOM 中
-            const currentOverlay = document.getElementById(`cd-${skillId}`);
-            if (!currentOverlay) return;
-
-            const skill = SkillRegistry[skillId];
-            if (!skill) return;
-
-            // --- 核心：动态同步进度条 ---
-            // 每一帧都获取最新的“实际冷却时长”，这样即使在冷却中途开启虎跑，进度条也会瞬间对齐
-            const actualCD = skill.getActualCooldown(worldManager.heroData);
-            const elapsed = Date.now() - (skill.lastUsed || 0);
-            
-            const progress = Math.max(0, 1 - elapsed / actualCD);
-            currentOverlay.style.height = `${progress * 100}%`;
-            
-            if (progress > 0 && this.isActive) {
-                requestAnimationFrame(update);
-            }
-        };
-        update();
     }
 
     showSkillIndicator(skillId, config) {
         this.hideSkillIndicator();
         const skill = SkillRegistry[skillId];
         if (!skill) return;
-
-        // 【新功能】进入瞄准模式时，强制收缩技能面板，防止挡住战场选点
-        const bottomUI = document.getElementById('battle-bottom-ui');
-        if (bottomUI) bottomUI.classList.add('is-targeting');
 
         // 核心：使用 getActualRadius 获取最终半径（尊重 CoC 修正器）
         const heroData = this.worldManager.heroData;
@@ -1150,10 +965,6 @@ export class BattleScene {
     }
 
     hideSkillIndicator() {
-        // 【新功能】退出瞄准模式，允许 UI 重新收缩
-        const bottomUI = document.getElementById('battle-bottom-ui');
-        if (bottomUI) bottomUI.classList.remove('is-targeting');
-
         if (this.skillIndicator) {
             this.scene.remove(this.skillIndicator);
             this.skillIndicator.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
@@ -1897,33 +1708,21 @@ export class BattleScene {
         
         const heroData = this.worldManager.heroData;
         const isHeroDead = this.heroUnit ? this.heroUnit.isDead : true;
+        const now = Date.now();
 
-        // 性能优化：只有当内力值（整数部分）或英雄生死状态发生变化时，才更新技能栏状态
-        const mpInt = Math.floor(heroData.mpCurrent);
-        if (this._lastSkillUpdateMP === mpInt && this._lastHeroDeadState === isHeroDead) return;
-        this._lastSkillUpdateMP = mpInt;
-        this._lastHeroDeadState = isHeroDead;
-        
+        const caster = this.heroUnit || { side: 'player', isHero: true, type: heroData.id };
+
         heroData.skills.forEach(skillId => {
-            const btn = document.getElementById(`skill-${skillId}`);
-            if (!btn) return;
-            
             const skill = SkillRegistry[skillId];
             if (!skill) return;
 
-            // 检查：主角是否存活、内力是否足够
-            // 注意：冷却状态由 overlay 处理，此处主要控制“绝对不可放”的情况 (死亡/蓝耗)
-            const mpMult = modifierManager.getModifiedValue({ side: 'player', isHero: true, type: heroData.id }, 'mana_cost_multiplier', 1.0);
-            const actualCost = Math.floor(skill.cost * mpMult);
-            const hasEnoughMP = heroData.mpCurrent >= actualCost;
-            
-            const isDisabled = isHeroDead || !hasEnoughMP;
-            
-            if (isDisabled) {
-                btn.classList.add('disabled');
-            } else {
-                btn.classList.remove('disabled');
-            }
+            const actualCD = skill.getActualCooldown(caster);
+            const elapsed = now - (skill.lastUsed || 0);
+            const remaining = Math.max(0, actualCD - elapsed);
+            const isReady = !isHeroDead && skill.isReady(heroData);
+
+            // 同步到 React Store
+            useBattleStore.getState().updateSkillCD(skillId, remaining, isReady);
         });
     }
 
@@ -1954,9 +1753,7 @@ export class BattleScene {
         this.isFleeing = true;
         
         // 1. 隐藏底部 UI
-        if (document.getElementById('battle-bottom-ui')) {
-            document.getElementById('battle-bottom-ui').classList.add('hidden');
-        }
+        useBattleStore.getState().setBattleActive(false);
         
         // 2. 所有存活友军进入逃跑状态
         this.playerUnits.forEach(u => {
@@ -2105,145 +1902,59 @@ export class BattleScene {
     }
 
     showSettlementUI(isVictory, settlementChanges) {
-        document.getElementById('deployment-ui').classList.add('hidden');
-        if (document.getElementById('battle-bottom-ui')) {
-            document.getElementById('battle-bottom-ui').classList.add('hidden');
+        // 关闭战场 HUD
+        useBattleStore.getState().setBattleActive(false);
+
+        // 准备结算数据
+        const losses = settlementChanges.map(change => ({
+            name: this.getUnitName(change.type),
+            loss: Math.abs(change.loss || 0),
+            icon: change.type
+        })).filter(l => l.loss > 0);
+
+        const settlementData = {
+            title: isVictory ? "战斗胜利" : "战斗失败",
+            isVictory: isVictory,
+            xpGained: this.xpGained || 0,
+            level: this.levelAfter || 1,
+            xpProgress: (this.xpAfter && this.xpMaxAfter) ? (this.xpAfter / this.xpMaxAfter) * 100 : 0,
+            losses: losses
+        };
+
+        // 同步到 React Store
+        useGameStore.getState().setSettlement(settlementData);
+        useUIStore.getState().openPanel('battleSettlement');
+    }
+
+    /**
+     * 返回大世界
+     */
+    returnToWorld() {
+        const isVictory = useGameStore.getState().settlement?.isVictory;
+
+        // 停止士兵呐喊
+        if (this._shoutAudio) {
+            this._shoutAudio.pause();
+            this._shoutAudio.remove();
+            this._shoutAudio = null;
         }
-        const panel = document.getElementById('battle-settlement');
-        document.getElementById('settlement-title').innerText = isVictory ? "战斗胜利" : "战斗失败";
-        document.getElementById('settlement-title').style.color = isVictory ? "var(--jx3-celadon-dark)" : "#cc0000";
-
-        // --- 阅历结算展示 ---
-        const xpSection = document.getElementById('settlement-xp-section');
-        if (isVictory && this.xpGained > 0) {
-            if (xpSection) xpSection.style.display = 'flex';
-            const xpVal = document.getElementById('settlement-xp-val');
-            const xpBar = document.getElementById('settlement-xp-bar');
-            const xpLevelVal = document.getElementById('settlement-level-val');
-            
-            if (xpVal) xpVal.innerText = `+${this.xpGained}`;
-            if (xpLevelVal) xpLevelVal.innerText = `Lv.${this.levelBefore}`;
-
-            if (xpBar) {
-                const isLevelUp = this.levelAfter > this.levelBefore;
-                const startPct = (this.xpBefore / this.xpMaxBefore) * 100;
-                const endPct = (this.xpAfter / this.xpMaxAfter) * 100;
-                
-                // 初始状态
-                xpBar.style.transition = 'none';
-                xpBar.style.width = `${startPct}%`;
-                
-                // 强制重绘
-                xpBar.offsetHeight;
-
-                if (!isLevelUp) {
-                    // 情况 A: 未升级，平滑增长到目标百分比
-                    requestAnimationFrame(() => {
-                        xpBar.style.transition = 'width 1.5s cubic-bezier(0.22, 1, 0.36, 1)';
-                        xpBar.style.width = `${endPct}%`;
-                    });
-                } else {
-                    // 情况 B: 升了级，分两段展示
-                    requestAnimationFrame(() => {
-                        // 第一段：从当前涨到 100%
-                        xpBar.style.transition = 'width 0.8s ease-in';
-                        xpBar.style.width = '100%';
-                        
-                        setTimeout(() => {
-                            // 瞬间重置到 0%
-                            xpBar.style.transition = 'none';
-                            xpBar.style.width = '0%';
-                            
-                            // 更新等级显示
-                            if (xpLevelVal) {
-                                xpLevelVal.innerText = `Lv.${this.levelAfter}`;
-                                xpLevelVal.style.transform = 'scale(1.2)';
-                                xpLevelVal.style.transition = 'transform 0.2s';
-                                setTimeout(() => xpLevelVal.style.transform = 'scale(1)', 200);
-                            }
-                            
-                            // 强制重绘后再涨到最终位置
-                            xpBar.offsetHeight;
-                            
-                            setTimeout(() => {
-                                xpBar.style.transition = 'width 1.0s cubic-bezier(0.22, 1, 0.36, 1)';
-                                xpBar.style.width = `${endPct}%`;
-                            }, 50);
-                        }, 850); // 略多于第一段 transition 时间
-                    });
-                }
-            }
-        } else {
-            if (xpSection) xpSection.style.display = 'none';
-        }
-
-        const list = document.getElementById('settlement-losses-list');
-        const label = document.getElementById('settlement-losses-label');
-        list.innerHTML = '';
         
-        if (settlementChanges.length === 0) { 
-            // 无损情况：隐藏标题，显示居中的优雅提示
-            if (label) label.style.display = 'none';
-            const emptyHint = document.createElement('div');
-            emptyHint.className = 'loss-empty-hint';
-            emptyHint.innerText = '没有士兵损失。';
-            list.appendChild(emptyHint);
-        } else {
-            // 有变化情况：显示标题和列表
-            if (label) {
-                label.style.display = 'block';
-                label.innerText = "兵力变动"; // 还原用户喜欢的标题
-            }
-            settlementChanges.forEach(change => {
-                const { type, loss, gain } = change;
-                const iconStyle = spriteFactory.getIconStyle(type);
-                const item = document.createElement('div');
-                item.className = 'loss-item';
-                
-                // 构建数值显示部分
-                let countsHtml = `<div class="loss-count">${loss}</div>`;
-                if (gain > 0) {
-                    countsHtml += `<div class="gain-count">+${gain}</div>`;
-                }
-                
-                item.innerHTML = `
-                    <div class="slot-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin: 2px 0;">
-                        ${countsHtml}
-                    </div>
-                    <div class="loss-name">${this.getUnitName(type)}</div>
-                `;
-                list.appendChild(item);
-            });
-        }
-        panel.classList.remove('hidden');
-        if (document.getElementById('return-to-world-btn')) {
-            document.getElementById('return-to-world-btn').onclick = () => {
-                // 停止士兵呐喊
-                if (this._shoutAudio) {
-                    this._shoutAudio.pause();
-                    this._shoutAudio.remove();
-                    this._shoutAudio = null;
-                }
-                
-                // 恢复大世界 BGM (断点续播)
-                audioManager.playBGM('/audio/bgm/如寄.mp3');
+        // 恢复大世界 BGM (断点续播)
+        audioManager.playBGM('/audio/bgm/如寄.mp3');
 
-                // 核心修复：返回大世界前，彻底清理所有战斗瞬时 Modifier
-                // 解决单位死亡或战斗结束后的 Modifier 残留导致的性能与逻辑问题
-                modifierManager.clearBattleModifiers();
+        window.battleScene = null; // 清理全局引用
+        
+        // 核心修复：返回大世界前，彻底清理所有战斗瞬时 Modifier
+        modifierManager.clearBattleModifiers();
 
-                panel.classList.add('hidden');
-                window.dispatchEvent(new CustomEvent('battle-finished', { 
-                    detail: { 
-                        winner: isVictory ? 'player' : 'enemy',
-                        enemyPower: this.enemyPower,
-                        // 鲁棒性：回传战斗发起者，方便大世界判断归属权变动
-                        attackerFactionId: this.enemyConfig?.attackerFactionId || 'player'
-                    } 
-                }));
-            };
-        }
+        window.dispatchEvent(new CustomEvent('battle-finished', { 
+            detail: { 
+                winner: isVictory ? 'player' : 'enemy',
+                enemyPower: this.enemyPower,
+                // 鲁棒性：回传战斗发起者，方便大世界判断归属权变动
+                attackerFactionId: this.enemyConfig?.attackerFactionId || 'player'
+            } 
+        }));
     }
 
     getUnitName(type) {

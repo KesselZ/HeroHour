@@ -4,6 +4,7 @@ import { audioManager } from '../engine/AudioManager.js';
 import { timeManager } from '../systems/TimeManager.js';
 import { WorldStatusManager } from '../world/WorldStatusManager.js';
 import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
+import { useHeroStore } from '../store/heroStore';
 
 /**
  * 英雄管理器 (HeroManager)
@@ -56,6 +57,9 @@ export class HeroManager {
         
         // 刷新一次初始属性
         this.refreshHeroStats();
+
+        // 核心优化：初始化后立即同步状态到 Store，确保 UI 响应
+        this.syncToStore();
     }
 
     /**
@@ -146,6 +150,7 @@ export class HeroManager {
             window.dispatchEvent(new CustomEvent('hero-level-up'));
         }
         
+        this.syncToStore();
         window.dispatchEvent(new CustomEvent('hero-stats-changed'));
     }
 
@@ -155,6 +160,7 @@ export class HeroManager {
     modifyHeroMana(amount) {
         if (!this.heroData) return;
         this.heroData.mpCurrent = Math.max(0, Math.min(this.heroData.mpMax, this.heroData.mpCurrent + amount));
+        this.syncToStore();
         window.dispatchEvent(new CustomEvent('hero-stats-changed'));
     }
 
@@ -164,6 +170,7 @@ export class HeroManager {
     modifyHeroHealth(amount) {
         if (!this.heroData) return;
         this.heroData.hpCurrent = Math.max(0, Math.min(this.heroData.hpMax, this.heroData.hpCurrent + amount));
+        this.syncToStore();
         window.dispatchEvent(new CustomEvent('hero-stats-changed'));
     }
 
@@ -266,7 +273,39 @@ export class HeroManager {
         this.modifyHeroHealth(0);
         this.modifyHeroMana(0);
 
+        this.syncToStore();
         window.dispatchEvent(new CustomEvent('hero-stats-changed'));
+    }
+
+    syncToStore() {
+        const data = this.heroData;
+        const identity = this.getHeroIdentity(data.id);
+        
+        useHeroStore.getState().updateHero({
+            id: data.id,
+            name: identity?.name || '未知',
+            title: identity?.title || '侠客',
+            talentPoints: data.talentPoints || 0,
+            talents: { ...data.talents } // 同步奇穴状态
+        });
+
+        useHeroStore.getState().updateStats({
+            hp: data.hpCurrent,
+            hpMax: data.hpMax,
+            mp: data.mpCurrent,
+            mpMax: data.mpMax,
+            xp: data.xp,
+            xpMax: data.xpMax,
+            level: data.level,
+            morale: Math.floor(modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'morale', data.stats.morale)),
+            leadership: this.getHeroMaxLeadership(),
+            power: Math.floor(modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'power', data.stats.power)),
+            spells: Math.floor(data.stats.finalSpells || 0),
+            haste: Math.floor((data.stats.finalHaste || 0) * 100),
+            speed: parseFloat((modifierManager.getModifiedValue(this.getPlayerHeroDummy(), 'speed', data.stats.qinggong || 0.08)).toFixed(2)),
+            primaryStatName: identity?.primaryStat || '力道',
+            skills: [...data.skills] // 同步招式 ID 列表
+        });
     }
 
     /**

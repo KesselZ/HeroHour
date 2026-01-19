@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { useGameStore } from '../store/gameStore';
 
 /**
  * WeatherManager: 负责主世界天气的视觉表现 (雨、雪等)
@@ -38,6 +39,20 @@ export class WeatherManager {
         this.scene = scene;
         this.camera = camera;
         this.lastCameraPos.copy(camera.position);
+        this.syncToStore();
+    }
+
+    syncToStore() {
+        const nameMap = {
+            'none': '晴',
+            'rain': this.rainIntensity === 'light' ? '细雨' : '大雨',
+            'snow': '瑞雪'
+        };
+        useGameStore.getState().updateWeather({
+            type: this.type,
+            intensity: this.rainIntensity || 'medium',
+            name: nameMap[this.type] || '晴'
+        });
     }
 
     /**
@@ -51,6 +66,8 @@ export class WeatherManager {
         this.type = 'rain';
         this.rainIntensity = intensity; 
         this.isStopping = false;
+        
+        this.syncToStore();
         
         let count = this.particleCount;
         let maxOpacity = 0.6; 
@@ -100,6 +117,8 @@ export class WeatherManager {
         this.isStopping = false;
         this.targetOpacity = 0.8;
         this.currentOpacity = 0;
+
+        this.syncToStore();
 
         const vertices = [];
         for (let i = 0; i < this.particleCount; i++) {
@@ -151,6 +170,7 @@ export class WeatherManager {
     stop() {
         this.targetOpacity = 0;
         this.isStopping = true;
+        this.syncToStore();
     }
 
     cleanup() {
@@ -161,6 +181,7 @@ export class WeatherManager {
             this.particleMaterial.dispose();
             this.particleSystem = null;
             this.type = 'none';
+            this.syncToStore();
         }
     }
 

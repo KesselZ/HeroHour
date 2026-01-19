@@ -1,5 +1,6 @@
 import { worldManager } from '../core/WorldManager.js';
 import { modifierManager } from './ModifierManager.js';
+import { useGameStore } from '../store/gameStore';
 
 /**
  * 时间管理器：管理游戏内的日期、季节和季度更替
@@ -166,18 +167,13 @@ class TimeManager {
     }
 
     updateUI() {
-        const dateDisplay = document.querySelector('.world-date-display');
-        if (dateDisplay) {
-            dateDisplay.innerHTML = `天宝 ${this.year} 年 · ${this.seasons[this.seasonIndex]}`;
-        }
-
-        // 更新环形进度条
+        // --- 核心进化：只负责数据分发，不再干涉 DOM ---
         const progress = (this.currentTime / this.seasonDuration) * 100;
-        const circle = document.querySelector('.time-progress-circle');
-        if (circle) {
-            // 背景色改为淡灰色，进度色为金色
-            circle.style.background = `conic-gradient(var(--jx3-gold) ${progress}%, #e0e0e0 0)`;
-        }
+        useGameStore.getState().updateTime({
+            year: this.year,
+            season: this.seasons[this.seasonIndex],
+            progress: progress
+        });
     }
 
     getDateString() {

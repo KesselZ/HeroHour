@@ -198,24 +198,23 @@ img {
     position: absolute;
     left: 0;
     width: 100%;
-    height: 40px;
-    background: var(--jx3-celadon);
+    height: 35px;
+    background: linear-gradient(to right, transparent, rgba(166, 139, 68, 0.05), transparent);
     display: flex;
     justify-content: center;
     align-items: center;
-    color: var(--jx3-paper);
-    font-weight: bold;
-    letter-spacing: 4px;
+    color: transparent; /* 隐藏文字，只留线条感 */
+    pointer-events: none;
     transition: var(--transition-base);
 }
 
 .menu-decoration-top { 
     top: 0; 
-    border-bottom: 2px solid var(--jx3-gold);
+    border-bottom: 1px solid rgba(166, 139, 68, 0.2);
 }
 .menu-decoration-bottom { 
     bottom: 0; 
-    border-top: 2px solid var(--jx3-gold);
+    border-top: 1px solid rgba(166, 139, 68, 0.2);
 }
 
 /* 游戏标题 */
@@ -1926,31 +1925,31 @@ img {
 .teleport-btn-v3 {
     width: 120px;
     height: 32px;
-    background: var(--jx3-gold);
-    color: white;
-    border: 1px solid var(--jx3-celadon);
+    background: #fdfaf2;
+    color: #a68b44;
+    border: 1px solid #a68b44;
     border-radius: var(--radius-sm);
     cursor: pointer;
     font-weight: bold;
     font-family: "Microsoft YaHei", sans-serif;
     transition: all 0.2s;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     justify-self: end; /* 靠右对齐 */
 }
 
 .teleport-btn-v3:hover {
-    background: #ffcc00;
+    background: #a68b44;
+    color: #fff;
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 10px rgba(166, 139, 68, 0.2);
 }
 
 .teleport-panel-v3 {
     width: 600px;
     max-width: 90vw;
     padding: 40px 30px;
-    background: var(--jx3-paper);
-    border: 6px solid var(--jx3-celadon);
-    outline: 2px solid var(--jx3-gold);
+    background: #fdfaf2; /* 宣纸色 */
+    border: 3px solid #e8e0d0;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.1), 0 0 0 2px #a68b44;
 }
 
 .teleport-header {
@@ -1999,6 +1998,18 @@ img {
     transform: translateX(5px);
 }
 
+.teleport-dest-card.disabled {
+    opacity: 0.6;
+    filter: grayscale(100%);
+    cursor: not-allowed;
+}
+
+.teleport-dest-card.disabled:hover {
+    transform: none;
+    background: white;
+    border-color: var(--jx3-celadon-light);
+}
+
 .teleport-dest-icon {
     width: 48px;
     height: 48px;
@@ -2028,24 +2039,24 @@ img {
 .town-panel-v3 {
     width: 1150px;
     max-width: 96vw;
-    padding: 42px 30px 45px 30px; /* 恢复底部边距至 45px 以上，以避开 40px 高的底部装饰条 */
+    padding: 42px 30px 45px 30px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    background: #f4f0e0;
-    height: 800px; /* 核心：设定固定高度，实现内容与面板尺寸的彻底解耦 */
+    background: #fdfaf2; /* 宣纸色 */
+    height: 800px;
     max-height: 96vh;
-    border: 6px solid var(--jx3-celadon);
-    outline: 2px solid var(--jx3-gold);
+    border: 3px solid #e8e0d0;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.1), 0 0 0 2px #a68b44;
     box-sizing: border-box;
-    position: relative; /* 确保内部绝对定位正常 */
+    position: relative;
 }
 
 .town-header-top-v3 {
     display: grid;
     grid-template-columns: 200px 1fr 200px; /* 左右等宽，中间自适应 */
     align-items: center;
-    border-bottom: 3px double var(--jx3-celadon);
+    border-bottom: 1px solid #e8e0d0;
     margin-bottom: 5px;
     padding: 0 5px;
 }
@@ -2084,9 +2095,9 @@ img {
     right: 15px;
     width: 30px;
     height: 30px;
-    background: var(--jx3-paper);
-    border: 2px solid var(--jx3-celadon);
-    color: var(--jx3-celadon-dark);
+    background: #fdfaf2;
+    border: 1px solid #e8e0d0;
+    color: #4a4439;
     font-size: 24px;
     line-height: 24px;
     cursor: pointer;
@@ -2113,48 +2124,433 @@ img {
     min-height: 0; /* 关键：允许 flex 子元素在空间不足时收缩并触发滚动 */
 }
 
-/* 建筑规划区块 */
+/* 建筑规划区块 (高级营造图风格) */
 .town-construction-section {
+    flex: 1.4; /* 建筑部分占更多比例 */
     display: flex;
     flex-direction: column;
-    background: #fff;
-    border: 2px solid var(--jx3-celadon);
+    background: #fdfaf2; /* 宣纸色背景 */
+    border: 2px solid #a68b44;
     border-radius: var(--radius-md);
+    position: relative;
     overflow: hidden;
+    box-shadow: inset 0 0 40px rgba(166, 139, 68, 0.05);
+}
+
+.town-construction-layout {
+    display: flex;
     height: 100%;
 }
 
-.construction-container {
-    padding: 10px;
-    overflow-y: auto;
+/* 侧边区域导航 (V8 雅致宣纸风格) */
+.district-sidebar {
+    width: 74px;
+    background: #fdfaf2; /* 宣纸色 */
+    background-image: 
+        linear-gradient(to bottom, rgba(166, 139, 68, 0.02), transparent),
+        url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDE2NiwgMTM5LCA2OCwgMC4wNSkiIHN0cm9rZS13aWR0aD0iMSI+PHBhdGggZD0iTTAgMGg0MHY0MEgweiIvPjxwYXRoIGQ9Ik0wIDIwaDQwTTIwIDB2NDAiLz48L2c+PC9zdmc+');
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    flex: 1; /* 撑满父容器空间 */
+    gap: 6px;
+    padding: 12px 0;
+    border-right: 2px solid #e8e0d0;
+    position: relative;
+    box-shadow: inset -2px 0 10px rgba(166, 139, 68, 0.05);
 }
 
-.construction-category {
+.district-active-indicator {
+    position: absolute;
+    left: 6px;
+    width: 62px;
+    height: 110px;
+    background: #fdfaf2;
+    border-radius: 4px;
+    transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    z-index: 1;
+    box-shadow: 0 4px 15px rgba(166, 139, 68, 0.15);
+    border: 2px solid #a68b44;
+}
+
+.district-active-indicator::after {
+    content: "";
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left: 10px solid #a68b44;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+}
+
+.district-tab {
+    height: 110px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #8c8882;
+    transition: all 0.3s ease;
+    position: relative;
+    background: transparent;
+    border: none;
+    margin: 0 6px;
+    z-index: 2; /* 确保在指示器上方 */
 }
 
-.cat-label {
+.district-tab:hover {
+    color: #4a4439;
+}
+
+.district-tab.active {
+    color: #a68b44;
+}
+
+/* 移除原有的 active 样式 */
+.district-tab.active::after {
+    display: none;
+}
+
+/* 侧边栏图标优化 */
+.district-tab-icon {
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: grayscale(0.8) opacity(0.5); /* 默认几乎灰掉，强调对比 */
+}
+
+.district-tab:hover .district-tab-icon {
+    filter: grayscale(0) opacity(1);
+    transform: scale(1.1);
+}
+
+.district-tab.active .district-tab-icon {
+    filter: grayscale(0) opacity(1);
+    transform: scale(1.2);
+}
+
+/* 针对不同分类的主题发光效果 */
+.district-tab[data-id="economy"].active .district-tab-icon {
+    filter: drop-shadow(0 0 12px rgba(166, 139, 68, 0.9));
+}
+.district-tab[data-id="military"].active .district-tab-icon {
+    filter: drop-shadow(0 0 12px rgba(200, 50, 50, 0.9));
+}
+.district-tab[data-id="magic"].active .district-tab-icon {
+    filter: drop-shadow(0 0 12px rgba(91, 138, 138, 0.9));
+}
+
+.district-tab-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
     font-size: 0.9rem;
+    letter-spacing: 3px;
     font-weight: bold;
-    color: var(--jx3-celadon);
-    border-left: 5px solid var(--jx3-gold);
-    padding: 1px 12px;
-    background: #f9f9f9;
+    font-family: "Microsoft YaHei", sans-serif;
+    text-shadow: none;
 }
 
-.building-grid {
+/* 区域内容显示区 (V7 剑三/武侠明亮风格) */
+.district-viewport {
+    flex: 1;
     display: flex;
-    overflow-x: auto;
-    gap: 10px;
-    padding: 5px 5px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--jx3-celadon) transparent;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #fdfaf2; /* 宣纸/米白色基调 */
+    position: relative;
+    background-image: 
+        linear-gradient(rgba(166, 139, 68, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(166, 139, 68, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+.district-content-wrapper {
+    display: flex;
+    height: 100%;
+    width: 300%;
+    transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+    z-index: 1;
+}
+
+.district-pane {
+    width: 33.333%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    position: relative;
+    flex-shrink: 0; /* 关键：防止被压缩 */
+    overflow: hidden;
+    /* 营造图网格背景：加重质感 */
+    background-image: 
+        linear-gradient(rgba(166, 139, 68, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(166, 139, 68, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+/* 经济：暖金氛围 */
+.pane-economy {
+    background: linear-gradient(135deg, rgba(166, 139, 68, 0.12) 0%, transparent 100%);
+}
+.pane-economy::after {
+    content: "💰";
+    position: absolute;
+    bottom: -30px;
+    right: 20px;
+    font-size: 14rem;
+    opacity: 0.08;
+    pointer-events: none;
+    filter: sepia(1) saturate(2);
+}
+
+/* 军事：淡朱氛围 */
+.pane-military {
+    background: linear-gradient(135deg, rgba(200, 50, 50, 0.1) 0%, transparent 100%);
+}
+.pane-military::after {
+    content: "⚔️";
+    position: absolute;
+    bottom: -30px;
+    right: 20px;
+    font-size: 14rem;
+    opacity: 0.08;
+    pointer-events: none;
+}
+
+/* 宗门：浅青氛围 */
+.pane-magic {
+    background: linear-gradient(135deg, rgba(91, 138, 138, 0.12) 0%, transparent 100%);
+}
+.pane-magic::after {
+    content: "☯️";
+    position: absolute;
+    bottom: -30px;
+    right: 20px;
+    font-size: 14rem;
+    opacity: 0.08;
+    pointer-events: none;
+}
+
+/* 区域头部：极简风格 */
+.district-header-v5-mini {
+    padding: 10px 20px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.9), transparent);
+    border-bottom: 1px solid rgba(166, 139, 68, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.mini-icon {
+    font-size: 1.2rem;
+}
+
+.mini-title {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #4a4439;
+    font-family: "Microsoft YaHei", sans-serif;
+}
+
+.mini-desc {
+    font-size: 0.8rem;
+    color: #a68b44;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.blueprint-scroll-area.v5 {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* 每行 4 个左右 */
+    gap: 12px;
+    align-content: start;
+}
+
+/* 建筑节点：大图标、精致感升级 */
+.building-node-v4 {
+    background: #fff;
+    border: 1px solid #e8e0d0;
+    border-radius: 4px;
+    padding: 0;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.05);
+    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    height: fit-content;
+}
+
+.building-node-v4:hover {
+    transform: translateY(-6px);
+    border-color: #a68b44;
+    box-shadow: 0 12px 24px rgba(166, 139, 68, 0.15);
+}
+
+.node-icon-wrapper {
+    width: 100%;
+    height: 80px; /* 稍微调小一点，配合 4 列 */
+    background: #fdfaf2;
+    border-bottom: 1px solid #f0e6cc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
+}
+
+.node-icon {
+    width: 56px !important;
+    height: 56px !important;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+}
+
+.node-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.node-name {
+    color: #333;
+    font-size: 0.85rem;
+    font-weight: bold;
+    margin-bottom: 6px;
+    font-family: "Microsoft YaHei", sans-serif;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-level-bar {
+    width: 100%;
+    height: 4px;
+    background: #f0f0f0;
+    border-radius: 2px;
+    margin-bottom: 6px;
+    overflow: hidden;
+}
+
+.node-level-progress {
+    height: 100%;
+    background: #a68b44;
+    transition: width 0.5s ease;
+}
+
+.node-footer {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 0.75rem;
+    align-items: center;
+}
+
+.node-lv-text {
+    color: #8c8882;
+    font-weight: bold;
+}
+
+.node-cost-mini {
+    color: #a68b44;
+    font-weight: bold;
+    background: rgba(166, 139, 68, 0.05);
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+
+/* 自定义滚动条匹配深色调 */
+.blueprint-scroll-area.v5::-webkit-scrollbar {
+    width: 4px;
+}
+/* 营造动态云雾/粒子感 */
+@keyframes flowMist {
+    from { background-position: 0% 0%; }
+    to { background-position: 100% 100%; }
+}
+
+.pane-magic::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48ZyBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii4wNSI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMiIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iNDAiIHI9IjEiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjgwIiByPSIxLjUiLz48L2c+PC9zdmc+');
+    opacity: 0.3;
+    animation: flowMist 60s linear infinite;
+    pointer-events: none;
+}
+
+/* 施工完成后的闪烁特效 */
+@keyframes buildSuccess {
+    0% { box-shadow: 0 0 0 0 rgba(166, 139, 68, 0.4); }
+    70% { box-shadow: 0 0 0 15px rgba(166, 139, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(166, 139, 68, 0); }
+}
+
+.building-node-v4.just-upgraded {
+    animation: buildSuccess 0.6s ease-out;
+}
+
+.node-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.node-name {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #3d3b38;
+    margin-bottom: 6px;
+    text-align: center;
+    font-family: "Microsoft YaHei", sans-serif;
+}
+
+.node-level-bar {
+    width: 100%;
+    height: 4px;
+    background: #f0f0f0;
+    border-radius: 2px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+.node-level-progress {
+    height: 100%;
+    background: #a68b44;
+    transition: width 0.5s ease;
+}
+
+.node-footer {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 0.7rem;
+    align-items: center;
+}
+
+.node-lv-text {
+    color: #8c8882;
+    font-weight: 500;
+}
+
+.node-cost-mini {
+    color: #a68b44;
+    font-weight: bold;
+    background: rgba(166, 139, 68, 0.05);
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+
+.building-node-v4.cannot-afford {
+    opacity: 0.8;
+}
+
+.building-node-v4.cannot-afford .node-cost-mini {
+    color: #ff4444;
 }
 
 .building-grid::-webkit-scrollbar {
@@ -2233,14 +2629,27 @@ img {
 }
 
 .building-name {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: bold;
-    color: #333;
+    color: #444;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
+    font-family: "Microsoft YaHei", sans-serif;
+    margin-bottom: 2px;
+}
+
+.building-level-badge {
+    font-size: 0.7rem;
+    color: #888;
+    background: #f5f5f5;
+    padding: 0px 6px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    margin-bottom: 2px;
+    font-weight: 500;
 }
 
 .building-cost {
@@ -2255,151 +2664,180 @@ img {
     border: 1px solid #f0e6cc;
 }
 
-/* 招募区块 */
+/* 招募区块 (V8 雅致宣纸风格) */
 .town-recruit-section {
     display: flex;
     flex-direction: column;
-    background: white;
-    border: 2px solid var(--jx3-celadon);
-    border-radius: var(--radius-md);
+    background: #fdfaf2;
+    background-image: 
+        linear-gradient(to bottom, rgba(166, 139, 68, 0.05), transparent),
+        url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48ZyBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii4wNSI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMiIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iNDAiIHI9IjEiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjgwIiByPSIxLjUiLz48L2c+PC9zdmc+');
+    border: 2px solid #e8e0d0;
+    border-radius: 4px;
+    position: relative;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
     overflow: hidden;
-    transition: var(--transition-base);
     height: 100%;
 }
 
 .recruit-list-v3 {
-    padding: 12px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     overflow-y: auto;
-    flex: 1; /* 核心：独立滚动空间，不再受建筑列表长度影响 */
+    flex: 1;
 }
 
 .recruit-item {
     display: grid;
-    grid-template-columns: 48px 1fr 70px;
+    grid-template-columns: 56px 1fr 70px;
     align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border: 1px solid #eee;
-    border-radius: var(--radius-md);
-    background: #fff;
-    transition: var(--transition-base);
+    gap: 12px;
+    padding: 10px;
+    border: 1px solid #e8e0d0;
+    background: white;
+    background-image: linear-gradient(135deg, rgba(166, 139, 68, 0.02) 0%, transparent 100%);
+    border-radius: 2px;
+    transition: all 0.3s ease;
 }
 
 .recruit-item:hover {
-    border-color: var(--jx3-gold);
-    background: #fdfaf2;
-    transform: translateX(3px);
+    transform: translateX(5px);
+    border-color: #a68b44;
+    box-shadow: 0 4px 12px rgba(166, 139, 68, 0.1);
+}
+
+.unit-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.unit-name {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #4a4439;
+}
+
+.unit-cost {
+    font-size: 0.8rem;
+    color: #a68b44;
+    font-weight: bold;
 }
 
 .recruit-item .wuxia-btn {
-    padding: 8px 0;
-    font-size: 0.9rem;
-    letter-spacing: 1px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: #fdfaf2;
+    border: 1px solid #a68b44;
+    color: #a68b44;
+    box-shadow: none;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
 }
 
-/* 调兵区域 */
+.recruit-item .wuxia-btn:hover {
+    background: #a68b44;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(166, 139, 68, 0.2);
+}
+
+/* 调兵区域 (V8 雅致宣纸风格) */
 .town-army-section {
     display: grid;
-    grid-template-columns: 1fr 60px 1fr;
-    gap: 10px;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 15px;
     align-items: center;
-    background: #fff;
-    padding: 8px; /* 压缩内边距 */
-    border: 2px solid var(--jx3-celadon);
-    border-radius: var(--radius-md);
-    transition: var(--transition-base);
+    background: #fdfaf2;
+    padding: 15px;
+    border: 2px solid #e8e0d0;
+    border-radius: 4px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    position: relative;
+    margin-top: 10px;
 }
 
 .army-container {
-    background: #f9f9f9;
-    border: 1px solid #ddd;
-    border-radius: var(--radius-md);
-    padding: 8px 8px 12px 8px; /* 增加底部内边距，防止兵力文字被截断 */
-    min-width: 0; /* 核心修复：防止 grid/flex 子元素被内部长内容撑开，强制触发滚动条 */
-    transition: var(--transition-base);
-}
-
-.army-slots-v3 {
-    display: flex;
-    flex-wrap: nowrap; /* 核心：禁止换行，确保单行水平排列 */
-    gap: 8px;
-    height: 85px; /* 核心：固定高度，禁止垂直扩展，保证原始尺寸稳定 */
-    justify-content: flex-start; /* 核心：必须靠左对齐，以便在溢出时正确滚动 */
-    padding: 8px;
-    overflow-x: auto; /* 开启水平滚动 */
-    overflow-y: hidden; /* 禁止垂直溢出 */
-    scrollbar-width: thin;
-    scrollbar-color: var(--jx3-gold) rgba(0,0,0,0.05);
-}
-
-/* 确保兵力槽在滚动时不收缩 */
-.army-slots-v3 .unit-slot {
-    flex-shrink: 0;
-}
-
-/* 自定义水平滚动条样式 */
-.army-slots-v3::-webkit-scrollbar {
-    height: 6px;
-}
-
-.army-slots-v3::-webkit-scrollbar-thumb {
-    background: var(--jx3-gold);
-    border-radius: var(--radius-md);
-}
-
-.army-slots-v3::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.05);
-    border-radius: var(--radius-md);
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 2px;
+    padding: 12px;
+    height: 100%;
 }
 
 .army-label {
     font-size: 0.9rem;
+    color: #4a4439;
+    letter-spacing: 2px;
     font-weight: bold;
-    color: var(--jx3-celadon);
+    margin-bottom: 10px;
     text-align: center;
-    margin-bottom: 5px;
+    border-bottom: 1px solid #f0e6cc;
     padding-bottom: 5px;
-    border-bottom: 1px solid #eee;
 }
 
+.army-slots-v3 {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+/* 调兵槽位：雅致风格 */
+.army-slots-v3 .unit-slot {
+    width: 48px;
+    height: 48px;
+    background: #fdfaf2;
+    border: 1px solid #e8e0d0;
+    border-radius: 4px;
+    position: relative;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+    flex-shrink: 0;
+}
+
+.army-slots-v3 .unit-slot:hover {
+    background: #fff;
+    border-color: #a68b44;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(166, 139, 68, 0.15);
+}
+
+/* 调兵转换按钮：雅致风格 */
 .army-transfer-actions {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 15px;
     align-items: center;
-    justify-content: center;
-    padding: 0 5px;
 }
 
 .transfer-btn {
+    width: 40px;
+    height: 40px;
     background: #fdfaf2;
-    border: 2px solid var(--jx3-celadon);
-    color: var(--jx3-celadon);
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-md);
-    cursor: pointer;
+    border: 2px solid #a68b44;
+    border-radius: 50%;
+    color: #a68b44;
     font-size: 1.1rem;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    padding: 0;
 }
 
-.transfer-btn:hover {
-    background: var(--jx3-celadon);
-    color: white;
+.transfer-btn:hover:not(:disabled) {
+    background: #a68b44;
+    color: #fff;
     transform: scale(1.1);
-    border-color: var(--jx3-gold);
 }
 
-.transfer-btn:active {
-    transform: scale(0.95);
+.transfer-btn:active:not(:disabled) {
+    transform: scale(0.9);
 }
 
 .town-footer-v3 {
@@ -3801,6 +4239,8 @@ body.is-mobile .save-details {
     pointer-events: auto;
     position: absolute;
     bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
     background: var(--jx3-paper);
     border: 4px solid var(--jx3-celadon);
     padding: 15px 30px;
@@ -3809,6 +4249,7 @@ body.is-mobile .save-details {
     align-items: center;
     gap: 15px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    z-index: 1000;
 }
 
 .pixel-font {

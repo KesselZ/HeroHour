@@ -3,6 +3,8 @@ import { SkillRegistry } from '../data/SkillRegistry.js';
 import { audioManager } from '../engine/AudioManager.js';
 import { talentManager } from '../systems/TalentManager.js';
 import { timeManager } from '../systems/TimeManager.js';
+import { useGameStore } from '../store/gameStore';
+import { useHeroStore } from '../store/heroStore';
 import { rng, setSeed } from '../utils/Random.js';
 import { UNIT_STATS_DATA, UNIT_COSTS, HERO_IDENTITY } from '../data/UnitStatsData.js';
 import { WorldStatusManager } from '../world/WorldStatusManager.js';
@@ -18,9 +20,7 @@ import { terrainManager, TERRAIN_STYLES } from '../world/TerrainManager.js';
  */
 const UNIT_STATS_DATA_INTERNAL = UNIT_STATS_DATA;
 
-/**
- * 大世界数据管理器 (单例)
- * 负责追踪资源、英雄兵力、城镇兵力
+ /* 负责追踪资源、英雄兵力、城镇兵力
  */
 export class WorldManager {
     /**
@@ -343,6 +343,9 @@ export class WorldManager {
                 description: '由藏剑山庄真传弟子和长老组成的精锐，重剑无锋，大巧不工。'
             }
         };
+
+        // --- 核心初始化：立即同步一次初始数据到 UI ---
+        this.updateHUD();
     }
 
     get heroData() { return this.heroManager.heroData; }
@@ -1227,6 +1230,48 @@ export class WorldManager {
         };
     }
 
+    /**
+     * 核心同步：将指定城镇数据推送到 React Store
+     * @param {string} cityId 
+     */
+    /**
+     * 核心同步：将指定城镇数据推送到 React Store
+     * @param {string} cityId 
+     * @param {boolean} isPhysicalOverride 强制设定是否为“亲临” (不传则根据距离自动判定)
+     */
+    syncCityToStore(cityId, isPhysicalOverride = null) {
+        const city = this.cities[cityId];
+        if (!city) return;
+
+        // 获取可招募列表
+        const recruits = this.getAvailableRecruits(cityId).map(u => ({
+            type: u.type,
+            name: this.getUnitDetails(u.type).name,
+            cost: this.getRecruitGoldCost(u.type, cityId),
+            icon: u.type // 兵种 ID 通常也是图标 ID
+        }));
+
+        const isPhysicalVisit = (isPhysicalOverride !== null) ? isPhysicalOverride : this.isPlayerAtCity(cityId);
+
+        useGameStore.getState().updateCity({
+            id: city.id,
+            name: city.name,
+            type: city.type,
+            isMainCity: cityId === 'main_city_1',
+            isPhysicalVisit: isPhysicalVisit,
+            income: city.getTotalProduction(),
+            buildings: city.getAvailableBuildings(),
+            garrison: city.availableUnits || {}, // 使用城市自身的守军数据
+            recruits: recruits
+        });
+
+        // 同步英雄队伍
+        useHeroStore.getState().updateStats({
+            army: { ...this.factions['player'].army },
+            currentLeadership: this.getArmyTotalPower(this.factions['player'].army, 1) // 计算当前占用的统御值
+        });
+    }
+
     updateHUD() {
         this.syncBuildingsToModifiers();
         const resources = ['gold', 'wood'];
@@ -1234,6 +1279,15 @@ export class WorldManager {
             const el = document.getElementById(`world-${res}`);
             if (el) el.innerText = this.resources[res];
         });
+
+        // --- 核心同步：将数据推送到 React Store ---
+        useGameStore.getState().updateResources({
+            gold: this.resources.gold,
+            wood: this.resources.wood
+        });
+
+        // 默认同步当前关注的城镇（如果是主城）
+        this.syncCityToStore('main_city_1');
     }
 
     updateHeroArmy(changes) {

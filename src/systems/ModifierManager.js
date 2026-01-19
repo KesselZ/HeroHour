@@ -1,51 +1,20 @@
+import { useModifierStore } from '../store/modifierStore';
+
 /**
  * ModifierManager - 核心属性修正管理器
- * 
- * ============================================================================
- * 设计哲学：约定优于配置 (Convention over Configuration, CoC)
- * ============================================================================
- * 为了实现英雄技能、天赋、Buff 系统的高度解耦，我们采用了一套声明式的命名协议。
- * 
- * [核心逻辑]：
- * 消费端（如 Skill.js）不查询具体的英雄或天赋，而是查询特定命名的“属性（Stat）”。
- * 生产端（如 TalentRegistry.js）通过 addModifier 注入这些属性。
- * 
- * ============================================================================
- * 命名协议清单 (Protocol Registry)
- * ============================================================================
- * 
- * 1. 技能控制协议 (Skill Control Protocol)
- *    消费端: src/systems/Skill.js -> getActualCooldown() / getActualDuration() / getActualRadius()
- *    ------------------------------------------------------------------------
- *    - [skillId/category]_cooldown_multiplier: [倍率] 独立乘法修正
- *    - [skillId/category]_cooldown_override:   [绝对值] 强制覆盖 CD (ms)
- *    - [skillId/category]_duration_offset:     [绝对值] 增加时长 (ms)
- *    - [skillId/category]_duration_override:   [绝对值] 强制覆盖时长 (ms)
- *    - [skillId/category]_radius_multiplier:   [倍率] 范围缩放
- *    - [skillId/category]_mana_cost_multiplier: [倍率] 内力消耗倍率
- * 
- *    协议格式约定: [作用域]_[标识符]_[属性]_[方式]
- *    作用域(Scope): skill (针对具体 ID) 或 category (针对招式类别)
- *    属性(Property): cooldown, duration, radius, mana_cost
- *    方式(Method): multiplier (乘法), offset (加法), override (覆盖)
- * 
- * 2. 英雄机制协议 (Hero Mechanism Protocol)
- *    消费端: src/entities/Soldier.js -> performAttack() 或其他特定逻辑
- *    ------------------------------------------------------------------------
- *    - tiance_yulin_enabled: [开关] 1=开启 AOE 扫击模式, 0=默认单体模式
- *    - tiance_bleeding_enabled: [系数] 非 0 则开启招式流血，值为伤害百分比 (如 0.15)
- *    - cangjian_fengming_enabled: [开关] 1=开启凤鸣奇穴联动逻辑
- * 
- * 3. 基础状态协议 (Core Flag Protocol)
- *    消费端: src/systems/ModifierManager.js -> getModifiedValue() 的 flagStats 列表
- *    ------------------------------------------------------------------------
- *    - stun: [开关] 1=眩晕，无法行动
- *    - invincible: [开关] 1=无敌，不接收伤害判定
- *    - controlImmune: [开关] 1=免疫控制
  */
 class ModifierManager {
     constructor() {
         this.globalModifiers = []; // 全局修正 (如主角天赋、科技树)
+    }
+
+    /**
+     * 核心优化：将底层数据同步至 React Store，触发 UI 响应
+     */
+    syncToStore() {
+        if (typeof window !== 'undefined') {
+            useModifierStore.getState().syncModifiers(this.globalModifiers);
+        }
     }
 
     /**
@@ -60,7 +29,7 @@ class ModifierManager {
         const normalizedMod = {
             id: mod.id,
             side: mod.side,
-            unitType: mod.unitType || 'global', // 核心修复：不再使用 mod.type 作为 fallback，防止与计算类型冲突
+            unitType: mod.unitType || 'global',
             stat: mod.stat,
             source: mod.source,
             targetUnit: mod.targetUnit, 
@@ -68,7 +37,9 @@ class ModifierManager {
             offset: mod.offset || 0,
             startTime: mod.startTime || Date.now(),
             duration: mod.duration || null,
-            onCleanup: mod.onCleanup || null // 核心新增：支持过期后的清理回调
+            onCleanup: mod.onCleanup || null,
+            type: mod.type, // 保持类型信息供 React 层识别逻辑
+            method: mod.method
         };
 
         // 处理显式类型转换
@@ -88,13 +59,15 @@ class ModifierManager {
             }
         }
 
-        // --- 核心优化：原地更新以防止数值闪烁与状态丢失 ---
         const existingIndex = this.globalModifiers.findIndex(m => m.id === mod.id);
         if (existingIndex !== -1) {
             this.globalModifiers[existingIndex] = normalizedMod;
         } else {
             this.globalModifiers.push(normalizedMod);
         }
+
+        // 同步至 React
+        this.syncToStore();
     }
 
     /**
@@ -103,30 +76,31 @@ class ModifierManager {
      */
     removeModifiersBySource(source) {
         this.globalModifiers = this.globalModifiers.filter(m => m.source !== source);
+        this.syncToStore();
     }
 
     /**
-     * 移除特定单位的所有修正器 (解决内存泄漏与性能压力)
+     * 移除特定单位的所有修正器
      * @param {Object} unit 
      */
     removeModifiersByTarget(unit) {
         if (!unit) return;
         this.globalModifiers = this.globalModifiers.filter(m => m.targetUnit !== unit);
+        this.syncToStore();
     }
 
     /**
-     * 清理所有战斗相关的瞬时修正器 (通常在战斗结束时调用)
-     * 移除所有具有 targetUnit 的修正器，以及来源为 skill 或 status 的修正器
+     * 清理所有战斗相关的瞬时修正器
      */
     clearBattleModifiers() {
         this.globalModifiers = this.globalModifiers.filter(m => {
-            // 保留没有 targetUnit 且 来源不是 skill/status/hero_mode 的修正器 (如天赋)
             const isPermanent = !m.targetUnit && 
                               m.source !== 'skill' && 
                               m.source !== 'status' && 
                               m.source !== 'hero_mode';
             return isPermanent;
         });
+        this.syncToStore();
     }
 
     /**
@@ -136,6 +110,7 @@ class ModifierManager {
     removeModifier(id) {
         if (!id) return;
         this.globalModifiers = this.globalModifiers.filter(m => m.id !== id);
+        this.syncToStore();
     }
 
     /**
@@ -143,7 +118,7 @@ class ModifierManager {
      * 遵循标准的 RPG 数值模型：Final = (Base * Product(More) * (1 + Sum(Inc))) + Sum(Flat)
      */
     getModifiedValue(unit, statName, baseValue) {
-        // --- 1. 处理具有逻辑依赖的派生属性 (聚合桶逻辑) ---
+        // ... (保持计算逻辑不变以确保引擎性能)
         
         // 1.1 冷却与消耗
         if (statName === 'cooldown_multiplier' || statName === 'mana_cost_multiplier') {
@@ -301,6 +276,7 @@ class ModifierManager {
 
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('modifiers-updated'));
+                this.syncToStore();
             }
         }
     }
@@ -366,6 +342,7 @@ class ModifierManager {
      */
     clear() {
         this.globalModifiers = [];
+        this.syncToStore();
     }
 }
 

@@ -18,10 +18,12 @@ import { weatherManager } from './systems/WeatherManager.js';
 
 import { HOW_TO_PLAY } from './data/HowToPlayContent.js';
 
+import { useGameStore } from './store/gameStore';
+import { useUIStore } from './store/uiStore';
+
 // 游戏状态管理
 const GameState = {
     MENU: 'menu',
-    CHAR_SELECT: 'char_select',
     LOADING: 'loading',
     WORLD: 'world', 
     BATTLE: 'battle'
@@ -30,21 +32,16 @@ const GameState = {
 let currentState = GameState.MENU;
 let worldInstance = null; 
 let battleInstance = null;
-let selectedHero = null;
 
 function togglePause() {
     if (currentState !== GameState.WORLD && currentState !== GameState.BATTLE) return;
     const nextState = !timeManager.isLogicPaused;
-    const pauseMenu = document.getElementById('pause-menu');
+    
     if (nextState) {
-        pauseMenu.classList.remove('hidden');
+        useUIStore.getState().openPanel('pauseMenu');
         audioManager.play('ui_click');
     } else {
-        pauseMenu.classList.add('hidden');
-        const defaultOps = document.getElementById('pause-default-options');
-        const settingOps = document.getElementById('pause-settings-options');
-        if (defaultOps) defaultOps.classList.remove('hidden');
-        if (settingOps) settingOps.classList.add('hidden');
+        useUIStore.getState().closePanel();
         audioManager.play('ui_click');
     }
     window.setGamePaused(nextState);
@@ -62,41 +59,20 @@ window.setGamePaused = (paused) => {
 
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        const panels = [
-            'talent-panel',
-            'hero-stats-panel',
-            'town-management-panel',
-            'skill-learn-panel',
-            'how-to-play-panel',
-            'load-save-panel',
-            'save-game-panel',
-            'game-start-window'
-        ];
-        let panelClosed = false;
-        for (const id of panels) {
-            const panel = document.getElementById(id);
-            if (panel && !panel.classList.contains('hidden')) {
-                if (id === 'talent-panel') {
-                    uiManager.toggleTalentPanel(false);
-                    panelClosed = true;
-                    break;
-                }
-                panel.classList.add('hidden');
-                audioManager.play('ui_click', { volume: 0.4 });
-                if (id === 'town-management-panel' && worldInstance) {
-                    worldInstance.closeTownManagement();
-                }
-                if (id === 'world-event-history-panel') {
-                    WorldStatusManager.updateNotificationDot(false);
-                }
-                if ((id === 'skill-learn-panel' || id === 'how-to-play-panel') && uiManager.isMobile) {
-                    uiManager.setHUDVisibility(true);
-                }
-                panelClosed = true;
-                break; 
+        // 核心逻辑：优先关闭 React 面板
+        const activePanel = useUIStore.getState().activePanel;
+        if (activePanel) {
+            // 如果是在暂停菜单里开了子面板（如存读档），返回暂停菜单
+            if (activePanel === 'saveGame' || activePanel === 'loadSave') {
+                useUIStore.getState().openPanel('pauseMenu');
+            } else {
+                useUIStore.getState().closePanel();
+                if (uiManager.isMobile) uiManager.setHUDVisibility(true);
             }
+            return;
         }
-        if (panelClosed) return;
+
+        // 战斗内特殊逻辑
         if (currentState === GameState.BATTLE && battleInstance) {
             if (battleInstance.selectedType) {
                 battleInstance.selectedType = null;
@@ -113,6 +89,8 @@ window.addEventListener('keydown', (e) => {
                 return;
             }
         }
+        
+        // 最后才是切换暂停
         togglePause();
     }
 });
@@ -141,15 +119,8 @@ const pauseSaveBtn = document.getElementById('pause-save-btn');
 const pauseLoadBtn = document.getElementById('pause-load-btn');
 if (pauseSaveBtn) {
     pauseSaveBtn.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        const savePanel = document.getElementById('save-game-panel');
-        if (savePanel) {
-            savePanel.classList.remove('hidden');
-            renderSaveSlots('save-game-list-container', 'save');
-            if (uiManager.isMobile) uiManager.setHUDVisibility(false);
-            const closeBtn = document.getElementById('close-save-game');
-            if (closeBtn) closeBtn.onclick = () => closePanelWithHUD('save-game-panel');
-        }
+        useUIStore.getState().openPanel('saveGame');
+        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
     });
 }
 if (pauseLoadBtn) {
@@ -166,35 +137,7 @@ if (pauseLoadBtn) {
     });
 }
 
-const openSettingsBtn = document.getElementById('open-settings-btn');
-const closeSettingsBtn = document.getElementById('close-settings-btn');
-if (openSettingsBtn && closeSettingsBtn) {
-    openSettingsBtn.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        document.getElementById('pause-default-options').classList.add('hidden');
-        document.getElementById('pause-settings-options').classList.remove('hidden');
-    });
-    closeSettingsBtn.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        document.getElementById('pause-settings-options').classList.add('hidden');
-        document.getElementById('pause-default-options').classList.remove('hidden');
-    });
-}
-
-const bgmSlider = document.getElementById('bgm-volume-slider');
-const sfxSlider = document.getElementById('sfx-volume-slider');
-if (bgmSlider) {
-    bgmSlider.value = audioManager.bgmVolume;
-    bgmSlider.addEventListener('input', (e) => audioManager.setBGMVolume(parseFloat(e.target.value)));
-}
-if (sfxSlider) {
-    sfxSlider.value = audioManager.sfxVolume;
-    sfxSlider.addEventListener('input', (e) => audioManager.setSFXVolume(parseFloat(e.target.value)));
-}
-
-if (document.getElementById('back-to-menu-from-pause-btn')) {
-    document.getElementById('back-to-menu-from-pause-btn').addEventListener('click', () => window.location.reload());
-}
+// 暂停菜单逻辑已迁移至 React (PauseMenuPanel.tsx)
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -219,201 +162,11 @@ const progressFill = document.getElementById('loading-progress-fill');
 const loadingText = document.getElementById('loading-text');
 const uiLayer = document.getElementById('ui-layer');
 
-const startBtn = document.querySelector('#start-btn');
-const loadSaveBtnRoot = document.querySelector('#load-save-btn');
-const skillGalleryBtn = document.querySelector('#open-skill-learn-btn');
-const howToPlayBtn = document.querySelector('#how-to-play-btn');
-const mainMenu = document.querySelector('#main-menu');
-const charSelectMenu = document.querySelector('#character-select');
-const charCards = document.querySelectorAll('.hero-card');
-const confirmCharBtn = document.querySelector('#confirm-char-btn');
-const backToMenuBtn = document.querySelector('#back-to-menu-btn');
-const menuBg = document.querySelector('#menu-background');
-const diffSelectMenu = document.querySelector('#difficulty-select');
-const diffCards = document.querySelectorAll('.diff-card');
-const confirmDiffBtn = document.querySelector('#confirm-diff-btn');
-const backToCharBtn = document.querySelector('#back-to-char-btn');
-let selectedDifficulty = 'easy';
-
 function initUIIcons() {
-    ['liwangsheng', 'lichengen', 'yeying'].forEach(id => {
-        const p = document.querySelector(`.${id}-portrait`);
-        if (p) Object.assign(p.style, spriteFactory.getIconStyle(id));
-    });
-    document.querySelectorAll('.unit-slot').forEach(slot => {
-        const type = slot.getAttribute('data-type');
-        const icon = slot.querySelector('.slot-icon');
-        if (icon && type) Object.assign(icon.style, spriteFactory.getIconStyle(type));
-    });
+    // 图标预加载已移至 React 组件内部
 }
 
 initUIIcons();
-WorldStatusManager.initUI();
-
-if (skillGalleryBtn) {
-    skillGalleryBtn.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        ['town-management-panel', 'hero-stats-panel', 'game-start-window', 'how-to-play-panel', 'load-save-panel', 'save-game-panel'].forEach(id => {
-            const p = document.getElementById(id);
-            if (p) p.classList.add('hidden');
-        });
-        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
-        const p = document.getElementById('skill-learn-panel');
-        if (p) {
-            p.classList.remove('hidden');
-            uiManager.renderLearnableSkills('chunyang');
-        }
-    });
-}
-
-if (loadSaveBtnRoot) {
-    loadSaveBtnRoot.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        ['town-management-panel', 'hero-stats-panel', 'game-start-window', 'how-to-play-panel', 'skill-learn-panel', 'save-game-panel'].forEach(id => {
-            const p = document.getElementById(id);
-            if (p) p.classList.add('hidden');
-        });
-        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
-        const p = document.getElementById('load-save-panel');
-        if (p) {
-            p.classList.remove('hidden');
-            renderSaveSlots('save-list-container', 'load');
-            const closeBtn = document.getElementById('close-load-save');
-            if (closeBtn) closeBtn.onclick = () => closePanelWithHUD('load-save-panel');
-        }
-    });
-}
-
-function renderSaveSlots(containerId, mode) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = '';
-    saveManager.getAllMetadata().forEach((meta, index) => {
-        const slotId = index + 1;
-        const item = document.createElement('div');
-        item.className = `save-item ${!meta && mode === 'load' ? 'empty' : ''}`;
-        if (meta) {
-            const iconStyle = spriteFactory.getIconStyle(meta.heroId || 'liwangsheng');
-            item.innerHTML = `<div class="save-portrait" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div><div class="save-info"><div class="save-name">${meta.heroName} <span class="save-lv">Lv.${meta.heroLevel}</span></div><div class="save-details"><span>${meta.dateStr}</span><span class="save-res">💰${meta.gold}</span><span class="save-time">${saveManager.formatTimestamp(meta.timestamp)}</span></div></div>${mode === 'save' ? '<div class="save-action-badge override">覆盖</div>' : ''}`;
-        } else {
-            item.innerHTML = `<div class="save-portrait empty"></div><div class="save-info"><div class="save-name" style="color: rgba(255,255,255,0.3)">空存档位</div><div class="save-details">尚无江湖传闻</div></div>${mode === 'save' ? '<div class="save-action-badge create">建立</div>' : ''}`;
-        }
-        item.onclick = () => {
-            audioManager.play('ui_click');
-            if (mode === 'save') {
-                if (currentState === GameState.WORLD && worldInstance) worldInstance.syncEntitiesToLogic();
-                if (saveManager.save(slotId)) {
-                    uiManager.showNotification(`位置 ${slotId} 存档成功`);
-                    renderSaveSlots(containerId, mode);
-                }
-            } else if (meta) {
-                if (saveManager.load(slotId)) {
-                    uiManager.showNotification("江湖快马载入中...");
-                    ['load-save-panel', 'save-game-panel', 'pause-menu', 'main-menu', 'character-select', 'difficulty-select'].forEach(id => {
-                        const p = document.getElementById(id);
-                        if (p) p.classList.add('hidden');
-                    });
-                    if (currentState === GameState.MENU && menuBg) menuBg.classList.add('hidden');
-                    enterGameState(GameState.LOADING);
-                    setTimeout(async () => {
-                        await spriteFactory.load();
-                        selectedHero = worldManager.heroData.id;
-                        enterGameState(GameState.WORLD);
-                        window.setGamePaused(false);
-                    }, 800);
-                }
-            }
-        };
-        container.appendChild(item);
-    });
-}
-
-if (howToPlayBtn) {
-    howToPlayBtn.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        ['town-management-panel', 'hero-stats-panel', 'skill-learn-panel', 'game-start-window', 'load-save-panel', 'save-game-panel'].forEach(id => {
-            const p = document.getElementById(id);
-            if (p) p.classList.add('hidden');
-        });
-        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
-        const p = document.getElementById('how-to-play-panel');
-        const t = document.getElementById('how-to-play-text');
-        if (p && t) {
-            t.innerHTML = HOW_TO_PLAY.sections.map(s => `<div class="htp-section"><div class="htp-subtitle">${s.subtitle}</div><div class="htp-content">${s.content}</div></div>`).join('');
-            p.classList.remove('hidden');
-            const c = document.getElementById('close-how-to-play');
-            if (c) c.onclick = () => window.closePanelWithHUD('how-to-play-panel');
-        }
-    });
-}
-
-startBtn.addEventListener('click', () => {
-    audioManager.play('ui_click');
-    mainMenu.classList.add('hidden');
-    charSelectMenu.classList.remove('hidden');
-    currentState = GameState.CHAR_SELECT;
-});
-
-backToMenuBtn.addEventListener('click', () => {
-    audioManager.play('ui_click');
-    charSelectMenu.classList.add('hidden');
-    mainMenu.classList.remove('hidden');
-    currentState = GameState.MENU;
-    selectedHero = null;
-    charCards.forEach(c => c.classList.remove('selected'));
-    confirmCharBtn.classList.add('disabled');
-    confirmCharBtn.disabled = true;
-});
-
-charCards.forEach(card => {
-    card.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        charCards.forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        selectedHero = card.dataset.hero;
-        confirmCharBtn.classList.remove('disabled');
-        confirmCharBtn.disabled = false;
-    });
-});
-
-confirmCharBtn.addEventListener('click', () => {
-    if (!selectedHero) return;
-    audioManager.play('ui_click');
-    charSelectMenu.classList.add('hidden');
-    diffSelectMenu.classList.remove('hidden');
-});
-
-diffCards.forEach(card => {
-    card.addEventListener('click', () => {
-        audioManager.play('ui_click');
-        diffCards.forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        selectedDifficulty = card.dataset.diff;
-    });
-});
-
-backToCharBtn.addEventListener('click', () => {
-    audioManager.play('ui_click');
-    diffSelectMenu.classList.add('hidden');
-    charSelectMenu.classList.remove('hidden');
-});
-
-confirmDiffBtn.addEventListener('click', async () => {
-    if (!selectedHero || !selectedDifficulty) return;
-    audioManager.play('ui_click');
-    import('./utils/Random.js').then(m => m.setSeed(Math.floor(Math.random() * 1000000)));
-    diffSelectMenu.classList.add('hidden');
-    if (menuBg) menuBg.classList.add('hidden');
-    enterGameState(GameState.LOADING);
-    try {
-        await spriteFactory.load();
-        timeManager.setDifficulty(selectedDifficulty);
-        applyHeroTraits(selectedHero);
-        enterGameState(GameState.WORLD);
-    } catch (e) {
-        console.error('游戏启动失败:', e);
-    }
-});
 
 window.addEventListener('load', () => {
     setTimeout(() => {
@@ -425,9 +178,34 @@ window.addEventListener('load', () => {
             setTimeout(() => {
                 if (loadingScreen) loadingScreen.classList.add('hidden');
                 if (uiLayer) uiLayer.classList.remove('hidden');
+                // 自动打开主菜单
+                useUIStore.getState().openPanel('mainMenu');
             }, 500);
         });
     }, 100);
+});
+
+// --- 核心桥梁：响应来自 React 的游戏启动请求 ---
+window.addEventListener('request-game-start', async (e) => {
+    const { heroId, difficulty } = e.detail;
+    if (!heroId || !difficulty) return;
+    
+    console.log(`%c[游戏启动] %c侠客: ${heroId}, 难度: ${difficulty}`, 'color: #44ccff; font-weight: bold', 'color: #fff');
+    
+    // 初始化随机种子
+    import('./utils/Random.js').then(m => m.setSeed(Math.floor(Math.random() * 1000000)));
+    
+    // 进入加载状态
+    enterGameState(GameState.LOADING);
+    
+    try {
+        await spriteFactory.load();
+        timeManager.setDifficulty(difficulty);
+        applyHeroTraits(heroId);
+        enterGameState(GameState.WORLD);
+    } catch (e) {
+        console.error('游戏启动失败:', e);
+    }
 });
 
 window.addEventListener('start-battle', (e) => enterGameState(GameState.BATTLE, e.detail));
@@ -439,6 +217,39 @@ window.addEventListener('hero-level-up', () => worldManager.refreshHeroStats());
 window.addEventListener('talents-updated', () => {
     worldManager.refreshHeroStats();
     worldManager.updateHUD();
+});
+
+// --- 核心桥梁：响应来自 React UI 的存档/读档请求 ---
+window.addEventListener('request-save', (e) => {
+    const { slotId } = e.detail;
+    if (currentState === GameState.WORLD && worldInstance) {
+        // 存档前同步实体的逻辑位置
+        worldInstance.syncEntitiesToLogic();
+    }
+    if (saveManager.save(slotId)) {
+        uiManager.showNotification(`位置 ${slotId} 存档成功`);
+        // 触发 UI 刷新 (React 会监听到这个存储变化)
+        window.dispatchEvent(new CustomEvent('save-updated'));
+    }
+});
+
+window.addEventListener('request-load', (e) => {
+    const { slotId } = e.detail;
+    if (saveManager.load(slotId)) {
+        uiManager.showNotification("江湖快马载入中...");
+        
+        // 关闭所有面板
+        useUIStore.getState().closePanel();
+
+        // 进入加载流程
+        enterGameState(GameState.LOADING);
+        setTimeout(async () => {
+            await spriteFactory.load();
+            const loadedHeroId = worldManager.heroData.id;
+            enterGameState(GameState.WORLD);
+            window.setGamePaused(false);
+        }, 800);
+    }
 });
 
 function applyHeroTraits(heroId) {
@@ -480,8 +291,9 @@ function enterGameState(state, config = null) {
     scene.fog = null;
     renderer.toneMappingExposure = 1.0; 
     if (state === GameState.WORLD) {
+        const heroId = worldManager.heroData.id;
         worldInstance = new WorldScene(scene, camera, renderer);
-        worldInstance.init(selectedHero);
+        worldInstance.init(heroId);
         if (config && config.winner) worldInstance.onBattleEnd(config);
         worldInstance.start();
     } else if (state === GameState.BATTLE) {

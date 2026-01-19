@@ -10,10 +10,13 @@
     <link rel="preload" href="/assets/ui/主界面背景图.png" as="image" type="image/png">
 
     <!-- 预加载核心脚本 -->
-    <script type="module" src="./src/main.js" defer></script>
+    <script type="module" src="./src/index.tsx" defer></script>
 </head>
 <body oncontextmenu="return false;">
     <div id="app">
+        <!-- React UI 挂载点 -->
+        <div id="react-ui-root"></div>
+
         <!-- 全局通知容器 -->
         <div id="notification-container"></div>
 
@@ -34,490 +37,82 @@
 
         <!-- UI 层：主菜单、UI面板等 -->
         <div id="ui-layer" class="hidden">
-            <div id="menu-background" class="menu-bg"></div>
-            <!-- 主菜单 -->
-            <div id="main-menu" class="menu-container">
-                <div class="menu-decoration-top"></div>
-                <h1 class="game-title">稻香村<span>发展计划</span></h1>
-                <div class="menu-options">
-                    <button id="start-btn" class="wuxia-btn">闯荡江湖</button>
-                    <button id="load-save-btn" class="wuxia-btn">加载存档</button>
-                    <button id="how-to-play-btn" class="wuxia-btn">江湖指南</button>
-                    <button id="open-skill-learn-btn" class="wuxia-btn">招式图谱</button>
-                    <button id="exit-btn" class="wuxia-btn">退出游戏</button>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- React 游戏启动流程挂载点 -->
+            <div id="react-game-start-flow-mount"></div>
 
             <!-- 大世界 HUD -->
             <div id="world-ui" class="hidden">
                 <div class="top-hud-bar">
-                    <div class="resource-bar">
-                        <div class="res-item"><span class="res-emoji">💰</span><span id="world-gold">10500</span></div>
-                        <div class="res-item"><span class="res-emoji">🪵</span><span id="world-wood">5300</span></div>
-                    </div>
+                    <!-- React 资源条挂载点 -->
+                    <div id="react-resource-bar"></div>
                     
                     <div class="top-hud-divider"></div>
 
-                    <div class="world-date-display-container">
-                        <div class="world-date-display">天宝 三年 · 夏</div>
-                        <div class="time-progress-outer">
-                            <div class="time-progress-circle"></div>
-                        </div>
-                    </div>
+                    <!-- React 时间显示挂载点 -->
+                    <div id="react-date-display"></div>
                 </div>
 
-                <!-- 江湖播报系统 (小鸽子图标与气泡) -->
+                <!-- 江湖播报系统 (已迁移至 React BroadcastHorn.tsx & BroadcastBubble.tsx) -->
                 <div id="world-broadcast-system" class="broadcast-container">
-                    <div id="broadcast-horn" class="broadcast-horn" title="江湖传闻">
-                        <div class="horn-icon">🕊️</div>
-                        <div id="broadcast-dot" class="broadcast-dot hidden"></div>
-                    </div>
-                    <div id="broadcast-bubble-container" class="broadcast-bubble-container">
-                        <!-- 动态生成的播报气泡将出现在这里 -->
-                    </div>
+                    <div id="react-broadcast-horn-mount"></div>
+                    <div id="react-broadcast-bubble-mount"></div>
                 </div>
 
                 <!-- 大世界 HUD：左下角状态区 -->
                 <div class="hud-bottom-left" id="world-hud-bottom-left">
-                    <div class="hud-card hud-card-city" id="city-mini-card">
-                        <div class="hud-portrait" id="world-city-portrait"></div>
-                        <div class="hud-info">
-                            <span class="hud-name" id="world-city-display-name">稻香村</span>
-                            <span class="hud-sub">当前主城</span>
-                        </div>
-                    </div>
+                    <!-- React 城市简卡挂载点 -->
+                    <div id="react-city-mini-card"></div>
 
-                    <div class="hud-card hud-card-hero" id="hero-mini-card">
-                        <!-- 新增：天赋提醒 -->
-                        <div id="talent-hint" class="talent-hint-v1 hidden">
-                            <span class="hint-icon">✧</span>
-                            <span class="hint-text">星魄待悟</span>
-                        </div>
-                        <div class="hud-portrait" id="world-hero-portrait">
-                            <div class="hud-level-badge" id="hud-hero-level">Lv.1</div>
-                        </div>
-                        <div class="hud-info">
-                            <div class="hud-mini-bars">
-                                <div class="mini-bar-bg"><div id="hud-hero-hp-bar" class="mini-bar-fill hp"></div></div>
-                                <div class="mini-bar-bg"><div id="hud-hero-mp-bar" class="mini-bar-fill mp"></div></div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- React 英雄简卡挂载点 -->
+                    <div id="react-hero-mini-card"></div>
                 </div>
             </div>
 
-            <!-- 侠客属性面板 -->
-            <div id="hero-stats-panel" class="menu-container hidden hero-panel-v4">
-                <div class="hero-panel-header">
-                    <div class="header-ornament-left"></div>
-                    <div class="panel-title">侠客名鉴</div>
-                    <div class="header-ornament-right"></div>
-                    <button id="close-hero-panel" class="close-btn-v3">×</button>
-                </div>
-                <div class="hero-panel-main">
-                    <div class="hero-core-info">
-                            <div class="hero-avatar-area">
-                                <div class="hero-big-portrait" id="hero-panel-portrait"></div>
-                                <div class="hero-identity">
-                                    <h2 id="hero-panel-name">李忘生</h2>
-                                    <p id="hero-panel-title" class="char-title">纯阳掌门</p>
-                                    <div class="hero-level-tag">等级 <span id="hero-level-val">1</span></div>
-                                </div>
-                            </div>
-                        <div class="hero-bars-area">
-                            <div class="stat-group-v3">
-                                <div class="bar-label">气血 (HP)</div>
-                                <div class="stat-bar-container">
-                                    <div class="stat-bar-bg"><div id="hero-hp-bar" class="stat-bar-fill hp"></div></div>
-                                    <span id="hero-hp-text" class="stat-value">500/500</span>
-                                </div>
-                            </div>
-                            <div class="stat-group-v3">
-                                <div class="bar-label">内力 (MP)</div>
-                                <div class="stat-bar-container">
-                                    <div class="stat-bar-bg"><div id="hero-mp-bar" class="stat-bar-fill mp"></div></div>
-                                    <span id="hero-mp-text" class="stat-value">100/100</span>
-                                </div>
-                            </div>
-                            <div class="stat-group-v3">
-                                <div class="bar-label">阅历 (XP)</div>
-                                <div class="stat-bar-container">
-                                    <div class="stat-bar-bg"><div id="hero-xp-bar" class="stat-bar-fill xp"></div></div>
-                                    <span id="hero-xp-text" class="stat-value">0/100</span>
-                                </div>
-                            </div>
-                            <button id="open-talent-btn" class="talent-btn-v4">奇穴</button>
-                        </div>
-                    </div>
-                    <div class="hero-attributes-section">
-                        <div class="attributes-header"><span>—— 基础潜能 ——</span></div>
-                        <div class="attributes-grid-v4">
-                            <div class="attr-box highlighted" id="attr-box-morale">
-                                <div class="attr-label">士气</div>
-                                <div class="attr-val" id="attr-morale">40</div>
-                            </div>
-                            <div class="attr-box highlighted" id="attr-box-leadership">
-                                <div class="attr-label">统御</div>
-                                <div class="attr-val" id="attr-leadership-max">20</div>
-                            </div>
-                            <div class="attr-box highlighted" id="attr-box-power">
-                                <div class="attr-label" id="attr-power-label">力道</div>
-                                <div class="attr-val" id="attr-primary-val">50</div>
-                            </div>
-                            <div class="attr-box highlighted" id="attr-box-spells">
-                                <div class="attr-label">功法</div>
-                                <div class="attr-val" id="attr-fali">100</div>
-                            </div>
-                            <div class="attr-box highlighted" id="attr-box-haste">
-                                <div class="attr-label">调息</div>
-                                <div class="attr-val"><span id="attr-haste">10</span>%</div>
-                            </div>
-                            <div class="attr-box" id="attr-box-speed">
-                                <div class="attr-label">轻功</div>
-                                <div class="attr-val" id="attr-speed">0.08</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="hero-skills-section-v4">
-                        <div class="section-header-v4"><div class="label-with-icon">習得招式</div></div>
-                        <div id="hero-panel-skills" class="hero-skills-list-v4"></div>
-                    </div>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 侠客属性面板 (已迁移至 React HeroStatsPanel.tsx) -->
+            <div id="react-hero-stats-mount"></div>
 
-            <!-- 城镇管理面板 -->
-            <div id="town-management-panel" class="menu-container hidden town-panel-v3">
-                <div class="menu-decoration-top"></div>
-                <button id="close-town-panel" class="close-btn-v3" title="关闭">×</button>
-                <div class="town-header-top-v3">
-                    <div class="town-income-v3">季度产出: 💰<span id="town-income-gold">1000</span> 🪵<span id="town-income-wood">200</span></div>
-                    <h2 id="town-name" class="town-title-v3">稻香村</h2>
-                    <button id="city-teleport-btn" class="teleport-btn-v3">神行千里</button>
-                </div>
-                <div class="town-main-content">
-                    <div class="town-construction-section">
-                        <div class="construction-container">
-                            <div class="construction-category economy"><div class="cat-label">商业</div><div id="build-cat-economy" class="building-grid"></div></div>
-                            <div class="construction-category military"><div class="cat-label">军事</div><div id="build-cat-military" class="building-grid"></div></div>
-                            <div class="construction-category magic"><div class="cat-label">特殊</div><div id="build-cat-magic" class="building-grid"></div></div>
-                        </div>
-                    </div>
-                    <div class="town-recruit-section">
-                        <div id="town-recruit-list" class="recruit-list-v3"></div>
-                    </div>
-                </div>
-                <div class="town-army-section">
-                    <div class="army-container garrison"><div class="army-label">驻守兵力</div><div id="town-units-list" class="army-slots-v3"></div></div>
-                    <div class="army-transfer-actions">
-                        <button id="collect-all-btn" class="transfer-btn" title="全部领取至队伍">▶</button>
-                        <button id="deposit-all-btn" class="transfer-btn" title="队伍全部驻守">◀</button>
-                    </div>
-                    <div class="army-container hero-army"><div class="army-label">我的队伍</div><div id="hero-army-list" class="army-slots-v3"></div></div>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 城镇管理面板 (已迁移至 React TownManagementPanel.tsx) -->
+            <div id="react-town-management-mount"></div>
 
-            <!-- 神行千里传送面板 -->
-            <div id="teleport-panel" class="menu-container hidden teleport-panel-v3">
-                <div class="menu-decoration-top"></div>
-                <button id="close-teleport-panel" class="close-btn-v3" title="关闭">×</button>
-                <div class="teleport-header">
-                    <h2 class="teleport-title">神行千里</h2>
-                    <p class="teleport-subtitle">选择你要传送的目的地</p>
-                </div>
-                <div id="teleport-destinations" class="teleport-grid panel-content-scroll">
-                    <!-- 动态生成传送点 -->
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 神行千里传送面板 (已迁移至 React TeleportPanel.tsx) -->
+            <div id="react-teleport-mount"></div>
 
-            <!-- 招式学习/指南面板 -->
-            <div id="skill-learn-panel" class="menu-container hidden standard-panel-v4">
-                <div class="standard-panel-header">
-                    <div class="header-ornament-left"></div>
-                    <div class="panel-title">招式图谱</div>
-                    <div class="header-ornament-right"></div>
-                    <button id="close-skill-learn" class="close-btn-v3">×</button>
-                </div>
-                <div class="standard-panel-main">
-                    <div class="skill-learn-header-row">
-                        <div class="skill-learn-tabs">
-                            <button class="tab-btn active" data-sect="chunyang">纯阳招式</button>
-                            <button class="tab-btn" data-sect="tiance">天策招式</button>
-                            <button class="tab-btn" data-sect="cangjian">藏剑招式</button>
-                        </div>
-                    </div>
-                    <div id="skill-list-to-learn" class="skill-grid-v3 panel-content-scroll"></div>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 招式学习/指南面板 (已迁移至 React SkillLearnPanel.tsx) -->
+            <div id="react-skill-learn-mount"></div>
 
-            <div id="how-to-play-panel" class="menu-container hidden standard-panel-v4">
-                <div class="standard-panel-header">
-                    <div class="header-ornament-left"></div>
-                    <div class="panel-title">江湖指南</div>
-                    <div class="header-ornament-right"></div>
-                    <button id="close-how-to-play" class="close-btn-v3">×</button>
-                </div>
-                <div class="standard-panel-main">
-                    <div id="how-to-play-text" class="panel-content-scroll"></div>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 玩法指南面板 (已迁移至 React HowToPlayPanel.tsx) -->
+            <div id="react-how-to-play-mount"></div>
 
-            <!-- 读取存档面板 -->
-            <div id="load-save-panel" class="menu-container hidden standard-panel-v4">
-                <div class="standard-panel-header">
-                    <div class="header-ornament-left"></div>
-                    <div class="panel-title">载入江湖</div>
-                    <div class="header-ornament-right"></div>
-                    <button id="close-load-save" class="close-btn-v3">×</button>
-                </div>
-                <div class="standard-panel-main">
-                    <div class="load-save-list panel-content-scroll" id="save-list-container">
-                        <!-- 存档项占位 -->
-                    </div>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 读取存档面板 (已迁移至 React SaveLoadPanel.tsx) -->
+            <div id="react-load-save-mount"></div>
 
-            <!-- 保存存档面板 -->
-            <div id="save-game-panel" class="menu-container hidden standard-panel-v4">
-                <div class="standard-panel-header">
-                    <div class="header-ornament-left"></div>
-                    <div class="panel-title">记叙江湖</div>
-                    <div class="header-ornament-right"></div>
-                    <button id="close-save-game" class="close-btn-v3">×</button>
-                </div>
-                <div class="standard-panel-main">
-                    <div class="load-save-list panel-content-scroll" id="save-game-list-container">
-                        <!-- 存档项占位 -->
-                    </div>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 保存存档面板 (已迁移至 React SaveLoadPanel.tsx) -->
+            <div id="react-save-game-mount"></div>
 
-            <!-- 江湖传闻历史面板 -->
-            <div id="world-event-history-panel" class="menu-container hidden standard-panel-v4">
-                <div class="standard-panel-header">
-                    <div class="header-ornament-left"></div>
-                    <div class="panel-title">江湖快报</div>
-                    <div class="header-ornament-right"></div>
-                    <button id="close-event-history" class="close-btn-v3">×</button>
-                </div>
-                <div class="standard-panel-main">
-                    <div class="panel-content-scroll" id="event-history-list">
-                        <!-- 历史事件将动态填充在这里 -->
-                    </div>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 江湖传闻历史面板 (已迁移至 React WorldEventHistoryPanel.tsx) -->
+            <div id="react-world-event-history-mount"></div>
 
-            <!-- 角色选择界面 -->
-            <div id="character-select" class="menu-container hidden">
-                <div class="menu-decoration-top"></div>
-                <h2 class="game-title select-title">选择<span>你的侠客</span></h2>
-                <div class="character-cards">
-                    <div class="char-card hero-card" data-hero="liwangsheng">
-                        <div class="char-portrait liwangsheng-portrait"></div>
-                        <h3 class="char-name">李忘生</h3><p class="char-title">纯阳掌门</p>
-                        <div class="char-traits"><div class="trait"><span class="trait-tag">门派领袖</span><span class="trait-desc">纯阳弟子血量和伤害提高 20%</span></div></div>
-                    </div>
-                    <div class="char-card hero-card" data-hero="lichengen">
-                        <div class="char-portrait lichengen-portrait"></div>
-                        <h3 class="char-name">李承恩</h3><p class="char-title">天策府统领</p>
-                        <div class="char-traits"><div class="trait"><span class="trait-tag">骁勇善战</span><span class="trait-desc">大世界移动速度提高 20%，天策兵种血量提高 10%</span></div></div>
-                    </div>
-                    <div class="char-card hero-card" data-hero="yeying">
-                        <div class="char-portrait yeying-portrait"></div>
-                        <h3 class="char-name">叶英</h3><p class="char-title">藏剑大庄主</p>
-                        <div class="char-traits"><div class="trait"><span class="trait-tag">心剑合一</span><span class="trait-desc">藏剑弟子攻击频率提高 20%</span></div></div>
-                    </div>
-                </div>
-                <div class="menu-options">
-                    <button id="confirm-char-btn" class="wuxia-btn disabled" disabled>开启江湖</button>
-                    <button id="back-to-menu-btn" class="wuxia-btn small-btn">返回主页</button>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 战场 HUD (已迁移至 React BattleHUD.tsx) -->
+            <div id="react-battle-hud-mount"></div>
 
-            <!-- 难度选择界面 (New) -->
-            <div id="difficulty-select" class="menu-container hidden">
-                <div class="menu-decoration-top"></div>
-                <h2 class="game-title select-title">选择<span>江湖难度</span></h2>
-                <div class="character-cards difficulty-cards">
-                    <div class="char-card diff-card selected" data-diff="easy">
-                        <div class="diff-icon" style="font-size: 3em; margin: 10px 0;">🍃</div>
-                        <h3 class="char-name">简单</h3>
-                        <p class="char-title">EASY</p>
-                        <div class="char-traits">
-                            <div class="trait">
-                                <span class="trait-desc">敌军成长较慢。</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="char-card diff-card" data-diff="hard">
-                        <div class="diff-icon" style="font-size: 3em; margin: 10px 0;">🔥</div>
-                        <h3 class="char-name">困难</h3>
-                        <p class="char-title">HARD</p>
-                        <div class="char-traits">
-                            <div class="trait">
-                                <span class="trait-desc">敌军成长迅速。</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="char-card diff-card" data-diff="hell">
-                        <div class="diff-icon" style="font-size: 3em; margin: 10px 0;">🩸</div>
-                        <h3 class="char-name">地狱</h3>
-                        <p class="char-title">HELL</p>
-                        <div class="char-traits">
-                            <div class="trait">
-                                <span class="trait-desc">敌军实力突飞猛进！</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="menu-options">
-                    <button id="confirm-diff-btn" class="wuxia-btn">踏入江湖</button>
-                    <button id="back-to-char-btn" class="wuxia-btn small-btn">重选侠客</button>
-                </div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
+            <!-- 战斗结算与弹窗 (已迁移至 React BattleSettlementPanel.tsx & BattleModals.tsx) -->
+            <div id="react-settlement-mount"></div>
 
-            <!-- 部署与战斗界面 -->
-            <div id="deployment-ui" class="deployment-container hidden">
-                <div class="deploy-info">请派遣你的侠客 (点击图标后点击地面)</div>
-                <div class="unit-slots">
-                    <div class="unit-slot" data-type="melee"><div class="slot-icon melee-icon"></div><span class="slot-count">x10</span></div>
-                    <div class="unit-slot" data-type="ranged"><div class="slot-icon ranged-icon"></div><span class="slot-count">x4</span></div>
-                    <div class="unit-slot" data-type="archer"><div class="slot-icon archer-icon"></div><span class="slot-count">x2</span></div>
-                    <div class="unit-slot" data-type="healer"><div class="slot-icon healer-icon"></div><span class="slot-count">x2</span></div>
-                    <div class="unit-slot" data-type="cangjian"><div class="slot-icon cangjian-icon"></div><span class="slot-count">x2</span></div>
-                    <div class="unit-slot" data-type="tiance"><div class="slot-icon tiance-icon"></div><span class="slot-count">x1</span></div>
-                    <div class="unit-slot" data-type="chunyang"><div class="slot-icon chunyang-icon"></div><span class="slot-count">x2</span></div>
-                    <div class="unit-slot" data-type="cangyun"><div class="slot-icon cangyun-icon"></div><span class="slot-count">x2</span></div>
-                </div>
-                <button id="fight-btn" class="wuxia-btn small-btn">开战！</button>
-            </div>
+            <!-- 游戏开始告示面板 (已迁移至 React GameStartPanel.tsx) -->
+            <div id="react-game-start-mount"></div>
 
-            <div id="battle-bottom-ui" class="battle-bottom-ui hidden">
-                <div id="battle-skill-bar" class="skill-bar-container">
-                    <div class="battle-mp-status"><div class="mp-bar-bg"><div id="battle-mp-fill" class="mp-bar-fill"></div></div><div id="battle-mp-text" class="mp-text">内力: 100/100</div></div>
-                    <div id="skill-category-filters" class="skill-category-filters"><button class="filter-btn active" data-category="all">所有</button></div>
-                    <div class="skill-slots" id="skill-slots"></div>
-                </div>
-                <button id="battle-escape-btn" class="battle-escape-btn" title="撤退"><span>逃</span></button>
-            </div>
+            <!-- 季度建筑抽卡面板 (已迁移至 React BuildingDraftPanel.tsx) -->
+            <div id="react-building-draft-mount"></div>
 
-            <!-- 战斗结算 -->
-            <div id="battle-settlement" class="menu-container hidden">
-                <div class="menu-decoration-top">战斗统计</div>
-                <h2 id="settlement-title" class="game-title">战斗胜利</h2>
-                <div class="settlement-content">
-                    <div class="xp-gain-section" id="settlement-xp-section">
-                        <div class="section-label">阅历获得 <span id="settlement-level-val" style="color: var(--jx3-gold-light);">Lv.1</span></div>
-                        <div class="xp-gain-display"><span class="xp-gain-val" id="settlement-xp-val">+0</span><div class="stat-bar-bg" style="height: 12px; flex: 1;"><div id="settlement-xp-bar" class="stat-bar-fill xp" style="width: 0%;"></div></div></div>
-                    </div>
-                    <div class="loss-section"><div class="section-label">兵力变化</div><div id="settlement-losses-list" class="loss-list"></div></div>
-                </div>
-                <div class="menu-options"><button id="return-to-world-btn" class="wuxia-btn">返回大世界</button></div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
-
-            <!-- 撤退确认与开局提示 -->
-            <div id="escape-confirm-modal" class="menu-overlay hidden">
-                <div class="menu-container confirm-container">
-                    <div class="menu-decoration-top">战场撤退</div>
-                    <h2 class="game-title">是否<span>撤离战场</span>？</h2>
-                    <p class="confirm-desc">撤退将导致本次战斗失败，且可能损失部分兵力。</p>
-                    <div class="menu-options horizontal"><button id="confirm-escape-btn" class="wuxia-btn">确认撤退</button><button id="cancel-escape-btn" class="wuxia-btn secondary">继续战斗</button></div>
-                    <div class="menu-decoration-bottom"></div>
-                </div>
-            </div>
-
-            <div id="skip-battle-modal" class="menu-overlay hidden">
-                <div class="menu-container confirm-container">
-                    <div class="menu-decoration-top">势不可挡</div>
-                    <h2 class="game-title">敌人<span>过于弱小</span></h2>
-                    <p class="confirm-desc">对手实力平平，是否直接席卷战场？<br><span style="font-size: 0.8em; color: #aa8888;">(跳过战斗将直接获得胜利，但会损失少量低阶兵力)</span></p>
-                    <div class="menu-options horizontal">
-                        <button id="confirm-skip-btn" class="wuxia-btn">直接碾压</button>
-                        <button id="cancel-skip-btn" class="wuxia-btn secondary">常规战斗</button>
-                    </div>
-                    <div class="menu-decoration-bottom"></div>
-                </div>
-            </div>
-
-            <div id="game-start-window" class="menu-container hidden">
-                <div class="menu-decoration-top">江湖告示</div>
-                <h2 class="game-title">初入<span>江湖</span></h2>
-                <div class="game-start-content">
-                    <p class="game-start-intro">请你发展稻香村，扩大势力，成就一番霸业。</p>
-                    <div class="enemy-info-box"><div class="enemy-info-label">本场对手</div><div id="game-start-enemies" class="enemy-list-horizontal"></div></div>
-                </div>
-                <div class="menu-options"><button id="close-game-start-btn" class="wuxia-btn">踏上征途</button></div>
-                <div class="menu-decoration-bottom"></div>
-            </div>
-
-            <!-- 季度建筑抽卡 (Hearthstone Style) -->
-            <div id="building-draft-overlay" class="menu-overlay hidden">
-                <div class="draft-instruction">—— 季 度 策 划 ——</div>
-                <div id="building-draft-cards" class="building-cards-wrapper">
-                    <!-- 卡牌将动态插入到这里 -->
-                </div>
-            </div>
-
-            <!-- 暂停菜单 -->
-            <div id="pause-menu" class="menu-overlay hidden">
-                <div class="menu-container pause-container" id="pause-main-content">
-                    <div class="menu-decoration-top">江湖休整</div>
-                    <h2 class="game-title">中途<span>休息</span></h2>
-                    <div class="menu-options" id="pause-default-options">
-                        <button id="resume-game-btn" class="wuxia-btn">继续江湖</button>
-                        <button id="pause-save-btn" class="wuxia-btn">保存存档</button>
-                        <button id="pause-load-btn" class="wuxia-btn">载入存档</button>
-                        <button id="open-settings-btn" class="wuxia-btn">江湖设置</button>
-                        <button id="back-to-menu-from-pause-btn" class="wuxia-btn small-btn">退出到主界面</button>
-                    </div>
-                    <div id="pause-settings-options" class="hidden">
-                        <div class="settings-group"><label>音乐音量</label><input type="range" id="bgm-volume-slider" min="0" max="1" step="0.01" value="0.5"></div>
-                        <div class="settings-group"><label>音效音量</label><input type="range" id="sfx-volume-slider" min="0" max="1" step="0.01" value="0.5"></div>
-                        <button id="close-settings-btn" class="wuxia-btn small-btn" style="margin-top: 20px;">返回暂停</button>
-                    </div>
-                    <div class="menu-decoration-bottom"></div>
-                </div>
-            </div>
+            <!-- 暂停菜单面板 (已迁移至 React PauseMenuPanel.tsx) -->
+            <div id="react-pause-menu-mount"></div>
         </div> <!-- End of ui-layer -->
 
         <!-- Canvas 层：Three.js 渲染 -->
         <canvas id="game-canvas"></canvas>
 
-        <!-- 奇穴系统面板 (沉浸式全屏) -->
-        <div id="talent-panel" class="hidden talent-panel-immersive">
-            <div class="talent-starry-bg"></div>
-            
-            <!-- 极简沉浸式 UI -->
-            <div class="talent-ui-overlay">
-                <div class="talent-points-clean">
-                    <div class="points-icon">✧</div>
-                    <div class="points-num" id="talent-points-val">0</div>
-                    <div class="points-label">星魄</div>
-                </div>
-
-                <button id="close-talent-panel" class="close-talent-minimal">
-                    <span class="close-icon">✕</span>
-                    <span class="close-text">离 开</span>
-                </button>
-            </div>
-
-            <div class="talent-star-chart">
-                <div id="talent-container" class="talent-node-container">
-                    <svg id="talent-links-svg" class="talent-links-svg"></svg>
-                </div>
-            </div>
-        </div>
+        <!-- 奇穴系统面板 (已迁移至 React TalentPanel.tsx) -->
+        <div id="react-talent-mount"></div>
 
         <!-- 全局提示框 (Tooltip) -->
         <div id="game-tooltip" class="tooltip-container hidden">

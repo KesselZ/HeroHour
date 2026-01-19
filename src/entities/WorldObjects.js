@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { spriteFactory } from '../engine/SpriteFactory.js';
 import { worldManager } from '../core/WorldManager.js';
 import { timeManager } from '../systems/TimeManager.js';
+import { modifierManager } from '../systems/ModifierManager.js';
 import { mapGenerator } from '../world/MapGenerator.js';
 import { Pathfinder } from '../utils/Pathfinder.js';
 import { audioManager } from '../engine/AudioManager.js';
@@ -479,7 +480,10 @@ export class TreeObject extends WorldObject {
 
     getTooltipData() {
         // 获取当前全局木材收益倍率 (仅包含可能的奇穴加成)
-        const currentMult = modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', 1);
+        // 安全检查：确保 modifierManager 已加载
+        const currentMult = modifierManager ? 
+            modifierManager.getModifiedValue({ side: 'player' }, 'wood_income', 1) : 
+            1;
         // 估算总收益：(剩余耐久度 / 3 * 20) + 40 (砍断奖励)
         const estimatedTotal = Math.floor(((this.durability / 3) * 20 + 40) * currentMult);
         
@@ -571,7 +575,10 @@ export class TreeObject extends WorldObject {
 
             // 核心修改：砍断树木直接获得 30-50 木材
             const baseFinalAmount = Math.floor(Math.random() * 21) + 30; // 30-50 随机
-            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side }, 'wood_income', baseFinalAmount));
+            // 安全检查：确保 modifierManager 已加载
+            const finalAmount = modifierManager ? 
+                Math.floor(modifierManager.getModifiedValue({ side }, 'wood_income', baseFinalAmount)) : 
+                baseFinalAmount;
             worldManager.addWood(finalAmount, factionId, { x: this.x, z: this.z });
             
             worldManager.removeEntity(this.id);
@@ -589,7 +596,10 @@ export class TreeObject extends WorldObject {
         // 每砍三下获得随机木材
         if (this.chopCount % 3 === 0 && this.durability > 0) {
             const baseAmount = Math.floor(Math.random() * 11) + 15; // 15-25 随机
-            const finalAmount = Math.floor(modifierManager.getModifiedValue({ side }, 'wood_income', baseAmount));
+            // 安全检查：确保 modifierManager 已加载
+            const finalAmount = modifierManager ? 
+                Math.floor(modifierManager.getModifiedValue({ side }, 'wood_income', baseAmount)) : 
+                baseAmount;
             worldManager.addWood(finalAmount, factionId, { x: this.x, z: this.z });
         }
     }

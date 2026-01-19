@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { useUIStore } from '../store/uiStore';
+import { useGameStore } from '../store/gameStore';
+import { useBattleStore } from '../store/battleStore';
 import { spriteFactory } from '../engine/SpriteFactory.js';
 import { modifierManager } from '../systems/ModifierManager.js';
 import { WorldManager, worldManager } from '../core/WorldManager.js'; // 引入数据管家
@@ -393,38 +396,14 @@ export class WorldScene {
             };
         }
 
-        const closeHeroBtn = document.getElementById('close-hero-panel');
-        if (closeHeroBtn) {
-            closeHeroBtn.onclick = () => {
-                audioManager.play('ui_click', { volume: 0.4 });
-                document.getElementById('hero-stats-panel').classList.add('hidden');
-
-                // --- 手机端适配：仅在没有其他全屏面板打开时恢复 HUD ---
-                if (uiManager.isMobile) {
-                    const townPanel = document.getElementById('town-management-panel');
-                    const talentPanel = document.getElementById('talent-panel');
-                    const skillPanel = document.getElementById('skill-learn-panel');
-                    if (
-                        (!townPanel || townPanel.classList.contains('hidden')) &&
-                        (!talentPanel || talentPanel.classList.contains('hidden')) &&
-                        (!skillPanel || skillPanel.classList.contains('hidden'))
-                    ) {
-                        uiManager.setHUDVisibility(true);
-                    }
-                }
-            };
-        }
+        // --- 侠客属性面板已由 React 接管，移除了原有的 DOM 事件绑定 ---
 
         // 移除旧的监听器防止重复
         window.removeEventListener('hero-stats-changed', this._onHeroStatsChanged);
         this._onHeroStatsChanged = () => {
-            this.updateHeroHUD();
             // 核心修复：属性变化时同步更新大世界移动速度
             const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
             this.moveSpeed = heroDetails.qinggong;
-
-            // 核心修复：如果属性面板打开，实时刷新它
-            this.updateHeroStatsUI();
         };
         window.addEventListener('hero-stats-changed', this._onHeroStatsChanged);
 
@@ -434,12 +413,6 @@ export class WorldScene {
             const heroDetails = worldManager.getUnitDetails(worldManager.heroData.id);
             this.moveSpeed = heroDetails.qinggong;
             console.log(`%c[属性同步] 奇穴已更新，当前大世界移速: ${this.moveSpeed.toFixed(3)}`, "color: #5b8a8a");
-            
-            // 同步更新 HUD (隐藏或更新提醒气泡)
-            this.updateHeroHUD();
-
-            // 核心修复：如果属性面板打开，实时刷新它
-            this.updateHeroStatsUI();
 
             // 核心修复：奇穴更新后，如果城镇面板开着，也要刷新它，否则费用显示不更新
             if (this.activeCityId) {
@@ -457,196 +430,19 @@ export class WorldScene {
         window.addEventListener('resource-gained', this._onResourceGained);
 
         worldManager.updateHUD();
-        this.updateHeroHUD(); 
     }
 
     updateHeroHUD() {
-        const heroPortrait = document.getElementById('world-hero-portrait');
-        const hpBar = document.getElementById('hud-hero-hp-bar');
-        const mpBar = document.getElementById('hud-hero-mp-bar');
-        const levelBadge = document.getElementById('hud-hero-level');
-        const talentHint = document.getElementById('talent-hint');
-        
-        const heroData = worldManager.heroData;
-        
-        if (heroPortrait) {
-            const iconStyle = spriteFactory.getIconStyle(heroData.id);
-            Object.assign(heroPortrait.style, iconStyle);
-        }
-
-        if (levelBadge) {
-            levelBadge.innerText = `Lv.${heroData.level}`;
-        }
-
-        if (hpBar) {
-            const hpPct = (heroData.hpCurrent / heroData.hpMax) * 100;
-            hpBar.style.width = `${hpPct}%`;
-        }
-
-        if (mpBar) {
-            const mpPct = (heroData.mpCurrent / heroData.mpMax) * 100;
-            mpBar.style.width = `${mpPct}%`;
-        }
-
-        // 核心逻辑：一旦有剩余点数，显示气泡提醒
-        if (talentHint) {
-            const points = heroData.talentPoints || 0;
-            if (points > 0) {
-                talentHint.classList.remove('hidden');
-            } else {
-                talentHint.classList.add('hidden');
-            }
-        }
+        // --- 已迁移至 React (HeroMiniCard.tsx) ---
     }
 
     openHeroStats() {
-        // --- 互斥逻辑：打开属性面板时，关闭其他可能冲突的面板 ---
-        this.closeTownManagement();
-        const skillLearnPanel = document.getElementById('skill-learn-panel');
-        if (skillLearnPanel) skillLearnPanel.classList.add('hidden');
-        const startWindow = document.getElementById('game-start-window');
-        if (startWindow) startWindow.classList.add('hidden');
-        const htpPanel = document.getElementById('how-to-play-panel');
-        if (htpPanel) htpPanel.classList.add('hidden');
-        
-        // --- 手机端适配：打开面板时隐藏 HUD ---
-        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
-
-        const panel = document.getElementById('hero-stats-panel');
-        if (panel) {
-            panel.classList.remove('hero-panel-v3');
-            panel.classList.add('hero-panel-v4');
-            panel.classList.remove('hidden');
-        }
-
-        // 核心逻辑：刷新英雄属性面板数据
-        this.updateHeroStatsUI();
+        // --- 已迁移至 React (HeroStatsPanel.tsx) ---
+        useUIStore.getState().openPanel('heroStats');
     }
 
-    /**
-     * 核心逻辑：刷新英雄属性面板数据 (不包含互斥关闭逻辑)
-     */
     updateHeroStatsUI() {
-        const panel = document.getElementById('hero-stats-panel');
-        // 关键防护：如果面板没打开，则不需要浪费性能更新 DOM
-        if (!panel || panel.classList.contains('hidden')) return;
-
-        const data = worldManager.heroData;
-        const heroInfo = worldManager.availableHeroes[data.id];
-        const dummy = worldManager.getPlayerHeroDummy();
-        
-        // 填充数据
-        document.getElementById('hero-panel-name').innerText = (data.id === 'liwangsheng' ? '李忘生' : (data.id === 'lichengen' ? '李承恩' : '叶英'));
-        document.getElementById('hero-panel-title').innerText = heroInfo ? heroInfo.title : '';
-        
-        const portrait = document.getElementById('hero-panel-portrait');
-        const iconStyle = spriteFactory.getIconStyle(data.id);
-        Object.assign(portrait.style, iconStyle);
-        
-        const xpPct = (data.xp / data.xpMax) * 100;
-        const hpPct = (data.hpCurrent / data.hpMax) * 100;
-        const mpPct = (data.mpCurrent / data.mpMax) * 100;
-        
-        document.getElementById('hero-xp-bar').style.width = `${xpPct}%`;
-        document.getElementById('hero-hp-bar').style.width = `${hpPct}%`;
-        document.getElementById('hero-mp-bar').style.width = `${mpPct}%`;
-        
-        document.getElementById('hero-xp-text').innerText = `${data.xp}/${data.xpMax}`;
-        document.getElementById('hero-hp-text').innerText = `${Math.floor(data.hpCurrent)}/${data.hpMax}`;
-        document.getElementById('hero-mp-text').innerText = `${data.mpCurrent}/${data.mpMax}`;
-        
-        const levelDisplay = document.getElementById('hero-level-val');
-        if (levelDisplay) levelDisplay.innerText = data.level;
-
-        // 士气显示
-        const moraleVal = document.getElementById('attr-morale');
-        if (moraleVal) {
-            const realMorale = Math.floor(modifierManager.getModifiedValue(dummy, 'morale', data.stats.morale));
-            moraleVal.innerText = realMorale;
-        }
-        const details = worldManager.getUnitDetails(data.id);
-        document.getElementById('attr-speed').innerText = details.qinggong.toFixed(1); 
-        
-        // 动态修改力道/身法标签
-        const powerLabel = document.getElementById('attr-power-label');
-        const powerName = heroInfo ? heroInfo.primaryStat : '力道';
-        if (powerLabel) powerLabel.innerText = powerName;
-        
-        const identity = worldManager.getHeroIdentity(data.id);
-        const cb = identity.combatBase;
-        
-        document.getElementById('attr-primary-val').innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'power', data.stats.power));
-        document.getElementById('attr-fali').innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'spells', data.stats.spells));
-        
-        // 核心修复：显示经过 ModifierManager 截断后的真实调息百分比
-        const actualHaste = modifierManager.getModifiedValue(dummy, 'haste', 0);
-        document.getElementById('attr-haste').innerText = Math.floor(actualHaste * 100);
-        
-        const leaderMax = document.getElementById('attr-leadership-max');
-        if (leaderMax) {
-            leaderMax.innerText = Math.floor(modifierManager.getModifiedValue(dummy, 'leadership', data.stats.leadership));
-        }
-
-        // 绑定属性 Tooltip (动态显示主属性收益)
-        const realMorale = Math.floor(modifierManager.getModifiedValue(dummy, 'morale', data.stats.morale));
-        const realPower = Math.floor(modifierManager.getModifiedValue(dummy, 'power', data.stats.power));
-        const realSpells = Math.floor(modifierManager.getModifiedValue(dummy, 'spells', data.stats.spells));
-        
-        const moraleAtkBonus = (realMorale).toFixed(0);
-        const moraleHpBonus = (realMorale).toFixed(0);
-        this.bindAttrTooltip('attr-box-morale', '士气', `统御三军，使帐下士兵的<span class="skill-term-highlight">攻击力</span>提升 <span class="skill-num-highlight">${moraleAtkBonus}%</span>，<span class="skill-term-highlight">气血上限</span>提升 <span class="skill-num-highlight">${moraleHpBonus}%</span>。`);
-        
-        const powerAtkBonus = (realPower * (cb.atkScaling || 0.05) * 100).toFixed(0);
-        const powerHpBonus = (realPower * cb.hpScaling).toFixed(0);
-        this.bindAttrTooltip('attr-box-power', powerName, `修习内功外招，使侠客自身的<span class="skill-term-highlight">普通攻击</span>伤害提升 <span class="skill-num-highlight">${powerAtkBonus}%</span>，并额外增加 <span class="skill-num-highlight">${powerHpBonus}</span> 点<span class="skill-term-highlight">气血上限</span>。`);
-        
-        const spellBonus = (realSpells).toFixed(0);
-        this.bindAttrTooltip('attr-box-spells', '功法', `通过玄妙法门，使侠客的<span class="skill-term-highlight">招式威力</span>提升 <span class="skill-num-highlight">${spellBonus}%</span>。`);
-        
-        this.bindAttrTooltip('attr-box-speed', '轻功', `身轻如燕，提升侠客行走江湖与临阵对敌时的移动速度`);
-        
-        const hasteReduction = (actualHaste * 100).toFixed(0);
-        this.bindAttrTooltip('attr-box-haste', '调息', `提升招式运转速度，使<span class="skill-term-highlight">冷却时间</span>与<span class="skill-term-highlight">内力消耗</span>降低 <span class="skill-num-highlight">${hasteReduction}%</span>。`);
-        this.bindAttrTooltip('attr-box-leadership', '统御', `侠客带兵容量上限，每种兵力产生不同的占用点数`);
-        
-        const skillsContainer = document.getElementById('hero-panel-skills');
-        skillsContainer.innerHTML = '';
-
-        if (!data.skills || data.skills.length === 0) {
-            skillsContainer.innerHTML = `<div class="hero-no-skills">暂无习得技能</div>`;
-        } else {
-            data.skills.forEach(skillId => {
-                const skill = SkillRegistry[skillId];
-                if (!skill) return;
-
-                const slot = document.createElement('div');
-                slot.className = 'hero-skill-slot';
-                
-                const iconStyle = spriteFactory.getIconStyle(skill.icon);
-                slot.innerHTML = `
-                    <div class="skill-icon-small" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize};"></div>
-                `;
-
-            // 使用优雅的 Tooltip 绑定器
-            uiManager.bindTooltip(slot, () => {
-                const skill = SkillRegistry[skillId];
-                if (!skill) return null;
-                const actualCD = (skill.getActualCooldown(data) / 1000).toFixed(1);
-                const actualCost = skill.getActualManaCost(data);
-                
-                return {
-                    name: skill.name,
-                    level: skill.level,
-                    mpCost: `消耗: ${actualCost} 内力`,
-                    cdText: `冷却: ${actualCD}s`,
-                    description: skill.getDescription(data),
-                    type: 'skill'
-                };
-            });
-
-            skillsContainer.appendChild(slot);
-            });
-        }
+        // --- 已由 React 接管 ---
     }
 
     bindAttrTooltip(id, name, desc) {
@@ -713,15 +509,16 @@ export class WorldScene {
      * 职责：比 isAnyMenuOpen 更严格，包含所有可能遮挡视线的面板
      */
     isAnyUIOpen() {
-        // 首先检查基础的阻塞性面板
-        if (this.isAnyMenuOpen()) return true;
+        // 核心逻辑：检查 React Store 中的面板状态
+        const activePanel = useUIStore.getState().activePanel;
+        if (activePanel) return true;
 
-        // 加上那些允许移动但应禁用 Tooltip 的面板
-        const extraPanels = [
-            'town-management-panel',
-            'teleport-panel'
-        ];
-        return extraPanels.some(id => {
+        // 检查战斗状态
+        if (useBattleStore.getState().isActive) return true;
+
+        // 兼容性：检查残留的旧版基础面板
+        const panels = ['main-menu', 'character-select', 'difficulty-select'];
+        return panels.some(id => {
             const el = document.getElementById(id);
             return el && !el.classList.contains('hidden');
         });
@@ -730,21 +527,16 @@ export class WorldScene {
     /**
      * 判断当前是否有阻塞性 UI 面板打开 (禁用 WASD 和点击移动)
      * 职责：统一管理 UI 状态，供移动、交互等逻辑进行互斥判定
-     * 注意：town-management-panel 和 teleport-panel 豁免，因为允许在周围移动
+     * 注意：townManagement 豁免，因为允许在周围移动
      */
     isAnyMenuOpen() {
-        const panels = [
-            'hero-stats-panel',
-            'skill-learn-panel',
-            'talent-panel',
-            'game-start-window',
-            'how-to-play-panel',
-            'skip-battle-modal',
-            'battle-settlement',
-            'load-save-panel',
-            'save-game-panel',
-            'world-event-history-panel'
-        ];
+        // 1. 检查 React Store 中的面板，排除豁免面板
+        const activePanel = useUIStore.getState().activePanel;
+        const exemptReactPanels = ['townManagement']; 
+        if (activePanel && !exemptReactPanels.includes(activePanel)) return true;
+
+        // 2. 检查残留的旧版阻塞面板
+        const panels = ['main-menu', 'character-select', 'difficulty-select'];
         return panels.some(id => {
             const el = document.getElementById(id);
             return el && !el.classList.contains('hidden');
@@ -805,277 +597,28 @@ export class WorldScene {
     }
 
     openTownManagement(cityId, isPhysical = false) {
-        // --- 互斥逻辑：打开城镇面板时，关闭其他可能冲突的面板 ---
-        const panelsToClose = [
-            'hero-stats-panel',
-            'skill-learn-panel',
-            'game-start-window',
-            'how-to-play-panel',
-            'teleport-panel',
-            'load-save-panel',
-            'save-game-panel'
-        ];
-        panelsToClose.forEach(id => {
-            const p = document.getElementById(id);
-            if (p) p.classList.add('hidden');
-        });
-
-        // --- 手机端适配：在所有面板状态更新后，确定最终的 HUD 可见性 ---
-        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
-
-        const panel = document.getElementById('town-management-panel');
+        // --- 已迁移至 React (TownManagementPanel.tsx) ---
         const cityData = worldManager.cities[cityId];
-        
         if (!cityData) return;
 
-        // --- 核心修复：位置“懒同步” ---
-        // 在打开面板前，将 3D 世界的实时位置同步给逻辑层，确保 isPlayerAtCity 判定准确
+        // 1. 位置与状态同步
         if (this.playerGroup) {
             worldManager.savePlayerPos(this.playerGroup.position.x, this.playerGroup.position.z);
         }
 
         this.activeCityId = cityId; 
-        // 智能判定：如果你手动标记了亲临 (isPhysical)，或者你当前坐标确实在城里
         const isPhysicalVisit = isPhysical || worldManager.isPlayerAtCity(cityId);
         this.isPhysicalVisit = isPhysicalVisit;
 
-        // 核心：仅在亲自访问时响起铃铛
         if (isPhysicalVisit) {
             audioManager.play('ui_bell', { volume: 0.8 });
         }
 
-        document.getElementById('town-name').innerText = cityData.name;
-        panel.classList.remove('hidden');
+        // 2. 同步数据到 Store
+        worldManager.syncCityToStore(cityId, isPhysicalVisit);
 
-        this.refreshTownUI(cityId);
-    }
-
-    refreshTownUI(cityId) {
-        const cityData = worldManager.cities[cityId];
-        const allBuildings = cityData.getAvailableBuildings();
-        
-        // --- 核心改动：展示全局总收益，而非单一城市收益 ---
-        const prodData = worldManager.getGlobalProduction();
-        const goldIncome = document.getElementById('town-income-gold');
-        const woodIncome = document.getElementById('town-income-wood');
-        if (goldIncome) goldIncome.innerText = prodData.gold;
-        if (woodIncome) woodIncome.innerText = prodData.wood;
-
-        // 为收益容器绑定明细 Tooltip
-        const incomeContainer = document.querySelector('.town-income-v3');
-        if (incomeContainer) {
-            incomeContainer.style.cursor = 'help';
-            uiManager.bindTooltip(incomeContainer, () => {
-                const breakdown = prodData.breakdown;
-                let desc = `<div style="color: var(--jx3-celadon); margin-bottom: 4px;">各城池贡献:</div>`;
-                breakdown.cities.forEach(c => {
-                    desc += `<div style="display: flex; justify-content: space-between; gap: 10px;">
-                        <span>${c.name}</span>
-                        <span>💰${c.gold} 🪵${c.wood}</span>
-                    </div>`;
-                });
-                
-                if (breakdown.mines.count.gold_mine > 0 || breakdown.mines.count.sawmill > 0) {
-                    desc += `<div style="color: var(--jx3-gold); margin-top: 8px; margin-bottom: 4px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px;">野外产出:</div>`;
-                    if (breakdown.mines.count.gold_mine > 0) {
-                        desc += `<div style="display: flex; justify-content: space-between;">
-                            <span>金矿 x${breakdown.mines.count.gold_mine}</span>
-                            <span>💰${breakdown.mines.gold}</span>
-                        </div>`;
-                    }
-                    if (breakdown.mines.count.sawmill > 0) {
-                        desc += `<div style="display: flex; justify-content: space-between;">
-                            <span>伐木场 x${breakdown.mines.count.sawmill}</span>
-                            <span>🪵${breakdown.mines.wood}</span>
-                        </div>`;
-                    }
-                }
-                
-                return {
-                    name: "本季度总收益明细",
-                    level: "所有城池与矿产合计",
-                    description: desc
-                };
-            });
-        }
-
-        // 更新统御力显示
-        const heroLeadershipLabel = document.querySelector('.hero-army .army-label');
-        if (heroLeadershipLabel) {
-            const current = worldManager.getHeroCurrentLeadership();
-            const max = worldManager.getHeroMaxLeadership();
-            heroLeadershipLabel.innerHTML = `我的队伍 <span style="color: ${current > max * 0.8 ? '#ff4444' : 'var(--jx3-celadon)'}">(${current}/${max})</span>`;
-        }
-
-        // --- 核心限制：远程访问不允许调兵 ---
-        const canTransfer = this.isPhysicalVisit;
-        const collectBtn = document.getElementById('collect-all-btn');
-        const depositBtn = document.getElementById('deposit-all-btn');
-        
-        if (collectBtn) {
-            collectBtn.disabled = !canTransfer;
-            collectBtn.title = canTransfer ? "全部领取至队伍" : "必须亲临城市才能领兵";
-            collectBtn.style.opacity = canTransfer ? "1" : "0.3";
-            collectBtn.style.cursor = canTransfer ? "pointer" : "not-allowed";
-        }
-        if (depositBtn) {
-            depositBtn.disabled = !canTransfer;
-            depositBtn.title = canTransfer ? "队伍全部驻守" : "必须亲临城市才能遣散";
-            depositBtn.style.opacity = canTransfer ? "1" : "0.3";
-            depositBtn.style.cursor = canTransfer ? "pointer" : "not-allowed";
-        }
-
-        // --- 核心限制：远程访问不允许神行千里 ---
-        const teleportBtn = document.getElementById('city-teleport-btn');
-        if (teleportBtn) {
-            teleportBtn.title = this.isPhysicalVisit ? "开启神行千里" : "必须亲临城市才能使用神行千里";
-            teleportBtn.style.opacity = this.isPhysicalVisit ? "1" : "0.3";
-            teleportBtn.style.cursor = this.isPhysicalVisit ? "pointer" : "not-allowed";
-        }
-
-        // 1. 刷新建筑面板
-        ['economy', 'military', 'magic'].forEach(cat => {
-            const container = document.getElementById(`build-cat-${cat}`);
-            if (!container) return;
-            container.innerHTML = '';
-            
-            allBuildings[cat].forEach(build => {
-                const card = document.createElement('div');
-                const isMax = build.level >= build.maxLevel;
-                const isLocked = !build.unlockStatus.met;
-                
-                card.className = `building-card lv-${build.level} ${isMax ? 'is-max' : ''} ${isLocked ? 'is-locked' : ''}`;
-                
-                let costText = isMax ? '已满级' : `💰${build.cost.gold} 🪵${build.cost.wood}`;
-                if (isLocked) {
-                    costText = `🔒 ${build.unlockStatus.reason}`;
-                }
-
-                card.innerHTML = `
-                    <div class="building-icon" style="${this.getIconStyleString(build.icon)}"></div>
-                    <span class="building-name">${build.name}</span>
-                    <span class="building-cost">${costText}</span>
-                `;
-                
-                uiManager.bindTooltip(card, () => {
-                    const tooltipData = { ...build };
-                    if (isLocked) {
-                        tooltipData.description = `<div style="color: #ff4444; margin-bottom: 8px; font-weight: bold;">[锁定] ${build.unlockStatus.reason}</div>` + (build.description || '');
-                    }
-                    return tooltipData;
-                });
-
-                card.onclick = () => {
-                    if (isLocked) {
-                        worldManager.showNotification(`无法建设：${build.unlockStatus.reason}`);
-                        audioManager.play('ui_invalid', { volume: 0.8 });
-                        return;
-                    }
-                    if (isMax) return;
-
-                    // 使用原子化的资源消耗接口，修复资源扣除顺序导致的 Bug
-                    if (worldManager.spendResources(build.cost)) {
-                        // 建筑升级成功：播放厚重的“按下”音效
-                        audioManager.play('ui_press', { volume: 0.8 });
-                        cityData.upgradeBuilding(build.id);
-                        this.refreshTownUI(cityId);
-                    } else {
-                        worldManager.showNotification('资源不足，无法建设！');
-                        audioManager.play('ui_invalid', { volume: 0.8 });
-                    }
-                };
-                container.appendChild(card);
-            });
-        });
-
-        // 2. 刷新城镇驻军
-        const townUnitsList = document.getElementById('town-units-list');
-        townUnitsList.innerHTML = '';
-        for (const type in cityData.availableUnits) {
-            const count = cityData.availableUnits[type];
-            if (count > 0) {
-                const slot = this.createArmySlot(type, count, () => {
-                    if (!this.isPhysicalVisit) {
-                        worldManager.showNotification("必须亲临城市才能领兵！");
-                        return;
-                    }
-                    audioManager.play('ui_click', { volume: 0.5 });
-                    worldManager.transferToHero(type, 1, cityId);
-                    this.refreshTownUI(cityId);
-                });
-                this.bindUnitTooltip(slot, type);
-                // 远程访问样式
-                if (!this.isPhysicalVisit) {
-                    slot.style.opacity = "0.6";
-                    slot.style.cursor = "not-allowed";
-                }
-                townUnitsList.appendChild(slot);
-            }
-        }
-
-        // 3. 刷新可招募列表
-        const recruitList = document.getElementById('town-recruit-list');
-        if (recruitList) {
-            recruitList.innerHTML = '';
-            worldManager.getAvailableRecruits(cityId).forEach(unitInfo => {
-                const type = unitInfo.type;
-                const details = worldManager.getUnitDetails(type);
-                const item = document.createElement('div');
-                item.className = 'recruit-item';
-                
-                // 计算最终招募价格 (带入当前城镇 ID 以应用局部折扣)
-                const finalCost = worldManager.getRecruitGoldCost(type, cityId);
-
-                item.innerHTML = `
-                    <div class="slot-icon" style="${this.getIconStyleString(type)}"></div>
-                    <div class="unit-info">
-                        <span class="unit-name">${details.name}</span>
-                        <span class="unit-cost">💰${finalCost}</span>
-                    </div>
-                    <button class="wuxia-btn wuxia-btn-small">招募</button>
-                `;
-
-                this.bindUnitTooltip(item, type);
-                item.querySelector('button').onclick = (e) => {
-                    e.stopPropagation();
-                    // 核心修改：逻辑已收拢至 WorldManager，它会自动判断是否能直接入队
-                    if (worldManager.recruitUnit(type, cityId)) {
-                        // 招募成功：播放清脆音效
-                        audioManager.play('ui_click', { volume: 0.5 });
-                        this.refreshTownUI(cityId);
-                    } else {
-                        worldManager.showNotification('资源不足或统御上限已满！');
-                        audioManager.play('ui_invalid', { volume: 0.8 });
-                    }
-                };
-                recruitList.appendChild(item);
-            });
-        }
-
-        // 4. 刷新侠客队伍
-        const heroArmyList = document.getElementById('hero-army-list');
-        heroArmyList.innerHTML = '';
-        for (const type in worldManager.heroArmy) {
-            const count = worldManager.heroArmy[type];
-            if (count > 0) {
-                const slot = this.createArmySlot(type, count, () => {
-                    if (!this.isPhysicalVisit) {
-                        worldManager.showNotification("必须亲临城市才能调动部队！");
-                        return;
-                    }
-                    audioManager.play('ui_click', { volume: 0.5 });
-                    worldManager.transferToCity(type, 1, cityId);
-                    this.refreshTownUI(cityId);
-                });
-                this.bindUnitTooltip(slot, type);
-                // 远程访问样式
-                if (!this.isPhysicalVisit) {
-                    slot.style.opacity = "0.6";
-                    slot.style.cursor = "not-allowed";
-                }
-                heroArmyList.appendChild(slot);
-            }
-        }
+        // 3. 通过 UI Store 开启 React 面板
+        useUIStore.getState().openPanel('townManagement');
     }
 
     /**
@@ -1095,26 +638,6 @@ export class WorldScene {
                 color: '#d4af37' // 武侠金色
             };
         });
-    }
-
-    createArmySlot(type, count, onClick) {
-        const slot = document.createElement('div');
-        slot.className = 'unit-slot';
-        slot.innerHTML = `
-            <div class="slot-icon" style="${this.getIconStyleString(type)}"></div>
-            <span class="slot-count">x${count}</span>
-        `;
-        slot.onclick = onClick;
-        return slot;
-    }
-
-    getIconStyleString(type) {
-        const style = spriteFactory.getIconStyle(type);
-        return `background-image: ${style.backgroundImage}; background-position: ${style.backgroundPosition}; background-size: ${style.backgroundSize}; image-rendering: pixelated;`;
-    }
-
-    getUnitName(type) {
-        return worldManager.getUnitDetails(type).name;
     }
 
     createGround(mapData) {
@@ -1297,30 +820,34 @@ export class WorldScene {
      * 打开跳过战斗确认弹窗
      */
     showSkipBattleDialog(enemyConfig, scaledPoints, onCancel, onConfirm) {
-        const modal = document.getElementById('skip-battle-modal');
-        const confirmBtn = document.getElementById('confirm-skip-btn');
-        const cancelBtn = document.getElementById('cancel-skip-btn');
-
-        if (!modal || !confirmBtn || !cancelBtn) return;
-
         // 立即停止当前大世界移动
         this.currentPath = [];
         this.clearPathVisuals();
         this.isNavigating = false;
 
-        modal.classList.remove('hidden');
+        // 存储回调以便 React 组件调用
+        this._skipOnCancel = onCancel;
+        this._skipOnConfirm = onConfirm;
 
-        confirmBtn.onclick = () => {
-            audioManager.play('ui_click');
-            modal.classList.add('hidden');
-            if (onConfirm) onConfirm();
-        };
+        useUIStore.getState().openPanel('skipBattle');
+    }
 
-        cancelBtn.onclick = () => {
-            audioManager.play('ui_click');
-            modal.classList.add('hidden');
-            if (onCancel) onCancel();
-        };
+    /**
+     * 响应 React 组件的确认跳过请求
+     */
+    confirmSkipBattle() {
+        if (this._skipOnConfirm) this._skipOnConfirm();
+        this._skipOnConfirm = null;
+        this._skipOnCancel = null;
+    }
+
+    /**
+     * 响应 React 组件的取消跳过请求
+     */
+    cancelSkipBattle() {
+        if (this._skipOnCancel) this._skipOnCancel();
+        this._skipOnConfirm = null;
+        this._skipOnCancel = null;
     }
 
     /**
@@ -1328,102 +855,39 @@ export class WorldScene {
      */
     showSimpleSettlement(result) {
         const { isVictory, settlementChanges, xpGained, xpBefore, xpMaxBefore, levelBefore, xpAfter, xpMaxAfter, levelAfter, enemyConfig } = result;
-        
-        const panel = document.getElementById('battle-settlement');
-        if (!panel) return;
 
         // 停止大世界背景音乐，播放胜利音效
         audioManager.play('battle_victory');
 
-        document.getElementById('settlement-title').innerText = isVictory ? "战斗胜利" : "战斗失败";
-        document.getElementById('settlement-title').style.color = isVictory ? "var(--jx3-celadon-dark)" : "#cc0000";
+        const settlementData = {
+            title: isVictory ? "战斗胜利" : "战斗失败",
+            isVictory: isVictory,
+            xpGained: xpGained,
+            level: levelBefore,
+            xpProgress: (xpBefore / xpMaxBefore) * 100,
+            losses: settlementChanges.map(c => ({
+                type: c.type,
+                name: worldManager.getUnitDisplayName(c.type),
+                loss: c.loss,
+                gain: c.gain,
+                icon: c.type
+            }))
+        };
 
-        // --- 阅历结算展示 ---
-        const xpSection = document.getElementById('settlement-xp-section');
-        if (isVictory && xpGained > 0) {
-            if (xpSection) xpSection.style.display = 'flex';
-            const xpVal = document.getElementById('settlement-xp-val');
-            const xpBar = document.getElementById('settlement-xp-bar');
-            const xpLevelVal = document.getElementById('settlement-level-val');
-            
-            if (xpVal) xpVal.innerText = `+${xpGained}`;
-            if (xpLevelVal) xpLevelVal.innerText = `Lv.${levelBefore}`;
+        // 同步数据供后续清理使用
+        this._lastSimpleResult = result;
 
-            if (xpBar) {
-                const isLevelUp = levelAfter > levelBefore;
-                const startPct = (xpBefore / xpMaxBefore) * 100;
-                const endPct = (xpAfter / xpMaxAfter) * 100;
-                
-                xpBar.style.transition = 'none';
-                xpBar.style.width = `${startPct}%`;
-                xpBar.offsetHeight; // 强制重绘
+        // 同步到 React Store
+        useGameStore.getState().setSettlement(settlementData);
+        useUIStore.getState().openPanel('battleSettlement');
+    }
 
-                if (!isLevelUp) {
-                    requestAnimationFrame(() => {
-                        xpBar.style.transition = 'width 1.5s cubic-bezier(0.22, 1, 0.36, 1)';
-                        xpBar.style.width = `${endPct}%`;
-                    });
-                } else {
-                    requestAnimationFrame(() => {
-                        xpBar.style.transition = 'width 0.8s ease-in';
-                        xpBar.style.width = '100%';
-                        setTimeout(() => {
-                            xpBar.style.transition = 'none';
-                            xpBar.style.width = '0%';
-                            if (xpLevelVal) xpLevelVal.innerText = `Lv.${levelAfter}`;
-                            xpBar.offsetHeight;
-                            setTimeout(() => {
-                                xpBar.style.transition = 'width 1.0s cubic-bezier(0.22, 1, 0.36, 1)';
-                                xpBar.style.width = `${endPct}%`;
-                            }, 50);
-                        }, 850);
-                    });
-                }
-            }
-        } else {
-            if (xpSection) xpSection.style.display = 'none';
-        }
-
-        const list = document.getElementById('settlement-losses-list');
-        list.innerHTML = '';
-        
-        if (settlementChanges.length === 0) { 
-            const emptyHint = document.createElement('div');
-            emptyHint.className = 'loss-empty-hint';
-            emptyHint.innerText = '没有士兵损失。';
-            list.appendChild(emptyHint);
-        } else {
-            settlementChanges.forEach(change => {
-                const { type, loss, gain } = change;
-                const iconStyle = spriteFactory.getIconStyle(type);
-                const item = document.createElement('div');
-                item.className = 'loss-item';
-                
-                let countsHtml = `<div class="loss-count">${loss}</div>`;
-                if (gain > 0) countsHtml += `<div class="gain-count">+${gain}</div>`;
-                
-                item.innerHTML = `
-                    <div class="slot-icon" style="background-image: ${iconStyle.backgroundImage}; background-position: ${iconStyle.backgroundPosition}; background-size: ${iconStyle.backgroundSize}; image-rendering: pixelated; width: 32px; height: 32px;"></div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin: 2px 0;">
-                        ${countsHtml}
-                    </div>
-                    <div class="loss-name">${worldManager.getUnitDisplayName(type)}</div>
-                `;
-                list.appendChild(item);
-            });
-        }
-
-        // 隐藏大世界 HUD
-        const worldUI = document.getElementById('world-ui');
-        if (worldUI) worldUI.classList.add('hidden');
-
-        panel.classList.remove('hidden');
-
-        const returnBtn = document.getElementById('return-to-world-btn');
-        if (returnBtn) {
-            returnBtn.onclick = () => {
-                panel.classList.add('hidden');
-                if (worldUI) worldUI.classList.remove('hidden');
+    /**
+     * 由 React 结算面板调用：清理结算后的扫尾逻辑
+     */
+    finalizeSimpleSettlement() {
+        const result = this._lastSimpleResult;
+        if (!result) return;
 
                 const enemyId = worldManager.mapState.pendingBattleEnemyId;
                 if (enemyId) {
@@ -1439,8 +903,7 @@ export class WorldScene {
                 // 核心修复：回到大世界后重置寻路状态，防止意外位移
                 this.isNavigating = false;
                 this.currentPath = [];
-            };
-        }
+        this._lastSimpleResult = null;
     }
 
     stop() {
@@ -2019,84 +1482,14 @@ export class WorldScene {
     }
 
     /**
-     * 动态刷新左下角 HUD (支持多个城市)
+     * 动态刷新左下角 HUD (已迁移至 React)
      */
     refreshWorldHUD() {
-        const container = document.getElementById('world-hud-bottom-left');
-        if (!container) return;
+        // --- 已由 React 接管 (CityMiniCard.tsx, HeroMiniCard.tsx) ---
+    }
 
-        // 清空现有内容
-        container.innerHTML = '';
-
-        // 获取模板
-        const cityTpl = document.getElementById('tpl-hud-city');
-        const heroTpl = document.getElementById('tpl-hud-hero');
-
-        // 1. 获取所有属于玩家的城市
-        const playerCities = Object.values(worldManager.cities).filter(c => c.owner === 'player');
-
-        // 2. 为每个城市创建一个卡片
-        playerCities.forEach(city => {
-            if (!cityTpl) return;
-            const clone = cityTpl.content.cloneNode(true);
-            const cityCard = clone.querySelector('.hud-card');
-            cityCard.id = `card-city-${city.id}`;
-            
-            const iconStyle = spriteFactory.getIconStyle(city.getIconKey());
-            const portrait = cityCard.querySelector('.hud-portrait');
-            Object.assign(portrait.style, iconStyle);
-
-            cityCard.querySelector('.hud-name').innerText = city.name;
-            cityCard.querySelector('.hud-sub').innerText = city.id === 'main_city_1' ? '大本营' : '占领据点';
-
-            cityCard.onpointerup = (e) => {
-                e.stopPropagation(); // 防止触发底层的 pointerup
-                audioManager.play('ui_click', { volume: 0.6 });
-                console.log("[HUD] Opening city:", city.id);
-                this.openTownManagement(city.id);
-            };
-
-            container.appendChild(clone);
-        });
-
-        // 3. 添加英雄卡片 (始终在最后)
-        if (heroTpl) {
-            const clone = heroTpl.content.cloneNode(true);
-            const heroCard = clone.querySelector('.hud-card-hero');
-            const talentHint = clone.querySelector('#talent-hint');
-            const heroData = worldManager.heroData;
-            const heroIconStyle = spriteFactory.getIconStyle(heroData.id);
-
-            const portrait = heroCard.querySelector('.hud-portrait');
-            Object.assign(portrait.style, heroIconStyle);
-
-            heroCard.querySelector('#hud-hero-level').innerText = heroData.level;
-            
-            // 设置初始条状态
-            const hpBar = heroCard.querySelector('#hud-hero-hp-bar');
-            const mpBar = heroCard.querySelector('#hud-hero-mp-bar');
-            if (hpBar) hpBar.style.width = `${(heroData.hpCurrent / heroData.hpMax) * 100}%`;
-            if (mpBar) mpBar.style.width = `${(heroData.mpCurrent / heroData.mpMax) * 100}%`;
-
-            heroCard.onpointerup = (e) => {
-                e.stopPropagation();
-                audioManager.play('ui_click', { volume: 0.6 });
-                this.openHeroStats();
-            };
-
-            // 绑定天赋提醒点击事件
-            if (talentHint) {
-                talentHint.onpointerup = (e) => {
-                    e.stopPropagation();
-                    uiManager.toggleTalentPanel(true);
-                };
-            }
-
-            container.appendChild(clone);
-        }
-
-        // 刷新后同步更新英雄 HUD 状态 (例如天赋提醒)
-        this.updateHeroHUD();
+    updateHeroHUD() {
+        // --- 已由 React 接管 ---
     }
 
     checkInteractions() {
@@ -2160,8 +1553,7 @@ export class WorldScene {
      * 关闭神行千里传送菜单
      */
     closeTeleportMenu() {
-        const panel = document.getElementById('teleport-panel');
-        if (panel) panel.classList.add('hidden');
+        useUIStore.getState().closePanel();
         
         // 核心修复：如果有关联的祭坛，添加交互锁，防止由于站在祭坛上导致立即重复开启
         if (this.activeAltarId) {
@@ -2169,22 +1561,6 @@ export class WorldScene {
         }
         
         this.activeAltarId = null;
-
-        // --- 手机端适配：恢复 HUD ---
-        if (uiManager.isMobile) {
-            const heroPanel = document.getElementById('hero-stats-panel');
-            const talentPanel = document.getElementById('talent-panel');
-            const skillPanel = document.getElementById('skill-learn-panel');
-            const townPanel = document.getElementById('town-management-panel');
-            if (
-                (!heroPanel || heroPanel.classList.contains('hidden')) &&
-                (!talentPanel || talentPanel.classList.contains('hidden')) &&
-                (!skillPanel || skillPanel.classList.contains('hidden')) &&
-                (!townPanel || townPanel.classList.contains('hidden'))
-            ) {
-                uiManager.setHUDVisibility(true);
-            }
-        }
     }
 
     /**
@@ -2192,123 +1568,8 @@ export class WorldScene {
      * @param {string} altarId 如果是从祭坛打开的，传入祭坛 ID
      */
     openTeleportMenu(altarId = null) {
-        // --- 互斥逻辑：打开传送面板时，关闭其他所有面板 ---
-        const panelsToClose = [
-            'hero-stats-panel',
-            'skill-learn-panel',
-            'game-start-window',
-            'how-to-play-panel',
-            'town-management-panel',
-            'load-save-panel',
-            'save-game-panel'
-        ];
-        panelsToClose.forEach(id => {
-            const p = document.getElementById(id);
-            if (p) p.classList.add('hidden');
-        });
-
-        // 记录来源
         this.activeAltarId = altarId;
-
-        // 手机端适配
-        if (uiManager.isMobile) uiManager.setHUDVisibility(false);
-
-        const panel = document.getElementById('teleport-panel');
-        const container = document.getElementById('teleport-destinations');
-        if (!panel || !container) return;
-
-        // 清空列表
-        container.innerHTML = '';
-
-        // 收集目的地
-        const destinations = [];
-
-        // 1. 玩家拥有的城市
-        Object.values(worldManager.cities).forEach(city => {
-            if (city.owner === 'player') {
-                destinations.push({
-                    id: city.id,
-                    name: city.name,
-                    type: 'city',
-                    x: city.x,
-                    z: city.z,
-                    icon: city.getIconKey(),
-                    isActivated: true // 玩家拥有的城市默认就是激活的可传送点
-                });
-            }
-        });
-
-        // 2. 激活的传送祭坛
-        const altarNames = {
-            'TL': '西北祭坛',
-            'TR': '东北祭坛',
-            'BL': '西南祭坛',
-            'BR': '东南祭坛'
-        };
-
-        worldManager.mapState.entities.forEach(entity => {
-            if (entity.type === 'captured_building' && entity.buildingType === 'teleport_altar') {
-                const owner = entity.config.owner || 'none';
-                const isActivated = owner === 'player';
-                const isEnemyOccupied = owner !== 'none' && owner !== 'player';
-                const suffix = entity.id.split('_').pop(); // 获取 TL, TR, BL, BR
-                
-                destinations.push({
-                    id: entity.id,
-                    name: altarNames[suffix] || '古老祭坛',
-                    type: 'altar',
-                    x: entity.x,
-                    z: entity.z,
-                    icon: 'spell_altar_v2',
-                    isActivated: isActivated,
-                    isEnemyOccupied: isEnemyOccupied
-                });
-            }
-        });
-
-        // 渲染列表
-        destinations.forEach(dest => {
-            const card = document.createElement('div');
-            // 恢复正常逻辑：未激活或被敌人占据的祭坛显示锁定状态
-            card.className = `teleport-dest-card ${!dest.isActivated ? 'is-locked' : ''}`;
-            
-            let statusText = '未知';
-            if (dest.type === 'city') {
-                statusText = '城池';
-            } else {
-                if (dest.isActivated) statusText = '已占领';
-                else if (dest.isEnemyOccupied) statusText = '被敌方占据';
-                else statusText = '未激活';
-            }
-            
-            card.innerHTML = `
-                <div class="teleport-dest-icon" style="${this.getIconStyleString(dest.icon)}"></div>
-                <div class="teleport-dest-info">
-                    <span class="teleport-dest-name">${dest.name}</span>
-                    <span class="teleport-dest-type">${statusText}</span>
-                </div>
-            `;
-
-            card.onclick = () => {
-                if (!dest.isActivated) {
-                    if (dest.isEnemyOccupied) {
-                        worldManager.showNotification("该祭坛被敌方势力占据，无法传送。");
-                    } else {
-                        worldManager.showNotification("该祭坛尚未激活，无法传送。");
-                    }
-                    audioManager.play('ui_invalid', { volume: 0.8 });
-                    return;
-                }
-                audioManager.play('ui_teleport', { volume: 0.8 });
-                this.teleportTo(dest.x, dest.z);
-                this.closeTeleportMenu();
-                this.closeTownManagement();
-            };
-
-            container.appendChild(card);
-        });
-
-        panel.classList.remove('hidden');
+        useUIStore.getState().openPanel('teleport');
     }
 
     /**

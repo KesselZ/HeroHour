@@ -10,6 +10,8 @@ import { audioManager } from '../engine/AudioManager.js';
 import { worldManager } from '../core/WorldManager.js';
 import { terrainManager, TERRAIN_STYLES } from './TerrainManager.js';
 import { weatherManager } from '../systems/WeatherManager.js';
+import { useWorldStore } from '../store/worldStore';
+import { useUIStore } from '../store/uiStore';
 
 export class WorldStatusManager {
     // --- 0. 频率控制超参数 ---
@@ -65,7 +67,6 @@ export class WorldStatusManager {
 
     // --- 2. 状态存储 ---
     static activeSituationKeys = new Set(); // 当前生效的重大局势 ID
-    static eventHistory = [];               // 所有的传闻播报历史
     static usedEvilFactions = new Set();    // 永久记录已经登场过的势力 ID
     static firstKillFactions = new Set();   // 永久记录已经完成“首杀”的势力 ID
     static seasonalEventWeights = {};       // 季节事件的动态权重 (触发后衰减)
@@ -552,24 +553,20 @@ export class WorldStatusManager {
      * 内部处理：记录历史、派发播报事件
      */
     static _processEvent(event) {
-        this.eventHistory.unshift(event);
-        if (this.eventHistory.length > 50) this.eventHistory.pop(); // 限制历史记录
+        // 使用 Zustand Store 记录历史 (响应式)
+        useWorldStore.getState().addEvent(event);
 
         console.log(`%c[江湖播报] ${event.title}: ${event.text}`, "color: #d4af37");
         
-        // 派发全局事件给 UI
+        // 派发全局事件给 UI (用于气泡弹窗)
         window.dispatchEvent(new CustomEvent('world-broadcast', { detail: event }));
     }
 
-    // --- UI 逻辑维持 ---
-
-    /**
-     * 获取存档数据
-     */
+    // --- 存档逻辑维持 ---
     static getSaveData() {
         return {
             activeSituationKeys: Array.from(this.activeSituationKeys),
-            eventHistory: this.eventHistory,
+            eventHistory: useWorldStore.getState().eventHistory,
             usedEvilFactions: Array.from(this.usedEvilFactions), // 记录已登场的势力
             firstKillFactions: Array.from(this.firstKillFactions), // 记录已首杀的势力
             seasonalEventWeights: this.seasonalEventWeights, // 记录季节事件权重
@@ -588,7 +585,7 @@ export class WorldStatusManager {
         }
         
         if (data.eventHistory) {
-            this.eventHistory = data.eventHistory;
+            useWorldStore.getState().setEvents(data.eventHistory);
         }
 
         if (data.usedEvilFactions) {
@@ -612,145 +609,4 @@ export class WorldStatusManager {
         console.log("%c[系统] WorldStatusManager 存档数据恢复完毕", "color: #4CAF50; font-weight: bold");
     }
 
-    static initUI() {
-        const horn = document.getElementById('broadcast-horn');
-        const historyPanel = document.getElementById('world-event-history-panel');
-        const closeBtn = document.getElementById('close-event-history');
-
-        if (horn) {
-            horn.onclick = () => {
-                audioManager.play('ui_click');
-                this.toggleHistoryPanel(true);
-            };
-        }
-
-        if (closeBtn) {
-            closeBtn.onclick = () => {
-                // 如果在 main.js 中定义了全局 closePanelWithHUD，则使用它以保持逻辑统一
-                if (window.closePanelWithHUD) {
-                    window.closePanelWithHUD('world-event-history-panel');
-                } else {
-                    audioManager.play('ui_click');
-                    this.toggleHistoryPanel(false);
-                }
-            };
-        }
-
-        window.addEventListener('world-broadcast', (e) => {
-            const event = e.detail;
-            this.showBroadcastBubble(event);
-            
-            // --- 修复：如果历史面板已打开，则通过添加 DOM 元素实现动画刷新 ---
-            const panel = document.getElementById('world-event-history-panel');
-            const isPanelOpen = panel && !panel.classList.contains('hidden');
-
-            if (isPanelOpen) {
-                this.addEventToHistoryUI(event);
-                this.updateNotificationDot(false);
-            } else {
-                this.updateNotificationDot(true);
-            }
-            
-            this.shakeHorn();
-        });
-    }
-
-    /**
-     * 动态向 UI 列表中插入一个新事件（带动画）
-     */
-    static addEventToHistoryUI(event) {
-        const list = document.getElementById('event-history-list');
-        if (!list) return;
-
-        // 如果之前是空的，先清空提示
-        if (list.querySelector('.history-empty-hint')) {
-            list.innerHTML = '';
-        }
-
-        const item = document.createElement('div');
-        item.className = 'history-item';
-        item.innerHTML = `
-            <div class="history-item-header">
-                <span class="history-item-time">天宝 ${event.year} 年 · ${event.season}</span>
-                <span class="history-item-tag ${event.type}">${event.title}</span>
-            </div>
-            <div class="history-item-content">
-                ${event.text}
-            </div>
-        `;
-
-        // 插入到最前面
-        list.insertBefore(item, list.firstChild);
-
-        // 如果条目过多，移除末尾多余的 DOM 元素（保持 UI 简洁）
-        if (list.children.length > 50) {
-            list.lastChild.remove();
-        }
-    }
-
-    static toggleHistoryPanel(show) {
-        const panel = document.getElementById('world-event-history-panel');
-        if (!panel) return;
-        if (show) {
-            this.renderHistoryList();
-            panel.classList.remove('hidden');
-            this.updateNotificationDot(false);
-        } else {
-            panel.classList.add('hidden');
-        }
-    }
-
-    static renderHistoryList() {
-        const list = document.getElementById('event-history-list');
-        if (!list) return;
-        if (this.eventHistory.length === 0) {
-            list.innerHTML = '<div class="history-empty-hint">暂无江湖传闻...</div>';
-            return;
-        }
-        list.innerHTML = this.eventHistory.map(event => `
-            <div class="history-item">
-                <div class="history-item-header">
-                    <span class="history-item-time">天宝 ${event.year} 年 · ${event.season}</span>
-                    <span class="history-item-tag ${event.type}">${event.title}</span>
-                </div>
-                <div class="history-item-content">
-                    ${event.text}
-                </div>
-            </div>
-        `).join('');
-    }
-
-    static showBroadcastBubble(event) {
-        const container = document.getElementById('broadcast-bubble-container');
-        if (!container) return;
-
-        const bubble = document.createElement('div');
-        bubble.className = 'broadcast-bubble';
-        
-        bubble.innerHTML = `
-            <span class="event-tag ${event.type}">${event.title}</span>
-            <div class="event-text">${event.text}</div>
-        `;
-        container.appendChild(bubble);
-        setTimeout(() => {
-            bubble.classList.add('fade-out');
-            setTimeout(() => bubble.remove(), 500);
-        }, 4000);
-    }
-
-    static updateNotificationDot(show) {
-        const dot = document.getElementById('broadcast-dot');
-        if (dot) {
-            if (show) dot.classList.remove('hidden');
-            else dot.classList.add('hidden');
-        }
-    }
-
-    static shakeHorn() {
-        const horn = document.getElementById('broadcast-horn');
-        if (horn) {
-            horn.classList.add('shake');
-            setTimeout(() => horn.classList.remove('shake'), 2000);
-        }
-    }
 }
